@@ -53,25 +53,6 @@ The app will be available at `http://localhost:3000`
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome
 
-## Project Structure
-
-```
-paraules/
-├── src/
-│   ├── components/     # React components
-│   │   └── ui/         # shadcn/ui components
-│   ├── data/           # Data files (catalan-words.json generated here)
-│   ├── lib/            # Utility functions
-│   │   └── crossword-generator.ts  # Crossword generation logic
-│   ├── routes/         # TanStack Router routes
-│   │   ├── __root.tsx  # Root layout
-│   │   └── index.tsx   # Main game page
-│   └── styles.css      # Global styles
-├── scripts/
-│   └── download-dictionary.ts  # Dictionary download script
-└── public/             # Static assets
-```
-
 ## How It Works
 
 ### Dictionary Download
@@ -169,6 +150,8 @@ pnpm run download-dict
 This will fetch the latest version from the Softcatala repository.
 
 ## License
+
+See [LICENSE](LICENSE)
 
 This project uses dictionary data from Softcatala, which is licensed under LGPL-2.1 and GPL-2.0.
 
