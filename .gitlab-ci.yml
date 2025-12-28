@@ -2,15 +2,15 @@ stages:
   - check
   - deploy
 
-sast:
-  stage: check
-
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
 
 variables:
   SECRET_DETECTION_ENABLED: "true"
+
+sast:
+  stage: check
 
 secret_detection:
   stage: check
@@ -25,12 +25,9 @@ lint:
     - pnpm lint
     - pnpm check
     - pnpm typecheck
-  artifacts:
+  cache:
     paths:
       - node_modules
-      - test-report.xml
-    reports:
-      junit: test-report.xml
 
 deploy:
   stage: deploy
