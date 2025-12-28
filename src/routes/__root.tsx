@@ -7,8 +7,8 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import Header from "@/components/Header";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "next-themes";
+import Header from "@/components/header";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -43,12 +43,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
 	return (
-		<html lang="ca">
+		<html lang="ca" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
 			<body>
-				<ThemeProvider defaultTheme="system" storageKey="paraules-theme">
+				<ThemeProvider storageKey="paraules-theme" attribute="class">
 					<Header />
 					<Outlet />
 					<TanStackDevtools
