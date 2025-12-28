@@ -11,7 +11,7 @@ export default function Header() {
 						to="/"
 						className="flex items-center gap-3 hover:opacity-90 transition-opacity"
 					>
-						<Logo className="w-6 h-6" />
+						<Logo className="w-6 h-6 opacity-50" />
 						<h1 className="text-2xl font-bold">Paraules</h1>
 					</Link>
 					<ThemeToggle />

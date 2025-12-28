@@ -2,12 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
 	CheckCircle2,
 	Delete,
-	RefreshCw,
+	Lightbulb,
 	Shuffle,
 	Trophy,
 	XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import allWords from "@/data/catalan-words.json";
@@ -17,6 +17,7 @@ import {
 	generateCrossword,
 	getRandomLetterSet,
 	normalizeWord,
+	SeededRandom,
 	shuffleArray,
 	wordsMatch,
 } from "@/lib/crossword-generator";
@@ -28,20 +29,46 @@ export const Route = createFileRoute("/")({
 function Home() {
 	const [crossword, setCrossword] = useState<CrosswordGrid | null>(null);
 	const [guessedWords, setGuessedWords] = useState<Set<number>>(new Set());
+	const [guesses, setGuesses] = useState<string[]>([]);
+	const [hintsUsed, setHintsUsed] = useState(0);
+	const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [message, setMessage] = useState<{
 		text: string;
 		type: "success" | "error" | "info";
 	} | null>(null);
-	const [wordList, setWordList] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
+
+	const seed = useMemo(() => {
+		const today = new Date();
+		return (
+			today.getFullYear() * 10000 +
+			(today.getMonth() + 1) * 100 +
+			today.getDate()
+		);
+	}, []);
 
 	// Load words and generate crossword
 	useEffect(() => {
 		try {
 			const words = allWords as string[];
-			setWordList(words);
+			const random = new SeededRandom(seed);
+
+			// Cleanup old states
+			const keysToRemove: string[] = [];
+			for (let i = 0; i < localStorage.length; i++) {
+				const key = localStorage.key(i);
+				if (
+					key?.startsWith("paraules-state-") &&
+					key !== `paraules-state-${seed}`
+				) {
+					keysToRemove.push(key);
+				}
+			}
+			for (const key of keysToRemove) {
+				localStorage.removeItem(key);
+			}
 
 			// Generate initial crossword
 			let letters: string[] = [];
@@ -49,11 +76,11 @@ function Home() {
 			let attempts = 0;
 
 			while (attempts < 30) {
-				letters = getRandomLetterSet(words);
+				letters = getRandomLetterSet(words, random);
 				const filteredWords = filterWordsByLetters(words, letters);
 
 				try {
-					const result = generateCrossword(filteredWords, 5, 15);
+					const result = generateCrossword(filteredWords, 5, 15, random);
 					const usedLetters = new Set(
 						result.words.flatMap((w) => normalizeWord(w.word).split("")),
 					);
@@ -70,20 +97,64 @@ function Home() {
 
 			if (!newCrossword) throw new Error("Failed to generate crossword");
 
-			setShuffledLetters(shuffleArray(letters));
+			setShuffledLetters(random.shuffleArray(letters));
 			setCrossword(newCrossword);
+
+			// Load saved state for today
+			const savedState = localStorage.getItem(`paraules-state-${seed}`);
+			if (savedState) {
+				try {
+					const {
+						guessedWords: savedGuessedWords,
+						guesses: savedGuesses,
+						hintsUsed: savedHintsUsed,
+						hintedCells: savedHintedCells,
+						shuffledLetters: savedShuffledLetters,
+					} = JSON.parse(savedState);
+					if (savedGuessedWords) setGuessedWords(new Set(savedGuessedWords));
+					if (savedGuesses) setGuesses(savedGuesses);
+					if (savedHintsUsed) setHintsUsed(savedHintsUsed);
+					if (savedHintedCells) setHintedCells(new Set(savedHintedCells));
+					if (savedShuffledLetters) setShuffledLetters(savedShuffledLetters);
+				} catch (e) {
+					console.error("Failed to parse saved state:", e);
+				}
+			}
+
 			setLoading(false);
 		} catch (error) {
 			console.error("Failed to load words:", error);
 			setMessage({ text: "Error carregant el diccionari", type: "error" });
 			setLoading(false);
 		}
-	}, []);
+	}, [seed]);
+
+	// Save game state to localStorage
+	useEffect(() => {
+		if (!crossword) return;
+
+		const state = {
+			guessedWords: Array.from(guessedWords),
+			guesses,
+			hintsUsed,
+			hintedCells: Array.from(hintedCells),
+			shuffledLetters,
+		};
+		localStorage.setItem(`paraules-state-${seed}`, JSON.stringify(state));
+	}, [
+		guessedWords,
+		guesses,
+		hintsUsed,
+		hintedCells,
+		shuffledLetters,
+		crossword,
+		seed,
+	]);
 
 	const revealedCells = useMemo(() => {
 		if (!crossword) return new Set<string>();
 
-		const cells = new Set<string>();
+		const cells = new Set<string>(hintedCells);
 		for (const wordId of guessedWords) {
 			const word = crossword.words[wordId];
 			for (let i = 0; i < word.word.length; i++) {
@@ -95,7 +166,7 @@ function Home() {
 			}
 		}
 		return cells;
-	}, [crossword, guessedWords]);
+	}, [crossword, guessedWords, hintedCells]);
 
 	const handleGuess = (e?: React.FormEvent) => {
 		if (e) e.preventDefault();
@@ -103,6 +174,7 @@ function Home() {
 		if (!crossword || !currentGuess.trim()) return;
 
 		const guess = currentGuess.trim();
+		setGuesses((prev) => [...prev, guess]);
 
 		// Check if word matches any unguessed words
 		const matchingWord = crossword.words.find(
@@ -126,7 +198,7 @@ function Home() {
 					});
 				}, 500);
 			}
-		} else if (guess.match(/^[a-zA-Z]+$/)) {
+		} else if (guess.match(/^[a-zA-ZçÇ]+$/)) {
 			setMessage({
 				text: `<b>${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}</b> no hi és`,
 				type: "error",
@@ -141,6 +213,7 @@ function Home() {
 		}
 	};
 
+	/*
 	const handleNewGame = () => {
 		if (wordList.length === 0) return;
 
@@ -161,7 +234,7 @@ function Home() {
 					newCrossword = result;
 					break;
 				}
-			} catch (e) {
+			} catch (_e) {
 				// continue
 			}
 			attempts++;
@@ -178,6 +251,7 @@ function Home() {
 		setCurrentGuess("");
 		setMessage({ text: "Nou joc generat!", type: "info" });
 	};
+	*/
 
 	const handleLetterClick = (letter: string) => {
 		setCurrentGuess((prev) => prev + letter);
@@ -189,6 +263,29 @@ function Home() {
 
 	const handleShuffle = () => {
 		setShuffledLetters(shuffleArray(shuffledLetters));
+	};
+
+	const handleHint = () => {
+		if (!crossword || hintsUsed >= 3) return;
+
+		const hiddenCells: string[] = [];
+		for (let r = 0; r < crossword.grid.length; r++) {
+			for (let c = 0; c < crossword.grid[r].length; c++) {
+				if (crossword.grid[r][c]) {
+					const key = `${r},${c}`;
+					if (!revealedCells.has(key)) {
+						hiddenCells.push(key);
+					}
+				}
+			}
+		}
+
+		if (hiddenCells.length > 0) {
+			const randomKey =
+				hiddenCells[Math.floor(Math.random() * hiddenCells.length)];
+			setHintedCells((prev) => new Set([...prev, randomKey]));
+			setHintsUsed((prev) => prev + 1);
+		}
 	};
 
 	if (loading) {
@@ -217,9 +314,9 @@ function Home() {
 						<p className="dark:text-gray-300">
 							No s'ha pogut generar el joc de mots encreuats
 						</p>
-						<Button onClick={handleNewGame} className="mt-4">
+						{/* <Button onClick={handleNewGame} className="mt-4">
 							Tornar a intentar
-						</Button>
+						</Button> */}
 					</CardContent>
 				</Card>
 			</div>
@@ -234,19 +331,15 @@ function Home() {
 			<div className="max-w-7xl mx-auto">
 				{/* Progress */}
 				<div className="mb-6">
-					<div className="flex items-center justify-between mb-2">
-						<span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-							Progrés: {guessedWords.size} / {crossword.words.length}
+					<div className="flex items-center justify-between mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+						<span>
+							{guessedWords.size} / {crossword.words.length} paraules trobades
 						</span>
-						<Button
-							onClick={handleNewGame}
-							variant="outline"
-							size="sm"
-							className="gap-2"
-						>
-							<RefreshCw className="w-4 h-4" />
-							Nou joc
-						</Button>
+						<div className="flex gap-4 opacity-70">
+							<span>
+								{guesses.length} intent{guesses.length === 1 ? "" : "s"}
+							</span>
+						</div>
 					</div>
 					<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
 						<div
@@ -282,44 +375,45 @@ function Home() {
 					{/* Crossword Grid */}
 					<div className="lg:col-span-2">
 						<Card>
-							<CardContent>
-								<div className="overflow-x-auto">
-									<div className="inline-block min-w-full">
-										<div
-											className="grid gap-1"
-											style={{
-												gridTemplateColumns: `repeat(${crossword.cols}, minmax(0, 1fr))`,
-											}}
-										>
-											{crossword.grid.map((row, rowIdx) =>
-												row.map((cell, colIdx) => {
-													const key = `${rowIdx},${colIdx}`;
-													const isRevealed = revealedCells.has(key);
+							<CardContent className="p-2 sm:p-4 md:p-6">
+								<div
+									className="flex items-center justify-center w-full @container"
+									style={{ "--cols": crossword.cols } as CSSProperties}
+								>
+									<div
+										className="grid gap-0.5 sm:gap-1 w-full max-w-2xl mx-auto"
+										style={{
+											gridTemplateColumns: `repeat(${crossword.cols}, 1fr)`,
+										}}
+									>
+										{crossword.grid.map((row, rowIdx) =>
+											row.map((cell, colIdx) => {
+												const key = `${rowIdx},${colIdx}`;
+												const isRevealed = revealedCells.has(key);
 
-													if (!cell) {
-														return (
-															<div
-																key={key}
-																className="w-8 h-8 md:w-10 md:h-10 bg-transparent"
-															/>
-														);
-													}
-
+												if (!cell) {
 													return (
 														<div
 															key={key}
-															className={`w-8 h-8 md:w-10 md:h-10 border-2 flex items-center justify-center font-bold text-sm md:text-base transition-all duration-300 ${
-																isRevealed
-																	? "bg-indigo-100 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-500 text-indigo-900 dark:text-indigo-200"
-																	: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600"
-															}`}
-														>
-															{isRevealed ? cell.letter.toUpperCase() : ""}
-														</div>
+															className="aspect-square bg-transparent"
+														/>
 													);
-												}),
-											)}
-										</div>
+												}
+
+												return (
+													<div
+														key={key}
+														className={`aspect-square border rounded-sm sm:rounded-md sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-all duration-300 ${
+															isRevealed
+																? "bg-indigo-100 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-500 text-indigo-900 dark:text-indigo-200"
+																: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600"
+														}`}
+													>
+														{isRevealed ? cell.letter.toUpperCase() : ""}
+													</div>
+												);
+											}),
+										)}
 									</div>
 								</div>
 							</CardContent>
@@ -357,23 +451,23 @@ function Home() {
 										</div>
 
 										{/* Actions */}
-										<div className="flex gap-4 w-full">
+										<div className="grid grid-cols-2 gap-4 w-full">
 											<Button
 												variant="ghost"
 												onClick={handleShuffle}
-												className="flex-1 gap-2"
+												className="gap-2"
 											>
 												<Shuffle className="w-4 h-4" />
-												Barreja
+												Barrejar
 											</Button>
 											<Button
 												variant="ghost"
 												onClick={handleBackspace}
-												className="flex-1 gap-2"
+												className="gap-2"
 												disabled={currentGuess.length === 0}
 											>
 												<Delete className="w-4 h-4" />
-												Esborra
+												Esborrar
 											</Button>
 										</div>
 
@@ -385,10 +479,20 @@ function Home() {
 										>
 											Comprovar
 										</Button>
+
+										<Button
+											variant="outline"
+											onClick={handleHint}
+											disabled={hintsUsed >= 3 || isComplete}
+											className="col-span-2 gap-2 border-amber-200 dark:border-amber-900 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+										>
+											<Lightbulb
+												className={`w-4 h-4 ${hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
+											/>
+											Pista ({3 - hintsUsed}{" "}
+											{3 - hintsUsed === 1 ? "restant" : "restants"})
+										</Button>
 									</div>
-									<p className="text-sm text-center text-gray-600 dark:text-gray-400 mt-6">
-										Toca les lletres per formar paraules
-									</p>
 								</CardContent>
 							</Card>
 						)}
@@ -411,8 +515,8 @@ function Home() {
 												className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
 											>
 												<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
-												<span className="font-medium text-green-900 dark:text-green-300">
-													{word.word}
+												<span className="font-medium text-green-900 dark:text-green-300 tracking-widest">
+													{word.word.toUpperCase()}
 												</span>
 												<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
 													{word.word.length} lletres
@@ -422,20 +526,39 @@ function Home() {
 
 									{crossword.words
 										.filter((w) => !guessedWords.has(w.id))
-										.map((word) => (
-											<div
-												key={word.id}
-												className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
-											>
-												<div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
-												<span className="text-gray-400 dark:text-gray-500">
-													{"?".repeat(word.word.length)}
-												</span>
-												<span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-													{word.word.length} lletres
-												</span>
-											</div>
-										))}
+										.map((word) => {
+											const displayedWord = word.word
+												.split("")
+												.map((char, i) => {
+													const row =
+														word.direction === "horizontal"
+															? word.startRow
+															: word.startRow + i;
+													const col =
+														word.direction === "horizontal"
+															? word.startCol + i
+															: word.startCol;
+													return revealedCells.has(`${row},${col}`)
+														? char.toUpperCase()
+														: "_";
+												})
+												.join("");
+
+											return (
+												<div
+													key={word.id}
+													className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+												>
+													<div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+													<span className="text-gray-400 dark:text-gray-500 font-mono tracking-widest">
+														{displayedWord}
+													</span>
+													<span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+														{word.word.length} lletres
+													</span>
+												</div>
+											);
+										})}
 								</div>
 							</CardContent>
 						</Card>
@@ -450,16 +573,9 @@ function Home() {
 								</CardHeader>
 								<CardContent className="text-center">
 									<p className="text-gray-700 dark:text-gray-300 mb-4">
-										Has guanyat!
+										Has guanyat en {guesses.length} intents!
+										{hintsUsed > 0 && ` I has fet servir ${hintsUsed} pistes.`}
 									</p>
-									<Button
-										onClick={handleNewGame}
-										size="lg"
-										className="w-full gap-2"
-									>
-										<RefreshCw className="w-5 h-5" />
-										Jugar de nou
-									</Button>
 								</CardContent>
 							</Card>
 						)}

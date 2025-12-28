@@ -1,5 +1,33 @@
 // Crossword generator for Catalan word game
 
+/**
+ * Seeded random number generator for reproducible crosswords
+ */
+export class SeededRandom {
+	private seed: number;
+
+	constructor(seed: number) {
+		this.seed = seed;
+	}
+
+	// Mulberry32 algorithm
+	next(): number {
+		let t = (this.seed += 0x6d2b79f5);
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	}
+
+	shuffleArray<T>(array: T[]): T[] {
+		const newArray = [...array];
+		for (let i = newArray.length - 1; i > 0; i--) {
+			const j = Math.floor(this.next() * (i + 1));
+			[newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+		}
+		return newArray;
+	}
+}
+
 export interface GridCell {
 	letter: string;
 	wordIds: number[];
@@ -36,7 +64,9 @@ export function normalizeWord(word: string): string {
 	return word
 		.toLowerCase()
 		.normalize("NFD")
-		.replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+		.replace(/c\u0327/g, "ç") // Keep ç as a distinct letter
+		.replace(/[\u0300-\u036f]/g, "") // Remove other diacritics
+		.normalize("NFC")
 		.replace(/[·]/g, ""); // Remove middle dot
 }
 
@@ -54,12 +84,15 @@ export function generateCrossword(
 	words: string[],
 	minWords = 5,
 	maxWords = 15,
+	random: SeededRandom = new SeededRandom(Date.now()),
 ): CrosswordGrid {
 	// Filter words: 3-12 letters, only letters
-	const validWords = words
-		.filter((w) => w.length >= 3 && w.length <= 12)
-		.filter((w) => /^[a-záàéèíïóòúüçñ·]+$/i.test(w))
-		.sort(() => Math.random() - 0.5) // Shuffle
+	const validWords = random
+		.shuffleArray(
+			words
+				.filter((w) => w.length >= 3 && w.length <= 12)
+				.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w)),
+		)
 		.slice(0, Math.min(words.length, maxWords * 3)); // Take more than needed for better chances
 
 	if (validWords.length === 0) {
@@ -70,12 +103,9 @@ export function generateCrossword(
 	for (let attempt = 0; attempt < 50; attempt++) {
 		const result = tryGenerateCrossword(validWords, minWords, maxWords);
 		if (result && result.words.length >= minWords) {
-			console.debug("Words:", result.words);
 			return result;
 		}
 	}
-
-	console.debug("Generating fallback crossword", validWords);
 
 	// Fallback: create a simple crossword with the first word
 	return createFallbackCrossword(validWords.slice(0, minWords));
@@ -445,7 +475,10 @@ export function filterWordsByLetters(
 /**
  * Pick 6 random letters that produce a good amount of words
  */
-export function getRandomLetterSet(words: string[]): string[] {
+export function getRandomLetterSet(
+	words: string[],
+	random: SeededRandom = new SeededRandom(Date.now()),
+): string[] {
 	// Try to find a word with 6 unique letters to use as our set
 	const candidates = words.filter((w) => {
 		const normalized = normalizeWord(w);
@@ -459,14 +492,14 @@ export function getRandomLetterSet(words: string[]): string[] {
 
 	if (candidates.length > 0) {
 		const randomWord =
-			candidates[Math.floor(Math.random() * candidates.length)];
+			candidates[Math.floor(random.next() * candidates.length)];
 		const normalized = normalizeWord(randomWord);
 		const chars = Array.from(new Set(normalized.split("")));
-		return shuffleArray(chars).slice(0, 6);
+		return random.shuffleArray(chars).slice(0, 6);
 	}
 
 	// Fallback: common Catalan letters
-	return shuffleArray("aeioustrln".split("")).slice(0, 6);
+	return random.shuffleArray("aeioustrln".split("")).slice(0, 6);
 }
 
 /**
