@@ -9,6 +9,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
+import { Toaster } from "@/components/ui/sonner";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -51,6 +52,7 @@ function RootDocument() {
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
 					<Header />
 					<Outlet />
+					<Toaster position="top-center" />
 					<TanStackDevtools
 						config={{
 							position: "bottom-right",

@@ -1,12 +1,6 @@
-import {
-	CheckCircle2,
-	Delete,
-	Lightbulb,
-	Shuffle,
-	Trophy,
-	XCircle,
-} from "lucide-react";
+import { CheckCircle2, Delete, Lightbulb, Shuffle } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import allWords from "@/data/catalan-words.json";
@@ -28,10 +22,7 @@ export function Daily() {
 	const [hintsUsed, setHintsUsed] = useState(0);
 	const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
 	const [currentGuess, setCurrentGuess] = useState("");
-	const [message, setMessage] = useState<{
-		text: string;
-		type: "success" | "error" | "info";
-	} | null>(null);
+
 	const [loading, setLoading] = useState(true);
 	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
 
@@ -119,7 +110,7 @@ export function Daily() {
 			setLoading(false);
 		} catch (error) {
 			console.error("Failed to load words:", error);
-			setMessage({ text: "Error carregant el diccionari", type: "error" });
+			toast.error("Error carregant el diccionari");
 			setLoading(false);
 		}
 	}, [seed]);
@@ -178,32 +169,32 @@ export function Daily() {
 
 		if (matchingWord) {
 			setGuessedWords(new Set([...guessedWords, matchingWord.id]));
-			setMessage({
-				text: `Correcte! Has trobat <b>${matchingWord.word}</b>`,
-				type: "success",
-			});
+			toast.success(
+				<span>
+					Correcte! Has trobat <b>{matchingWord.word}</b>
+				</span>,
+			);
 			setCurrentGuess("");
 
 			// Check if game is complete
 			if (guessedWords.size + 1 === crossword.words.length) {
 				setTimeout(() => {
-					setMessage({
-						text: "🎉 Enhorabona! Has completat el joc!",
-						type: "success",
-					});
+					toast.success("🎉 Enhorabona! Has completat el joc!");
 				}, 500);
 			}
 		} else if (guess.match(/^[a-zA-ZçÇ]+$/)) {
-			setMessage({
-				text: `<b>${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}</b> no hi és`,
-				type: "error",
-			});
+			toast.error(
+				<span>
+					<b>
+						{guess.slice(0, 1).toUpperCase()}
+						{guess.slice(1).toLowerCase()}
+					</b>{" "}
+					no hi és
+				</span>,
+			);
 			setCurrentGuess("");
 		} else {
-			setMessage({
-				text: `La paraula no és vàlida`,
-				type: "error",
-			});
+			toast.error("La paraula no és vàlida");
 			setCurrentGuess("");
 		}
 	};
@@ -236,7 +227,7 @@ export function Daily() {
 		}
 
 		if (!newCrossword) {
-			setMessage({ text: "No s'ha pogut generar un joc vàlid", type: "error" });
+			toast.error("No s'ha pogut generar un joc vàlid");
 			return;
 		}
 
@@ -244,7 +235,7 @@ export function Daily() {
 		setCrossword(newCrossword);
 		setGuessedWords(new Set());
 		setCurrentGuess("");
-		setMessage({ text: "Nou joc generat!", type: "info" });
+		toast.info("Nou joc generat!");
 	};
 	*/
 
@@ -343,28 +334,6 @@ export function Daily() {
 						/>
 					</div>
 				</div>
-
-				{/* Message */}
-				{message && (
-					<div
-						className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
-							message.type === "success"
-								? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-								: message.type === "error"
-									? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
-									: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
-						}`}
-					>
-						{message.type === "success" && <CheckCircle2 className="w-5 h-5" />}
-						{message.type === "error" && <XCircle className="w-5 h-5" />}
-						{message.type === "info" && <Trophy className="w-5 h-5" />}
-						<span
-							className="font-medium"
-							// biome-ignore lint/security/noDangerouslySetInnerHtml: This is not direct user input, only guessable text can be part of the message, html markup is added later
-							dangerouslySetInnerHTML={{ __html: message.text }}
-						/>
-					</div>
-				)}
 
 				<div className="grid lg:grid-cols-3 gap-6">
 					{/* Crossword Grid */}
