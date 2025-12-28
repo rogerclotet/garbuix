@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Header() {
@@ -10,7 +11,7 @@ export default function Header() {
 						to="/"
 						className="flex items-center gap-3 hover:opacity-90 transition-opacity"
 					>
-						<div className="text-2xl">🎯</div>
+						<Logo className="w-6 h-6" />
 						<h1 className="text-2xl font-bold">Paraules</h1>
 					</Link>
 					<ThemeToggle />
