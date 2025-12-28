@@ -1,9 +1,9 @@
 stages:
-  - test
-  - secret-detection
+  - check
+  - deploy
 
 sast:
-  stage: test
+  stage: check
 
 include:
   - template: Security/SAST.gitlab-ci.yml
@@ -13,4 +13,32 @@ variables:
   SECRET_DETECTION_ENABLED: "true"
 
 secret_detection:
-  stage: secret-detection
+  stage: check
+
+lint:
+  stage: check
+  image: node:25.2-slim
+  before_script:
+    - npm install -g pnpm@latest-10
+    - pnpm install
+  script:
+    - pnpm lint
+    - pnpm check
+    - pnpm typecheck
+  artifacts:
+    paths:
+      - node_modules
+      - test-report.xml
+    reports:
+      junit: test-report.xml
+
+deploy:
+  stage: deploy
+  image: alpine
+  before_script:
+    - apk add openssh-client sshpass
+  script:
+    - chmod +x scripts/deploy.sh
+    - scripts/deploy.sh
+  only:
+    - main

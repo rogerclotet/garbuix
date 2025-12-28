@@ -1,6 +1,6 @@
 # Paraules
 
-A responsive web application for a Catalan crossword-style word game built with TanStack Start.
+A responsive web application for a Catalan crossword-style word game.
 
 ## Features
 
@@ -11,15 +11,13 @@ A responsive web application for a Catalan crossword-style word game built with 
 - 📱 Fully responsive design
 - 🎨 Modern UI with Tailwind CSS and shadcn/ui components
 - 🌓 Dark mode with system preference detection and manual toggle
-- ⚡ Fast performance with TanStack Start
 
 ## How to Play
 
 1. Look at the crossword grid (letters are hidden initially)
 2. Type a word you think appears in the crossword
-3. Write words without accents or punctuation (e.g., "pare" instead of "pare")
-4. When you guess correctly, the word reveals on the grid
-5. Complete the puzzle by finding all words!
+3. When you guess correctly, the word reveals on the grid
+4. Complete the puzzle by finding all words!
 
 ## Setup
 
@@ -35,10 +33,10 @@ A responsive web application for a Catalan crossword-style word game built with 
 pnpm install
 
 # Download the Catalan dictionary (required before first run)
-pnpm run download-dict
+pnpm download-dict
 
 # Start the development server
-pnpm run dev
+pnpm dev
 ```
 
 The app will be available at `http://localhost:3000`
@@ -52,6 +50,7 @@ The app will be available at `http://localhost:3000`
 - `pnpm run format` - Format code with Biome
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome
+- `pnpm run typecheck` - Check TypeScript types
 
 ## How It Works
 

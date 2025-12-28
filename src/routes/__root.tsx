@@ -55,7 +55,8 @@ function RootDocument() {
 					<Toaster position="top-center" />
 					<TanStackDevtools
 						config={{
-							position: "bottom-right",
+							position: "bottom-left",
+							hideUntilHover: true,
 						}}
 						plugins={[
 							{
