@@ -121,9 +121,11 @@ function tryGenerateCrossword(
 	const grid: Map<string, GridCell> = new Map();
 
 	// Place first word horizontally in the middle
+	const MAX_GRID_SIZE = 15;
 	const firstWord = words[0];
-	const startRow = 10;
-	const startCol = 10;
+	// Place the first word around the center of the potential 15x15 grid
+	const startRow = Math.floor((MAX_GRID_SIZE - firstWord.length) / 2);
+	const startCol = Math.floor((MAX_GRID_SIZE - firstWord.length) / 2);
 
 	placements.push({
 		id: 0,
@@ -269,8 +271,15 @@ function isValidPlacement(
 	direction: "horizontal" | "vertical",
 	grid: Map<string, GridCell>,
 ): boolean {
+	const MAX_GRID_SIZE = 15;
+
 	// Check bounds
-	if (startRow < 0 || startCol < 0 || startRow > 50 || startCol > 50) {
+	if (
+		startRow < 0 ||
+		startCol < 0 ||
+		(direction === "horizontal" && startCol + word.length > MAX_GRID_SIZE) ||
+		(direction === "vertical" && startRow + word.length > MAX_GRID_SIZE)
+	) {
 		return false;
 	}
 

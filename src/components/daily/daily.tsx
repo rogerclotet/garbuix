@@ -29,7 +29,7 @@ export function Daily() {
 	const seed = useMemo(() => {
 		const today = new Date();
 		return (
-			today.getFullYear() * 10000 +
+			(today.getFullYear() - 2000) * 10000 +
 			(today.getMonth() + 1) * 100 +
 			today.getDate()
 		);
@@ -313,7 +313,7 @@ export function Daily() {
 	const isComplete = guessedWords.size === crossword.words.length;
 
 	return (
-		<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 p-4 md:p-8 transition-colors">
+		<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8 transition-colors">
 			<div className="max-w-7xl mx-auto">
 				{/* Progress */}
 				<div className="mb-6">
@@ -385,28 +385,28 @@ export function Daily() {
 					</div>
 
 					{/* Guess Form and Word List */}
-					<div className="space-y-6">
+					<div className="lg:space-y-6">
 						{/* Guess Form */}
 						{!isComplete && (
-							<Card>
-								<CardHeader>
+							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t bg-white/95 dark:bg-slate-900/95 lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-sm lg:border lg:backdrop-blur-none">
+								<CardHeader className="hidden lg:block">
 									<CardTitle>Endevina una paraula</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="flex flex-col items-center gap-6">
+									<div className="flex flex-col items-center gap-4 lg:gap-6">
 										{/* Current Guess Display */}
-										<div className="text-3xl font-bold tracking-widest h-12 border-b-2 border-indigo-300 dark:border-indigo-700 min-w-50 text-center uppercase flex items-center justify-center dark:text-white">
+										<div className="text-2xl sm:text-3xl font-bold tracking-widest h-10 sm:h-12 border-b-2 border-indigo-300 dark:border-indigo-700 w-full text-center uppercase flex items-center justify-center dark:text-white">
 											{currentGuess}
 										</div>
 
 										{/* Letter Buttons */}
-										<div className="grid grid-cols-3 gap-3">
+										<div className="grid grid-cols-3 gap-2 sm:gap-3">
 											{shuffledLetters.map((letter) => (
 												<Button
 													key={`letter-${letter}`}
 													variant="outline"
 													size="lg"
-													className="w-14 h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+													className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
 													onClick={() => handleLetterClick(letter)}
 												>
 													{letter.toUpperCase()}
@@ -414,48 +414,49 @@ export function Daily() {
 											))}
 										</div>
 
-										{/* Actions */}
-										<div className="grid grid-cols-2 gap-4 w-full">
+										<div className="w-[80%] mx-auto">
 											<Button
-												variant="ghost"
-												onClick={handleShuffle}
-												className="gap-2"
+												onClick={() => handleGuess()}
+												className="w-full h-10 sm:h-12"
+												size="lg"
+												disabled={currentGuess.length < 3}
 											>
-												<Shuffle className="w-4 h-4" />
-												Barrejar
+												Comprovar
 											</Button>
+										</div>
+
+										{/* Actions */}
+										<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full">
 											<Button
 												variant="ghost"
 												onClick={handleBackspace}
-												className="gap-2"
+												className="gap-2 h-9 sm:h-10"
 												disabled={currentGuess.length === 0}
 											>
 												<Delete className="w-4 h-4" />
 												Esborrar
 											</Button>
+											<Button
+												variant="ghost"
+												onClick={handleHint}
+												className="gap-2 h-9 sm:h-10"
+												disabled={hintsUsed >= 3 || isComplete}
+												size="lg"
+											>
+												<Lightbulb
+													className={`w-4 h-4 ${hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
+												/>
+												Pista ({3 - hintsUsed})
+											</Button>
+											<Button
+												variant="ghost"
+												onClick={handleShuffle}
+												className="gap-2 h-9 sm:h-10"
+											>
+												<Shuffle className="w-4 h-4" />
+												Barrejar
+											</Button>
 										</div>
-
-										<Button
-											onClick={() => handleGuess()}
-											className="w-full"
-											size="lg"
-											disabled={currentGuess.length < 3}
-										>
-											Comprovar
-										</Button>
-
-										<Button
-											variant="outline"
-											onClick={handleHint}
-											disabled={hintsUsed >= 3 || isComplete}
-											className="col-span-2 gap-2 border-amber-200 dark:border-amber-900 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-										>
-											<Lightbulb
-												className={`w-4 h-4 ${hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
-											/>
-											Pista ({3 - hintsUsed}{" "}
-											{3 - hintsUsed === 1 ? "restant" : "restants"})
-										</Button>
 									</div>
 								</CardContent>
 							</Card>

@@ -48,10 +48,14 @@ function RootDocument() {
 			<head>
 				<HeadContent />
 			</head>
-			<body>
+			<body className="h-dvh overflow-hidden">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
-					<Header />
-					<Outlet />
+					<div className="flex flex-col h-dvh">
+						<Header />
+						<main className="flex-1 overflow-y-auto">
+							<Outlet />
+						</main>
+					</div>
 					<Toaster position="top-center" />
 					<TanStackDevtools
 						config={{
