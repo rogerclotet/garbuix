@@ -70,9 +70,12 @@ export function generateCrossword(
 	for (let attempt = 0; attempt < 50; attempt++) {
 		const result = tryGenerateCrossword(validWords, minWords, maxWords);
 		if (result && result.words.length >= minWords) {
+			console.debug("Words:", result.words);
 			return result;
 		}
 	}
+
+	console.debug("Generating fallback crossword", validWords);
 
 	// Fallback: create a simple crossword with the first word
 	return createFallbackCrossword(validWords.slice(0, minWords));
@@ -413,4 +416,67 @@ function createFallbackCrossword(words: string[]): CrosswordGrid {
 	}
 
 	return convertToGrid(grid, placements);
+}
+
+/**
+ * Filter words that can be formed using only the given set of letters
+ * (letters can be repeated, accents are ignored)
+ */
+export function filterWordsByLetters(
+	words: string[],
+	allowedLetters: string[],
+): string[] {
+	const normalizedAllowed = new Set(
+		allowedLetters.map((l) => normalizeWord(l)),
+	);
+
+	return words.filter((word) => {
+		const normalized = normalizeWord(word);
+		if (normalized.length < 3) return false;
+		for (const char of normalized) {
+			if (!normalizedAllowed.has(char)) {
+				return false;
+			}
+		}
+		return true;
+	});
+}
+
+/**
+ * Pick 6 random letters that produce a good amount of words
+ */
+export function getRandomLetterSet(words: string[]): string[] {
+	// Try to find a word with 6 unique letters to use as our set
+	const candidates = words.filter((w) => {
+		const normalized = normalizeWord(w);
+		const uniqueChars = new Set(normalized.split(""));
+		return (
+			uniqueChars.size === 6 &&
+			normalized.length >= 6 &&
+			normalized.length <= 10
+		);
+	});
+
+	if (candidates.length > 0) {
+		const randomWord =
+			candidates[Math.floor(Math.random() * candidates.length)];
+		const normalized = normalizeWord(randomWord);
+		const chars = Array.from(new Set(normalized.split("")));
+		return shuffleArray(chars).slice(0, 6);
+	}
+
+	// Fallback: common Catalan letters
+	return shuffleArray("aeioustrln".split("")).slice(0, 6);
+}
+
+/**
+ * Shuffle an array
+ */
+export function shuffleArray<T>(array: T[]): T[] {
+	const newArray = [...array];
+	for (let i = newArray.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+	}
+	return newArray;
 }

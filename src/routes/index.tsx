@@ -1,13 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, RefreshCw, Trophy, XCircle } from "lucide-react";
+import {
+	CheckCircle2,
+	Delete,
+	RefreshCw,
+	Shuffle,
+	Trophy,
+	XCircle,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import allWords from "@/data/catalan-words.json";
 import {
 	type CrosswordGrid,
+	filterWordsByLetters,
 	generateCrossword,
+	getRandomLetterSet,
+	normalizeWord,
+	shuffleArray,
 	wordsMatch,
 } from "@/lib/crossword-generator";
 
@@ -25,6 +35,7 @@ function Home() {
 	} | null>(null);
 	const [wordList, setWordList] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
 
 	// Load words and generate crossword
 	useEffect(() => {
@@ -33,7 +44,33 @@ function Home() {
 			setWordList(words);
 
 			// Generate initial crossword
-			const newCrossword = generateCrossword(words, 5, 15);
+			let letters: string[] = [];
+			let newCrossword: CrosswordGrid | null = null;
+			let attempts = 0;
+
+			while (attempts < 30) {
+				letters = getRandomLetterSet(words);
+				const filteredWords = filterWordsByLetters(words, letters);
+
+				try {
+					const result = generateCrossword(filteredWords, 5, 15);
+					const usedLetters = new Set(
+						result.words.flatMap((w) => normalizeWord(w.word).split("")),
+					);
+
+					if (letters.every((l) => usedLetters.has(l))) {
+						newCrossword = result;
+						break;
+					}
+				} catch (_e) {
+					// continue
+				}
+				attempts++;
+			}
+
+			if (!newCrossword) throw new Error("Failed to generate crossword");
+
+			setShuffledLetters(shuffleArray(letters));
 			setCrossword(newCrossword);
 			setLoading(false);
 		} catch (error) {
@@ -60,8 +97,8 @@ function Home() {
 		return cells;
 	}, [crossword, guessedWords]);
 
-	const handleGuess = (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleGuess = (e?: React.FormEvent) => {
+		if (e) e.preventDefault();
 
 		if (!crossword || !currentGuess.trim()) return;
 
@@ -75,7 +112,7 @@ function Home() {
 		if (matchingWord) {
 			setGuessedWords(new Set([...guessedWords, matchingWord.id]));
 			setMessage({
-				text: `Correcte! Has trobat "${matchingWord.word}"`,
+				text: `Correcte! Has trobat <b>${matchingWord.word}</b>`,
 				type: "success",
 			});
 			setCurrentGuess("");
@@ -89,22 +126,69 @@ function Home() {
 					});
 				}, 500);
 			}
-		} else {
+		} else if (guess.match(/^[a-zA-Z]+$/)) {
 			setMessage({
-				text: "Aquesta paraula no hi és",
+				text: `<b>${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}</b> no hi és`,
 				type: "error",
 			});
+			setCurrentGuess("");
+		} else {
+			setMessage({
+				text: `La paraula no és vàlida`,
+				type: "error",
+			});
+			setCurrentGuess("");
 		}
 	};
 
 	const handleNewGame = () => {
 		if (wordList.length === 0) return;
 
-		const newCrossword = generateCrossword(wordList, 5, 15);
+		let letters: string[] = [];
+		let newCrossword: CrosswordGrid | null = null;
+		let attempts = 0;
+
+		while (attempts < 30) {
+			letters = getRandomLetterSet(wordList);
+			const filteredWords = filterWordsByLetters(wordList, letters);
+			try {
+				const result = generateCrossword(filteredWords, 5, 15);
+				const usedLetters = new Set(
+					result.words.flatMap((w) => normalizeWord(w.word).split("")),
+				);
+
+				if (letters.every((l) => usedLetters.has(l))) {
+					newCrossword = result;
+					break;
+				}
+			} catch (e) {
+				// continue
+			}
+			attempts++;
+		}
+
+		if (!newCrossword) {
+			setMessage({ text: "No s'ha pogut generar un joc vàlid", type: "error" });
+			return;
+		}
+
+		setShuffledLetters(shuffleArray(letters));
 		setCrossword(newCrossword);
 		setGuessedWords(new Set());
 		setCurrentGuess("");
 		setMessage({ text: "Nou joc generat!", type: "info" });
+	};
+
+	const handleLetterClick = (letter: string) => {
+		setCurrentGuess((prev) => prev + letter);
+	};
+
+	const handleBackspace = () => {
+		setCurrentGuess((prev) => prev.slice(0, -1));
+	};
+
+	const handleShuffle = () => {
+		setShuffledLetters(shuffleArray(shuffledLetters));
 	};
 
 	if (loading) {
@@ -186,7 +270,11 @@ function Home() {
 						{message.type === "success" && <CheckCircle2 className="w-5 h-5" />}
 						{message.type === "error" && <XCircle className="w-5 h-5" />}
 						{message.type === "info" && <Trophy className="w-5 h-5" />}
-						<span className="font-medium">{message.text}</span>
+						<span
+							className="font-medium"
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: This is not direct user input, only guessable text can be part of the message, html markup is added later
+							dangerouslySetInnerHTML={{ __html: message.text }}
+						/>
 					</div>
 				)}
 
@@ -223,10 +311,10 @@ function Home() {
 															className={`w-8 h-8 md:w-10 md:h-10 border-2 flex items-center justify-center font-bold text-sm md:text-base transition-all duration-300 ${
 																isRevealed
 																	? "bg-indigo-100 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-500 text-indigo-900 dark:text-indigo-200"
-																	: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600 text-transparent"
+																	: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600"
 															}`}
 														>
-															{cell.letter.toUpperCase()}
+															{isRevealed ? cell.letter.toUpperCase() : ""}
 														</div>
 													);
 												}),
@@ -247,22 +335,59 @@ function Home() {
 									<CardTitle>Endevina una paraula</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<form onSubmit={handleGuess} className="space-y-4">
-										<Input
-											type="text"
-											value={currentGuess}
-											onChange={(e) => setCurrentGuess(e.target.value)}
-											placeholder="Escriu una paraula..."
-											className="text-lg"
-											autoComplete="off"
-											autoFocus
-										/>
-										<Button type="submit" className="w-full" size="lg">
+									<div className="flex flex-col items-center gap-6">
+										{/* Current Guess Display */}
+										<div className="text-3xl font-bold tracking-widest h-12 border-b-2 border-indigo-300 dark:border-indigo-700 min-w-50 text-center uppercase flex items-center justify-center dark:text-white">
+											{currentGuess}
+										</div>
+
+										{/* Letter Buttons */}
+										<div className="grid grid-cols-3 gap-3">
+											{shuffledLetters.map((letter) => (
+												<Button
+													key={`letter-${letter}`}
+													variant="outline"
+													size="lg"
+													className="w-14 h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+													onClick={() => handleLetterClick(letter)}
+												>
+													{letter.toUpperCase()}
+												</Button>
+											))}
+										</div>
+
+										{/* Actions */}
+										<div className="flex gap-4 w-full">
+											<Button
+												variant="ghost"
+												onClick={handleShuffle}
+												className="flex-1 gap-2"
+											>
+												<Shuffle className="w-4 h-4" />
+												Barreja
+											</Button>
+											<Button
+												variant="ghost"
+												onClick={handleBackspace}
+												className="flex-1 gap-2"
+												disabled={currentGuess.length === 0}
+											>
+												<Delete className="w-4 h-4" />
+												Esborra
+											</Button>
+										</div>
+
+										<Button
+											onClick={() => handleGuess()}
+											className="w-full"
+											size="lg"
+											disabled={currentGuess.length < 3}
+										>
 											Comprovar
 										</Button>
-									</form>
-									<p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-										💡 Consell: Escriu paraules sense accents
+									</div>
+									<p className="text-sm text-center text-gray-600 dark:text-gray-400 mt-6">
+										Toca les lletres per formar paraules
 									</p>
 								</CardContent>
 							</Card>
@@ -325,7 +450,7 @@ function Home() {
 								</CardHeader>
 								<CardContent className="text-center">
 									<p className="text-gray-700 dark:text-gray-300 mb-4">
-										Has completat el cruciugrama!
+										Has guanyat!
 									</p>
 									<Button
 										onClick={handleNewGame}
