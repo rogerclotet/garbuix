@@ -19,11 +19,13 @@ lint:
   stage: check
   image: node:25.2-slim
   before_script:
+    - apt-get update && apt-get install -y unzip
     - npm install -g pnpm@latest-10
     - pnpm install
   script:
     - pnpm lint
     - pnpm check
+    - pnpm download-dict
     - pnpm typecheck
   cache:
     paths:
