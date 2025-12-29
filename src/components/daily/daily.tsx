@@ -15,6 +15,8 @@ import {
 	wordsMatch,
 } from "@/lib/crossword-generator";
 
+const STATE_KEY_PREFIX = "paraules-state-";
+
 export function Daily() {
 	const [crossword, setCrossword] = useState<CrosswordGrid | null>(null);
 	const [guessedWords, setGuessedWords] = useState<Set<number>>(new Set());
@@ -22,17 +24,21 @@ export function Daily() {
 	const [hintsUsed, setHintsUsed] = useState(0);
 	const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
 	const [currentGuess, setCurrentGuess] = useState("");
+	const [seed, setSeed] = useState(getCurrentSeed());
 
 	const [loading, setLoading] = useState(true);
 	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
 
-	const seed = useMemo(() => {
-		const today = new Date();
-		return (
-			(today.getFullYear() - 2000) * 10000 +
-			(today.getMonth() + 1) * 100 +
-			today.getDate()
-		);
+	// Set a timer to update the seed at midnight
+	useEffect(() => {
+		const midnight = new Date();
+		midnight.setHours(24, 0, 0, 0);
+		const timeToMidnight = midnight.getTime() - Date.now();
+		const timer = setTimeout(() => {
+			setSeed(getCurrentSeed());
+		}, timeToMidnight);
+
+		return () => clearTimeout(timer);
 	}, []);
 
 	// Load words and generate crossword
@@ -45,10 +51,7 @@ export function Daily() {
 			const keysToRemove: string[] = [];
 			for (let i = 0; i < localStorage.length; i++) {
 				const key = localStorage.key(i);
-				if (
-					key?.startsWith("paraules-state-") &&
-					key !== `paraules-state-${seed}`
-				) {
+				if (key?.startsWith(STATE_KEY_PREFIX) && key !== getStateKey(seed)) {
 					keysToRemove.push(key);
 				}
 			}
@@ -87,7 +90,7 @@ export function Daily() {
 			setCrossword(newCrossword);
 
 			// Load saved state for today
-			const savedState = localStorage.getItem(`paraules-state-${seed}`);
+			const savedState = localStorage.getItem(getStateKey(seed));
 			if (savedState) {
 				try {
 					const {
@@ -119,6 +122,12 @@ export function Daily() {
 	useEffect(() => {
 		if (!crossword) return;
 
+		if (getCurrentSeed() !== seed) {
+			localStorage.removeItem(getStateKey(seed));
+			setSeed(getCurrentSeed());
+			return;
+		}
+
 		const state = {
 			guessedWords: Array.from(guessedWords),
 			guesses,
@@ -126,7 +135,7 @@ export function Daily() {
 			hintedCells: Array.from(hintedCells),
 			shuffledLetters,
 		};
-		localStorage.setItem(`paraules-state-${seed}`, JSON.stringify(state));
+		localStorage.setItem(getStateKey(seed), JSON.stringify(state));
 	}, [
 		guessedWords,
 		guesses,
@@ -549,4 +558,17 @@ export function Daily() {
 			</div>
 		</div>
 	);
+}
+
+function getCurrentSeed(): number {
+	const today = new Date();
+	return (
+		(today.getFullYear() - 2000) * 10000 +
+		(today.getMonth() + 1) * 100 +
+		today.getDate()
+	);
+}
+
+function getStateKey(seed: number) {
+	return `${STATE_KEY_PREFIX}${seed}`;
 }
