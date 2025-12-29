@@ -376,7 +376,7 @@ export function Daily() {
 												return (
 													<div
 														key={key}
-														className={`aspect-square border rounded-sm sm:rounded-md sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-all duration-300 ${
+														className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-all duration-300 ${
 															isRevealed
 																? "bg-indigo-100 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-500 text-indigo-900 dark:text-indigo-200"
 																: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600"

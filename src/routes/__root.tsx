@@ -9,6 +9,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
+import { links } from "@/components/meta";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "@/styles.css?url";
 
@@ -29,8 +30,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{
 				title: "Paraules - Joc de Mots Encreuats en Català",
 			},
+			{
+				name: "mobile-web-app-capable",
+				content: "yes",
+			},
 		],
 		links: [
+			...links,
 			{
 				rel: "stylesheet",
 				href: appCss,
