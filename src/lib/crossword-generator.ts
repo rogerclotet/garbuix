@@ -1,5 +1,7 @@
 // Crossword generator for Catalan word game
 
+import type { Word } from "@/data/types";
+
 /**
  * Seeded random number generator for reproducible crosswords
  */
@@ -36,7 +38,7 @@ export interface GridCell {
 
 export interface WordPlacement {
 	id: number;
-	word: string;
+	word: Word;
 	startRow: number;
 	startCol: number;
 	direction: "horizontal" | "vertical";
@@ -51,7 +53,7 @@ export interface CrosswordGrid {
 }
 
 interface Candidate {
-	word: string;
+	word: Word;
 	row: number;
 	col: number;
 	direction: "horizontal" | "vertical";
@@ -82,7 +84,7 @@ export function wordsMatch(word1: string, word2: string): boolean {
  * Generate a crossword grid with the given words
  */
 export function generateCrossword(
-	words: string[],
+	words: Word[],
 	minWords = 5,
 	maxWords = 15,
 	random: SeededRandom = new SeededRandom(Date.now()),
@@ -91,8 +93,8 @@ export function generateCrossword(
 	const validWords = random
 		.shuffleArray(
 			words
-				.filter((w) => w.length >= 3 && w.length <= 12)
-				.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w)),
+				.filter((w) => w.name.length >= 3 && w.name.length <= 12)
+				.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
 		)
 		.slice(0, Math.min(words.length, maxWords * 3)); // Take more than needed for better chances
 
@@ -113,7 +115,7 @@ export function generateCrossword(
 }
 
 function tryGenerateCrossword(
-	words: string[],
+	words: Word[],
 	minWords: number,
 	maxWords: number,
 ): CrosswordGrid | null {
@@ -124,8 +126,8 @@ function tryGenerateCrossword(
 	const MAX_GRID_SIZE = 15;
 	const firstWord = words[0];
 	// Place the first word around the center of the potential 15x15 grid
-	const startRow = Math.floor((MAX_GRID_SIZE - firstWord.length) / 2);
-	const startCol = Math.floor((MAX_GRID_SIZE - firstWord.length) / 2);
+	const startRow = Math.floor((MAX_GRID_SIZE - firstWord.name.length) / 2);
+	const startCol = Math.floor((MAX_GRID_SIZE - firstWord.name.length) / 2);
 
 	placements.push({
 		id: 0,
@@ -136,10 +138,10 @@ function tryGenerateCrossword(
 		revealed: false,
 	});
 
-	for (let i = 0; i < firstWord.length; i++) {
+	for (let i = 0; i < firstWord.name.length; i++) {
 		const key = `${startRow},${startCol + i}`;
 		grid.set(key, {
-			letter: firstWord[i],
+			letter: firstWord.name[i],
 			wordIds: [0],
 		});
 	}
@@ -153,7 +155,7 @@ function tryGenerateCrossword(
 		if (placement) {
 			placements.push(placement);
 			// Add to grid
-			for (let j = 0; j < word.length; j++) {
+			for (let j = 0; j < word.name.length; j++) {
 				const row =
 					placement.direction === "horizontal"
 						? placement.startRow
@@ -169,7 +171,7 @@ function tryGenerateCrossword(
 					existing.wordIds.push(wordId);
 				} else {
 					grid.set(key, {
-						letter: word[j],
+						letter: word.name[j],
 						wordIds: [wordId],
 					});
 				}
@@ -187,7 +189,7 @@ function tryGenerateCrossword(
 }
 
 function findBestPlacement(
-	word: string,
+	word: Word,
 	placements: WordPlacement[],
 	grid: Map<string, GridCell>,
 	wordId: number,
@@ -204,12 +206,12 @@ function findBestPlacement(
 			if (direction === placement.direction) continue;
 
 			// Check each letter of the existing word
-			for (let i = 0; i < existingWord.length; i++) {
-				const existingLetter = existingWord[i];
+			for (let i = 0; i < existingWord.name.length; i++) {
+				const existingLetter = existingWord.name[i];
 
 				// Check each letter of the new word
-				for (let j = 0; j < word.length; j++) {
-					if (word[j] === existingLetter) {
+				for (let j = 0; j < word.name.length; j++) {
+					if (word.name[j] === existingLetter) {
 						// Found potential intersection
 						let row: number, col: number;
 
@@ -265,7 +267,7 @@ function findBestPlacement(
 }
 
 function isValidPlacement(
-	word: string,
+	word: Word,
 	startRow: number,
 	startCol: number,
 	direction: "horizontal" | "vertical",
@@ -277,8 +279,9 @@ function isValidPlacement(
 	if (
 		startRow < 0 ||
 		startCol < 0 ||
-		(direction === "horizontal" && startCol + word.length > MAX_GRID_SIZE) ||
-		(direction === "vertical" && startRow + word.length > MAX_GRID_SIZE)
+		(direction === "horizontal" &&
+			startCol + word.name.length > MAX_GRID_SIZE) ||
+		(direction === "vertical" && startRow + word.name.length > MAX_GRID_SIZE)
 	) {
 		return false;
 	}
@@ -287,7 +290,7 @@ function isValidPlacement(
 	let hasIntersection = false;
 
 	// Check each cell
-	for (let i = 0; i < word.length; i++) {
+	for (let i = 0; i < word.name.length; i++) {
 		const row = isHorizontal ? startRow : startRow + i;
 		const col = isHorizontal ? startCol + i : startCol;
 		const key = `${row},${col}`;
@@ -295,7 +298,7 @@ function isValidPlacement(
 
 		if (cell) {
 			// Cell is occupied
-			if (cell.letter !== word[i]) {
+			if (cell.letter !== word.name[i]) {
 				return false; // Letter mismatch
 			}
 			hasIntersection = true;
@@ -323,8 +326,8 @@ function isValidPlacement(
 	// Check before and after the word
 	const beforeRow = isHorizontal ? startRow : startRow - 1;
 	const beforeCol = isHorizontal ? startCol - 1 : startCol;
-	const afterRow = isHorizontal ? startRow : startRow + word.length;
-	const afterCol = isHorizontal ? startCol + word.length : startCol;
+	const afterRow = isHorizontal ? startRow : startRow + word.name.length;
+	const afterCol = isHorizontal ? startCol + word.name.length : startCol;
 
 	if (
 		grid.has(`${beforeRow},${beforeCol}`) ||
@@ -337,7 +340,7 @@ function isValidPlacement(
 }
 
 function countIntersections(
-	word: string,
+	word: Word,
 	startRow: number,
 	startCol: number,
 	direction: "horizontal" | "vertical",
@@ -346,7 +349,7 @@ function countIntersections(
 	let count = 0;
 	const isHorizontal = direction === "horizontal";
 
-	for (let i = 0; i < word.length; i++) {
+	for (let i = 0; i < word.name.length; i++) {
 		const row = isHorizontal ? startRow : startRow + i;
 		const col = isHorizontal ? startCol + i : startCol;
 		const key = `${row},${col}`;
@@ -406,7 +409,7 @@ function convertToGrid(
 	};
 }
 
-function createFallbackCrossword(words: string[]): CrosswordGrid {
+function createFallbackCrossword(words: Word[]): CrosswordGrid {
 	const placements: WordPlacement[] = [];
 	const grid: Map<string, GridCell> = new Map();
 
@@ -429,7 +432,7 @@ function createFallbackCrossword(words: string[]): CrosswordGrid {
 		});
 
 		// Add to grid
-		for (let j = 0; j < word.length; j++) {
+		for (let j = 0; j < word.name.length; j++) {
 			const row = direction === "horizontal" ? currentRow : currentRow + j;
 			const col = direction === "horizontal" ? currentCol + j : currentCol;
 			const key = `${row},${col}`;
@@ -439,7 +442,7 @@ function createFallbackCrossword(words: string[]): CrosswordGrid {
 				existing.wordIds.push(wordId);
 			} else {
 				grid.set(key, {
-					letter: word[j],
+					letter: word.name[j],
 					wordIds: [wordId],
 				});
 			}
@@ -463,15 +466,15 @@ function createFallbackCrossword(words: string[]): CrosswordGrid {
  * (letters can be repeated, accents are ignored)
  */
 export function filterWordsByLetters(
-	words: string[],
+	words: Word[],
 	allowedLetters: string[],
-): string[] {
+): Word[] {
 	const normalizedAllowed = new Set(
 		allowedLetters.map((l) => normalizeWord(l)),
 	);
 
 	return words.filter((word) => {
-		const normalized = normalizeWord(word);
+		const normalized = normalizeWord(word.name);
 		if (normalized.length < 3) return false;
 		for (const char of normalized) {
 			if (!normalizedAllowed.has(char)) {
@@ -486,12 +489,12 @@ export function filterWordsByLetters(
  * Pick 6 random letters that produce a good amount of words
  */
 export function getRandomLetterSet(
-	words: string[],
+	words: Word[],
 	random: SeededRandom = new SeededRandom(Date.now()),
 ): string[] {
 	// Try to find a word with 6 unique letters to use as our set
 	const candidates = words.filter((w) => {
-		const normalized = normalizeWord(w);
+		const normalized = normalizeWord(w.name);
 		const uniqueChars = new Set(normalized.split(""));
 		return (
 			uniqueChars.size === 6 &&
@@ -503,7 +506,7 @@ export function getRandomLetterSet(
 	if (candidates.length > 0) {
 		const randomWord =
 			candidates[Math.floor(random.next() * candidates.length)];
-		const normalized = normalizeWord(randomWord);
+		const normalized = normalizeWord(randomWord.name);
 		const chars = Array.from(new Set(normalized.split("")));
 		return random.shuffleArray(chars).slice(0, 6);
 	}

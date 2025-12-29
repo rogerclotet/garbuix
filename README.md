@@ -5,7 +5,7 @@ A responsive web application for a Catalan crossword-style word game.
 ## Features
 
 - 🎮 Interactive crossword puzzle game with Catalan words
-- 📚 Uses official Catalan dictionary from [Softcatala](https://github.com/Softcatala/catalan-dict-tools)
+- 📚 Uses IATE Catalan dictionary from [TermCat](https://www.termcat.cat)
 - 🎯 5-15 words per game, all crossing with each other
 - 🔤 Guess words without accents, see them properly spelled
 - 📱 Fully responsive design
@@ -57,11 +57,9 @@ The app will be available at `http://localhost:3000`
 ### Dictionary Download
 
 The build process automatically:
-1. Fetches the latest release from [catalan-dict-tools](https://github.com/Softcatala/catalan-dict-tools)
-2. Downloads the `ca.X.X.X-all.zip` file
-3. Extracts `catalan.dic` (Hunspell dictionary format)
-4. Parses and filters words (3+ letters, letters only)
-5. Saves to `src/data/catalan-words.json` (~197k words)
+1. Fetches TermCat's IATE dictionary from https://www.termcat.cat/Thor/files/diccionaris/wadfiateencatala.xml
+2. Parses and filters words (3+ letters, letters only), with topics and definitions
+3. Saves to `src/data/catalan-words.json` (~5.5k words)
 
 ### Crossword Generation
 
@@ -90,14 +88,6 @@ The crossword generator:
 - **[Lucide React](https://lucide.dev/)** - Icons
 - **[Vite](https://vitejs.dev/)** - Build tool
 - **[TypeScript](https://www.typescriptlang.org/)** - Type safety
-
-## Data Source
-
-Dictionary data is sourced from:
-- **Repository**: [Softcatala/catalan-dict-tools](https://github.com/Softcatala/catalan-dict-tools)
-- **License**: LGPL-2.1 / GPL-2.0
-- **Format**: Hunspell dictionary format (.dic)
-- **Content**: Comprehensive Catalan language word list
 
 ## Development Notes
 
@@ -146,26 +136,14 @@ The dictionary is automatically downloaded during the build process. To manually
 pnpm run download-dict
 ```
 
-This will fetch the latest version from the Softcatala repository.
-
-## License
-
-See [LICENSE](LICENSE)
-
-This project uses dictionary data from Softcatala, which is licensed under LGPL-2.1 and GPL-2.0.
+This will fetch the latest version from TermCat's IATE dictionary.
 
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
-- Better crossword generation algorithms
-- Difficulty levels
-- Hints system
-- Score tracking
-- Multiplayer mode
-- Word definitions/translations
+Contributions are welcome! Feel free to submit pull requests or open issues.
 
 ## Acknowledgments
 
-- **Softcatalà** for maintaining the excellent Catalan dictionary
+- **TermCat** for maintaining and providing downloadable dictionaries
 - **TanStack** team for the amazing React tools
 - **shadcn** for the beautiful UI components

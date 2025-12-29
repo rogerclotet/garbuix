@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import allWords from "@/data/catalan-words.json";
+import type { Word } from "@/data/types";
 import {
 	type CrosswordGrid,
 	filterWordsByLetters,
@@ -45,7 +46,7 @@ export function Daily() {
 	// Load words and generate crossword
 	useEffect(() => {
 		try {
-			const words = allWords as string[];
+			const words = allWords as Word[];
 			const random = new SeededRandom(seed);
 
 			// Cleanup old states
@@ -72,7 +73,7 @@ export function Daily() {
 				try {
 					const result = generateCrossword(filteredWords, 5, 15, random);
 					const usedLetters = new Set(
-						result.words.flatMap((w) => normalizeWord(w.word).split("")),
+						result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
 					);
 
 					if (letters.every((l) => usedLetters.has(l))) {
@@ -153,7 +154,7 @@ export function Daily() {
 		const cells = new Set<string>(hintedCells);
 		for (const wordId of guessedWords) {
 			const word = crossword.words[wordId];
-			for (let i = 0; i < word.word.length; i++) {
+			for (let i = 0; i < word.word.name.length; i++) {
 				const row =
 					word.direction === "horizontal" ? word.startRow : word.startRow + i;
 				const col =
@@ -174,14 +175,14 @@ export function Daily() {
 
 		// Check if word matches any unguessed words
 		const matchingWord = crossword.words.find(
-			(w) => !guessedWords.has(w.id) && wordsMatch(w.word, guess),
+			(w) => !guessedWords.has(w.id) && wordsMatch(w.word.name, guess),
 		);
 
 		if (matchingWord) {
 			setGuessedWords(new Set([...guessedWords, matchingWord.id]));
 			toast.success(
 				<span>
-					Correcte! Has trobat <b>{matchingWord.word}</b>
+					Correcte! Has trobat <b>{matchingWord.word.name}</b>
 				</span>,
 			);
 			setCurrentGuess("");
@@ -486,22 +487,34 @@ export function Daily() {
 										.map((word) => (
 											<div
 												key={word.id}
-												className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+												className="flex flex-col gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
 											>
-												<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
-												<span className="font-medium text-green-900 dark:text-green-300 tracking-widest">
-													{word.word.toUpperCase()}
-												</span>
-												<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
-													{word.word.length} lletres
-												</span>
+												<div className="flex items-center gap-2">
+													<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+													<span className="font-medium text-green-900 dark:text-green-300 tracking-widest">
+														{word.word.name.toUpperCase()}
+													</span>
+													<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
+														{word.word.name.length} lletres
+													</span>
+												</div>
+
+												<p className="text-xs text-green-900/80 dark:text-green-400/80">
+													{word.word.areatematica}
+												</p>
+
+												{word.word.definition && (
+													<p className="text-xs text-green-900/80 dark:text-green-400/80">
+														{word.word.definition}
+													</p>
+												)}
 											</div>
 										))}
 
 									{crossword.words
 										.filter((w) => !guessedWords.has(w.id))
 										.map((word) => {
-											const displayedWord = word.word
+											const displayedWord = word.word.name
 												.split("")
 												.map((char, i) => {
 													const row =
@@ -528,7 +541,7 @@ export function Daily() {
 														{displayedWord}
 													</span>
 													<span className="text-xs ml-auto">
-														{word.word.length} lletres
+														{word.word.name.length} lletres
 													</span>
 												</div>
 											);
