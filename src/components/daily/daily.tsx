@@ -14,6 +14,7 @@ import {
 	shuffleArray,
 	wordsMatch,
 } from "@/lib/crossword-generator";
+import { Progress } from "../ui/progress";
 
 const STATE_KEY_PREFIX = "paraules-state-";
 
@@ -285,7 +286,7 @@ export function Daily() {
 
 	if (loading) {
 		return (
-			<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+			<div className="min-h-screen flex items-center justify-center">
 				<div className="text-center">
 					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 dark:border-indigo-400 mx-auto mb-4"></div>
 					<p className="text-lg text-gray-700 dark:text-gray-300">
@@ -298,7 +299,7 @@ export function Daily() {
 
 	if (!crossword) {
 		return (
-			<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+			<div className="min-h-screen flex items-center justify-center">
 				<Card className="max-w-md">
 					<CardHeader>
 						<CardTitle className="text-red-600 dark:text-red-400">
@@ -318,30 +319,29 @@ export function Daily() {
 		);
 	}
 
-	const progress = (guessedWords.size / crossword.words.length) * 100;
 	const isComplete = guessedWords.size === crossword.words.length;
 
 	return (
-		<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8 transition-colors">
+		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8">
 			<div className="max-w-7xl mx-auto">
 				{/* Progress */}
 				<div className="mb-6">
-					<div className="flex items-center justify-between mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+					<div className="flex items-center justify-between mb-2 text-sm font-medium opacity-70">
 						<span>
 							{guessedWords.size} / {crossword.words.length} paraules trobades
 						</span>
-						<div className="flex gap-4 opacity-70">
+						<div className="flex gap-4">
 							<span>
 								{guesses.length} intent{guesses.length === 1 ? "" : "s"}
 							</span>
 						</div>
 					</div>
-					<div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-						<div
-							className="bg-linear-to-r from-indigo-500 to-purple-600 dark:from-indigo-400 dark:to-purple-500 h-full transition-all duration-500 rounded-full"
-							style={{ width: `${progress}%` }}
-						/>
-					</div>
+
+					<Progress
+						value={guessedWords.size}
+						max={crossword.words.length}
+						className="h-3"
+					/>
 				</div>
 
 				<div className="grid lg:grid-cols-3 gap-6">
@@ -378,8 +378,8 @@ export function Daily() {
 														key={key}
 														className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-all duration-300 ${
 															isRevealed
-																? "bg-indigo-100 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-500 text-indigo-900 dark:text-indigo-200"
-																: "bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600"
+																? "bg-primary/10 border-primary/40 text-secondary-foreground"
+																: "bg-border/30 border-border"
 														}`}
 													>
 														{isRevealed ? cell.letter.toUpperCase() : ""}
@@ -397,14 +397,14 @@ export function Daily() {
 					<div className="lg:space-y-6">
 						{/* Guess Form */}
 						{!isComplete && (
-							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t bg-white/95 dark:bg-slate-900/95 lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-sm lg:border lg:backdrop-blur-none">
+							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-sm lg:border lg:backdrop-blur-none">
 								<CardHeader className="hidden lg:block">
 									<CardTitle>Endevina una paraula</CardTitle>
 								</CardHeader>
 								<CardContent>
 									<div className="flex flex-col items-center gap-4 lg:gap-6">
 										{/* Current Guess Display */}
-										<div className="text-2xl sm:text-3xl font-bold tracking-widest h-10 sm:h-12 border-b-2 border-indigo-300 dark:border-indigo-700 w-full text-center uppercase flex items-center justify-center dark:text-white">
+										<div className="text-2xl sm:text-3xl font-bold tracking-widest h-10 sm:h-12 border-b-2 border-primary w-full text-center uppercase flex items-center justify-center dark:text-white">
 											{currentGuess}
 										</div>
 
@@ -415,7 +415,7 @@ export function Daily() {
 													key={`letter-${letter}`}
 													variant="outline"
 													size="lg"
-													className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+													className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-colors"
 													onClick={() => handleLetterClick(letter)}
 												>
 													{letter.toUpperCase()}
@@ -521,13 +521,13 @@ export function Daily() {
 											return (
 												<div
 													key={word.id}
-													className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+													className="flex items-center gap-2 p-3 rounded-lg border bg-border/20"
 												>
-													<div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
-													<span className="text-gray-400 dark:text-gray-500 font-mono tracking-widest">
+													<div className="w-5 h-5 rounded-full border-2 shrink-0" />
+													<span className="font-mono text-muted-foreground tracking-widest">
 														{displayedWord}
 													</span>
-													<span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+													<span className="text-xs ml-auto">
 														{word.word.length} lletres
 													</span>
 												</div>

@@ -4,7 +4,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Header() {
 	return (
-		<header className="bg-linear-to-br from-primary to-secondary text-primary-foreground shadow-md border-b border-secondary transition-colors duration-500">
+		<header className="bg-primary text-primary-foreground shadow-md border-b border-background transition-colors duration-500">
 			<div className="max-w-7xl mx-auto px-4 py-4">
 				<div className="flex items-center justify-between">
 					<Link
