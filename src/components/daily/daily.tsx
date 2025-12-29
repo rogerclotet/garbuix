@@ -1,5 +1,11 @@
 import { CheckCircle2, Delete, Lightbulb, Shuffle } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+	type CSSProperties,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +48,41 @@ export function Daily() {
 
 		return () => clearTimeout(timer);
 	}, []);
+
+	const loadSavedState = useCallback(
+		(savedState: string, letters: string[]) => {
+			try {
+				const {
+					guessedWords: savedGuessedWords,
+					guesses: savedGuesses,
+					hintsUsed: savedHintsUsed,
+					hintedCells: savedHintedCells,
+					shuffledLetters: savedShuffledLetters,
+				} = JSON.parse(savedState);
+
+				console.log(savedShuffledLetters, letters);
+				if (!Array.isArray(savedShuffledLetters)) {
+					return;
+				}
+
+				const sortedSavedLetters = savedShuffledLetters.sort();
+				const sortedLetters = letters.sort();
+				if (sortedSavedLetters.join("") !== sortedLetters.join("")) {
+					// Ignore saved state if letters have changed
+					return;
+				}
+
+				if (savedGuessedWords) setGuessedWords(new Set(savedGuessedWords));
+				if (savedGuesses) setGuesses(savedGuesses);
+				if (savedHintsUsed) setHintsUsed(savedHintsUsed);
+				if (savedHintedCells) setHintedCells(new Set(savedHintedCells));
+				if (savedShuffledLetters) setShuffledLetters(savedShuffledLetters);
+			} catch (e) {
+				console.error("Failed to parse saved state:", e);
+			}
+		},
+		[],
+	);
 
 	// Load words and generate crossword
 	useEffect(() => {
@@ -94,22 +135,7 @@ export function Daily() {
 			// Load saved state for today
 			const savedState = localStorage.getItem(getStateKey(seed));
 			if (savedState) {
-				try {
-					const {
-						guessedWords: savedGuessedWords,
-						guesses: savedGuesses,
-						hintsUsed: savedHintsUsed,
-						hintedCells: savedHintedCells,
-						shuffledLetters: savedShuffledLetters,
-					} = JSON.parse(savedState);
-					if (savedGuessedWords) setGuessedWords(new Set(savedGuessedWords));
-					if (savedGuesses) setGuesses(savedGuesses);
-					if (savedHintsUsed) setHintsUsed(savedHintsUsed);
-					if (savedHintedCells) setHintedCells(new Set(savedHintedCells));
-					if (savedShuffledLetters) setShuffledLetters(savedShuffledLetters);
-				} catch (e) {
-					console.error("Failed to parse saved state:", e);
-				}
+				loadSavedState(savedState, letters);
 			}
 
 			setLoading(false);
@@ -118,7 +144,7 @@ export function Daily() {
 			toast.error("Error carregant el diccionari");
 			setLoading(false);
 		}
-	}, [seed]);
+	}, [seed, loadSavedState]);
 
 	// Save game state to localStorage
 	useEffect(() => {
@@ -287,12 +313,10 @@ export function Daily() {
 
 	if (loading) {
 		return (
-			<div className="min-h-screen flex items-center justify-center">
+			<div className="h-full flex items-center justify-center">
 				<div className="text-center">
-					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 dark:border-indigo-400 mx-auto mb-4"></div>
-					<p className="text-lg text-gray-700 dark:text-gray-300">
-						Carregant paraules...
-					</p>
+					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
+					<p className="text-lg text-muted-foreground">Carregant paraules...</p>
 				</div>
 			</div>
 		);
@@ -308,9 +332,7 @@ export function Daily() {
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="dark:text-gray-300">
-							No s'ha pogut generar el joc de mots encreuats
-						</p>
+						<p className="dark:text-gray-300">No s'ha pogut generar el joc</p>
 						{/* <Button onClick={handleNewGame} className="mt-4">
 							Tornar a intentar
 						</Button> */}

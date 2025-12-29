@@ -475,7 +475,10 @@ export function filterWordsByLetters(
 
 	return words.filter((word) => {
 		const normalized = normalizeWord(word.name);
-		if (normalized.length < 3) return false;
+		if (normalized.length < 3) {
+			return false;
+		}
+
 		for (const char of normalized) {
 			if (!normalizedAllowed.has(char)) {
 				return false;
