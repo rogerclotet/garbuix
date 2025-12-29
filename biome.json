@@ -9,9 +9,9 @@
 		"ignoreUnknown": false,
 		"includes": [
 			"**/src/**/*",
-			"**/.vscode/**/*",
 			"**/index.html",
 			"**/vite.config.js",
+			"**/public/**/*",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/data/catalan-words.json"
 		]
