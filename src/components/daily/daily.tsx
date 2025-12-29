@@ -60,7 +60,6 @@ export function Daily() {
 					shuffledLetters: savedShuffledLetters,
 				} = JSON.parse(savedState);
 
-				console.log(savedShuffledLetters, letters);
 				if (!Array.isArray(savedShuffledLetters)) {
 					return;
 				}

@@ -12,7 +12,6 @@ export function ThemeToggle() {
 				.matches
 				? "dark"
 				: "light";
-			console.log(systemTheme);
 			setTheme(systemTheme);
 		}
 	}, [theme, setTheme]);
