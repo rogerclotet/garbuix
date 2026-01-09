@@ -31,9 +31,9 @@ fi
     source ~/.bashrc
     cd $SSH_PROJECT_DIRECTORY
     git pull
-    docker build -t forja .
-    docker stop forja
-    docker rm forja
-    docker run --name=forja --restart=unless-stopped -d -p $PORT:3000 forja
+    docker build -t paraules .
+    docker stop paraules
+    docker rm paraules
+    docker run --name=paraules --restart=unless-stopped -d -p $PORT:3000 paraules
 EOF
 )
