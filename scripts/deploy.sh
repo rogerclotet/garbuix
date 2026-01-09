@@ -33,7 +33,7 @@ fi
     git pull
     docker build -t paraules .
     docker stop paraules 2>/dev/null || true
-    docker rm paraules
+    docker rm paraules 2>/dev/null || true
     docker run --name=paraules --restart=unless-stopped -d -p $PORT:3000 paraules
 EOF
 )
