@@ -32,7 +32,7 @@ fi
     cd $SSH_PROJECT_DIRECTORY
     git pull
     docker build -t paraules .
-    docker stop --ignore-unknown paraules
+    docker stop paraules 2>/dev/null || true
     docker rm paraules
     docker run --name=paraules --restart=unless-stopped -d -p $PORT:3000 paraules
 EOF
