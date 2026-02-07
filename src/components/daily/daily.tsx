@@ -105,13 +105,28 @@ export function Daily() {
 			let letters: string[] = [];
 			let newCrossword: CrosswordGrid | null = null;
 			let attempts = 0;
+			const minWords = 5;
+			const maxWords = 15;
 
 			while (attempts < 30) {
 				letters = getRandomLetterSet(words, random);
 				const filteredWords = filterWordsByLetters(words, letters);
+				if (filteredWords.length < minWords) {
+					attempts++;
+					continue;
+				}
 
 				try {
-					const result = generateCrossword(filteredWords, 5, 15, random);
+					const result = generateCrossword(
+						filteredWords,
+						minWords,
+						maxWords,
+						random,
+					);
+					if (result.words.length < minWords) {
+						attempts++;
+						continue;
+					}
 					const usedLetters = new Set(
 						result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
 					);
