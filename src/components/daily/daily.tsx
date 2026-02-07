@@ -37,6 +37,11 @@ export function Daily() {
 	const [loading, setLoading] = useState(true);
 	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
 
+	const formatGuess = useCallback((guess: string) => {
+		if (!guess) return "";
+		return `${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}`;
+	}, []);
+
 	// Set a timer to update the seed at midnight
 	useEffect(() => {
 		const midnight = new Date();
@@ -211,18 +216,58 @@ export function Daily() {
 		if (!crossword || !currentGuess.trim()) return;
 
 		const guess = currentGuess.trim();
+		const isValidGuess = /^[a-zA-ZçÇ]+$/.test(guess);
+		if (!isValidGuess) {
+			toast.error("La paraula no és vàlida");
+			setCurrentGuess("");
+			return;
+		}
+
+		const matchingWord = crossword.words.find((w) =>
+			wordsMatch(w.word.name, guess),
+		);
+		const prettyGuess = formatGuess(guess);
+
+		if (matchingWord && guessedWords.has(matchingWord.id)) {
+			toast.info(
+				<span>
+					Ja has encertat <b>{matchingWord.word.name}</b>
+				</span>,
+			);
+			setCurrentGuess("");
+			return;
+		}
+
+		const alreadyTried = guesses.some((prev) => wordsMatch(prev, guess));
+		if (alreadyTried) {
+			if (matchingWord) {
+				toast.info(
+					<span>
+						Ja has encertat <b>{matchingWord.word.name}</b>
+					</span>,
+				);
+			} else {
+				toast.info(
+					<span>
+						Ja has provat <b>{prettyGuess}</b>
+					</span>,
+				);
+			}
+			setCurrentGuess("");
+			return;
+		}
+
 		setGuesses((prev) => [...prev, guess]);
 
 		// Check if word matches any unguessed words
-		const matchingWord = crossword.words.find(
-			(w) => !guessedWords.has(w.id) && wordsMatch(w.word.name, guess),
-		);
+		const unguessedMatch =
+			matchingWord && !guessedWords.has(matchingWord.id) ? matchingWord : null;
 
-		if (matchingWord) {
-			setGuessedWords(new Set([...guessedWords, matchingWord.id]));
+		if (unguessedMatch) {
+			setGuessedWords(new Set([...guessedWords, unguessedMatch.id]));
 			toast.success(
 				<span>
-					Correcte! Has trobat <b>{matchingWord.word.name}</b>
+					Correcte! Has trobat <b>{unguessedMatch.word.name}</b>
 				</span>,
 			);
 			setCurrentGuess("");
@@ -233,19 +278,12 @@ export function Daily() {
 					toast.success("🎉 Enhorabona! Has completat el joc!");
 				}, 500);
 			}
-		} else if (guess.match(/^[a-zA-ZçÇ]+$/)) {
+		} else {
 			toast.error(
 				<span>
-					<b>
-						{guess.slice(0, 1).toUpperCase()}
-						{guess.slice(1).toLowerCase()}
-					</b>{" "}
-					no hi és
+					<b>{prettyGuess}</b> no hi és
 				</span>,
 			);
-			setCurrentGuess("");
-		} else {
-			toast.error("La paraula no és vàlida");
 			setCurrentGuess("");
 		}
 	};
