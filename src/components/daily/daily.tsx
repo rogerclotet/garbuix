@@ -21,9 +21,12 @@ import {
 	shuffleArray,
 	wordsMatch,
 } from "@/lib/crossword-generator";
+import {
+	getCurrentSeed,
+	getStateKey,
+	saveHistorySnapshot,
+} from "@/lib/history";
 import { Progress } from "../ui/progress";
-
-const STATE_KEY_PREFIX = "paraules-state-";
 
 export function Daily() {
 	const [crossword, setCrossword] = useState<CrosswordGrid | null>(null);
@@ -94,18 +97,6 @@ export function Daily() {
 			const words = allWords as Word[];
 			const random = new SeededRandom(seed);
 
-			// Cleanup old states
-			const keysToRemove: string[] = [];
-			for (let i = 0; i < localStorage.length; i++) {
-				const key = localStorage.key(i);
-				if (key?.startsWith(STATE_KEY_PREFIX) && key !== getStateKey(seed)) {
-					keysToRemove.push(key);
-				}
-			}
-			for (const key of keysToRemove) {
-				localStorage.removeItem(key);
-			}
-
 			// Generate initial crossword
 			let letters: string[] = [];
 			let newCrossword: CrosswordGrid | null = null;
@@ -170,7 +161,6 @@ export function Daily() {
 		if (!crossword) return;
 
 		if (getCurrentSeed() !== seed) {
-			localStorage.removeItem(getStateKey(seed));
 			setSeed(getCurrentSeed());
 			return;
 		}
@@ -183,6 +173,13 @@ export function Daily() {
 			shuffledLetters,
 		};
 		localStorage.setItem(getStateKey(seed), JSON.stringify(state));
+		saveHistorySnapshot({
+			seed,
+			totalWords: crossword.words.length,
+			guessedWords: guessedWords.size,
+			guesses: guesses.length,
+			hintsUsed,
+		});
 	}, [
 		guessedWords,
 		guesses,
@@ -645,17 +642,4 @@ export function Daily() {
 			</div>
 		</div>
 	);
-}
-
-function getCurrentSeed(): number {
-	const today = new Date();
-	return (
-		(today.getFullYear() - 2000) * 10000 +
-		(today.getMonth() + 1) * 100 +
-		today.getDate()
-	);
-}
-
-function getStateKey(seed: number) {
-	return `${STATE_KEY_PREFIX}${seed}`;
 }
