@@ -47,17 +47,43 @@ export function Daily() {
 		return `${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}`;
 	}, []);
 
+	const refreshSeedIfNeeded = useCallback(() => {
+		const currentSeed = getCurrentSeed();
+		setSeed((previousSeed) =>
+			previousSeed === currentSeed ? previousSeed : currentSeed,
+		);
+	}, []);
+
 	// Set a timer to update the seed at midnight
 	useEffect(() => {
 		const midnight = new Date();
 		midnight.setHours(24, 0, 0, 0);
 		const timeToMidnight = midnight.getTime() - Date.now();
 		const timer = setTimeout(() => {
-			setSeed(getCurrentSeed());
+			refreshSeedIfNeeded();
 		}, timeToMidnight);
 
 		return () => clearTimeout(timer);
-	}, []);
+	}, [refreshSeedIfNeeded]);
+
+	// Refresh when returning to the app after midnight
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "visible") {
+				refreshSeedIfNeeded();
+			}
+		};
+
+		window.addEventListener("focus", refreshSeedIfNeeded);
+		window.addEventListener("pageshow", refreshSeedIfNeeded);
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+
+		return () => {
+			window.removeEventListener("focus", refreshSeedIfNeeded);
+			window.removeEventListener("pageshow", refreshSeedIfNeeded);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+		};
+	}, [refreshSeedIfNeeded]);
 
 	const loadSavedState = useCallback(
 		(savedState: string, letters: string[]) => {

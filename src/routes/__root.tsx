@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
 import { links } from "@/components/meta";
+import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "@/styles.css?url";
@@ -71,9 +72,10 @@ function RootDocument() {
 			<head>
 				<HeadContent />
 			</head>
-			<body className="h-dvh overflow-hidden">
+			<body className="h-dvh overflow-hidden bg-background text-foreground">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
 					<ThemeMeta />
+					<ServiceWorkerRegister />
 					<div className="flex flex-col h-dvh">
 						<Header />
 						<main className="flex-1 overflow-y-auto">
