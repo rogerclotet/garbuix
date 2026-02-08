@@ -4,6 +4,7 @@
 	"start_url": "/",
 	"display": "standalone",
 	"theme_color": "#9336ea",
+	"background_color": "#9336ea",
 	"icons": [
 		{
 			"src": "icons/manifest-icon-192.maskable.png",

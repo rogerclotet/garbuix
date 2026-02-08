@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export default function Header() {
 	return (
 		<header className="bg-primary text-primary-foreground shadow-md border-b border-background transition-colors duration-500">
-			<div className="max-w-7xl mx-auto px-4 py-4">
+			<div className="max-w-7xl mx-auto px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
 				<div className="flex items-center justify-between">
 					<Link
 						to="/"

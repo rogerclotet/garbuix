@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
 import { links } from "@/components/meta";
+import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "@/styles.css?url";
 
@@ -25,7 +26,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			},
 			{
 				name: "viewport",
-				content: "width=device-width, initial-scale=1",
+				content: "width=device-width, initial-scale=1, viewport-fit=cover",
 			},
 			{
 				title: "Paraules - Joc de Mots Encreuats en Català",
@@ -33,6 +34,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{
 				name: "mobile-web-app-capable",
 				content: "yes",
+			},
+			{
+				name: "apple-mobile-web-app-capable",
+				content: "yes",
+			},
+			{
+				name: "apple-mobile-web-app-status-bar-style",
+				content: "black-translucent",
+			},
+			{
+				name: "color-scheme",
+				content: "light dark",
+			},
+			{
+				name: "theme-color",
+				content: "#9336ea",
 			},
 		],
 		links: [
@@ -56,6 +73,7 @@ function RootDocument() {
 			</head>
 			<body className="h-dvh overflow-hidden">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
+					<ThemeMeta />
 					<div className="flex flex-col h-dvh">
 						<Header />
 						<main className="flex-1 overflow-y-auto">
