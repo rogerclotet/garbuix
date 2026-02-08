@@ -21,6 +21,20 @@ export function getCurrentSeed(): number {
 	);
 }
 
+export function getSeedForDate(date: Date): number {
+	return (
+		(date.getFullYear() - 2000) * 10000 +
+		(date.getMonth() + 1) * 100 +
+		date.getDate()
+	);
+}
+
+export function getYesterdaySeed(referenceDate = new Date()): number {
+	const yesterday = new Date(referenceDate);
+	yesterday.setDate(yesterday.getDate() - 1);
+	return getSeedForDate(yesterday);
+}
+
 export function getStateKey(seed: number) {
 	return `${STATE_KEY_PREFIX}${seed}`;
 }
@@ -90,4 +104,9 @@ export function saveHistorySnapshot(snapshot: {
 export function getHistoryEntries(): HistoryEntry[] {
 	const history = readHistoryMap();
 	return Object.values(history).sort((a, b) => b.seed - a.seed);
+}
+
+export function getHistoryEntry(seed: number): HistoryEntry | null {
+	const history = readHistoryMap();
+	return history[seed] ?? null;
 }

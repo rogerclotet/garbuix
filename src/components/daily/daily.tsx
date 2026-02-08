@@ -1,4 +1,10 @@
-import { CheckCircle2, Delete, Lightbulb, Shuffle } from "lucide-react";
+import {
+	CheckCircle2,
+	CornerDownLeft,
+	Delete,
+	Lightbulb,
+	Shuffle,
+} from "lucide-react";
 import {
 	type CSSProperties,
 	useCallback,
@@ -13,11 +19,7 @@ import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import {
 	type CrosswordGrid,
-	filterWordsByLetters,
-	generateCrossword,
-	getRandomLetterSet,
-	normalizeWord,
-	SeededRandom,
+	generateDailyCrosswordForSeed,
 	shuffleArray,
 	wordsMatch,
 } from "@/lib/crossword-generator";
@@ -95,57 +97,16 @@ export function Daily() {
 	useEffect(() => {
 		try {
 			const words = allWords as Word[];
-			const random = new SeededRandom(seed);
+			const result = generateDailyCrosswordForSeed(words, seed);
+			if (!result) throw new Error("Failed to generate crossword");
 
-			// Generate initial crossword
-			let letters: string[] = [];
-			let newCrossword: CrosswordGrid | null = null;
-			let attempts = 0;
-			const minWords = 5;
-			const maxWords = 15;
-
-			while (attempts < 30) {
-				letters = getRandomLetterSet(words, random);
-				const filteredWords = filterWordsByLetters(words, letters);
-				if (filteredWords.length < minWords) {
-					attempts++;
-					continue;
-				}
-
-				try {
-					const result = generateCrossword(
-						filteredWords,
-						minWords,
-						maxWords,
-						random,
-					);
-					if (result.words.length < minWords) {
-						attempts++;
-						continue;
-					}
-					const usedLetters = new Set(
-						result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
-					);
-
-					if (letters.every((l) => usedLetters.has(l))) {
-						newCrossword = result;
-						break;
-					}
-				} catch (_e) {
-					// continue
-				}
-				attempts++;
-			}
-
-			if (!newCrossword) throw new Error("Failed to generate crossword");
-
-			setShuffledLetters(random.shuffleArray(letters));
-			setCrossword(newCrossword);
+			setShuffledLetters(result.shuffledLetters);
+			setCrossword(result.crossword);
 
 			// Load saved state for today
 			const savedState = localStorage.getItem(getStateKey(seed));
 			if (savedState) {
-				loadSavedState(savedState, letters);
+				loadSavedState(savedState, result.letters);
 			}
 
 			setLoading(false);
@@ -392,7 +353,6 @@ export function Daily() {
 	}
 
 	const isComplete = guessedWords.size === crossword.words.length;
-
 	return (
 		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8">
 			<div className="max-w-7xl mx-auto">
@@ -469,7 +429,7 @@ export function Daily() {
 					<div className="lg:space-y-6">
 						{/* Guess Form */}
 						{!isComplete && (
-							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-sm lg:border lg:backdrop-blur-none">
+							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-none lg:dark:shadow-none lg:border lg:backdrop-blur-none">
 								<CardHeader className="hidden lg:block">
 									<CardTitle>Endevina una paraula</CardTitle>
 								</CardHeader>
@@ -480,29 +440,29 @@ export function Daily() {
 											{currentGuess}
 										</div>
 
-										{/* Letter Buttons */}
-										<div className="grid grid-cols-3 gap-2 sm:gap-3">
-											{shuffledLetters.map((letter) => (
-												<Button
-													key={`letter-${letter}`}
-													variant="outline"
-													size="lg"
-													className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-colors"
-													onClick={() => handleLetterClick(letter)}
-												>
-													{letter.toUpperCase()}
-												</Button>
-											))}
-										</div>
-
-										<div className="w-[80%] mx-auto">
+										{/* Letter Buttons + Submit */}
+										<div className="flex items-center justify-center gap-5 sm:gap-6">
+											<div className="grid grid-cols-3 gap-2 sm:gap-3">
+												{shuffledLetters.map((letter) => (
+													<Button
+														key={`letter-${letter}`}
+														variant="outline"
+														size="lg"
+														className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-colors"
+														onClick={() => handleLetterClick(letter)}
+													>
+														{letter.toUpperCase()}
+													</Button>
+												))}
+											</div>
 											<Button
 												onClick={() => handleGuess()}
-												className="w-full h-10 sm:h-12"
-												size="lg"
-												disabled={currentGuess.length < 3}
+												size="icon"
+												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl"
+												disabled={currentGuess.length < 4}
+												aria-label="Comprovar"
 											>
-												Comprovar
+												<CornerDownLeft className="h-5 w-5" />
 											</Button>
 										</div>
 

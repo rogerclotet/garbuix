@@ -89,11 +89,11 @@ export function generateCrossword(
 	maxWords = 15,
 	random: SeededRandom = new SeededRandom(Date.now()),
 ): CrosswordGrid {
-	// Filter words: 3-12 letters, only letters
+	// Filter words: 4-12 letters, only letters
 	const validWords = random
 		.shuffleArray(
 			words
-				.filter((w) => w.name.length >= 3 && w.name.length <= 12)
+				.filter((w) => w.name.length >= 4 && w.name.length <= 12)
 				.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
 		)
 		.slice(0, Math.min(words.length, maxWords * 3)); // Take more than needed for better chances
@@ -475,7 +475,7 @@ export function filterWordsByLetters(
 
 	return words.filter((word) => {
 		const normalized = normalizeWord(word.name);
-		if (normalized.length < 3) {
+		if (normalized.length < 4) {
 			return false;
 		}
 
@@ -516,6 +516,63 @@ export function getRandomLetterSet(
 
 	// Fallback: common Catalan letters
 	return random.shuffleArray("aeioustrln".split("")).slice(0, 6);
+}
+
+export function generateDailyCrosswordForSeed(
+	words: Word[],
+	seed: number,
+	minWords = 5,
+	maxWords = 15,
+): {
+	crossword: CrosswordGrid;
+	letters: string[];
+	shuffledLetters: string[];
+} | null {
+	const random = new SeededRandom(seed);
+	let letters: string[] = [];
+	let newCrossword: CrosswordGrid | null = null;
+	let attempts = 0;
+
+	while (attempts < 30) {
+		letters = getRandomLetterSet(words, random);
+		const filteredWords = filterWordsByLetters(words, letters);
+		if (filteredWords.length < minWords) {
+			attempts++;
+			continue;
+		}
+
+		try {
+			const result = generateCrossword(
+				filteredWords,
+				minWords,
+				maxWords,
+				random,
+			);
+			if (result.words.length < minWords) {
+				attempts++;
+				continue;
+			}
+			const usedLetters = new Set(
+				result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
+			);
+
+			if (letters.every((l) => usedLetters.has(l))) {
+				newCrossword = result;
+				break;
+			}
+		} catch (_e) {
+			// continue
+		}
+		attempts++;
+	}
+
+	if (!newCrossword) return null;
+
+	return {
+		crossword: newCrossword,
+		letters,
+		shuffledLetters: random.shuffleArray(letters),
+	};
 }
 
 /**
