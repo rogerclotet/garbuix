@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
 	"vcs": {
 		"enabled": false,
 		"clientKind": "git",
@@ -12,6 +12,9 @@
 			"**/public/**/*",
 			"**/package.json",
 			"**/vite.config.js",
+			"!**/.output",
+			"!**/dist",
+			"!**/node_modules",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/data/catalan-words.json"
 		]
