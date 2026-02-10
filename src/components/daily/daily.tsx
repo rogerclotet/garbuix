@@ -467,7 +467,7 @@ export function Daily() {
 										</div>
 
 										{/* Letter Buttons + Submit */}
-										<div className="flex items-center justify-center gap-5 sm:gap-6">
+										<div className="flex items-center justify-evenly w-full gap-4 sm:gap-6">
 											<div className="grid grid-cols-3 gap-2 sm:gap-3">
 												{shuffledLetters.map((letter) => (
 													<Button
