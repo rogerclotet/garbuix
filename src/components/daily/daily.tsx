@@ -3,6 +3,7 @@ import {
 	CornerDownLeft,
 	Delete,
 	Lightbulb,
+	RotateCcw,
 	Shuffle,
 } from "lucide-react";
 import {
@@ -13,6 +14,17 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import allWords from "@/data/catalan-words.json";
@@ -392,6 +404,49 @@ export function Daily() {
 		}
 	};
 
+	const hasProgress =
+		guessedWords.size > 0 || guesses.length > 0 || hintsUsed > 0;
+
+	const handleResetDailyProgress = () => {
+		triggerHaptic(10);
+		resetGameProgress();
+		toast.success("S'ha reiniciat el progrés d'avui");
+	};
+
+	const resetProgressControl = (
+		<AlertDialog>
+			<AlertDialogTrigger asChild>
+				<Button
+					variant="outline"
+					size="sm"
+					className="border-border/70 bg-background/60 text-muted-foreground hover:text-foreground"
+					disabled={!hasProgress}
+				>
+					<RotateCcw className="w-3.5 h-3.5" />
+					Reiniciar progrés d'avui
+				</Button>
+			</AlertDialogTrigger>
+			<AlertDialogContent size="sm">
+				<AlertDialogHeader>
+					<AlertDialogTitle>Reiniciar el progrés d'avui?</AlertDialogTitle>
+					<AlertDialogDescription>
+						Això esborrarà les paraules trobades, els intents i les pistes
+						utilitzades d'avui.
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter>
+					<AlertDialogCancel>Cancel·lar</AlertDialogCancel>
+					<AlertDialogAction
+						variant="destructive"
+						onClick={handleResetDailyProgress}
+					>
+						Reiniciar
+					</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
+	);
+
 	if (loading) {
 		return (
 			<div className="h-full flex items-center justify-center">
@@ -668,6 +723,10 @@ export function Daily() {
 								</CardContent>
 							</Card>
 						)}
+
+						<div className="mt-4 flex justify-center">
+							{resetProgressControl}
+						</div>
 					</div>
 				</div>
 			</div>
