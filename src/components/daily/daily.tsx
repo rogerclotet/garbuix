@@ -47,6 +47,14 @@ export function Daily() {
 		return `${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}`;
 	}, []);
 
+	const resetGameProgress = useCallback(() => {
+		setGuessedWords(new Set());
+		setGuesses([]);
+		setHintsUsed(0);
+		setHintedCells(new Set());
+		setCurrentGuess("");
+	}, []);
+
 	const refreshSeedIfNeeded = useCallback(() => {
 		const currentSeed = getCurrentSeed();
 		setSeed((previousSeed) =>
@@ -117,18 +125,26 @@ export function Daily() {
 					return;
 				}
 
-				const sortedSavedLetters = savedShuffledLetters.sort();
-				const sortedLetters = letters.sort();
+				const sortedSavedLetters = [...savedShuffledLetters].sort();
+				const sortedLetters = [...letters].sort();
 				if (sortedSavedLetters.join("") !== sortedLetters.join("")) {
 					// Ignore saved state if letters have changed
 					return;
 				}
 
-				if (savedGuessedWords) setGuessedWords(new Set(savedGuessedWords));
-				if (savedGuesses) setGuesses(savedGuesses);
-				if (savedHintsUsed) setHintsUsed(savedHintsUsed);
-				if (savedHintedCells) setHintedCells(new Set(savedHintedCells));
-				if (savedShuffledLetters) setShuffledLetters(savedShuffledLetters);
+				if (Array.isArray(savedGuessedWords)) {
+					setGuessedWords(new Set(savedGuessedWords));
+				}
+				if (Array.isArray(savedGuesses)) {
+					setGuesses(savedGuesses);
+				}
+				if (typeof savedHintsUsed === "number") {
+					setHintsUsed(savedHintsUsed);
+				}
+				if (Array.isArray(savedHintedCells)) {
+					setHintedCells(new Set(savedHintedCells));
+				}
+				setShuffledLetters(savedShuffledLetters);
 			} catch (e) {
 				console.error("Failed to parse saved state:", e);
 			}
@@ -138,27 +154,34 @@ export function Daily() {
 
 	// Load words and generate crossword
 	useEffect(() => {
+		setLoading(true);
 		try {
+			const currentSeed = getCurrentSeed();
+			if (seed !== currentSeed) {
+				setSeed(currentSeed);
+				return;
+			}
+
 			const words = allWords as Word[];
 			const result = generateDailyCrosswordForSeed(words, seed);
 			if (!result) throw new Error("Failed to generate crossword");
 
 			setShuffledLetters(result.shuffledLetters);
 			setCrossword(result.crossword);
+			resetGameProgress();
 
 			// Load saved state for today
 			const savedState = localStorage.getItem(getStateKey(seed));
 			if (savedState) {
 				loadSavedState(savedState, result.letters);
 			}
-
-			setLoading(false);
 		} catch (error) {
 			console.error("Failed to load words:", error);
 			toast.error("Error carregant el diccionari");
+		} finally {
 			setLoading(false);
 		}
-	}, [seed, loadSavedState]);
+	}, [seed, loadSavedState, resetGameProgress]);
 
 	// Save game state to localStorage
 	useEffect(() => {
