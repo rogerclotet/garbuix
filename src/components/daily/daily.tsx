@@ -474,7 +474,7 @@ export function Daily() {
 														key={`letter-${letter}`}
 														variant="outline"
 														size="lg"
-														className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-colors"
+														className="w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-all duration-100 active:scale-95 active:bg-primary/10 active:shadow-inner"
 														onClick={() => handleLetterClick(letter)}
 													>
 														{letter.toUpperCase()}
@@ -484,7 +484,7 @@ export function Daily() {
 											<Button
 												onClick={() => handleGuess()}
 												size="icon"
-												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl"
+												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl transition-transform duration-100 active:scale-95"
 												disabled={currentGuess.length < 4}
 												aria-label="Comprovar"
 											>
@@ -497,7 +497,7 @@ export function Daily() {
 											<Button
 												variant="ghost"
 												onClick={handleBackspace}
-												className="gap-2 h-9 sm:h-10"
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
 												disabled={currentGuess.length === 0}
 											>
 												<Delete className="w-4 h-4" />
@@ -506,7 +506,7 @@ export function Daily() {
 											<Button
 												variant="ghost"
 												onClick={handleHint}
-												className="gap-2 h-9 sm:h-10"
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
 												disabled={hintsUsed >= 3 || isComplete}
 												size="lg"
 											>
@@ -518,7 +518,7 @@ export function Daily() {
 											<Button
 												variant="ghost"
 												onClick={handleShuffle}
-												className="gap-2 h-9 sm:h-10"
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
 											>
 												<Shuffle className="w-4 h-4" />
 												Barrejar
