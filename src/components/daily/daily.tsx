@@ -54,6 +54,23 @@ export function Daily() {
 		);
 	}, []);
 
+	const triggerHaptic = useCallback((duration = 8) => {
+		if (typeof window === "undefined" || typeof navigator === "undefined") {
+			return;
+		}
+
+		const nav = navigator as Navigator & { standalone?: boolean };
+		const isStandalone =
+			window.matchMedia("(display-mode: standalone)").matches ||
+			nav.standalone === true;
+
+		if (!isStandalone || typeof navigator.vibrate !== "function") {
+			return;
+		}
+
+		navigator.vibrate(duration);
+	}, []);
+
 	// Set a timer to update the seed at midnight
 	useEffect(() => {
 		const midnight = new Date();
@@ -196,6 +213,7 @@ export function Daily() {
 
 	const handleGuess = (e?: React.FormEvent) => {
 		if (e) e.preventDefault();
+		triggerHaptic(10);
 
 		if (!crossword || !currentGuess.trim()) return;
 
@@ -313,18 +331,22 @@ export function Daily() {
 	*/
 
 	const handleLetterClick = (letter: string) => {
+		triggerHaptic(8);
 		setCurrentGuess((prev) => prev + letter);
 	};
 
 	const handleBackspace = () => {
+		triggerHaptic(8);
 		setCurrentGuess((prev) => prev.slice(0, -1));
 	};
 
 	const handleShuffle = () => {
+		triggerHaptic(8);
 		setShuffledLetters(shuffleArray(shuffledLetters));
 	};
 
 	const handleHint = () => {
+		triggerHaptic(8);
 		if (!crossword || hintsUsed >= 3) return;
 
 		const hiddenCells: string[] = [];
