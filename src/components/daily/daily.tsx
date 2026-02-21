@@ -11,6 +11,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import { toast } from "sonner";
@@ -42,6 +43,8 @@ import {
 } from "@/lib/history";
 import { Progress } from "../ui/progress";
 
+const POINTER_CLICK_DEDUP_MS = 350;
+
 export function Daily() {
 	const [crossword, setCrossword] = useState<CrosswordGrid | null>(null);
 	const [guessedWords, setGuessedWords] = useState<Set<number>>(new Set());
@@ -50,6 +53,7 @@ export function Daily() {
 	const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [seed, setSeed] = useState(getCurrentSeed());
+	const lastPointerPressAtRef = useRef(0);
 
 	const [loading, setLoading] = useState(true);
 	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
@@ -301,7 +305,7 @@ export function Daily() {
 			matchingWord && !guessedWords.has(matchingWord.id) ? matchingWord : null;
 
 		if (unguessedMatch) {
-			setGuessedWords(new Set([...guessedWords, unguessedMatch.id]));
+			setGuessedWords((prev) => new Set([...prev, unguessedMatch.id]));
 			toast.success(
 				<span>
 					Correcte! Has trobat <b>{unguessedMatch.word.name}</b>
@@ -377,8 +381,40 @@ export function Daily() {
 
 	const handleShuffle = () => {
 		triggerHaptic(8);
-		setShuffledLetters(shuffleArray(shuffledLetters));
+		setShuffledLetters((prev) => shuffleArray(prev));
 	};
+
+	const runPressAction = useCallback(
+		(
+			event: React.PointerEvent<HTMLButtonElement>,
+			action: () => void,
+		): void => {
+			if (event.pointerType === "mouse" && event.button !== 0) {
+				return;
+			}
+
+			lastPointerPressAtRef.current = performance.now();
+			event.preventDefault();
+			action();
+		},
+		[],
+	);
+
+	const runClickAction = useCallback(
+		(event: React.MouseEvent<HTMLButtonElement>, action: () => void): void => {
+			const clickIsFromPointer = event.detail > 0;
+			if (clickIsFromPointer) {
+				const elapsedSincePointerPress =
+					performance.now() - lastPointerPressAtRef.current;
+				if (elapsedSincePointerPress < POINTER_CLICK_DEDUP_MS) {
+					return;
+				}
+			}
+
+			action();
+		},
+		[],
+	);
 
 	const handleHint = () => {
 		triggerHaptic(8);
@@ -574,17 +610,31 @@ export function Daily() {
 														key={`letter-${letter}`}
 														variant="outline"
 														size="lg"
-														className="w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-all duration-100 active:scale-95 active:bg-primary/10 active:shadow-inner"
-														onClick={() => handleLetterClick(letter)}
+														className="w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-all duration-100 active:scale-95 active:bg-primary/10 active:shadow-inner touch-manipulation"
+														onPointerDown={(event) =>
+															runPressAction(event, () =>
+																handleLetterClick(letter),
+															)
+														}
+														onClick={(event) =>
+															runClickAction(event, () =>
+																handleLetterClick(letter),
+															)
+														}
 													>
 														{letter.toUpperCase()}
 													</Button>
 												))}
 											</div>
 											<Button
-												onClick={() => handleGuess()}
+												onPointerDown={(event) =>
+													runPressAction(event, () => handleGuess())
+												}
+												onClick={(event) =>
+													runClickAction(event, () => handleGuess())
+												}
 												size="icon"
-												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl transition-transform duration-100 active:scale-95"
+												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl transition-transform duration-100 active:scale-95 touch-manipulation"
 												disabled={currentGuess.length < 4}
 												aria-label="Comprovar"
 											>
@@ -596,8 +646,13 @@ export function Daily() {
 										<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full">
 											<Button
 												variant="ghost"
-												onClick={handleBackspace}
-												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
+												onPointerDown={(event) =>
+													runPressAction(event, handleBackspace)
+												}
+												onClick={(event) =>
+													runClickAction(event, handleBackspace)
+												}
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
 												disabled={currentGuess.length === 0}
 											>
 												<Delete className="w-4 h-4" />
@@ -605,8 +660,11 @@ export function Daily() {
 											</Button>
 											<Button
 												variant="ghost"
-												onClick={handleHint}
-												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
+												onPointerDown={(event) =>
+													runPressAction(event, handleHint)
+												}
+												onClick={(event) => runClickAction(event, handleHint)}
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
 												disabled={hintsUsed >= 3 || isComplete}
 												size="lg"
 											>
@@ -617,8 +675,13 @@ export function Daily() {
 											</Button>
 											<Button
 												variant="ghost"
-												onClick={handleShuffle}
-												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98]"
+												onPointerDown={(event) =>
+													runPressAction(event, handleShuffle)
+												}
+												onClick={(event) =>
+													runClickAction(event, handleShuffle)
+												}
+												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
 											>
 												<Shuffle className="w-4 h-4" />
 												Barrejar
