@@ -90,13 +90,15 @@ export function generateCrossword(
 	random: SeededRandom = new SeededRandom(Date.now()),
 ): CrosswordGrid {
 	// Filter words: 4-12 letters, only letters
-	const validWords = random
-		.shuffleArray(
-			words
-				.filter((w) => w.name.length >= 4 && w.name.length <= 12)
-				.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
-		)
-		.slice(0, Math.min(words.length, maxWords * 3)); // Take more than needed for better chances
+	const candidateWords = random.shuffleArray(
+		words
+			.filter((w) => w.name.length >= 4 && w.name.length <= 12)
+			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
+	);
+	const validWords = candidateWords.slice(
+		0,
+		Math.min(words.length, maxWords * 3),
+	); // Take more than needed for better chances
 
 	if (validWords.length === 0) {
 		throw new Error("No valid words available");
@@ -288,6 +290,8 @@ function isValidPlacement(
 
 	const isHorizontal = direction === "horizontal";
 	let hasIntersection = false;
+	let hasNewCell = false;
+	const overlapsByWordId = new Map<number, number>();
 
 	// Check each cell
 	for (let i = 0; i < word.name.length; i++) {
@@ -302,7 +306,15 @@ function isValidPlacement(
 				return false; // Letter mismatch
 			}
 			hasIntersection = true;
+			for (const existingWordId of cell.wordIds) {
+				const overlapCount = (overlapsByWordId.get(existingWordId) ?? 0) + 1;
+				if (overlapCount > 1) {
+					return false;
+				}
+				overlapsByWordId.set(existingWordId, overlapCount);
+			}
 		} else {
+			hasNewCell = true;
 			// Check adjacent cells (no touching words)
 			const adjacentPositions = isHorizontal
 				? [
@@ -336,7 +348,7 @@ function isValidPlacement(
 		return false;
 	}
 
-	return hasIntersection;
+	return hasIntersection && hasNewCell;
 }
 
 function countIntersections(
