@@ -505,7 +505,7 @@ export function Daily() {
 				<div className="grid lg:grid-cols-3 gap-6">
 					{/* Crossword Grid */}
 					<div className="lg:col-span-2">
-						<Card>
+						<Card className="bg-background border-border/85">
 							<CardContent className="p-2 sm:p-4 md:p-6">
 								<div
 									className="flex items-center justify-center w-full @container"
@@ -536,8 +536,8 @@ export function Daily() {
 														key={key}
 														className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-all duration-300 ${
 															isRevealed
-																? "bg-primary/10 border-primary/40 text-secondary-foreground"
-																: "bg-border/30 border-border"
+																? "bg-primary/18 border-primary/70 text-secondary-foreground"
+																: "bg-muted/80 border-muted-foreground/30 dark:bg-muted/90 dark:border-muted-foreground/45"
 														}`}
 													>
 														{isRevealed ? cell.letter.toUpperCase() : ""}
