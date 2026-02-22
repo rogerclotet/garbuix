@@ -401,14 +401,11 @@ export function Daily() {
 	);
 
 	const runClickAction = useCallback(
-		(event: React.MouseEvent<HTMLButtonElement>, action: () => void): void => {
-			const clickIsFromPointer = event.detail > 0;
-			if (clickIsFromPointer) {
-				const elapsedSincePointerPress =
-					performance.now() - lastPointerPressAtRef.current;
-				if (elapsedSincePointerPress < POINTER_CLICK_DEDUP_MS) {
-					return;
-				}
+		(_event: React.MouseEvent<HTMLButtonElement>, action: () => void): void => {
+			const elapsedSincePointerPress =
+				performance.now() - lastPointerPressAtRef.current;
+			if (elapsedSincePointerPress < POINTER_CLICK_DEDUP_MS) {
+				return;
 			}
 
 			action();
