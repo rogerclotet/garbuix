@@ -64,7 +64,7 @@ The build process automatically:
 ### Crossword Generation
 
 The crossword generator:
-- Randomly selects 5-15 valid words
+- Randomly selects 10-15 valid words
 - Places the first word horizontally
 - Finds intersections for subsequent words
 - Ensures all words cross with at least one other word

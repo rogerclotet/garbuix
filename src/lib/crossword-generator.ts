@@ -2,6 +2,10 @@
 
 import type { Word } from "@/data/types";
 
+const DEFAULT_MIN_WORDS = 10;
+const DEFAULT_MAX_WORDS = 15;
+const MIN_GRID_COLS = 8;
+
 /**
  * Seeded random number generator for reproducible crosswords
  */
@@ -85,10 +89,13 @@ export function wordsMatch(word1: string, word2: string): boolean {
  */
 export function generateCrossword(
 	words: Word[],
-	minWords = 5,
-	maxWords = 15,
+	minWords = DEFAULT_MIN_WORDS,
+	maxWords = DEFAULT_MAX_WORDS,
 	random: SeededRandom = new SeededRandom(Date.now()),
 ): CrosswordGrid {
+	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
+	const safeMaxWords = Math.max(maxWords, requiredMinWords);
+
 	// Filter words: 4-12 letters, only letters
 	const candidateWords = random.shuffleArray(
 		words
@@ -97,23 +104,38 @@ export function generateCrossword(
 	);
 	const validWords = candidateWords.slice(
 		0,
-		Math.min(words.length, maxWords * 3),
+		Math.min(words.length, safeMaxWords * 3),
 	); // Take more than needed for better chances
 
-	if (validWords.length === 0) {
-		throw new Error("No valid words available");
+	if (validWords.length < requiredMinWords) {
+		throw new Error("Not enough valid words available");
 	}
 
 	// Try to generate a crossword multiple times
 	for (let attempt = 0; attempt < 50; attempt++) {
-		const result = tryGenerateCrossword(validWords, minWords, maxWords);
-		if (result && result.words.length >= minWords) {
-			return result;
+		const result = tryGenerateCrossword(
+			validWords,
+			requiredMinWords,
+			safeMaxWords,
+		);
+		if (result && result.words.length >= requiredMinWords) {
+			const normalizedResult = ensureMinimumGridWidth(result, MIN_GRID_COLS);
+			if (allWordsHaveIntersections(normalizedResult)) {
+				return normalizedResult;
+			}
 		}
 	}
 
 	// Fallback: create a simple crossword with the first word
-	return createFallbackCrossword(validWords.slice(0, minWords));
+	const fallback = ensureMinimumGridWidth(
+		createFallbackCrossword(validWords.slice(0, requiredMinWords)),
+		MIN_GRID_COLS,
+	);
+	if (allWordsHaveIntersections(fallback)) {
+		return fallback;
+	}
+
+	throw new Error("Failed to generate a valid crossword");
 }
 
 function tryGenerateCrossword(
@@ -421,6 +443,54 @@ function convertToGrid(
 	};
 }
 
+function ensureMinimumGridWidth(
+	crossword: CrosswordGrid,
+	minCols: number,
+): CrosswordGrid {
+	if (crossword.cols >= minCols) {
+		return crossword;
+	}
+
+	const totalPadding = minCols - crossword.cols;
+	const leftPadding = Math.floor(totalPadding / 2);
+	const rightPadding = totalPadding - leftPadding;
+
+	const paddedGrid = crossword.grid.map((row) => [
+		...Array(leftPadding).fill(null),
+		...row,
+		...Array(rightPadding).fill(null),
+	]);
+
+	const adjustedPlacements = crossword.words.map((word) => ({
+		...word,
+		startCol: word.startCol + leftPadding,
+	}));
+
+	return {
+		...crossword,
+		grid: paddedGrid,
+		words: adjustedPlacements,
+		cols: minCols,
+	};
+}
+
+function allWordsHaveIntersections(crossword: CrosswordGrid): boolean {
+	const intersectingWordIds = new Set<number>();
+
+	for (const row of crossword.grid) {
+		for (const cell of row) {
+			if (!cell || cell.wordIds.length < 2) {
+				continue;
+			}
+			for (const wordId of cell.wordIds) {
+				intersectingWordIds.add(wordId);
+			}
+		}
+	}
+
+	return crossword.words.every((word) => intersectingWordIds.has(word.id));
+}
+
 function createFallbackCrossword(words: Word[]): CrosswordGrid {
 	const placements: WordPlacement[] = [];
 	const grid: Map<string, GridCell> = new Map();
@@ -533,13 +603,15 @@ export function getRandomLetterSet(
 export function generateDailyCrosswordForSeed(
 	words: Word[],
 	seed: number,
-	minWords = 5,
-	maxWords = 15,
+	minWords = DEFAULT_MIN_WORDS,
+	maxWords = DEFAULT_MAX_WORDS,
 ): {
 	crossword: CrosswordGrid;
 	letters: string[];
 	shuffledLetters: string[];
 } | null {
+	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
+	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
 	let letters: string[] = [];
 	let newCrossword: CrosswordGrid | null = null;
@@ -548,7 +620,7 @@ export function generateDailyCrosswordForSeed(
 	while (attempts < 30) {
 		letters = getRandomLetterSet(words, random);
 		const filteredWords = filterWordsByLetters(words, letters);
-		if (filteredWords.length < minWords) {
+		if (filteredWords.length < requiredMinWords) {
 			attempts++;
 			continue;
 		}
@@ -556,11 +628,14 @@ export function generateDailyCrosswordForSeed(
 		try {
 			const result = generateCrossword(
 				filteredWords,
-				minWords,
-				maxWords,
+				requiredMinWords,
+				safeMaxWords,
 				random,
 			);
-			if (result.words.length < minWords) {
+			if (
+				result.words.length < requiredMinWords ||
+				result.cols < MIN_GRID_COLS
+			) {
 				attempts++;
 				continue;
 			}
