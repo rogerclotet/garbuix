@@ -1,5 +1,6 @@
 export type Word = {
 	name: string;
-	areatematica: string | string[];
+	areatematica: string;
 	definition: string;
+	frequency: number;
 };

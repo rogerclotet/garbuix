@@ -5,9 +5,9 @@
 	"scripts": {
 		"dev": "vite dev --port 3000",
 		"build": "vite build",
-		"prebuild": "tsx scripts/download-termcat-dictionary.ts",
+		"prebuild": "tsx scripts/download-catalan-dictionary.ts --if-missing",
 		"start": "node .output/server/index.mjs",
-		"download-dict": "tsx scripts/download-termcat-dictionary.ts",
+		"download-dict": "tsx scripts/download-catalan-dictionary.ts --force",
 		"preview": "vite preview",
 		"test": "vitest run",
 		"format": "biome format",

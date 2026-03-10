@@ -64,6 +64,129 @@ interface Candidate {
 	intersections: number;
 }
 
+type WordLike = {
+	name: string;
+};
+
+type WordLengthProfile = {
+	total: number;
+	fourLetter: number;
+	fiveLetter: number;
+	short: number;
+	medium: number;
+	long: number;
+	sevenPlus: number;
+	fourLetterRatio: number;
+	fiveLetterRatio: number;
+	shortRatio: number;
+	mediumRatio: number;
+	longRatio: number;
+	sevenPlusRatio: number;
+	averageLength: number;
+	uniqueLengths: number;
+};
+
+const IDEAL_FOUR_LETTER_RATIO = 0.35;
+const IDEAL_SHORT_WORD_RATIO = 0.55;
+const STRONG_DIVERSITY_SCORE = 46;
+
+function getLengthPriority(normalizedLength: number): number {
+	if (normalizedLength === 4) {
+		return -0.2;
+	}
+
+	if (normalizedLength === 5) {
+		return 0.05;
+	}
+
+	if (normalizedLength >= 6 && normalizedLength <= 8) {
+		return 0.55;
+	}
+
+	if (normalizedLength <= 10) {
+		return 0.65;
+	}
+
+	return 0.3;
+}
+
+function getWordPriority(word: Word): number {
+	const normalizedLength = normalizeWord(word.name).length;
+	const frequencyScore = Math.log10((word.frequency ?? 0) + 10);
+	const lengthBonus = getLengthPriority(normalizedLength);
+	const partOfSpeechBonus = word.areatematica.includes("Nom")
+		? 0.2
+		: word.areatematica.includes("Adjectiu")
+			? 0.15
+			: word.areatematica.includes("Verb")
+				? 0.1
+				: 0.05;
+
+	return frequencyScore + lengthBonus + partOfSpeechBonus;
+}
+
+function prioritizeWords(words: Word[], random: SeededRandom): Word[] {
+	return words
+		.map((word) => ({
+			word,
+			score: getWordPriority(word) + random.next() * 0.75,
+		}))
+		.sort((a, b) => b.score - a.score)
+		.map(({ word }) => word);
+}
+
+function getWordLengthProfile(words: WordLike[]): WordLengthProfile {
+	const lengths = words.map((word) => normalizeWord(word.name).length);
+	const total = lengths.length;
+	const fourLetter = lengths.filter((length) => length === 4).length;
+	const fiveLetter = lengths.filter((length) => length === 5).length;
+	const short = lengths.filter((length) => length <= 5).length;
+	const medium = lengths.filter((length) => length >= 6 && length <= 8).length;
+	const long = lengths.filter((length) => length >= 9).length;
+	const sevenPlus = lengths.filter((length) => length >= 7).length;
+	const averageLength =
+		total === 0 ? 0 : lengths.reduce((sum, length) => sum + length, 0) / total;
+
+	return {
+		total,
+		fourLetter,
+		fiveLetter,
+		short,
+		medium,
+		long,
+		sevenPlus,
+		fourLetterRatio: total === 0 ? 0 : fourLetter / total,
+		fiveLetterRatio: total === 0 ? 0 : fiveLetter / total,
+		shortRatio: total === 0 ? 0 : short / total,
+		mediumRatio: total === 0 ? 0 : medium / total,
+		longRatio: total === 0 ? 0 : long / total,
+		sevenPlusRatio: total === 0 ? 0 : sevenPlus / total,
+		averageLength,
+		uniqueLengths: new Set(lengths).size,
+	};
+}
+
+function scoreWordLengthProfile(profile: WordLengthProfile): number {
+	if (profile.total === 0) {
+		return Number.NEGATIVE_INFINITY;
+	}
+
+	const fourLetterPenalty =
+		Math.max(0, profile.fourLetterRatio - IDEAL_FOUR_LETTER_RATIO) * 38;
+	const shortPenalty =
+		Math.max(0, profile.shortRatio - IDEAL_SHORT_WORD_RATIO) * 18;
+
+	return (
+		profile.averageLength * 4.5 +
+		profile.mediumRatio * 13 +
+		profile.sevenPlusRatio * 8 +
+		profile.longRatio * 18 +
+		Math.min(profile.uniqueLengths, 5) * 2 -
+		fourLetterPenalty -
+		shortPenalty
+	);
+}
+
 /**
  * Normalize a word by removing accents and converting to lowercase
  */
@@ -97,15 +220,16 @@ export function generateCrossword(
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 
 	// Filter words: 4-12 letters, only letters
-	const candidateWords = random.shuffleArray(
+	const candidateWords = prioritizeWords(
 		words
 			.filter((w) => w.name.length >= 4 && w.name.length <= 12)
 			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
+		random,
 	);
 	const validWords = candidateWords.slice(
 		0,
-		Math.min(words.length, safeMaxWords * 3),
-	); // Take more than needed for better chances
+		Math.min(candidateWords.length, safeMaxWords * 5),
+	); // Keep a larger pool so higher-quality words still have placement options
 
 	if (validWords.length < requiredMinWords) {
 		throw new Error("Not enough valid words available");
@@ -589,8 +713,12 @@ export function getRandomLetterSet(
 	});
 
 	if (candidates.length > 0) {
-		const randomWord =
-			candidates[Math.floor(random.next() * candidates.length)];
+		const prioritizedCandidates = prioritizeWords(candidates, random);
+		const pool = prioritizedCandidates.slice(
+			0,
+			Math.min(prioritizedCandidates.length, 64),
+		);
+		const randomWord = pool[Math.floor(random.next() * pool.length)];
 		const normalized = normalizeWord(randomWord.name);
 		const chars = Array.from(new Set(normalized.split("")));
 		return random.shuffleArray(chars).slice(0, 6);
@@ -613,12 +741,13 @@ export function generateDailyCrosswordForSeed(
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
-	let letters: string[] = [];
-	let newCrossword: CrosswordGrid | null = null;
+	let bestLetters: string[] = [];
+	let bestCrossword: CrosswordGrid | null = null;
+	let bestScore = Number.NEGATIVE_INFINITY;
 	let attempts = 0;
 
-	while (attempts < 30) {
-		letters = getRandomLetterSet(words, random);
+	while (attempts < 60) {
+		const letters = getRandomLetterSet(words, random);
 		const filteredWords = filterWordsByLetters(words, letters);
 		if (filteredWords.length < requiredMinWords) {
 			attempts++;
@@ -639,13 +768,25 @@ export function generateDailyCrosswordForSeed(
 				attempts++;
 				continue;
 			}
+
 			const usedLetters = new Set(
 				result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
 			);
 
 			if (letters.every((l) => usedLetters.has(l))) {
-				newCrossword = result;
-				break;
+				const score = scoreWordLengthProfile(
+					getWordLengthProfile(result.words.map((placement) => placement.word)),
+				);
+
+				if (score > bestScore) {
+					bestScore = score;
+					bestCrossword = result;
+					bestLetters = letters;
+				}
+
+				if (score >= STRONG_DIVERSITY_SCORE) {
+					break;
+				}
 			}
 		} catch (_e) {
 			// continue
@@ -653,12 +794,12 @@ export function generateDailyCrosswordForSeed(
 		attempts++;
 	}
 
-	if (!newCrossword) return null;
+	if (!bestCrossword) return null;
 
 	return {
-		crossword: newCrossword,
-		letters,
-		shuffledLetters: random.shuffleArray(letters),
+		crossword: bestCrossword,
+		letters: bestLetters,
+		shuffledLetters: random.shuffleArray(bestLetters),
 	};
 }
 

@@ -5,7 +5,7 @@ A responsive web application for a Catalan crossword-style word game.
 ## Features
 
 - 🎮 Interactive crossword puzzle game with Catalan words
-- 📚 Uses IATE Catalan dictionary from [TermCat](https://www.termcat.cat)
+- 📚 Uses a general Catalan lexicon from [Softcatalà](https://github.com/Softcatala/catalan-dict-tools)
 - 🎯 5-15 words per game, all crossing with each other
 - 🔤 Guess words without accents, see them properly spelled
 - 📱 Fully responsive design
@@ -46,7 +46,7 @@ The app will be available at `http://localhost:3000`
 - `pnpm run dev` - Start development server on port 3000
 - `pnpm run build` - Build for production (automatically downloads dictionary if missing)
 - `pnpm run preview` - Preview production build
-- `pnpm run download-dict` - Manually download and process the Catalan dictionary
+- `pnpm run download-dict` - Force-refresh and rebuild the Catalan dictionary
 - `pnpm run format` - Format code with Biome
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome
@@ -57,9 +57,10 @@ The app will be available at `http://localhost:3000`
 ### Dictionary Download
 
 The build process automatically:
-1. Fetches TermCat's IATE dictionary from https://www.termcat.cat/Thor/files/diccionaris/wadfiateencatala.xml
-2. Parses and filters words (3+ letters, letters only), with topics and definitions
-3. Saves to `src/data/catalan-words.json` (~5.5k words)
+1. Fetches general lexical data from Softcatalà's `catalan-dict-tools` repository
+2. Combines nouns, adjectives, verbs, adverbs, and lemma frequency data
+3. Filters to crossword-friendly entries (4-12 letters, alphabetic, common enough to be useful)
+4. Saves the result to `src/data/catalan-words.json` (currently ~14.5k words)
 
 ### Crossword Generation
 
@@ -77,6 +78,12 @@ The crossword generator:
 - Dictionary words are stored with proper spelling
 - Matching is accent-insensitive
 - Display shows correctly spelled words
+
+### Word Selection Quality
+
+- The dictionary source is a general lexicon instead of a terminology database
+- Low-frequency words are filtered out during the build step (currently `frequency >= 200`)
+- Puzzle generation prefers more common words, while keeping some randomness
 
 ## Technologies
 
@@ -123,20 +130,21 @@ The theme is managed by `ThemeProvider` in `src/components/theme-provider.tsx`.
 ### Customizing Crossword Generation
 
 Edit `src/lib/crossword-generator.ts` to adjust:
-- Word length filters (default: 3-12 characters)
+- Word length filters (default: 4-12 characters)
 - Number of placement attempts (default: 50)
 - Grid size constraints
 - Intersection requirements
 
 ### Updating the Dictionary
 
-The dictionary is automatically downloaded during the build process. To manually update:
+The build only downloads the dictionary if `src/data/catalan-words.json` is missing.
+To force a refresh from the upstream source:
 
 ```bash
 pnpm run download-dict
 ```
 
-This will fetch the latest version from TermCat's IATE dictionary.
+This will fetch the latest source files from Softcatalà and rebuild the local JSON.
 
 ## Contributing
 
@@ -144,6 +152,6 @@ Contributions are welcome! Feel free to submit pull requests or open issues.
 
 ## Acknowledgments
 
-- **TermCat** for maintaining and providing downloadable dictionaries
+- **Softcatalà** for maintaining and publishing open Catalan lexical data
 - **TanStack** team for the amazing React tools
 - **shadcn** for the beautiful UI components
