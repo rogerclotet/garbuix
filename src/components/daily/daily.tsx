@@ -715,16 +715,6 @@ export function Daily() {
 														{word.word.name.length} lletres
 													</span>
 												</div>
-
-												<p className="text-xs text-green-900/80 dark:text-green-400/80">
-													{word.word.areatematica}
-												</p>
-
-												{word.word.definition && (
-													<p className="text-xs text-green-900/80 dark:text-green-400/80">
-														{word.word.definition}
-													</p>
-												)}
 											</div>
 										))}
 

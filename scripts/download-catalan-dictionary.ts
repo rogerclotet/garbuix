@@ -41,7 +41,6 @@ type Source = (typeof SOURCES)[number];
 type WordEntry = {
 	name: string;
 	areatematica: string;
-	definition: string;
 	frequency: number;
 };
 
@@ -102,13 +101,12 @@ async function main() {
 
 	const result = Array.from(words.values())
 		.map(
-			(entry): WordEntry => ({
-				name: entry.name,
-				areatematica: formatLabels(entry.labels),
-				definition: "",
-				frequency: entry.frequency,
-			}),
-		)
+				(entry): WordEntry => ({
+					name: entry.name,
+					areatematica: formatLabels(entry.labels),
+					frequency: entry.frequency,
+				}),
+			)
 		.sort(
 			(a, b) =>
 				b.frequency - a.frequency || a.name.localeCompare(b.name, "ca"),
