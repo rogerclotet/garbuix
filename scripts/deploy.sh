@@ -31,9 +31,7 @@ fi
     source ~/.bashrc
     cd $SSH_PROJECT_DIRECTORY
     git pull
-    docker build -t paraules .
-    docker stop paraules 2>/dev/null || true
-    docker rm paraules 2>/dev/null || true
-    docker run --name=paraules --restart=unless-stopped -d -p $PORT:3000 paraules
+    export APP_PORT=$PORT
+    docker compose up -d --build --remove-orphans
 EOF
 )

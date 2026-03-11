@@ -1,24 +1,34 @@
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+	type CSSProperties,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import allWords from "@/data/catalan-words.json";
-import type { Word } from "@/data/types";
+import { authClient } from "@/lib/auth-client";
 import {
-	type CrosswordGrid,
-	generateDailyCrosswordForSeed,
-} from "@/lib/crossword-generator";
+	buildAnonymousImportPayload,
+	getDeviceId,
+	getSortedAnonymousHistoryEntries,
+	hasImportedAnonymousData,
+	markAnonymousDataImported,
+} from "@/lib/puzzle-local";
 import {
-	getCurrentSeed,
-	getHistoryEntries,
-	getHistoryEntry,
-	getYesterdaySeed,
-	type HistoryEntry,
-	seedToDate,
-} from "@/lib/history";
+	getHistoryPageData,
+	importAnonymousProgress,
+} from "@/lib/puzzle-server-fns";
+import type {
+	DailyPuzzlePreview,
+	HistorySummaryEntry,
+} from "@/lib/puzzle-types";
 
 const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
 	day: "numeric",
@@ -26,45 +36,93 @@ const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
 	year: "numeric",
 });
 
-export function History() {
-	const [entries, setEntries] = useState<HistoryEntry[]>([]);
-	const [yesterdayCrossword, setYesterdayCrossword] =
-		useState<CrosswordGrid | null>(null);
-	const [yesterdayEntry, setYesterdayEntry] = useState<HistoryEntry | null>(
-		null,
-	);
-	const [yesterdaySeed, setYesterdaySeed] = useState<number | null>(null);
+type HistoryData = {
+	accountHistory: HistorySummaryEntry[] | null;
+	yesterdayPuzzle: {
+		dateKey: string;
+		preview: DailyPuzzlePreview;
+	};
+};
+
+export function History({ initialData }: { initialData: HistoryData }) {
+	const session = authClient.useSession();
+	const activeUser = session.data?.user;
+	const fetchHistory = useServerFn(getHistoryPageData);
+	const importProgress = useServerFn(importAnonymousProgress);
+	const deviceId = useMemo(() => getDeviceId(), []);
+	const importAttemptedRef = useRef<string | null>(null);
+	const [accountHistory, setAccountHistory] = useState<
+		HistorySummaryEntry[] | null
+	>(initialData.accountHistory);
+	const [anonymousHistory, setAnonymousHistory] = useState<
+		HistorySummaryEntry[]
+	>([]);
 
 	useEffect(() => {
-		setEntries(getHistoryEntries());
-		const seed = getYesterdaySeed();
-		const words = allWords as Word[];
-		const result = generateDailyCrosswordForSeed(words, seed);
-		setYesterdayCrossword(result?.crossword ?? null);
-		setYesterdayEntry(getHistoryEntry(seed));
-		setYesterdaySeed(seed);
+		setAnonymousHistory(getSortedAnonymousHistoryEntries());
 	}, []);
 
-	const currentSeed = getCurrentSeed();
-	const yesterdayDateLabel = yesterdaySeed
-		? dateFormatter.format(seedToDate(yesterdaySeed))
-		: null;
+	useEffect(() => {
+		let cancelled = false;
 
-	const previousEntries = useMemo(
-		() => entries.filter((entry) => entry.seed < currentSeed),
-		[entries, currentSeed],
-	);
+		const loadHistory = async () => {
+			if (!activeUser) {
+				if (!cancelled) {
+					setAccountHistory(null);
+				}
+				return;
+			}
+
+			if (
+				!hasImportedAnonymousData(activeUser.id) &&
+				importAttemptedRef.current !== activeUser.id
+			) {
+				importAttemptedRef.current = activeUser.id;
+				const payload = buildAnonymousImportPayload();
+				if (
+					payload.historyEntries.length > 0 ||
+					Object.keys(payload.activeProgressByDate).length > 0
+				) {
+					try {
+						await importProgress({
+							data: {
+								deviceId,
+								payload,
+							},
+						});
+						markAnonymousDataImported(activeUser.id);
+						toast.success("S'han sincronitzat els resultats locals");
+					} catch (error) {
+						console.error("Failed to import anonymous history", error);
+					}
+				} else {
+					markAnonymousDataImported(activeUser.id);
+				}
+			}
+
+			const data = await fetchHistory();
+			if (!cancelled) {
+				setAccountHistory(data.accountHistory ?? []);
+			}
+		};
+
+		void loadHistory();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [activeUser, deviceId, fetchHistory, importProgress]);
+
+	const entries = activeUser ? (accountHistory ?? []) : anonymousHistory;
 
 	const stats = useMemo(() => {
-		const totalDays = previousEntries.length;
-		const completedDays = previousEntries.filter(
-			(entry) => entry.completed,
-		).length;
+		const totalDays = entries.length;
+		const completedDays = entries.filter((entry) => entry.completed).length;
 		const completionRate = totalDays
 			? Math.round((completedDays / totalDays) * 100)
 			: 0;
-		const totalGuesses = previousEntries.reduce(
-			(total, entry) => total + entry.guesses,
+		const totalGuesses = entries.reduce(
+			(total, entry) => total + entry.guessCount,
 			0,
 		);
 		const avgGuesses = totalDays ? totalGuesses / totalDays : 0;
@@ -75,7 +133,7 @@ export function History() {
 			completionRate,
 			avgGuesses,
 		};
-	}, [previousEntries]);
+	}, [entries]);
 
 	return (
 		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-16">
@@ -171,28 +229,32 @@ export function History() {
 									</CardHeader>
 									<CardContent>
 										<div className="space-y-4">
-											{previousEntries.map((entry) => {
+											{entries.map((entry) => {
 												const dateLabel = dateFormatter.format(
-													seedToDate(entry.seed),
+													new Date(`${entry.dateKey}T12:00:00.000Z`),
 												);
 												const progressLabel = `${entry.guessedWords} / ${entry.totalWords}`;
-												const isComplete = entry.completed;
 
 												return (
 													<div
-														key={entry.seed}
+														key={`${entry.dateKey}:${entry.seed ?? "legacy"}`}
 														className="rounded-lg border border-border/60 bg-background/70 p-4 space-y-3"
 													>
 														<div className="flex flex-wrap items-center gap-3">
 															<div className="font-semibold">{dateLabel}</div>
 															<Badge
-																variant={isComplete ? "secondary" : "outline"}
+																variant={
+																	entry.completed ? "secondary" : "outline"
+																}
 															>
-																{isComplete ? "Completat" : "Incomplet"}
+																{entry.completed ? "Completat" : "Incomplet"}
 															</Badge>
+															{entry.legacy ? (
+																<Badge variant="outline">Importat</Badge>
+															) : null}
 															<span className="text-sm text-muted-foreground">
-																{entry.guesses} intent
-																{entry.guesses === 1 ? "" : "s"} ·{" "}
+																{entry.guessCount} intent
+																{entry.guessCount === 1 ? "" : "s"} ·{" "}
 																{entry.hintsUsed} pista
 																{entry.hintsUsed === 1 ? "" : "s"}
 															</span>
@@ -224,32 +286,31 @@ export function History() {
 							</CardHeader>
 							<CardContent className="space-y-4">
 								<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-									<span>{yesterdayDateLabel ?? "Carregant..."}</span>
-									{yesterdayEntry ? (
-										<span>
-											· {yesterdayEntry.guessedWords} /{" "}
-											{yesterdayEntry.totalWords} paraules
-											{yesterdayEntry.completed ? " · completat" : ""}
-										</span>
-									) : (
-										<span>· no es va jugar</span>
-									)}
+									<span>
+										{dateFormatter.format(
+											new Date(
+												`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
+											),
+										)}
+									</span>
 								</div>
 
-								{yesterdayCrossword ? (
+								<div
+									className="flex items-center justify-center w-full @container"
+									style={
+										{
+											"--cols": initialData.yesterdayPuzzle.preview.cols,
+										} as CSSProperties
+									}
+								>
 									<div
-										className="flex items-center justify-center w-full @container"
-										style={
-											{ "--cols": yesterdayCrossword.cols } as CSSProperties
-										}
+										className="grid gap-0.5 sm:gap-1 w-full max-w-sm mx-auto"
+										style={{
+											gridTemplateColumns: `repeat(${initialData.yesterdayPuzzle.preview.cols}, 1fr)`,
+										}}
 									>
-										<div
-											className="grid gap-0.5 sm:gap-1 w-full max-w-sm mx-auto"
-											style={{
-												gridTemplateColumns: `repeat(${yesterdayCrossword.cols}, 1fr)`,
-											}}
-										>
-											{yesterdayCrossword.grid.map((row, rowIdx) =>
+										{initialData.yesterdayPuzzle.preview.gridLetters.map(
+											(row, rowIdx) =>
 												row.map((cell, colIdx) => {
 													const key = `${rowIdx},${colIdx}`;
 
@@ -267,18 +328,13 @@ export function History() {
 															key={key}
 															className="aspect-square border rounded-[0.2rem] sm:rounded-[0.3rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/40 text-secondary-foreground"
 														>
-															{cell.letter.toUpperCase()}
+															{cell.toUpperCase()}
 														</div>
 													);
 												}),
-											)}
-										</div>
+										)}
 									</div>
-								) : (
-									<p className="text-sm text-muted-foreground">
-										No s'ha pogut carregar la graella d'ahir.
-									</p>
-								)}
+								</div>
 							</CardContent>
 						</Card>
 					</div>

@@ -1,0 +1,58 @@
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    image: paraules-app:dev
+    command:
+      [
+        "sh",
+        "-lc",
+        "pnpm install --frozen-lockfile && pnpm db:migrate && pnpm dev --host 0.0.0.0 --port 3000",
+      ]
+    environment:
+      DOCKER_DEV: "true"
+      NODE_ENV: development
+      PORT: 3000
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_HMR_HOST: "${VITE_HMR_HOST:-localhost}"
+      VITE_HMR_CLIENT_PORT: "${APP_PORT:-3000}"
+      VITE_HMR_PROTOCOL: "${VITE_HMR_PROTOCOL:-ws}"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - pnpm_store:/root/.local/share/pnpm/store
+
+  backfill:
+    build:
+      context: .
+      target: dev
+    image: paraules-app:dev
+    command:
+      [
+        "sh",
+        "-lc",
+        "pnpm install --frozen-lockfile && pnpm backfill:puzzles",
+      ]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - pnpm_store:/root/.local/share/pnpm/store
+
+volumes:
+  app_node_modules:
+  pnpm_store:

@@ -1,3 +1,4 @@
+import { useServerFn } from "@tanstack/react-start";
 import {
 	CheckCircle2,
 	CornerDownLeft,
@@ -28,55 +29,364 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import allWords from "@/data/catalan-words.json";
-import type { Word } from "@/data/types";
+import { Progress } from "@/components/ui/progress";
+import { authClient } from "@/lib/auth-client";
 import {
-	type CrosswordGrid,
-	generateDailyCrosswordForSeed,
-	shuffleArray,
-	wordsMatch,
-} from "@/lib/crossword-generator";
+	createPuzzleEvent,
+	decodeHintLetters,
+	decodeRevealedAnswers,
+	resolveGuess,
+} from "@/lib/puzzle-client";
 import {
-	getCurrentSeed,
-	getStateKey,
-	saveHistorySnapshot,
-} from "@/lib/history";
-import { Progress } from "../ui/progress";
+	buildAnonymousImportPayload,
+	getAccountPuzzleCache,
+	getAnonymousProgress,
+	getDeviceId,
+	hasImportedAnonymousData,
+	markAnonymousDataImported,
+	saveAccountPuzzleCache,
+	saveAnonymousHistoryEntry,
+	saveAnonymousProgress,
+} from "@/lib/puzzle-local";
+import {
+	applyPuzzleEvent,
+	applyPuzzleEvents,
+	createEmptyProgressState,
+} from "@/lib/puzzle-progress";
+import {
+	getUserPuzzleProgress,
+	importAnonymousProgress,
+	syncUserPuzzleEvents,
+} from "@/lib/puzzle-server-fns";
+import { formatGuess } from "@/lib/puzzle-text";
+import type {
+	DailyPuzzlePublic,
+	PuzzleClientEvent,
+	PuzzleProgressState,
+} from "@/lib/puzzle-types";
+import { shuffleArray } from "@/lib/shuffle";
 
 const POINTER_CLICK_DEDUP_MS = 350;
 
-export function Daily() {
-	const [crossword, setCrossword] = useState<CrosswordGrid | null>(null);
-	const [guessedWords, setGuessedWords] = useState<Set<number>>(new Set());
-	const [guesses, setGuesses] = useState<string[]>([]);
-	const [hintsUsed, setHintsUsed] = useState(0);
-	const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
-	const [currentGuess, setCurrentGuess] = useState("");
-	const [seed, setSeed] = useState(getCurrentSeed());
-	const lastPointerPressAtRef = useRef(0);
+type DailyData = {
+	puzzle: DailyPuzzlePublic;
+	progress: PuzzleProgressState | null;
+	rolloverAt: string;
+	sessionUser: {
+		id: string;
+		name: string;
+		email: string;
+		image?: string | null;
+	} | null;
+};
 
-	const [loading, setLoading] = useState(true);
-	const [shuffledLetters, setShuffledLetters] = useState<string[]>([]);
+function buildHistoryEntry(
+	puzzle: DailyPuzzlePublic,
+	progress: PuzzleProgressState,
+) {
+	return {
+		dateKey: puzzle.dateKey,
+		seed: puzzle.seed,
+		totalWords: puzzle.wordSlots.length,
+		guessedWords: progress.guessedWordIds.length,
+		guessCount: progress.guessCount,
+		hintsUsed: progress.hintsUsed,
+		completed: progress.guessedWordIds.length >= puzzle.wordSlots.length,
+		lastUpdated: new Date().toISOString(),
+	};
+}
 
-	const formatGuess = useCallback((guess: string) => {
-		if (!guess) return "";
-		return `${guess.slice(0, 1).toUpperCase()}${guess.slice(1).toLowerCase()}`;
-	}, []);
+export function Daily({ initialData }: { initialData: DailyData }) {
+	const session = authClient.useSession();
+	const activeUser = session.data?.user ?? initialData.sessionUser;
+	const puzzle = initialData.puzzle;
+	const totalWords = puzzle.wordSlots.length;
+	const deviceId = useMemo(() => getDeviceId(), []);
+	const syncEvents = useServerFn(syncUserPuzzleEvents);
+	const fetchUserProgress = useServerFn(getUserPuzzleProgress);
+	const importProgress = useServerFn(importAnonymousProgress);
 
-	const resetGameProgress = useCallback(() => {
-		setGuessedWords(new Set());
-		setGuesses([]);
-		setHintsUsed(0);
-		setHintedCells(new Set());
-		setCurrentGuess("");
-	}, []);
-
-	const refreshSeedIfNeeded = useCallback(() => {
-		const currentSeed = getCurrentSeed();
-		setSeed((previousSeed) =>
-			previousSeed === currentSeed ? previousSeed : currentSeed,
+	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(() => {
+		const empty = createEmptyProgressState(puzzle);
+		return (
+			initialData.progress ?? getAnonymousProgress(puzzle.dateKey) ?? empty
 		);
+	});
+	const [queuedEvents, setQueuedEvents] = useState<PuzzleClientEvent[]>([]);
+	const [currentGuess, setCurrentGuess] = useState("");
+	const [revealedAnswers, setRevealedAnswers] = useState<
+		Record<number, string>
+	>({});
+	const [hintLetters, setHintLetters] = useState<Record<string, string>>({});
+	const [isOnline, setIsOnline] = useState(() =>
+		typeof navigator === "undefined" ? true : navigator.onLine,
+	);
+	const [isSyncing, setIsSyncing] = useState(false);
+	const lastPointerPressAtRef = useRef(0);
+	const importAttemptedRef = useRef<string | null>(null);
+
+	const derivedProgress = useMemo(
+		() =>
+			activeUser
+				? applyPuzzleEvents(baseProgress, queuedEvents, totalWords)
+				: baseProgress,
+		[activeUser, baseProgress, queuedEvents, totalWords],
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const loadProgress = async () => {
+			const empty = createEmptyProgressState(puzzle);
+
+			if (activeUser) {
+				const cached = getAccountPuzzleCache(activeUser.id, puzzle.dateKey);
+				if (cached) {
+					if (!cancelled) {
+						setBaseProgress(
+							cached.baseProgress ?? initialData.progress ?? empty,
+						);
+						setQueuedEvents(cached.queuedEvents ?? []);
+					}
+				} else {
+					const latestProgress =
+						(await fetchUserProgress({
+							data: { puzzleId: puzzle.id },
+						})) ??
+						initialData.progress ??
+						empty;
+
+					if (!cancelled) {
+						setBaseProgress(latestProgress);
+						setQueuedEvents([]);
+					}
+				}
+
+				if (
+					!hasImportedAnonymousData(activeUser.id) &&
+					importAttemptedRef.current !== activeUser.id
+				) {
+					importAttemptedRef.current = activeUser.id;
+					const payload = buildAnonymousImportPayload();
+					if (
+						payload.historyEntries.length > 0 ||
+						Object.keys(payload.activeProgressByDate).length > 0
+					) {
+						try {
+							await importProgress({
+								data: {
+									deviceId,
+									payload,
+								},
+							});
+							markAnonymousDataImported(activeUser.id);
+							const refreshed = await fetchUserProgress({
+								data: { puzzleId: puzzle.id },
+							});
+							if (!cancelled && refreshed) {
+								setBaseProgress(refreshed);
+							}
+							toast.success("S'han sincronitzat els resultats locals");
+						} catch (error) {
+							console.error("Failed to import anonymous progress", error);
+						}
+					} else {
+						markAnonymousDataImported(activeUser.id);
+					}
+				}
+
+				return;
+			}
+
+			if (!cancelled) {
+				setQueuedEvents([]);
+				setBaseProgress(getAnonymousProgress(puzzle.dateKey) ?? empty);
+			}
+		};
+
+		void loadProgress();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		activeUser,
+		deviceId,
+		fetchUserProgress,
+		importProgress,
+		initialData.progress,
+		puzzle,
+	]);
+
+	useEffect(() => {
+		if (activeUser) {
+			saveAccountPuzzleCache(activeUser.id, puzzle.dateKey, {
+				baseProgress,
+				queuedEvents,
+			});
+			return;
+		}
+
+		saveAnonymousProgress(puzzle.dateKey, derivedProgress);
+		saveAnonymousHistoryEntry(buildHistoryEntry(puzzle, derivedProgress));
+	}, [activeUser, baseProgress, derivedProgress, puzzle, queuedEvents]);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		void (async () => {
+			const [nextAnswers, nextHints] = await Promise.all([
+				decodeRevealedAnswers(puzzle, derivedProgress),
+				decodeHintLetters(puzzle, derivedProgress),
+			]);
+
+			if (!cancelled) {
+				setRevealedAnswers(nextAnswers);
+				setHintLetters(nextHints);
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [derivedProgress, puzzle]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+
+		const onOnline = () => setIsOnline(true);
+		const onOffline = () => setIsOnline(false);
+		window.addEventListener("online", onOnline);
+		window.addEventListener("offline", onOffline);
+
+		return () => {
+			window.removeEventListener("online", onOnline);
+			window.removeEventListener("offline", onOffline);
+		};
 	}, []);
+
+	useEffect(() => {
+		if (!activeUser || queuedEvents.length === 0 || !isOnline || isSyncing) {
+			return;
+		}
+
+		let cancelled = false;
+		const pendingEvents = [...queuedEvents];
+
+		setIsSyncing(true);
+		void syncEvents({
+			data: {
+				puzzleId: puzzle.id,
+				deviceId,
+				events: pendingEvents,
+			},
+		})
+			.then((result) => {
+				if (cancelled) return;
+				setBaseProgress(result.progress);
+				setQueuedEvents((previous) =>
+					previous.filter((event) => !result.ackedEventIds.includes(event.id)),
+				);
+			})
+			.catch((error) => {
+				console.error("Failed to sync puzzle events", error);
+			})
+			.finally(() => {
+				if (!cancelled) {
+					setIsSyncing(false);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		activeUser,
+		deviceId,
+		isOnline,
+		isSyncing,
+		puzzle.id,
+		queuedEvents,
+		syncEvents,
+	]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+
+		const rolloverAt = new Date(initialData.rolloverAt).getTime();
+		const delay = Math.max(1_000, rolloverAt - Date.now());
+		const timer = window.setTimeout(() => window.location.reload(), delay);
+		const refreshIfExpired = () => {
+			if (Date.now() >= rolloverAt) {
+				window.location.reload();
+			}
+		};
+
+		window.addEventListener("focus", refreshIfExpired);
+		window.addEventListener("pageshow", refreshIfExpired);
+		document.addEventListener("visibilitychange", refreshIfExpired);
+
+		return () => {
+			window.clearTimeout(timer);
+			window.removeEventListener("focus", refreshIfExpired);
+			window.removeEventListener("pageshow", refreshIfExpired);
+			document.removeEventListener("visibilitychange", refreshIfExpired);
+		};
+	}, [initialData.rolloverAt]);
+
+	const revealedCells = useMemo(() => {
+		const cells = new Set<string>(derivedProgress.hintedCells);
+
+		for (const slot of puzzle.wordSlots) {
+			if (!derivedProgress.guessedWordIds.includes(slot.id)) continue;
+			for (let index = 0; index < slot.length; index += 1) {
+				const row =
+					slot.direction === "horizontal"
+						? slot.startRow
+						: slot.startRow + index;
+				const col =
+					slot.direction === "horizontal"
+						? slot.startCol + index
+						: slot.startCol;
+				cells.add(`${row},${col}`);
+			}
+		}
+
+		return cells;
+	}, [
+		derivedProgress.guessedWordIds,
+		derivedProgress.hintedCells,
+		puzzle.wordSlots,
+	]);
+
+	const cellLetters = useMemo(() => {
+		const letters = new Map<string, string>();
+
+		for (const slot of puzzle.wordSlots) {
+			const answer = revealedAnswers[slot.id];
+			if (!answer) continue;
+
+			for (let index = 0; index < answer.length; index += 1) {
+				const row =
+					slot.direction === "horizontal"
+						? slot.startRow
+						: slot.startRow + index;
+				const col =
+					slot.direction === "horizontal"
+						? slot.startCol + index
+						: slot.startCol;
+				letters.set(`${row},${col}`, answer[index] ?? "");
+			}
+		}
+
+		for (const [cellKey, letter] of Object.entries(hintLetters)) {
+			if (!letters.has(cellKey)) {
+				letters.set(cellKey, letter);
+			}
+		}
+
+		return letters;
+	}, [hintLetters, puzzle.wordSlots, revealedAnswers]);
 
 	const triggerHaptic = useCallback((duration = 8) => {
 		if (typeof window === "undefined" || typeof navigator === "undefined") {
@@ -95,294 +405,19 @@ export function Daily() {
 		navigator.vibrate(duration);
 	}, []);
 
-	// Set a timer to update the seed at midnight
-	useEffect(() => {
-		const midnight = new Date();
-		midnight.setHours(24, 0, 0, 0);
-		const timeToMidnight = midnight.getTime() - Date.now();
-		const timer = setTimeout(() => {
-			refreshSeedIfNeeded();
-		}, timeToMidnight);
-
-		return () => clearTimeout(timer);
-	}, [refreshSeedIfNeeded]);
-
-	// Refresh when returning to the app after midnight
-	useEffect(() => {
-		const handleVisibilityChange = () => {
-			if (document.visibilityState === "visible") {
-				refreshSeedIfNeeded();
-			}
-		};
-
-		window.addEventListener("focus", refreshSeedIfNeeded);
-		window.addEventListener("pageshow", refreshSeedIfNeeded);
-		document.addEventListener("visibilitychange", handleVisibilityChange);
-
-		return () => {
-			window.removeEventListener("focus", refreshSeedIfNeeded);
-			window.removeEventListener("pageshow", refreshSeedIfNeeded);
-			document.removeEventListener("visibilitychange", handleVisibilityChange);
-		};
-	}, [refreshSeedIfNeeded]);
-
-	const loadSavedState = useCallback(
-		(savedState: string, letters: string[]) => {
-			try {
-				const {
-					guessedWords: savedGuessedWords,
-					guesses: savedGuesses,
-					hintsUsed: savedHintsUsed,
-					hintedCells: savedHintedCells,
-					shuffledLetters: savedShuffledLetters,
-				} = JSON.parse(savedState);
-
-				if (!Array.isArray(savedShuffledLetters)) {
-					return;
-				}
-
-				const sortedSavedLetters = [...savedShuffledLetters].sort();
-				const sortedLetters = [...letters].sort();
-				if (sortedSavedLetters.join("") !== sortedLetters.join("")) {
-					// Ignore saved state if letters have changed
-					return;
-				}
-
-				if (Array.isArray(savedGuessedWords)) {
-					setGuessedWords(new Set(savedGuessedWords));
-				}
-				if (Array.isArray(savedGuesses)) {
-					setGuesses(savedGuesses);
-				}
-				if (typeof savedHintsUsed === "number") {
-					setHintsUsed(savedHintsUsed);
-				}
-				if (Array.isArray(savedHintedCells)) {
-					setHintedCells(new Set(savedHintedCells));
-				}
-				setShuffledLetters(savedShuffledLetters);
-			} catch (e) {
-				console.error("Failed to parse saved state:", e);
-			}
-		},
-		[],
-	);
-
-	// Load words and generate crossword
-	useEffect(() => {
-		setLoading(true);
-		try {
-			const currentSeed = getCurrentSeed();
-			if (seed !== currentSeed) {
-				setSeed(currentSeed);
+	const applyLocalEvent = useCallback(
+		(event: PuzzleClientEvent) => {
+			if (activeUser) {
+				setQueuedEvents((previous) => [...previous, event]);
 				return;
 			}
 
-			const words = allWords as Word[];
-			const result = generateDailyCrosswordForSeed(words, seed);
-			if (!result) throw new Error("Failed to generate crossword");
-
-			setShuffledLetters(result.shuffledLetters);
-			setCrossword(result.crossword);
-			resetGameProgress();
-
-			// Load saved state for today
-			const savedState = localStorage.getItem(getStateKey(seed));
-			if (savedState) {
-				loadSavedState(savedState, result.letters);
-			}
-		} catch (error) {
-			console.error("Failed to load words:", error);
-			toast.error("Error carregant el diccionari");
-		} finally {
-			setLoading(false);
-		}
-	}, [seed, loadSavedState, resetGameProgress]);
-
-	// Save game state to localStorage
-	useEffect(() => {
-		if (!crossword) return;
-
-		if (getCurrentSeed() !== seed) {
-			setSeed(getCurrentSeed());
-			return;
-		}
-
-		const state = {
-			guessedWords: Array.from(guessedWords),
-			guesses,
-			hintsUsed,
-			hintedCells: Array.from(hintedCells),
-			shuffledLetters,
-		};
-		localStorage.setItem(getStateKey(seed), JSON.stringify(state));
-		saveHistorySnapshot({
-			seed,
-			totalWords: crossword.words.length,
-			guessedWords: guessedWords.size,
-			guesses: guesses.length,
-			hintsUsed,
-		});
-	}, [
-		guessedWords,
-		guesses,
-		hintsUsed,
-		hintedCells,
-		shuffledLetters,
-		crossword,
-		seed,
-	]);
-
-	const revealedCells = useMemo(() => {
-		if (!crossword) return new Set<string>();
-
-		const cells = new Set<string>(hintedCells);
-		for (const wordId of guessedWords) {
-			const word = crossword.words[wordId];
-			for (let i = 0; i < word.word.name.length; i++) {
-				const row =
-					word.direction === "horizontal" ? word.startRow : word.startRow + i;
-				const col =
-					word.direction === "horizontal" ? word.startCol + i : word.startCol;
-				cells.add(`${row},${col}`);
-			}
-		}
-		return cells;
-	}, [crossword, guessedWords, hintedCells]);
-
-	const handleGuess = (e?: React.FormEvent) => {
-		if (e) e.preventDefault();
-		triggerHaptic(10);
-
-		if (!crossword || !currentGuess.trim()) return;
-
-		const guess = currentGuess.trim();
-		const isValidGuess = /^[a-zA-ZçÇ]+$/.test(guess);
-		if (!isValidGuess) {
-			toast.error("La paraula no és vàlida");
-			setCurrentGuess("");
-			return;
-		}
-
-		const matchingWord = crossword.words.find((w) =>
-			wordsMatch(w.word.name, guess),
-		);
-		const prettyGuess = formatGuess(guess);
-
-		if (matchingWord && guessedWords.has(matchingWord.id)) {
-			toast.info(
-				<span>
-					Ja has encertat <b>{matchingWord.word.name}</b>
-				</span>,
+			setBaseProgress((previous) =>
+				applyPuzzleEvent(previous, event, totalWords),
 			);
-			setCurrentGuess("");
-			return;
-		}
-
-		const alreadyTried = guesses.some((prev) => wordsMatch(prev, guess));
-		if (alreadyTried) {
-			if (matchingWord) {
-				toast.info(
-					<span>
-						Ja has encertat <b>{matchingWord.word.name}</b>
-					</span>,
-				);
-			} else {
-				toast.info(
-					<span>
-						Ja has provat <b>{prettyGuess}</b>
-					</span>,
-				);
-			}
-			setCurrentGuess("");
-			return;
-		}
-
-		setGuesses((prev) => [...prev, guess]);
-
-		// Check if word matches any unguessed words
-		const unguessedMatch =
-			matchingWord && !guessedWords.has(matchingWord.id) ? matchingWord : null;
-
-		if (unguessedMatch) {
-			setGuessedWords((prev) => new Set([...prev, unguessedMatch.id]));
-			toast.success(
-				<span>
-					Correcte! Has trobat <b>{unguessedMatch.word.name}</b>
-				</span>,
-			);
-			setCurrentGuess("");
-
-			// Check if game is complete
-			if (guessedWords.size + 1 === crossword.words.length) {
-				setTimeout(() => {
-					toast.success("🎉 Enhorabona! Has completat el joc!");
-				}, 500);
-			}
-		} else {
-			toast.error(
-				<span>
-					<b>{prettyGuess}</b> no hi és
-				</span>,
-			);
-			setCurrentGuess("");
-		}
-	};
-
-	/*
-	const handleNewGame = () => {
-		if (wordList.length === 0) return;
-
-		let letters: string[] = [];
-		let newCrossword: CrosswordGrid | null = null;
-		let attempts = 0;
-
-		while (attempts < 30) {
-			letters = getRandomLetterSet(wordList);
-			const filteredWords = filterWordsByLetters(wordList, letters);
-			try {
-				const result = generateCrossword(filteredWords, 5, 15);
-				const usedLetters = new Set(
-					result.words.flatMap((w) => normalizeWord(w.word).split("")),
-				);
-
-				if (letters.every((l) => usedLetters.has(l))) {
-					newCrossword = result;
-					break;
-				}
-			} catch (_e) {
-				// continue
-			}
-			attempts++;
-		}
-
-		if (!newCrossword) {
-			toast.error("No s'ha pogut generar un joc vàlid");
-			return;
-		}
-
-		setShuffledLetters(shuffleArray(letters));
-		setCrossword(newCrossword);
-		setGuessedWords(new Set());
-		setCurrentGuess("");
-		toast.info("Nou joc generat!");
-	};
-	*/
-
-	const handleLetterClick = (letter: string) => {
-		triggerHaptic(8);
-		setCurrentGuess((prev) => prev + letter);
-	};
-
-	const handleBackspace = () => {
-		triggerHaptic(8);
-		setCurrentGuess((prev) => prev.slice(0, -1));
-	};
-
-	const handleShuffle = () => {
-		triggerHaptic(8);
-		setShuffledLetters((prev) => shuffleArray(prev));
-	};
+		},
+		[activeUser, totalWords],
+	);
 
 	const runPressAction = useCallback(
 		(
@@ -413,38 +448,152 @@ export function Daily() {
 		[],
 	);
 
-	const handleHint = () => {
-		triggerHaptic(8);
-		if (!crossword || hintsUsed >= 3) return;
-
-		const hiddenCells: string[] = [];
-		for (let r = 0; r < crossword.grid.length; r++) {
-			for (let c = 0; c < crossword.grid[r].length; c++) {
-				if (crossword.grid[r][c]) {
-					const key = `${r},${c}`;
-					if (!revealedCells.has(key)) {
-						hiddenCells.push(key);
-					}
-				}
-			}
-		}
-
-		if (hiddenCells.length > 0) {
-			const randomKey =
-				hiddenCells[Math.floor(Math.random() * hiddenCells.length)];
-			setHintedCells((prev) => new Set([...prev, randomKey]));
-			setHintsUsed((prev) => prev + 1);
-		}
-	};
-
-	const hasProgress =
-		guessedWords.size > 0 || guesses.length > 0 || hintsUsed > 0;
-
-	const handleResetDailyProgress = () => {
+	const handleGuess = useCallback(async () => {
 		triggerHaptic(10);
-		resetGameProgress();
+
+		if (!currentGuess.trim()) return;
+		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(currentGuess.trim())) {
+			toast.error("La paraula no és vàlida");
+			setCurrentGuess("");
+			return;
+		}
+
+		const guess = currentGuess.trim();
+		const prettyGuess = formatGuess(guess);
+		const result = await resolveGuess({
+			puzzle,
+			progress: derivedProgress,
+			guess,
+		});
+
+		if (
+			result.matchedSlotId != null &&
+			derivedProgress.guessedWordIds.includes(result.matchedSlotId)
+		) {
+			toast.info(
+				<span>
+					Ja has encertat <b>{result.displayWord}</b>
+				</span>,
+			);
+			setCurrentGuess("");
+			return;
+		}
+
+		if (result.duplicate) {
+			if (result.displayWord) {
+				toast.info(
+					<span>
+						Ja has encertat <b>{result.displayWord}</b>
+					</span>,
+				);
+			} else {
+				toast.info(
+					<span>
+						Ja has provat <b>{prettyGuess}</b>
+					</span>,
+				);
+			}
+			setCurrentGuess("");
+			return;
+		}
+
+		applyLocalEvent(
+			createPuzzleEvent("guess_added", {
+				guessHash: result.guessHash,
+				matchedWordId: result.matchedSlotId,
+				unlockToken: result.unlockToken,
+			}),
+		);
+
+		if (result.displayWord) {
+			toast.success(
+				<span>
+					Correcte! Has trobat <b>{result.displayWord}</b>
+				</span>,
+			);
+
+			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
+				window.setTimeout(() => {
+					toast.success("Has completat el joc!");
+				}, 500);
+			}
+		} else {
+			toast.error(
+				<span>
+					<b>{prettyGuess}</b> no hi és
+				</span>,
+			);
+		}
+
+		setCurrentGuess("");
+	}, [
+		applyLocalEvent,
+		currentGuess,
+		derivedProgress,
+		puzzle,
+		totalWords,
+		triggerHaptic,
+	]);
+
+	const handleLetterClick = useCallback(
+		(letter: string) => {
+			triggerHaptic(8);
+			setCurrentGuess((previous) => previous + letter);
+		},
+		[triggerHaptic],
+	);
+
+	const handleBackspace = useCallback(() => {
+		triggerHaptic(8);
+		setCurrentGuess((previous) => previous.slice(0, -1));
+	}, [triggerHaptic]);
+
+	const handleShuffle = useCallback(() => {
+		triggerHaptic(8);
+		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
+		applyLocalEvent(
+			createPuzzleEvent("letters_shuffled", {
+				shuffledLetters,
+			}),
+		);
+	}, [applyLocalEvent, derivedProgress.shuffledLetters, triggerHaptic]);
+
+	const handleHint = useCallback(() => {
+		triggerHaptic(8);
+		if (derivedProgress.hintsUsed >= 3) return;
+
+		const nextHint = puzzle.hintCapsules.find(
+			(capsule) =>
+				!revealedCells.has(capsule.cellKey) &&
+				!derivedProgress.hintedCells.includes(capsule.cellKey),
+		);
+
+		if (!nextHint) return;
+		applyLocalEvent(
+			createPuzzleEvent("hint_used", {
+				cellKey: nextHint.cellKey,
+			}),
+		);
+	}, [
+		applyLocalEvent,
+		derivedProgress.hintedCells,
+		derivedProgress.hintsUsed,
+		puzzle.hintCapsules,
+		revealedCells,
+		triggerHaptic,
+	]);
+
+	const handleResetDailyProgress = useCallback(() => {
+		triggerHaptic(10);
+		applyLocalEvent(createPuzzleEvent("progress_reset", {}));
 		toast.success("S'ha reiniciat el progrés d'avui");
-	};
+	}, [applyLocalEvent, triggerHaptic]);
+
+	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
+	const hasProgress =
+		derivedProgress.guessedWordIds.length > 0 ||
+		derivedProgress.guessCount > 0 ||
+		derivedProgress.hintsUsed > 0;
 
 	const resetProgressControl = (
 		<AlertDialog>
@@ -480,77 +629,45 @@ export function Daily() {
 		</AlertDialog>
 	);
 
-	if (loading) {
-		return (
-			<div className="h-full flex items-center justify-center">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mx-auto mb-4"></div>
-					<p className="text-lg text-muted-foreground">Carregant paraules...</p>
-				</div>
-			</div>
-		);
-	}
-
-	if (!crossword) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<Card className="max-w-md">
-					<CardHeader>
-						<CardTitle className="text-red-600 dark:text-red-400">
-							Error
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<p className="dark:text-gray-300">No s'ha pogut generar el joc</p>
-						{/* <Button onClick={handleNewGame} className="mt-4">
-							Tornar a intentar
-						</Button> */}
-					</CardContent>
-				</Card>
-			</div>
-		);
-	}
-
-	const isComplete = guessedWords.size === crossword.words.length;
 	return (
 		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8">
 			<div className="max-w-7xl mx-auto">
-				{/* Progress */}
 				<div className="mb-6">
 					<div className="flex items-center justify-between mb-2 text-sm font-medium opacity-70">
 						<span>
-							{guessedWords.size} / {crossword.words.length} paraules trobades
+							{derivedProgress.guessedWordIds.length} / {totalWords} paraules
+							trobades
 						</span>
 						<div className="flex gap-4">
 							<span>
-								{guesses.length} intent{guesses.length === 1 ? "" : "s"}
+								{derivedProgress.guessCount} intent
+								{derivedProgress.guessCount === 1 ? "" : "s"}
 							</span>
 						</div>
 					</div>
 
 					<Progress
-						value={guessedWords.size}
-						max={crossword.words.length}
+						value={derivedProgress.guessedWordIds.length}
+						max={totalWords}
 						className="h-3"
 					/>
 				</div>
 
 				<div className="grid lg:grid-cols-3 gap-6">
-					{/* Crossword Grid */}
 					<div className="lg:col-span-2">
 						<Card className="bg-background border-border/85">
 							<CardContent className="p-2 sm:p-4 md:p-6">
 								<div
 									className="flex items-center justify-center w-full @container"
-									style={{ "--cols": crossword.cols } as CSSProperties}
+									style={{ "--cols": puzzle.cols } as CSSProperties}
 								>
 									<div
 										className="grid gap-0.5 sm:gap-1 w-full max-w-2xl mx-auto"
 										style={{
-											gridTemplateColumns: `repeat(${crossword.cols}, 1fr)`,
+											gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
 										}}
 									>
-										{crossword.grid.map((row, rowIdx) =>
+										{puzzle.gridMask.map((row, rowIdx) =>
 											row.map((cell, colIdx) => {
 												const key = `${rowIdx},${colIdx}`;
 												const isRevealed = revealedCells.has(key);
@@ -573,7 +690,9 @@ export function Daily() {
 																: "bg-muted/80 border-muted-foreground/30 dark:bg-muted/90 dark:border-muted-foreground/45"
 														}`}
 													>
-														{isRevealed ? cell.letter.toUpperCase() : ""}
+														{isRevealed
+															? cellLetters.get(key)?.toUpperCase()
+															: ""}
 													</div>
 												);
 											}),
@@ -584,9 +703,7 @@ export function Daily() {
 						</Card>
 					</div>
 
-					{/* Guess Form and Word List */}
 					<div className="lg:space-y-6">
-						{/* Guess Form */}
 						{!isComplete && (
 							<Card className="fixed bottom-0 left-0 right-0 z-40 rounded-t-2xl rounded-b-none shadow-[0_-8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] border-t lg:bg-card lg:dark:bg-card backdrop-blur-md transition-all duration-300 lg:static lg:rounded-xl lg:shadow-none lg:dark:shadow-none lg:border lg:backdrop-blur-none">
 								<CardHeader className="hidden lg:block">
@@ -594,15 +711,13 @@ export function Daily() {
 								</CardHeader>
 								<CardContent>
 									<div className="flex flex-col items-center gap-4 lg:gap-6">
-										{/* Current Guess Display */}
 										<div className="text-2xl sm:text-3xl font-bold tracking-widest h-10 sm:h-12 border-b-2 border-primary w-full text-center uppercase flex items-center justify-center dark:text-white">
 											{currentGuess}
 										</div>
 
-										{/* Letter Buttons + Submit */}
 										<div className="flex items-center justify-evenly w-full gap-4 sm:gap-6">
 											<div className="grid grid-cols-3 gap-2 sm:gap-3">
-												{shuffledLetters.map((letter) => (
+												{derivedProgress.shuffledLetters.map((letter) => (
 													<Button
 														key={`letter-${letter}`}
 														variant="outline"
@@ -625,10 +740,14 @@ export function Daily() {
 											</div>
 											<Button
 												onPointerDown={(event) =>
-													runPressAction(event, () => handleGuess())
+													runPressAction(event, () => {
+														void handleGuess();
+													})
 												}
 												onClick={(event) =>
-													runClickAction(event, () => handleGuess())
+													runClickAction(event, () => {
+														void handleGuess();
+													})
 												}
 												size="icon"
 												className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl transition-transform duration-100 active:scale-95 touch-manipulation"
@@ -639,7 +758,6 @@ export function Daily() {
 											</Button>
 										</div>
 
-										{/* Actions */}
 										<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full">
 											<Button
 												variant="ghost"
@@ -662,13 +780,13 @@ export function Daily() {
 												}
 												onClick={(event) => runClickAction(event, handleHint)}
 												className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
-												disabled={hintsUsed >= 3 || isComplete}
+												disabled={derivedProgress.hintsUsed >= 3 || isComplete}
 												size="lg"
 											>
 												<Lightbulb
-													className={`w-4 h-4 ${hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
+													className={`w-4 h-4 ${derivedProgress.hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
 												/>
-												Pista ({3 - hintsUsed})
+												Pista ({3 - derivedProgress.hintsUsed})
 											</Button>
 											<Button
 												variant="ghost"
@@ -689,58 +807,63 @@ export function Daily() {
 							</Card>
 						)}
 
-						{/* Word List */}
 						<Card>
 							<CardHeader>
 								<CardTitle>
-									Paraules trobades ({guessedWords.size}/
-									{crossword.words.length})
+									Paraules trobades ({derivedProgress.guessedWordIds.length}/
+									{totalWords})
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
 								<div className="space-y-2 max-h-96 overflow-y-auto">
-									{crossword.words
-										.filter((w) => guessedWords.has(w.id))
-										.map((word) => (
+									{puzzle.wordSlots
+										.filter((slot) =>
+											derivedProgress.guessedWordIds.includes(slot.id),
+										)
+										.map((slot) => (
 											<div
-												key={word.id}
+												key={slot.id}
 												className="flex flex-col gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
 											>
 												<div className="flex items-center gap-2">
 													<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
 													<span className="font-medium text-green-900 dark:text-green-300 tracking-widest">
-														{word.word.name.toUpperCase()}
+														{revealedAnswers[slot.id]?.toUpperCase()}
 													</span>
 													<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
-														{word.word.name.length} lletres
+														{slot.length} lletres
 													</span>
 												</div>
 											</div>
 										))}
 
-									{crossword.words
-										.filter((w) => !guessedWords.has(w.id))
-										.map((word) => {
-											const displayedWord = word.word.name
-												.split("")
-												.map((char, i) => {
+									{puzzle.wordSlots
+										.filter(
+											(slot) =>
+												!derivedProgress.guessedWordIds.includes(slot.id),
+										)
+										.map((slot) => {
+											const displayedWord = Array.from(
+												{ length: slot.length },
+												(_, index) => {
 													const row =
-														word.direction === "horizontal"
-															? word.startRow
-															: word.startRow + i;
+														slot.direction === "horizontal"
+															? slot.startRow
+															: slot.startRow + index;
 													const col =
-														word.direction === "horizontal"
-															? word.startCol + i
-															: word.startCol;
-													return revealedCells.has(`${row},${col}`)
-														? char.toUpperCase()
-														: "_";
-												})
-												.join("");
+														slot.direction === "horizontal"
+															? slot.startCol + index
+															: slot.startCol;
+													return (
+														cellLetters.get(`${row},${col}`)?.toUpperCase() ??
+														"_"
+													);
+												},
+											).join("");
 
 											return (
 												<div
-													key={word.id}
+													key={slot.id}
 													className="flex items-center gap-2 p-3 rounded-lg border bg-border/20"
 												>
 													<div className="w-5 h-5 rounded-full border-2 shrink-0" />
@@ -748,7 +871,7 @@ export function Daily() {
 														{displayedWord}
 													</span>
 													<span className="text-xs ml-auto">
-														{word.word.name.length} lletres
+														{slot.length} lletres
 													</span>
 												</div>
 											);
@@ -757,7 +880,6 @@ export function Daily() {
 							</CardContent>
 						</Card>
 
-						{/* Victory */}
 						{isComplete && (
 							<Card className="bg-linear-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700">
 								<CardHeader>
@@ -767,8 +889,9 @@ export function Daily() {
 								</CardHeader>
 								<CardContent className="text-center">
 									<p className="text-gray-700 dark:text-gray-300 mb-4">
-										Has guanyat en {guesses.length} intents!
-										{hintsUsed > 0 && ` I has fet servir ${hintsUsed} pistes.`}
+										Has guanyat en {derivedProgress.guessCount} intents!
+										{derivedProgress.hintsUsed > 0 &&
+											` I has fet servir ${derivedProgress.hintsUsed} pistes.`}
 									</p>
 								</CardContent>
 							</Card>

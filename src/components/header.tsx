@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { History as HistoryIcon } from "lucide-react";
+import { AuthControl } from "@/components/auth-control";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export default function Header() {
 						</h1>
 					</Link>
 					<div className="flex items-center gap-2">
+						<AuthControl />
 						<Button variant="ghost" size="icon" asChild>
 							<Link to="/dies-anteriors" aria-label="Dies anteriors">
 								<HistoryIcon className="h-4 w-4 sm:h-5 sm:w-5" />

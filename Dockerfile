@@ -1,38 +1,34 @@
-FROM node:25.2 AS base
+FROM node:25.2-slim AS base
 
-# Install pnpm
-RUN npm install -g pnpm@latest-10
+RUN npm install -g pnpm@10.30.3
 
-# Install dependencies only when needed
-FROM base AS deps
 WORKDIR /app
+
+FROM base AS deps
 
 COPY package.json pnpm-lock.yaml ./
-RUN \
-    if [ -f pnpm-lock.yaml ]; then pnpm i --frozen-lockfile; \
-    else echo "Lockfile not found." && exit 1; \
-    fi
+RUN pnpm install --frozen-lockfile
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+FROM deps AS builder
+
 COPY . .
+RUN pnpm build
 
-RUN \
-    if [ -f pnpm-lock.yaml ]; then pnpm run build; \
-    else echo "Lockfile not found." && exit 1; \
-    fi
+FROM base AS dev
 
-FROM base AS runner
-WORKDIR /app
+ENV NODE_ENV=development
+
+FROM base AS production
 
 ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs
-
-COPY --from=builder /app/.output/ /app
+COPY package.json pnpm-lock.yaml tsconfig.json drizzle.config.ts ./
+COPY drizzle ./drizzle
+COPY scripts ./scripts
+COPY src ./src
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.output ./.output
 
 EXPOSE 3000
 
-CMD ["node", "/app/server/index.mjs"]
+CMD ["sh", "-lc", "pnpm db:migrate && node .output/server/index.mjs"]

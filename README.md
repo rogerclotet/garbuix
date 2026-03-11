@@ -41,12 +41,46 @@ pnpm dev
 
 The app will be available at `http://localhost:3000`
 
+## Docker Compose
+
+Copy the example env first:
+
+```bash
+cp .env.example .env
+```
+
+### Development
+
+This starts Postgres, installs dependencies in the container, runs migrations, and starts the Vite/TanStack Start dev server with your local source mounted into the container.
+
+```bash
+docker compose -f compose.yml -f compose.dev.yml up --build
+```
+
+The app will be available at `http://localhost:3000` and Postgres at `localhost:5432`.
+
+### Production
+
+This builds the production image, waits for Postgres, runs `pnpm db:migrate`, and then starts the built server.
+
+```bash
+docker compose up -d --build
+```
+
+To pre-generate historical puzzle snapshots:
+
+```bash
+docker compose --profile ops run --rm backfill
+```
+
 ## Available Scripts
 
 - `pnpm run dev` - Start development server on port 3000
 - `pnpm run build` - Build for production (automatically downloads dictionary if missing)
 - `pnpm run preview` - Preview production build
 - `pnpm run download-dict` - Force-refresh and rebuild the Catalan dictionary
+- `pnpm run db:migrate` - Apply Drizzle migrations
+- `pnpm run backfill:puzzles` - Persist daily puzzle snapshots for a date range
 - `pnpm run format` - Format code with Biome
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome

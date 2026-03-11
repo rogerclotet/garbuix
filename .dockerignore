@@ -1,0 +1,14 @@
+.env
+.env.*
+.git
+.github
+.husky
+.idea
+.output
+.turbo
+.vscode
+coverage
+dist
+node_modules
+pnpm-debug.log
+tmp

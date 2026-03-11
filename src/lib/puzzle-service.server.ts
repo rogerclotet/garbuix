@@ -1,0 +1,487 @@
+import { getRequestHeaders } from "@tanstack/react-start/server";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import allWords from "@/data/catalan-words.json";
+import type { Word } from "@/data/types";
+import {
+	dailyPuzzles,
+	legacyImportedResults,
+	userPuzzleEvents,
+	userPuzzleProgress,
+} from "@/db/schema";
+import { auth } from "@/lib/auth";
+import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
+import { db } from "@/lib/db";
+import { hashText, openAnswerCapsule } from "@/lib/puzzle-crypto";
+import {
+	dateKeyToSeed,
+	getNextRolloverAt,
+	getTodayDateKey,
+	getYesterdayDateKey,
+} from "@/lib/puzzle-dates";
+import {
+	applyPuzzleEvents,
+	createEmptyProgressState,
+} from "@/lib/puzzle-progress";
+import { buildPuzzleSnapshots, toPuzzlePreview } from "@/lib/puzzle-snapshot";
+import { filterSyncablePuzzleEvents } from "@/lib/puzzle-sync";
+import type {
+	AnonymousImportPayload,
+	DailyPuzzlePublic,
+	HistorySummaryEntry,
+	PuzzleClientEvent,
+	PuzzleProgressState,
+} from "@/lib/puzzle-types";
+
+export const PUZZLE_ALGORITHM_VERSION = "1";
+
+const serverWords = allWords as Word[];
+
+let cachedDictionaryVersion: Promise<string> | null = null;
+
+function serializeProgressRow(
+	row: typeof userPuzzleProgress.$inferSelect,
+): PuzzleProgressState {
+	return {
+		puzzleId: row.puzzleId,
+		guessHashes: row.guessHashes,
+		guessedWordIds: row.guessedWordIds,
+		revealedWordTokens: row.revealedWordTokens,
+		hintedCells: row.hintedCells,
+		hintsUsed: row.hintsUsed,
+		guessCount: row.guessCount,
+		shuffledLetters: row.shuffledLetters,
+		completedAt: row.completedAt?.toISOString() ?? null,
+		lastSyncedAt: row.lastSyncedAt.toISOString(),
+	};
+}
+
+async function getDictionaryVersion() {
+	if (!cachedDictionaryVersion) {
+		cachedDictionaryVersion = hashText(
+			JSON.stringify(
+				serverWords.map((word) => ({
+					name: word.name,
+					areatematica: word.areatematica,
+					frequency: word.frequency,
+				})),
+			),
+		);
+	}
+
+	return cachedDictionaryVersion;
+}
+
+export async function getAuthSession() {
+	const headers = new Headers(getRequestHeaders());
+	return auth.api.getSession({
+		headers,
+	});
+}
+
+export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
+	const existing = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.dateKey, dateKey),
+	});
+
+	if (existing) {
+		return existing;
+	}
+
+	const seed = dateKeyToSeed(dateKey);
+	const generated = generateDailyCrosswordForSeed(serverWords, seed);
+
+	if (!generated) {
+		throw new Error(`Failed to generate puzzle for ${dateKey}`);
+	}
+
+	const puzzleId = crypto.randomUUID();
+	const { publicSnapshot, privateSnapshot } = await buildPuzzleSnapshots({
+		puzzleId,
+		dateKey,
+		seed,
+		crossword: generated.crossword,
+		letters: generated.letters,
+		initialShuffledLetters: generated.shuffledLetters,
+		algorithmVersion: PUZZLE_ALGORITHM_VERSION,
+	});
+
+	const inserted = await db
+		.insert(dailyPuzzles)
+		.values({
+			id: puzzleId,
+			dateKey,
+			seed,
+			algorithmVersion: PUZZLE_ALGORITHM_VERSION,
+			dictionaryVersion: await getDictionaryVersion(),
+			wordCount: privateSnapshot.wordSlots.length,
+			publicSnapshotJson: publicSnapshot,
+			privateSnapshotJson: privateSnapshot,
+		})
+		.onConflictDoNothing({
+			target: dailyPuzzles.dateKey,
+		})
+		.returning();
+
+	if (inserted[0]) {
+		return inserted[0];
+	}
+
+	const conflictRow = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.dateKey, dateKey),
+	});
+
+	if (!conflictRow) {
+		throw new Error(`Failed to persist puzzle for ${dateKey}`);
+	}
+
+	return conflictRow;
+}
+
+export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
+	const puzzle = await ensureDailyPuzzleSnapshot(dateKey);
+	const sessionData = await getAuthSession();
+	const sessionUser = sessionData
+		? {
+				id: sessionData.user.id,
+				name: sessionData.user.name,
+				email: sessionData.user.email,
+				image: sessionData.user.image,
+			}
+		: null;
+
+	return {
+		puzzle: puzzle.publicSnapshotJson,
+		rolloverAt: getNextRolloverAt().toISOString(),
+		sessionUser,
+	};
+}
+
+export async function getUserPuzzleProgressData(
+	puzzleId: string,
+	userId: string,
+) {
+	const row = await db.query.userPuzzleProgress.findFirst({
+		where: and(
+			eq(userPuzzleProgress.puzzleId, puzzleId),
+			eq(userPuzzleProgress.userId, userId),
+		),
+	});
+
+	return row ? serializeProgressRow(row) : null;
+}
+
+function mergeProgressState(
+	existing: PuzzleProgressState | null,
+	incoming: PuzzleProgressState,
+): PuzzleProgressState {
+	const guessHashes = Array.from(
+		new Set([
+			...((existing?.guessHashes as string[]) ?? []),
+			...incoming.guessHashes,
+		]),
+	);
+	const guessedWordIds = Array.from(
+		new Set([
+			...((existing?.guessedWordIds as number[]) ?? []),
+			...incoming.guessedWordIds,
+		]),
+	).sort((left, right) => left - right);
+
+	return {
+		puzzleId: incoming.puzzleId,
+		guessHashes,
+		guessedWordIds,
+		revealedWordTokens: {
+			...(existing?.revealedWordTokens ?? {}),
+			...incoming.revealedWordTokens,
+		},
+		hintedCells: Array.from(
+			new Set([...(existing?.hintedCells ?? []), ...incoming.hintedCells]),
+		),
+		hintsUsed: Math.max(existing?.hintsUsed ?? 0, incoming.hintsUsed),
+		guessCount: guessHashes.length,
+		shuffledLetters:
+			incoming.shuffledLetters.length > 0
+				? incoming.shuffledLetters
+				: (existing?.shuffledLetters ?? []),
+		completedAt: existing?.completedAt ?? incoming.completedAt,
+		lastSyncedAt: incoming.lastSyncedAt,
+	};
+}
+
+export async function syncPuzzleEventsForUser(options: {
+	puzzleId: string;
+	userId: string;
+	deviceId: string;
+	events: PuzzleClientEvent[];
+}) {
+	const { deviceId, events, puzzleId, userId } = options;
+	const puzzleRow = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.id, puzzleId),
+	});
+
+	if (!puzzleRow) {
+		throw new Error("Puzzle not found");
+	}
+
+	const privateSnapshot = puzzleRow.privateSnapshotJson;
+	const publicSnapshot = puzzleRow.publicSnapshotJson;
+	const eventIds = events.map((event) => event.id);
+	const existingEvents =
+		eventIds.length === 0
+			? []
+			: await db.query.userPuzzleEvents.findMany({
+					where: and(
+						eq(userPuzzleEvents.userId, userId),
+						eq(userPuzzleEvents.puzzleId, puzzleId),
+						eq(userPuzzleEvents.deviceId, deviceId),
+						inArray(userPuzzleEvents.clientEventId, eventIds),
+					),
+				});
+
+	const existingEventIdSet = new Set(
+		existingEvents.map((event) => event.clientEventId),
+	);
+
+	const filteredEvents = await filterSyncablePuzzleEvents({
+		events,
+		existingEventIds: existingEventIdSet,
+		publicSnapshot,
+		privateSnapshot,
+	});
+
+	const existingProgress = await getUserPuzzleProgressData(puzzleId, userId);
+	const baseProgress =
+		existingProgress ?? createEmptyProgressState(publicSnapshot);
+	const nextProgress = applyPuzzleEvents(
+		baseProgress,
+		filteredEvents,
+		privateSnapshot.wordSlots.length,
+	);
+
+	await Promise.all(
+		filteredEvents.map((event) =>
+			db
+				.insert(userPuzzleEvents)
+				.values({
+					id: crypto.randomUUID(),
+					userId,
+					puzzleId,
+					deviceId,
+					clientEventId: event.id,
+					type: event.type,
+					payload: event.payload,
+				})
+				.onConflictDoNothing(),
+		),
+	);
+
+	await db
+		.insert(userPuzzleProgress)
+		.values({
+			id: `${userId}:${puzzleId}`,
+			userId,
+			puzzleId,
+			guessHashes: nextProgress.guessHashes,
+			guessedWordIds: nextProgress.guessedWordIds,
+			revealedWordTokens: nextProgress.revealedWordTokens,
+			hintedCells: nextProgress.hintedCells,
+			hintsUsed: nextProgress.hintsUsed,
+			guessCount: nextProgress.guessCount,
+			shuffledLetters: nextProgress.shuffledLetters,
+			completedAt: nextProgress.completedAt
+				? new Date(nextProgress.completedAt)
+				: null,
+			lastSyncedAt: new Date(),
+		})
+		.onConflictDoUpdate({
+			target: userPuzzleProgress.id,
+			set: {
+				guessHashes: nextProgress.guessHashes,
+				guessedWordIds: nextProgress.guessedWordIds,
+				revealedWordTokens: nextProgress.revealedWordTokens,
+				hintedCells: nextProgress.hintedCells,
+				hintsUsed: nextProgress.hintsUsed,
+				guessCount: nextProgress.guessCount,
+				shuffledLetters: nextProgress.shuffledLetters,
+				completedAt: nextProgress.completedAt
+					? new Date(nextProgress.completedAt)
+					: null,
+				lastSyncedAt: new Date(),
+			},
+		});
+
+	return {
+		ackedEventIds: filteredEvents.map((event) => event.id),
+		progress: {
+			...nextProgress,
+			lastSyncedAt: new Date().toISOString(),
+		},
+	};
+}
+
+export async function getHistoryEntriesForUser(userId: string) {
+	const progressRows = await db.query.userPuzzleProgress.findMany({
+		where: eq(userPuzzleProgress.userId, userId),
+		with: {
+			puzzle: true,
+		},
+		orderBy: [desc(userPuzzleProgress.lastSyncedAt)],
+	});
+	const legacyRows = await db.query.legacyImportedResults.findMany({
+		where: eq(legacyImportedResults.userId, userId),
+		orderBy: [desc(legacyImportedResults.dateKey)],
+	});
+
+	const entries: HistorySummaryEntry[] = progressRows.map((row) => ({
+		dateKey: row.puzzle.dateKey,
+		seed: row.puzzle.seed,
+		totalWords: row.puzzle.wordCount,
+		guessedWords: row.guessedWordIds.length,
+		guessCount: row.guessCount,
+		hintsUsed: row.hintsUsed,
+		completed: row.completedAt != null,
+		lastUpdated: row.lastSyncedAt.toISOString(),
+	}));
+
+	for (const row of legacyRows) {
+		entries.push({
+			dateKey: row.dateKey,
+			seed: row.seed,
+			totalWords: row.totalWords,
+			guessedWords: row.guessedWords,
+			guessCount: row.guessCount,
+			hintsUsed: row.hintsUsed,
+			completed: row.completed,
+			lastUpdated: row.lastUpdated.toISOString(),
+			legacy: true,
+		});
+	}
+
+	return entries.sort((left, right) =>
+		right.dateKey.localeCompare(left.dateKey),
+	);
+}
+
+export async function getHistoryPageDataForUser(
+	userId?: string,
+	dateKey = getYesterdayDateKey(),
+) {
+	const yesterdayPuzzleRow = await ensureDailyPuzzleSnapshot(dateKey);
+	const accountHistory = userId ? await getHistoryEntriesForUser(userId) : null;
+
+	return {
+		accountHistory,
+		yesterdayPuzzle: {
+			dateKey: yesterdayPuzzleRow.dateKey,
+			preview: toPuzzlePreview(yesterdayPuzzleRow.privateSnapshotJson),
+		},
+	};
+}
+
+export async function importAnonymousProgressForUser(options: {
+	userId: string;
+	payload: AnonymousImportPayload;
+}) {
+	const { payload, userId } = options;
+	const importedDates: string[] = [];
+	const skippedLegacyDates: string[] = [];
+
+	for (const historyEntry of payload.historyEntries) {
+		const activeProgress = payload.activeProgressByDate[historyEntry.dateKey];
+		if (!activeProgress) {
+			await db
+				.insert(legacyImportedResults)
+				.values({
+					id: crypto.randomUUID(),
+					userId,
+					dateKey: historyEntry.dateKey,
+					seed: historyEntry.seed,
+					totalWords: historyEntry.totalWords,
+					guessedWords: historyEntry.guessedWords,
+					guessCount: historyEntry.guessCount,
+					hintsUsed: historyEntry.hintsUsed,
+					completed: historyEntry.completed,
+					lastUpdated: new Date(historyEntry.lastUpdated),
+				})
+				.onConflictDoUpdate({
+					target: [legacyImportedResults.userId, legacyImportedResults.dateKey],
+					set: {
+						seed: historyEntry.seed,
+						totalWords: historyEntry.totalWords,
+						guessedWords: historyEntry.guessedWords,
+						guessCount: historyEntry.guessCount,
+						hintsUsed: historyEntry.hintsUsed,
+						completed: historyEntry.completed,
+						lastUpdated: new Date(historyEntry.lastUpdated),
+					},
+				});
+			skippedLegacyDates.push(historyEntry.dateKey);
+			continue;
+		}
+
+		const puzzle = await ensureDailyPuzzleSnapshot(historyEntry.dateKey);
+		const existingProgress = await getUserPuzzleProgressData(puzzle.id, userId);
+		const merged = mergeProgressState(existingProgress, activeProgress);
+
+		await db
+			.insert(userPuzzleProgress)
+			.values({
+				id: `${userId}:${puzzle.id}`,
+				userId,
+				puzzleId: puzzle.id,
+				guessHashes: merged.guessHashes,
+				guessedWordIds: merged.guessedWordIds,
+				revealedWordTokens: merged.revealedWordTokens,
+				hintedCells: merged.hintedCells,
+				hintsUsed: merged.hintsUsed,
+				guessCount: merged.guessCount,
+				shuffledLetters: merged.shuffledLetters,
+				completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
+				lastSyncedAt: new Date(),
+			})
+			.onConflictDoUpdate({
+				target: userPuzzleProgress.id,
+				set: {
+					guessHashes: merged.guessHashes,
+					guessedWordIds: merged.guessedWordIds,
+					revealedWordTokens: merged.revealedWordTokens,
+					hintedCells: merged.hintedCells,
+					hintsUsed: merged.hintsUsed,
+					guessCount: merged.guessCount,
+					shuffledLetters: merged.shuffledLetters,
+					completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
+					lastSyncedAt: new Date(),
+				},
+			});
+
+		importedDates.push(historyEntry.dateKey);
+	}
+
+	return {
+		importedDates,
+		skippedLegacyDates,
+	};
+}
+
+export async function decodeRevealedWords(
+	puzzle: DailyPuzzlePublic,
+	progress: PuzzleProgressState,
+) {
+	const entries = await Promise.all(
+		puzzle.wordSlots
+			.filter((slot) => progress.guessedWordIds.includes(slot.id))
+			.map(async (slot) => {
+				const unlockToken = progress.revealedWordTokens[String(slot.id)];
+				if (!unlockToken) return null;
+				return [
+					slot.id,
+					await openAnswerCapsule(slot.answerCapsule, unlockToken),
+				] as const;
+			}),
+	);
+
+	return Object.fromEntries(
+		entries.filter(Boolean) as Array<readonly [number, string]>,
+	);
+}
