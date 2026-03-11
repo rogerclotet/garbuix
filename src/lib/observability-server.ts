@@ -1,6 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { PostHog } from "posthog-node";
-import { getObservabilityConfig } from "@/lib/observability-config";
+import { getServerObservabilityConfig } from "@/lib/observability-config";
 import {
 	buildErrorProperties,
 	isObservabilityEnabled,
@@ -81,7 +81,7 @@ function getServerPostHog() {
 		return posthogClient;
 	}
 
-	const config = getObservabilityConfig();
+	const config = getServerObservabilityConfig();
 	if (!isObservabilityEnabled(config)) {
 		posthogClient = null;
 		return posthogClient;

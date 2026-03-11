@@ -3,13 +3,16 @@ import type { SessionUser } from "@/lib/puzzle-types";
 export type ObservabilityConfig = {
 	posthogHost?: string;
 	posthogKey?: string;
+	posthogProxyPath?: string;
 	posthogUIHost?: string;
 };
 
 export type ObservabilityUser = Exclude<SessionUser, null>;
 
 export function isObservabilityEnabled(config: ObservabilityConfig) {
-	return Boolean(config.posthogKey && config.posthogHost);
+	return Boolean(
+		config.posthogKey && (config.posthogProxyPath ?? config.posthogHost),
+	);
 }
 
 export function buildUserProperties(user: ObservabilityUser) {

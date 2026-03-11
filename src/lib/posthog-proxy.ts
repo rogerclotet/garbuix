@@ -1,0 +1,103 @@
+export const POSTHOG_PROXY_PATH = "/ph";
+
+const POSTHOG_STATIC_PATH_PREFIX = `${POSTHOG_PROXY_PATH}/static/`;
+const HOP_BY_HOP_HEADERS = new Set([
+	"connection",
+	"keep-alive",
+	"proxy-authenticate",
+	"proxy-authorization",
+	"te",
+	"trailer",
+	"transfer-encoding",
+	"upgrade",
+]);
+
+export function getPostHogProxyTarget(requestUrl: string, posthogHost: string) {
+	const incomingUrl = new URL(requestUrl);
+	const upstreamUrl = getUpstreamBaseUrl(incomingUrl.pathname, posthogHost);
+	const targetUrl = new URL(upstreamUrl);
+
+	targetUrl.search = incomingUrl.search;
+	targetUrl.pathname = joinUrlPaths(
+		upstreamUrl.pathname,
+		stripPostHogProxyPrefix(incomingUrl.pathname),
+	);
+
+	return targetUrl;
+}
+
+export function getPostHogProxyHeaders(
+	requestHeaders: Headers,
+	targetUrl: URL,
+) {
+	const headers = new Headers(requestHeaders);
+
+	for (const header of HOP_BY_HOP_HEADERS) {
+		headers.delete(header);
+	}
+
+	headers.delete("content-length");
+	headers.set("host", targetUrl.host);
+
+	return headers;
+}
+
+export function getPostHogProxyResponseHeaders(responseHeaders: Headers) {
+	const headers = new Headers(responseHeaders);
+
+	for (const header of HOP_BY_HOP_HEADERS) {
+		headers.delete(header);
+	}
+
+	return headers;
+}
+
+function getUpstreamBaseUrl(pathname: string, posthogHost: string) {
+	const upstreamUrl = new URL(posthogHost);
+
+	if (pathname.startsWith(POSTHOG_STATIC_PATH_PREFIX)) {
+		return getPostHogAssetsUrl(upstreamUrl);
+	}
+
+	return upstreamUrl;
+}
+
+function getPostHogAssetsUrl(upstreamUrl: URL) {
+	const assetsUrl = new URL(upstreamUrl);
+
+	if (upstreamUrl.hostname.endsWith(".i.posthog.com")) {
+		assetsUrl.hostname = upstreamUrl.hostname.replace(
+			/\.i\.posthog\.com$/,
+			"-assets.i.posthog.com",
+		);
+		assetsUrl.pathname = "/";
+	}
+
+	return assetsUrl;
+}
+
+function stripPostHogProxyPrefix(pathname: string) {
+	const normalizedPathname = pathname.startsWith(POSTHOG_PROXY_PATH)
+		? pathname.slice(POSTHOG_PROXY_PATH.length)
+		: pathname;
+
+	if (!normalizedPathname) {
+		return "/";
+	}
+
+	return normalizedPathname.startsWith("/")
+		? normalizedPathname
+		: `/${normalizedPathname}`;
+}
+
+function joinUrlPaths(basePathname: string, proxiedPathname: string) {
+	const normalizedBasePathname =
+		basePathname === "/" ? "" : basePathname.replace(/\/+$/, "");
+	const normalizedProxyPathname = proxiedPathname.startsWith("/")
+		? proxiedPathname
+		: `/${proxiedPathname}`;
+
+	return normalizedBasePathname
+		? `${normalizedBasePathname}${normalizedProxyPathname}`
+		: normalizedProxyPathname;
+}

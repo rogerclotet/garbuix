@@ -24,10 +24,11 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 
 		const tracingHosts =
 			typeof window === "undefined" ? undefined : [window.location.hostname];
+		const apiHost = config.posthogProxyPath ?? config.posthogHost;
 
 		return {
 			__add_tracing_headers: tracingHosts,
-			api_host: config.posthogHost,
+			api_host: apiHost,
 			capture_exceptions: {
 				capture_console_errors: false,
 				capture_unhandled_errors: true,
