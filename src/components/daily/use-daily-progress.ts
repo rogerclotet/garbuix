@@ -1,5 +1,5 @@
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	buildAnonymousImportPayload,
@@ -66,6 +66,21 @@ export function useDailyProgress({
 		[activeUser, baseProgress, queuedEvents, totalWords],
 	);
 
+	const fetchLatestProgress = useCallback(async () => {
+		if (!activeUser) {
+			return null;
+		}
+
+		const empty = createEmptyProgressState(puzzle);
+		return (
+			(await fetchUserProgress({
+				data: { puzzleId: puzzle.id },
+			})) ??
+			initialData.progress ??
+			empty
+		);
+	}, [activeUser, fetchUserProgress, initialData.progress, puzzle]);
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -81,18 +96,14 @@ export function useDailyProgress({
 						);
 						setQueuedEvents(cached.queuedEvents ?? []);
 					}
-				} else {
-					const latestProgress =
-						(await fetchUserProgress({
-							data: { puzzleId: puzzle.id },
-						})) ??
-						initialData.progress ??
-						empty;
+				} else if (!cancelled) {
+					setBaseProgress(initialData.progress ?? empty);
+					setQueuedEvents([]);
+				}
 
-					if (!cancelled) {
-						setBaseProgress(latestProgress);
-						setQueuedEvents([]);
-					}
+				const latestProgress = await fetchLatestProgress();
+				if (!cancelled && latestProgress) {
+					setBaseProgress(latestProgress);
 				}
 
 				if (
@@ -114,9 +125,7 @@ export function useDailyProgress({
 								},
 							});
 							markAnonymousDataImported(activeUser.id);
-							const refreshed = await fetchUserProgress({
-								data: { puzzleId: puzzle.id },
-							});
+							const refreshed = await fetchLatestProgress();
 							if (!cancelled && refreshed) {
 								setBaseProgress(refreshed);
 							}
@@ -146,11 +155,42 @@ export function useDailyProgress({
 	}, [
 		activeUser,
 		deviceId,
-		fetchUserProgress,
+		fetchLatestProgress,
 		importProgress,
 		initialData.progress,
 		puzzle,
 	]);
+
+	useEffect(() => {
+		if (!activeUser || typeof window === "undefined") {
+			return;
+		}
+
+		let cancelled = false;
+		const refreshFromServer = async () => {
+			if (!navigator.onLine) {
+				return;
+			}
+
+			const latestProgress = await fetchLatestProgress();
+			if (!cancelled && latestProgress) {
+				setBaseProgress(latestProgress);
+			}
+		};
+
+		const handleFocus = () => {
+			void refreshFromServer();
+		};
+
+		window.addEventListener("focus", handleFocus);
+		window.addEventListener("pageshow", handleFocus);
+
+		return () => {
+			cancelled = true;
+			window.removeEventListener("focus", handleFocus);
+			window.removeEventListener("pageshow", handleFocus);
+		};
+	}, [activeUser, fetchLatestProgress]);
 
 	useEffect(() => {
 		if (activeUser) {
