@@ -1,10 +1,6 @@
 import { useTheme } from "next-themes";
 import { useEffect } from "react";
-
-const THEME_COLORS = {
-	light: "#9336ea",
-	dark: "#a957f7",
-} as const;
+import { materialThemeMetaColors } from "@/lib/material-theme";
 
 type ThemeMode = "light" | "dark";
 
@@ -29,7 +25,7 @@ export function ThemeMeta() {
 
 	useEffect(() => {
 		const activeTheme = resolveTheme(theme, resolvedTheme);
-		const color = THEME_COLORS[activeTheme];
+		const color = materialThemeMetaColors[activeTheme];
 
 		let meta = document.querySelector('meta[name="theme-color"]');
 		if (!meta) {

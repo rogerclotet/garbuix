@@ -3,8 +3,8 @@
 	"name": "Paraules: Joc de Mots Encreuats en Català",
 	"start_url": "/",
 	"display": "standalone",
-	"theme_color": "#9336ea",
-	"background_color": "#9336ea",
+	"theme_color": "#8521dc",
+	"background_color": "#fffbff",
 	"icons": [
 		{
 			"src": "icons/manifest-icon-192.maskable.png",

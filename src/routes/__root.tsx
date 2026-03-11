@@ -13,6 +13,10 @@ import { links } from "@/components/meta";
 import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
+import {
+	materialThemeCss,
+	materialThemeMetaColors,
+} from "@/lib/material-theme";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -50,7 +54,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			},
 			{
 				name: "theme-color",
-				content: "#9336ea",
+				content: materialThemeMetaColors.light,
 			},
 		],
 		links: [
@@ -71,6 +75,7 @@ function RootDocument() {
 		<html lang="ca" suppressHydrationWarning>
 			<head>
 				<HeadContent />
+				<style>{materialThemeCss}</style>
 			</head>
 			<body className="h-dvh overflow-hidden bg-background text-foreground">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
