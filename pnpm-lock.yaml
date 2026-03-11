@@ -17,6 +17,9 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@posthog/react':
+        specifier: ^1.8.2
+        version: 1.8.2(@types/react@19.2.14)(posthog-js@1.360.0)(react@19.2.4)
       '@radix-ui/react-label':
         specifier: ^2.1.8
         version: 2.1.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1608,6 +1611,16 @@ packages:
 
   '@posthog/core@1.23.2':
     resolution: {integrity: sha512-zTDdda9NuSHrnwSOfFMxX/pyXiycF4jtU1kTr8DL61dHhV+7LF6XF1ndRZZTuaGGbfbb/GJYkEsjEX9SXfNZeQ==}
+
+  '@posthog/react@1.8.2':
+    resolution: {integrity: sha512-KzUuXIcAR8fAjU7IeDq+XfEcUTNvzgEGB381WRrFUUsu7jFTcKZZ6crx/ukHRCzTnoEuy5EJDkL7b7sJecPlCg==}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      posthog-js: '>=1.257.2'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@posthog/types@1.360.0':
     resolution: {integrity: sha512-roypbiJ49V3jWlV/lzhXGf0cKLLRj69L4H4ZHW6YsITHlnjQ12cgdPhPS88Bb9nW9xZTVSGWWDjfNGsdgAxsNg==}
@@ -7289,6 +7302,13 @@ snapshots:
   '@posthog/core@1.23.2':
     dependencies:
       cross-spawn: 7.0.6
+
+  '@posthog/react@1.8.2(@types/react@19.2.14)(posthog-js@1.360.0)(react@19.2.4)':
+    dependencies:
+      posthog-js: 1.360.0
+      react: 19.2.4
+    optionalDependencies:
+      '@types/react': 19.2.14
 
   '@posthog/types@1.360.0': {}
 

@@ -10,7 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
 import { links } from "@/components/meta";
-import { Observability } from "@/components/observability";
+import { ObservabilityProvider } from "@/components/observability";
 import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
@@ -89,30 +89,31 @@ function RootDocument() {
 			</head>
 			<body className="min-h-svh bg-background text-foreground">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
-					<Observability />
-					<ThemeMeta />
-					<ServiceWorkerRegister />
-					<div className="flex min-h-svh flex-col">
-						<Header />
-						<main className="flex-1">
-							<Outlet />
-						</main>
-					</div>
-					<Toaster position="top-center" />
-					{showDevtools ? (
-						<TanStackDevtools
-							config={{
-								position: "bottom-left",
-								hideUntilHover: true,
-							}}
-							plugins={[
-								{
-									name: "Tanstack Router",
-									render: <TanStackRouterDevtoolsPanel />,
-								},
-							]}
-						/>
-					) : null}
+					<ObservabilityProvider>
+						<ThemeMeta />
+						<ServiceWorkerRegister />
+						<div className="flex min-h-svh flex-col">
+							<Header />
+							<main className="flex-1">
+								<Outlet />
+							</main>
+						</div>
+						<Toaster position="top-center" />
+						{showDevtools ? (
+							<TanStackDevtools
+								config={{
+									position: "bottom-left",
+									hideUntilHover: true,
+								}}
+								plugins={[
+									{
+										name: "Tanstack Router",
+										render: <TanStackRouterDevtoolsPanel />,
+									},
+								]}
+							/>
+						) : null}
+					</ObservabilityProvider>
 				</ThemeProvider>
 				<Scripts />
 			</body>

@@ -2,10 +2,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
-import {
-	captureClientEvent,
-	resetClientUser,
-} from "@/lib/observability-client";
+import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -13,6 +10,7 @@ export function AuthControl() {
 	const rootData = rootRoute.useLoaderData();
 	const session = authClient.useSession();
 	const activeUser = session.data?.user ?? rootData.sessionUser;
+	const { captureEvent, resetUser } = useObservability();
 
 	if (session.isPending) {
 		return (
@@ -28,7 +26,7 @@ export function AuthControl() {
 				variant="ghost"
 				size="sm"
 				onClick={async () => {
-					void captureClientEvent("auth_sign_in_started", {
+					captureEvent("auth_sign_in_started", {
 						provider: "google",
 					});
 					await authClient.signIn.social({
@@ -51,8 +49,8 @@ export function AuthControl() {
 				variant="ghost"
 				size="icon"
 				onClick={async () => {
-					void captureClientEvent("auth_sign_out_clicked");
-					await resetClientUser();
+					captureEvent("auth_sign_out_clicked");
+					resetUser();
 					await authClient.signOut();
 					window.location.reload();
 				}}

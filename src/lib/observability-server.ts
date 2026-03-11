@@ -1,3 +1,4 @@
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import { PostHog } from "posthog-node";
 import { getObservabilityConfig } from "@/lib/observability-config";
 import {
@@ -53,16 +54,22 @@ export async function observeServerAction<T>(
 	},
 ) {
 	const startedAt = Date.now();
+	const client = getServerPostHog();
+	const context = getRequestObservabilityContext(options);
 
 	try {
-		return await action();
+		if (!client) {
+			return await action();
+		}
+
+		return await client.withContext(context, action);
 	} catch (error) {
 		captureServerException(error, {
-			distinctId: options?.distinctId,
+			distinctId: context.distinctId,
 			properties: {
 				action: name,
 				duration_ms: Date.now() - startedAt,
-				...options?.properties,
+				...context.properties,
 			},
 		});
 		throw error;
@@ -86,4 +93,24 @@ function getServerPostHog() {
 	});
 
 	return posthogClient;
+}
+
+function getRequestObservabilityContext(options?: {
+	distinctId?: string;
+	properties?: Record<string, unknown>;
+}) {
+	const headers = getRequestHeaders();
+	const distinctId =
+		options?.distinctId ?? headers["x-posthog-distinct-id"] ?? undefined;
+	const sessionId = headers["x-posthog-session-id"] ?? undefined;
+	const windowId = headers["x-posthog-window-id"] ?? undefined;
+
+	return {
+		distinctId,
+		properties: {
+			...options?.properties,
+			posthog_window_id: windowId,
+		},
+		sessionId,
+	};
 }

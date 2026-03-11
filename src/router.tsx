@@ -1,6 +1,6 @@
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
-import { captureClientException } from "@/lib/observability-client";
+import { RouterErrorComponent } from "@/components/router-error";
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
 // Import the generated route tree
@@ -16,13 +16,8 @@ export const getRouter = () => {
 			...rqContext,
 		},
 
+		defaultErrorComponent: RouterErrorComponent,
 		defaultPreload: "intent",
-		defaultOnCatch: (error, errorInfo) => {
-			void captureClientException(error, {
-				component_stack: errorInfo.componentStack,
-				scope: "router_error_boundary",
-			});
-		},
 	});
 
 	setupRouterSsrQueryIntegration({

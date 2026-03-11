@@ -1,56 +1,94 @@
+import { PostHogProvider } from "@posthog/react";
 import { getRouteApi, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import type { PostHogConfig } from "posthog-js";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { Metric } from "web-vitals";
 import { authClient } from "@/lib/auth-client";
-import {
-	captureClientEvent,
-	identifyClientUser,
-	initializeClientObservability,
-	resetClientUser,
-	toWebVitalProperties,
-} from "@/lib/observability-client";
+import { isObservabilityEnabled } from "@/lib/observability-shared";
+import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
 
-export function Observability() {
+type PostHogOptions = Partial<PostHogConfig> & {
+	__add_tracing_headers?: string[];
+};
+
+export function ObservabilityProvider({ children }: { children: ReactNode }) {
+	const rootData = rootRoute.useLoaderData();
+	const config = rootData.observability;
+
+	const options = useMemo<PostHogOptions | null>(() => {
+		if (!isObservabilityEnabled(config)) {
+			return null;
+		}
+
+		const tracingHosts =
+			typeof window === "undefined" ? undefined : [window.location.hostname];
+
+		return {
+			__add_tracing_headers: tracingHosts,
+			api_host: config.posthogHost,
+			capture_exceptions: {
+				capture_console_errors: false,
+				capture_unhandled_errors: true,
+				capture_unhandled_rejections: true,
+			},
+			capture_pageleave: true,
+			capture_pageview: false,
+			defaults: "2026-01-30",
+			person_profiles: "identified_only",
+			ui_host: config.posthogUIHost,
+		};
+	}, [config]);
+
+	if (!isObservabilityEnabled(config) || !options) {
+		return <>{children}</>;
+	}
+
+	return (
+		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
+			<ObservabilityRuntime />
+			{children}
+		</PostHogProvider>
+	);
+}
+
+function ObservabilityRuntime() {
 	const rootData = rootRoute.useLoaderData();
 	const session = authClient.useSession();
 	const location = useRouterState({
 		select: (state) => state.location,
 	});
 	const activeUser = session.data?.user ?? rootData.sessionUser;
-	const config = rootData.observability;
 	const lastIdentifiedUserIdRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		void initializeClientObservability(config);
-	}, [config]);
+	const { captureEvent, identifyUser, resetUser, toWebVitalProperties } =
+		useObservability();
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
 			return;
 		}
 
-		void captureClientEvent("$pageview", {
-			current_url: window.location.href,
+		captureEvent("$pageview", {
+			$current_url: window.location.href,
 			pathname: location.pathname,
 			search: location.searchStr,
 			title: document.title,
 		});
-	}, [location.pathname, location.searchStr]);
+	}, [captureEvent, location.pathname, location.searchStr]);
 
 	useEffect(() => {
 		if (activeUser) {
 			lastIdentifiedUserIdRef.current = activeUser.id;
-			void identifyClientUser(activeUser);
+			identifyUser(activeUser);
 			return;
 		}
 
 		if (lastIdentifiedUserIdRef.current) {
 			lastIdentifiedUserIdRef.current = null;
-			void resetClientUser();
+			resetUser();
 		}
-	}, [activeUser]);
+	}, [activeUser, identifyUser, resetUser]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
@@ -65,7 +103,7 @@ export function Observability() {
 			}
 
 			const reportMetric = (metric: Metric) => {
-				void captureClientEvent("web_vital", toWebVitalProperties(metric));
+				captureEvent("web_vital", toWebVitalProperties(metric));
 			};
 
 			onCLS(reportMetric);
@@ -78,7 +116,7 @@ export function Observability() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [captureEvent, toWebVitalProperties]);
 
 	return null;
 }

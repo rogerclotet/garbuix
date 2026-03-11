@@ -1,5 +1,3 @@
-import { captureClientException } from "@/lib/observability-client";
-
 const STATE_KEY_PREFIX = "paraules-state-";
 const HISTORY_KEY = "paraules-history-v1";
 
@@ -67,10 +65,6 @@ function readHistoryMap(): Record<number, HistoryEntry> {
 		return parsed;
 	} catch (error) {
 		console.error("Failed to read history:", error);
-		void captureClientException(error, {
-			scope: "read_history_map",
-			storage_key: HISTORY_KEY,
-		});
 		return {};
 	}
 }

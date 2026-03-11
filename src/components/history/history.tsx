@@ -15,10 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { authClient } from "@/lib/auth-client";
 import {
-	captureClientEvent,
-	captureClientException,
-} from "@/lib/observability-client";
-import {
 	buildAnonymousImportPayload,
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
@@ -33,6 +29,7 @@ import type {
 	DailyPuzzlePreview,
 	HistorySummaryEntry,
 } from "@/lib/puzzle-types";
+import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -58,6 +55,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);
 	const importAttemptedRef = useRef<string | null>(null);
+	const { captureEvent, captureException } = useObservability();
 	const [accountHistory, setAccountHistory] = useState<
 		HistorySummaryEntry[] | null
 	>(initialData.accountHistory);
@@ -98,7 +96,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 							},
 						});
 						markAnonymousDataImported(activeUser.id);
-						void captureClientEvent("anonymous_history_imported", {
+						captureEvent("anonymous_history_imported", {
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
 							imported_dates: result.importedDates.length,
@@ -107,7 +105,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 						toast.success("S'han sincronitzat els resultats locals");
 					} catch (error) {
 						console.error("Failed to import anonymous history", error);
-						void captureClientException(error, {
+						captureException(error, {
 							scope: "anonymous_history_import",
 						});
 					}
@@ -123,7 +121,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 				}
 			} catch (error) {
 				console.error("Failed to load account history", error);
-				void captureClientException(error, {
+				captureException(error, {
 					scope: "history_fetch",
 				});
 			}
@@ -134,7 +132,14 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [activeUser, deviceId, fetchHistory, importProgress]);
+	}, [
+		activeUser,
+		captureEvent,
+		captureException,
+		deviceId,
+		fetchHistory,
+		importProgress,
+	]);
 
 	const entries = activeUser ? (accountHistory ?? []) : anonymousHistory;
 

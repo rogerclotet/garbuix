@@ -60,6 +60,9 @@ const config = defineConfig(() => {
 					},
 				}
 			: undefined,
+		ssr: {
+			noExternal: ["@posthog/react", "posthog-js"],
+		},
 	};
 });
 
