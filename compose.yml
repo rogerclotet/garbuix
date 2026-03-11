@@ -35,6 +35,9 @@ services:
       BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      POSTHOG_KEY: "${POSTHOG_KEY:-}"
+      POSTHOG_HOST: "${POSTHOG_HOST:-}"
+      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
     init: true
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -56,6 +59,9 @@ services:
       BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      POSTHOG_KEY: "${POSTHOG_KEY:-}"
+      POSTHOG_HOST: "${POSTHOG_HOST:-}"
+      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
     init: true
     profiles: ["ops"]
     restart: "no"
