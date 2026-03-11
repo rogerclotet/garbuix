@@ -1,23 +1,12 @@
 import { PostHog } from "posthog-node";
+import { getObservabilityConfig } from "@/lib/observability-config";
 import {
 	buildErrorProperties,
 	isObservabilityEnabled,
-	type ObservabilityConfig,
 	toEventProperties,
 } from "@/lib/observability-shared";
-import { getServerEnv } from "@/lib/server-env";
 
 let posthogClient: PostHog | null | undefined;
-
-export function getObservabilityConfig(): ObservabilityConfig {
-	const env = getServerEnv();
-
-	return {
-		posthogHost: env.POSTHOG_HOST,
-		posthogKey: env.POSTHOG_KEY,
-		posthogUIHost: env.POSTHOG_UI_HOST,
-	};
-}
 
 export function captureServerEvent(options: {
 	event: string;

@@ -18,7 +18,7 @@ import {
 	materialThemeCss,
 	materialThemeMetaColors,
 } from "@/lib/material-theme";
-import { getObservabilityConfig } from "@/lib/observability-server";
+import { getObservabilityConfig } from "@/lib/observability-config";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import appCss from "@/styles.css?url";
 
