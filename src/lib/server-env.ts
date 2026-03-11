@@ -18,6 +18,9 @@ const serverEnvSchema = z.object({
 		.default("postgres://postgres:postgres@localhost:5432/paraules"),
 	GOOGLE_CLIENT_ID: optionalEnvString,
 	GOOGLE_CLIENT_SECRET: optionalEnvString,
+	POSTHOG_HOST: z.string().url().optional(),
+	POSTHOG_KEY: optionalEnvString,
+	POSTHOG_UI_HOST: z.string().url().optional(),
 });
 
 let cachedServerEnv: z.infer<typeof serverEnvSchema> | null = null;

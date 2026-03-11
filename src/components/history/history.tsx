@@ -15,6 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { authClient } from "@/lib/auth-client";
 import {
+	captureClientEvent,
+	captureClientException,
+} from "@/lib/observability-client";
+import {
 	buildAnonymousImportPayload,
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
@@ -87,25 +91,41 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					Object.keys(payload.activeProgressByDate).length > 0
 				) {
 					try {
-						await importProgress({
+						const result = await importProgress({
 							data: {
 								deviceId,
 								payload,
 							},
 						});
 						markAnonymousDataImported(activeUser.id);
+						void captureClientEvent("anonymous_history_imported", {
+							active_progress_count: Object.keys(payload.activeProgressByDate)
+								.length,
+							imported_dates: result.importedDates.length,
+							legacy_dates: result.skippedLegacyDates.length,
+						});
 						toast.success("S'han sincronitzat els resultats locals");
 					} catch (error) {
 						console.error("Failed to import anonymous history", error);
+						void captureClientException(error, {
+							scope: "anonymous_history_import",
+						});
 					}
 				} else {
 					markAnonymousDataImported(activeUser.id);
 				}
 			}
 
-			const data = await fetchHistory();
-			if (!cancelled) {
-				setAccountHistory(data.accountHistory ?? []);
+			try {
+				const data = await fetchHistory();
+				if (!cancelled) {
+					setAccountHistory(data.accountHistory ?? []);
+				}
+			} catch (error) {
+				console.error("Failed to load account history", error);
+				void captureClientException(error, {
+					scope: "history_fetch",
+				});
 			}
 		};
 

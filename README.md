@@ -59,6 +59,18 @@ docker compose -f compose.yml -f compose.dev.yml up --build
 
 The app will be available at `http://localhost:3000` and Postgres at `localhost:5432`.
 
+### Observability
+
+PostHog is optional. To enable it, set these runtime variables in `.env` before starting the app:
+
+```bash
+POSTHOG_KEY=phc_xxx
+POSTHOG_HOST=https://us.i.posthog.com
+POSTHOG_UI_HOST=https://us.posthog.com
+```
+
+`POSTHOG_UI_HOST` is optional, but it helps PostHog link events back to the right project UI region.
+
 ### Production
 
 This builds the production image, waits for Postgres, runs `pnpm db:migrate`, and then starts the built server.

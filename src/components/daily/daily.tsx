@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { authClient } from "@/lib/auth-client";
 import {
+	captureClientEvent,
+	captureClientException,
+} from "@/lib/observability-client";
+import {
 	createPuzzleEvent,
 	decodeHintLetters,
 	decodeRevealedAnswers,
@@ -34,6 +38,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	>({});
 	const [hintLetters, setHintLetters] = useState<Record<string, string>>({});
 	const lastPointerPressAtRef = useRef(0);
+	const completionTrackedRef = useRef(false);
 	const { applyLocalEvent, derivedProgress } = useDailyProgress({
 		activeUser,
 		deviceId,
@@ -44,14 +49,22 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		let cancelled = false;
 
 		void (async () => {
-			const [nextAnswers, nextHints] = await Promise.all([
-				decodeRevealedAnswers(puzzle, derivedProgress),
-				decodeHintLetters(puzzle, derivedProgress),
-			]);
+			try {
+				const [nextAnswers, nextHints] = await Promise.all([
+					decodeRevealedAnswers(puzzle, derivedProgress),
+					decodeHintLetters(puzzle, derivedProgress),
+				]);
 
-			if (!cancelled) {
-				setRevealedAnswers(nextAnswers);
-				setHintLetters(nextHints);
+				if (!cancelled) {
+					setRevealedAnswers(nextAnswers);
+					setHintLetters(nextHints);
+				}
+			} catch (error) {
+				console.error("Failed to decode puzzle progress", error);
+				void captureClientException(error, {
+					puzzle_date: puzzle.dateKey,
+					scope: "decode_progress",
+				});
 			}
 		})();
 
@@ -59,6 +72,40 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			cancelled = true;
 		};
 	}, [derivedProgress, puzzle]);
+
+	useEffect(() => {
+		void captureClientEvent("puzzle_loaded", {
+			date_key: puzzle.dateKey,
+			is_authenticated: Boolean(activeUser),
+			puzzle_id: puzzle.id,
+			rows: puzzle.rows,
+			total_words: totalWords,
+		});
+	}, [activeUser, puzzle.dateKey, puzzle.id, puzzle.rows, totalWords]);
+
+	useEffect(() => {
+		const isComplete = derivedProgress.guessedWordIds.length === totalWords;
+		if (!isComplete || completionTrackedRef.current) {
+			return;
+		}
+
+		completionTrackedRef.current = true;
+		void captureClientEvent("puzzle_completed", {
+			date_key: puzzle.dateKey,
+			guess_count: derivedProgress.guessCount,
+			hints_used: derivedProgress.hintsUsed,
+			is_authenticated: Boolean(activeUser),
+			puzzle_id: puzzle.id,
+		});
+	}, [
+		activeUser,
+		derivedProgress.guessCount,
+		derivedProgress.guessedWordIds.length,
+		derivedProgress.hintsUsed,
+		puzzle.dateKey,
+		puzzle.id,
+		totalWords,
+	]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -198,6 +245,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		);
 
 		if (result.displayWord) {
+			void captureClientEvent("puzzle_guess_result", {
+				date_key: puzzle.dateKey,
+				guess_length: guess.length,
+				matched: true,
+				puzzle_id: puzzle.id,
+			});
 			toast.success(
 				<span>
 					Correcte! Has trobat <b>{result.displayWord}</b>
@@ -210,6 +263,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}, 500);
 			}
 		} else {
+			void captureClientEvent("puzzle_guess_result", {
+				date_key: puzzle.dateKey,
+				guess_length: guess.length,
+				matched: false,
+				puzzle_id: puzzle.id,
+			});
 			toast.error(
 				<span>
 					<b>{prettyGuess}</b> no hi és
@@ -243,12 +302,22 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleShuffle = useCallback(() => {
 		triggerHaptic(8);
 		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
+		void captureClientEvent("puzzle_letters_shuffled", {
+			date_key: puzzle.dateKey,
+			puzzle_id: puzzle.id,
+		});
 		applyLocalEvent(
 			createPuzzleEvent("letters_shuffled", {
 				shuffledLetters,
 			}),
 		);
-	}, [applyLocalEvent, derivedProgress.shuffledLetters, triggerHaptic]);
+	}, [
+		applyLocalEvent,
+		derivedProgress.shuffledLetters,
+		puzzle.dateKey,
+		puzzle.id,
+		triggerHaptic,
+	]);
 
 	const handleHint = useCallback(() => {
 		triggerHaptic(8);
@@ -261,6 +330,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		);
 
 		if (!nextHint) return;
+		void captureClientEvent("puzzle_hint_used", {
+			date_key: puzzle.dateKey,
+			hints_used_after: derivedProgress.hintsUsed + 1,
+			puzzle_id: puzzle.id,
+		});
 		applyLocalEvent(
 			createPuzzleEvent("hint_used", {
 				cellKey: nextHint.cellKey,
@@ -270,16 +344,23 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		applyLocalEvent,
 		derivedProgress.hintedCells,
 		derivedProgress.hintsUsed,
+		puzzle.dateKey,
 		puzzle.hintCapsules,
+		puzzle.id,
 		revealedCells,
 		triggerHaptic,
 	]);
 
 	const handleResetDailyProgress = useCallback(() => {
 		triggerHaptic(10);
+		completionTrackedRef.current = false;
+		void captureClientEvent("puzzle_progress_reset", {
+			date_key: puzzle.dateKey,
+			puzzle_id: puzzle.id,
+		});
 		applyLocalEvent(createPuzzleEvent("progress_reset", {}));
 		toast.success("S'ha reiniciat el progrés d'avui");
-	}, [applyLocalEvent, triggerHaptic]);
+	}, [applyLocalEvent, puzzle.dateKey, puzzle.id, triggerHaptic]);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 	const hasProgress =

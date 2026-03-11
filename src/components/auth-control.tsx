@@ -2,6 +2,10 @@ import { getRouteApi } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import {
+	captureClientEvent,
+	resetClientUser,
+} from "@/lib/observability-client";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -24,6 +28,9 @@ export function AuthControl() {
 				variant="ghost"
 				size="sm"
 				onClick={async () => {
+					void captureClientEvent("auth_sign_in_started", {
+						provider: "google",
+					});
 					await authClient.signIn.social({
 						provider: "google",
 						callbackURL: window.location.href,
@@ -44,6 +51,8 @@ export function AuthControl() {
 				variant="ghost"
 				size="icon"
 				onClick={async () => {
+					void captureClientEvent("auth_sign_out_clicked");
+					await resetClientUser();
 					await authClient.signOut();
 					window.location.reload();
 				}}

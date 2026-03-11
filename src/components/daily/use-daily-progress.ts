@@ -2,6 +2,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+	captureClientEvent,
+	captureClientException,
+} from "@/lib/observability-client";
+import {
 	buildAnonymousImportPayload,
 	getAccountPuzzleCache,
 	getAnonymousProgress,
@@ -118,13 +122,19 @@ export function useDailyProgress({
 						Object.keys(payload.activeProgressByDate).length > 0
 					) {
 						try {
-							await importProgress({
+							const result = await importProgress({
 								data: {
 									deviceId,
 									payload,
 								},
 							});
 							markAnonymousDataImported(activeUser.id);
+							void captureClientEvent("anonymous_progress_imported", {
+								active_progress_count: Object.keys(payload.activeProgressByDate)
+									.length,
+								imported_dates: result.importedDates.length,
+								legacy_dates: result.skippedLegacyDates.length,
+							});
 							const refreshed = await fetchLatestProgress();
 							if (!cancelled && refreshed) {
 								setBaseProgress(refreshed);
@@ -132,6 +142,10 @@ export function useDailyProgress({
 							toast.success("S'han sincronitzat els resultats locals");
 						} catch (error) {
 							console.error("Failed to import anonymous progress", error);
+							void captureClientException(error, {
+								puzzle_date: puzzle.dateKey,
+								scope: "anonymous_progress_import",
+							});
 						}
 					} else {
 						markAnonymousDataImported(activeUser.id);
@@ -241,9 +255,18 @@ export function useDailyProgress({
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !result.ackedEventIds.includes(event.id)),
 				);
+				void captureClientEvent("puzzle_events_synced", {
+					acked_events: result.ackedEventIds.length,
+					puzzle_id: puzzle.id,
+					queued_events: pendingEvents.length,
+				});
 			})
 			.catch((error) => {
 				console.error("Failed to sync puzzle events", error);
+				void captureClientException(error, {
+					puzzle_id: puzzle.id,
+					scope: "puzzle_event_sync",
+				});
 			})
 			.finally(() => {
 				if (!cancelled) {

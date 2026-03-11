@@ -11,6 +11,7 @@ import {
 import { auth } from "@/lib/auth";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
+import { captureServerEvent } from "@/lib/observability-server";
 import { hashText, openAnswerCapsule } from "@/lib/puzzle-crypto";
 import {
 	dateKeyToSeed,
@@ -137,6 +138,15 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 		.returning();
 
 	if (inserted[0]) {
+		captureServerEvent({
+			event: "daily_puzzle_generated",
+			properties: {
+				date_key: dateKey,
+				puzzle_id: inserted[0].id,
+				seed,
+				word_count: privateSnapshot.wordSlots.length,
+			},
+		});
 		return inserted[0];
 	}
 
@@ -321,8 +331,23 @@ export async function syncPuzzleEventsForUser(options: {
 			},
 		});
 
+	const ackedEventIds = filteredEvents.map((event) => event.id);
+
+	captureServerEvent({
+		distinctId: userId,
+		event: "puzzle_progress_synced_server",
+		properties: {
+			acked_event_count: ackedEventIds.length,
+			completed: Boolean(nextProgress.completedAt),
+			device_id: deviceId,
+			guessed_word_count: nextProgress.guessedWordIds.length,
+			puzzle_id: puzzleId,
+			received_event_count: events.length,
+		},
+	});
+
 	return {
-		ackedEventIds: filteredEvents.map((event) => event.id),
+		ackedEventIds,
 		progress: {
 			...nextProgress,
 			lastSyncedAt: new Date().toISOString(),
@@ -379,6 +404,16 @@ export async function getHistoryPageDataForUser(
 ) {
 	const yesterdayPuzzleRow = await ensureDailyPuzzleSnapshot(dateKey);
 	const accountHistory = userId ? await getHistoryEntriesForUser(userId) : null;
+
+	captureServerEvent({
+		distinctId: userId,
+		event: "history_page_loaded_server",
+		properties: {
+			date_key: dateKey,
+			has_account_history: Boolean(accountHistory),
+			history_entry_count: accountHistory?.length ?? 0,
+		},
+	});
 
 	return {
 		accountHistory,
@@ -467,6 +502,16 @@ export async function importAnonymousProgressForUser(options: {
 
 		importedDates.push(historyEntry.dateKey);
 	}
+
+	captureServerEvent({
+		distinctId: userId,
+		event: "anonymous_progress_imported_server",
+		properties: {
+			active_progress_count: Object.keys(payload.activeProgressByDate).length,
+			imported_dates: importedDates.length,
+			legacy_dates: skippedLegacyDates.length,
+		},
+	});
 
 	return {
 		importedDates,
