@@ -369,7 +369,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.hintsUsed > 0;
 
 	return (
-		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-86 lg:pb-8">
+		<div className="min-h-full p-2 pb-[calc(21rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
 			<div className="max-w-7xl mx-auto">
 				<div className="mb-6">
 					<div className="flex items-center justify-between mb-2 text-sm font-medium opacity-70">

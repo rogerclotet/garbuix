@@ -40,8 +40,8 @@ export function DailyControls({
 	}
 
 	return (
-		<div className="fixed bottom-0 left-0 right-0 z-40 lg:static">
-			<div className="rounded-t-2xl rounded-b-none border-t bg-card shadow-[0_-8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md transition-all duration-300 dark:shadow-[0_-8px_30px_rgb(0,0,0,0.5)] lg:rounded-xl lg:border lg:shadow-none lg:backdrop-blur-none">
+		<div className="fixed right-0 bottom-0 left-0 z-40 lg:static">
+			<div className="rounded-t-2xl rounded-b-none border-x border-t bg-card shadow-[0_-8px_24px_rgb(0,0,0,0.12)] pb-[env(safe-area-inset-bottom)] lg:rounded-xl lg:border lg:shadow-none lg:pb-0">
 				<div className="hidden lg:block px-6 pt-6">
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
@@ -60,7 +60,7 @@ export function DailyControls({
 										key={`letter-${letter}`}
 										variant="outline"
 										size="lg"
-										className="w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 transition-all duration-100 active:scale-95 active:bg-primary/10 active:shadow-inner touch-manipulation"
+										className="w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-full border-2 active:bg-primary/10 active:shadow-inner touch-manipulation"
 										onPointerDown={(event) =>
 											runPressAction(event, () => onLetterClick(letter))
 										}
@@ -77,7 +77,7 @@ export function DailyControls({
 								onPointerDown={(event) => runPressAction(event, onSubmitGuess)}
 								onClick={(event) => runClickAction(event, onSubmitGuess)}
 								size="icon"
-								className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl transition-transform duration-100 active:scale-95 touch-manipulation"
+								className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl touch-manipulation"
 								disabled={currentGuess.length < 4}
 								aria-label="Comprovar"
 							>
@@ -90,7 +90,7 @@ export function DailyControls({
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onBackspace)}
 								onClick={(event) => runClickAction(event, onBackspace)}
-								className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
+								className="gap-2 h-9 sm:h-10 touch-manipulation"
 								disabled={currentGuess.length === 0}
 							>
 								<Delete className="w-4 h-4" />
@@ -100,7 +100,7 @@ export function DailyControls({
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onHint)}
 								onClick={(event) => runClickAction(event, onHint)}
-								className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
+								className="gap-2 h-9 sm:h-10 touch-manipulation"
 								disabled={hintsUsed >= 3 || isComplete}
 								size="lg"
 							>
@@ -113,7 +113,7 @@ export function DailyControls({
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onShuffle)}
 								onClick={(event) => runClickAction(event, onShuffle)}
-								className="gap-2 h-9 sm:h-10 transition-transform duration-100 active:scale-[0.98] touch-manipulation"
+								className="gap-2 h-9 sm:h-10 touch-manipulation"
 							>
 								<Shuffle className="w-4 h-4" />
 								Barrejar

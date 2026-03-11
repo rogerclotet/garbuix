@@ -79,36 +79,40 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
+	const showDevtools = import.meta.env.DEV;
+
 	return (
 		<html lang="ca" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
 			</head>
-			<body className="h-dvh overflow-hidden bg-background text-foreground">
+			<body className="min-h-svh bg-background text-foreground">
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
 					<Observability />
 					<ThemeMeta />
 					<ServiceWorkerRegister />
-					<div className="flex flex-col h-dvh">
+					<div className="flex min-h-svh flex-col">
 						<Header />
-						<main className="flex-1 overflow-y-auto">
+						<main className="flex-1">
 							<Outlet />
 						</main>
 					</div>
 					<Toaster position="top-center" />
-					<TanStackDevtools
-						config={{
-							position: "bottom-left",
-							hideUntilHover: true,
-						}}
-						plugins={[
-							{
-								name: "Tanstack Router",
-								render: <TanStackRouterDevtoolsPanel />,
-							},
-						]}
-					/>
+					{showDevtools ? (
+						<TanStackDevtools
+							config={{
+								position: "bottom-left",
+								hideUntilHover: true,
+							}}
+							plugins={[
+								{
+									name: "Tanstack Router",
+									render: <TanStackRouterDevtoolsPanel />,
+								},
+							]}
+						/>
+					) : null}
 				</ThemeProvider>
 				<Scripts />
 			</body>

@@ -3,6 +3,7 @@
 	"name": "Paraules: Joc de Mots Encreuats en Català",
 	"start_url": "/",
 	"display": "standalone",
+	"orientation": "portrait",
 	"theme_color": "#8521dc",
 	"background_color": "#fffbff",
 	"icons": [
