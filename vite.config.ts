@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -6,11 +8,28 @@ import { nitro } from "nitro/vite";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vite";
 
+function readBuildVersion() {
+	try {
+		const manifestPath = resolve(process.cwd(), "public/version.json");
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+			version?: string;
+		};
+
+		return manifest.version ?? "dev";
+	} catch {
+		return "dev";
+	}
+}
+
 const config = defineConfig(() => {
 	const port = Number(process.env.PORT ?? 3000);
 	const isDockerDev = process.env.DOCKER_DEV === "true";
+	const buildVersion = readBuildVersion();
 
 	return {
+		define: {
+			__APP_VERSION__: JSON.stringify(buildVersion),
+		},
 		plugins: [
 			devtools(),
 			nitro(),

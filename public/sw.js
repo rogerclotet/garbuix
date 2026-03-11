@@ -1,4 +1,5 @@
-const CACHE_VERSION = "v2";
+const CACHE_VERSION =
+	new URL(self.location.href).searchParams.get("v") ?? "dev";
 const STATIC_CACHE = `paraules-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `paraules-runtime-${CACHE_VERSION}`;
 
@@ -15,7 +16,6 @@ self.addEventListener("install", (event) => {
 	event.waitUntil(
 		caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)),
 	);
-	self.skipWaiting();
 });
 
 self.addEventListener("message", (event) => {
@@ -50,6 +50,11 @@ self.addEventListener("fetch", (event) => {
 
 	const url = new URL(request.url);
 	if (url.origin !== self.location.origin) {
+		return;
+	}
+
+	if (url.pathname === "/version.json") {
+		event.respondWith(fetch(request, { cache: "no-store" }));
 		return;
 	}
 

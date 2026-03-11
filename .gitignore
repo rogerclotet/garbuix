@@ -12,3 +12,4 @@ count.txt
 .vinxi
 .pnpm-store
 src/data/catalan-words.json
+public/version.json
