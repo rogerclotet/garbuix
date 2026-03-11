@@ -17,6 +17,7 @@ import {
 	materialThemeCss,
 	materialThemeMetaColors,
 } from "@/lib/material-theme";
+import { getSessionUser } from "@/lib/puzzle-server-fns";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -24,6 +25,10 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	loader: async () => ({
+		sessionUser: await getSessionUser(),
+	}),
+
 	head: () => ({
 		meta: [
 			{

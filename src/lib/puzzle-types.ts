@@ -1,5 +1,12 @@
 export type PuzzleDirection = "horizontal" | "vertical";
 
+export type SessionUser = {
+	id: string;
+	name: string;
+	email: string;
+	image?: string | null;
+} | null;
+
 export type PuzzleGridMaskCell = {
 	wordIds: number[];
 };

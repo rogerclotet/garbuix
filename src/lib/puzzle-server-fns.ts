@@ -4,6 +4,7 @@ import {
 	getAuthSession,
 	getDailyPuzzlePublicData,
 	getHistoryPageDataForUser,
+	getSessionUserData,
 	getUserPuzzleProgressData,
 	importAnonymousProgressForUser,
 	syncPuzzleEventsForUser,
@@ -24,6 +25,10 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		return getDailyPuzzlePublicData(data?.dateKey);
 	});
+
+export const getSessionUser = createServerFn({ method: "GET" }).handler(
+	async () => getSessionUserData(),
+);
 
 export const getUserPuzzleProgress = createServerFn({ method: "GET" })
 	.inputValidator(

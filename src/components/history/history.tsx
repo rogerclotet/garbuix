@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -30,6 +30,8 @@ import type {
 	HistorySummaryEntry,
 } from "@/lib/puzzle-types";
 
+const rootRoute = getRouteApi("__root__");
+
 const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
 	day: "numeric",
 	month: "long",
@@ -45,8 +47,9 @@ type HistoryData = {
 };
 
 export function History({ initialData }: { initialData: HistoryData }) {
+	const rootData = rootRoute.useLoaderData();
 	const session = authClient.useSession();
-	const activeUser = session.data?.user;
+	const activeUser = session.data?.user ?? rootData.sessionUser;
 	const fetchHistory = useServerFn(getHistoryPageData);
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);

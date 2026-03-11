@@ -1,14 +1,10 @@
 import type {
 	DailyPuzzlePublic,
 	PuzzleProgressState,
+	SessionUser,
 } from "@/lib/puzzle-types";
 
-export type DailySessionUser = {
-	id: string;
-	name: string;
-	email: string;
-	image?: string | null;
-} | null;
+export type DailySessionUser = SessionUser;
 
 export type DailyData = {
 	puzzle: DailyPuzzlePublic;

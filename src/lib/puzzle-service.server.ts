@@ -30,6 +30,7 @@ import type {
 	HistorySummaryEntry,
 	PuzzleClientEvent,
 	PuzzleProgressState,
+	SessionUser,
 } from "@/lib/puzzle-types";
 
 export const PUZZLE_ALGORITHM_VERSION = "1";
@@ -37,6 +38,19 @@ export const PUZZLE_ALGORITHM_VERSION = "1";
 const serverWords = allWords as Word[];
 
 let cachedDictionaryVersion: Promise<string> | null = null;
+
+function toSessionUser(
+	sessionData: Awaited<ReturnType<typeof getAuthSession>>,
+): SessionUser {
+	return sessionData
+		? {
+				id: sessionData.user.id,
+				name: sessionData.user.name,
+				email: sessionData.user.email,
+				image: sessionData.user.image,
+			}
+		: null;
+}
 
 function serializeProgressRow(
 	row: typeof userPuzzleProgress.$inferSelect,
@@ -140,20 +154,16 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	const puzzle = await ensureDailyPuzzleSnapshot(dateKey);
 	const sessionData = await getAuthSession();
-	const sessionUser = sessionData
-		? {
-				id: sessionData.user.id,
-				name: sessionData.user.name,
-				email: sessionData.user.email,
-				image: sessionData.user.image,
-			}
-		: null;
 
 	return {
 		puzzle: puzzle.publicSnapshotJson,
 		rolloverAt: getNextRolloverAt().toISOString(),
-		sessionUser,
+		sessionUser: toSessionUser(sessionData),
 	};
+}
+
+export async function getSessionUserData() {
+	return toSessionUser(await getAuthSession());
 }
 
 export async function getUserPuzzleProgressData(
