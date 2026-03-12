@@ -395,13 +395,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.hintsUsed > 0;
 
 	useEffect(() => {
-		if (typeof window === "undefined" || isComplete) {
+		if (typeof document === "undefined" || isComplete) {
 			return;
 		}
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (
-				event.defaultPrevented ||
 				event.metaKey ||
 				event.ctrlKey ||
 				event.altKey ||
@@ -413,6 +412,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			const action = getGuessKeyboardAction(
 				event.key,
 				derivedProgress.shuffledLetters,
+				event.code,
 			);
 			if (!action) {
 				return;
@@ -442,10 +442,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			handleLetterClick(action.letter);
 		};
 
-		window.addEventListener("keydown", handleKeyDown);
+		document.addEventListener("keydown", handleKeyDown, {
+			capture: true,
+		});
 
 		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
+			document.removeEventListener("keydown", handleKeyDown, {
+				capture: true,
+			});
 		};
 	}, [
 		currentGuess,

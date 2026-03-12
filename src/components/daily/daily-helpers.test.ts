@@ -30,6 +30,9 @@ describe("getGuessKeyboardAction", () => {
 		expect(getGuessKeyboardAction(" ", ["a", "m", "ç"])).toEqual({
 			type: "submit",
 		});
+		expect(getGuessKeyboardAction("Space", ["a", "m", "ç"], "Space")).toEqual({
+			type: "submit",
+		});
 		expect(getGuessKeyboardAction("Backspace", ["a", "m", "ç"])).toEqual({
 			type: "backspace",
 		});

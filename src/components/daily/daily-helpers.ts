@@ -80,8 +80,14 @@ export type GuessKeyboardAction =
 export function getGuessKeyboardAction(
 	key: string,
 	availableLetters: string[],
+	code?: string,
 ): GuessKeyboardAction | null {
-	if (key === "Enter" || key === " " || key === "Spacebar") {
+	if (
+		key === "Enter" ||
+		key === " " ||
+		key === "Spacebar" ||
+		code === "Space"
+	) {
 		return { type: "submit" };
 	}
 
