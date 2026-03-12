@@ -1,3 +1,4 @@
+import { normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzlePublic,
 	DailyPuzzleWordSlot,
@@ -69,6 +70,46 @@ export function buildCellLetters(
 	}
 
 	return letters;
+}
+
+export type GuessKeyboardAction =
+	| { type: "append_letter"; letter: string }
+	| { type: "backspace" }
+	| { type: "submit" };
+
+export function getGuessKeyboardAction(
+	key: string,
+	availableLetters: string[],
+): GuessKeyboardAction | null {
+	if (key === "Enter" || key === " " || key === "Spacebar") {
+		return { type: "submit" };
+	}
+
+	if (key === "Backspace" || key === "Delete") {
+		return { type: "backspace" };
+	}
+
+	if (key.length !== 1) {
+		return null;
+	}
+
+	const normalizedKey = normalizeWord(key);
+	if (normalizedKey.length !== 1) {
+		return null;
+	}
+
+	const matchedLetter = availableLetters.find(
+		(letter) => normalizeWord(letter) === normalizedKey,
+	);
+
+	if (!matchedLetter) {
+		return null;
+	}
+
+	return {
+		type: "append_letter",
+		letter: matchedLetter,
+	};
 }
 
 export function getDisplayedSlotWord(

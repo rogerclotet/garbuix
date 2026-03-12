@@ -46,6 +46,10 @@ export function DailyControls({
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
+					<p className="mt-2 text-sm text-muted-foreground">
+						Escriu amb el teclat, esborra amb retrocés i envia amb Enter o
+						espai.
+					</p>
 				</div>
 				<div className="p-6">
 					<div className="flex flex-col items-center gap-4 lg:gap-6">

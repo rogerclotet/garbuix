@@ -15,13 +15,30 @@ import { shuffleArray } from "@/lib/shuffle";
 import { useObservability } from "@/lib/use-observability";
 import { DailyControls } from "./daily-controls";
 import { DailyGrid } from "./daily-grid";
-import { buildCellLetters, buildRevealedCells } from "./daily-helpers";
+import {
+	buildCellLetters,
+	buildRevealedCells,
+	getGuessKeyboardAction,
+} from "./daily-helpers";
 import { DailyResetProgressDialog } from "./daily-reset-progress-dialog";
 import type { DailyData } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { useDailyProgress } from "./use-daily-progress";
 
 const POINTER_CLICK_DEDUP_MS = 350;
+
+function isEditableTarget(target: EventTarget | null) {
+	if (!(target instanceof HTMLElement)) {
+		return false;
+	}
+
+	return (
+		target.isContentEditable ||
+		target.closest(
+			"input, textarea, select, [contenteditable='true'], [role='textbox']",
+		) !== null
+	);
+}
 
 export function Daily({ initialData }: { initialData: DailyData }) {
 	const session = authClient.useSession();
@@ -376,6 +393,68 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.guessedWordIds.length > 0 ||
 		derivedProgress.guessCount > 0 ||
 		derivedProgress.hintsUsed > 0;
+
+	useEffect(() => {
+		if (typeof window === "undefined" || isComplete) {
+			return;
+		}
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (
+				event.defaultPrevented ||
+				event.metaKey ||
+				event.ctrlKey ||
+				event.altKey ||
+				isEditableTarget(event.target)
+			) {
+				return;
+			}
+
+			const action = getGuessKeyboardAction(
+				event.key,
+				derivedProgress.shuffledLetters,
+			);
+			if (!action) {
+				return;
+			}
+
+			if (action.type === "submit") {
+				if (event.repeat || currentGuess.trim().length < 4) {
+					return;
+				}
+
+				event.preventDefault();
+				void handleGuess();
+				return;
+			}
+
+			if (action.type === "backspace") {
+				if (currentGuess.length === 0) {
+					return;
+				}
+
+				event.preventDefault();
+				handleBackspace();
+				return;
+			}
+
+			event.preventDefault();
+			handleLetterClick(action.letter);
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [
+		currentGuess,
+		derivedProgress.shuffledLetters,
+		handleBackspace,
+		handleGuess,
+		handleLetterClick,
+		isComplete,
+	]);
 
 	return (
 		<div className="min-h-full p-2 pb-[calc(21rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
