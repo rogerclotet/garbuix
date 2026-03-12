@@ -395,12 +395,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.hintsUsed > 0;
 
 	useEffect(() => {
-		if (typeof document === "undefined" || isComplete) {
+		if (typeof window === "undefined" || isComplete) {
 			return;
 		}
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (
+				event.defaultPrevented ||
 				event.metaKey ||
 				event.ctrlKey ||
 				event.altKey ||
@@ -442,14 +443,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			handleLetterClick(action.letter);
 		};
 
-		document.addEventListener("keydown", handleKeyDown, {
-			capture: true,
-		});
+		window.addEventListener("keydown", handleKeyDown);
 
 		return () => {
-			document.removeEventListener("keydown", handleKeyDown, {
-				capture: true,
-			});
+			window.removeEventListener("keydown", handleKeyDown);
 		};
 	}, [
 		currentGuess,
