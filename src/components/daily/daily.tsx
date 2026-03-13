@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { authClient } from "@/lib/auth-client";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -12,6 +11,7 @@ import {
 import { getDeviceId } from "@/lib/puzzle-local";
 import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
+import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 import { DailyControls } from "./daily-controls";
 import { DailyGrid } from "./daily-grid";
@@ -42,8 +42,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function Daily({ initialData }: { initialData: DailyData }) {
-	const session = authClient.useSession();
-	const activeUser = session.data?.user ?? initialData.sessionUser;
+	const { activeUser } = useActiveSessionUser(initialData.sessionUser);
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
 	const deviceId = useMemo(() => getDeviceId(), []);

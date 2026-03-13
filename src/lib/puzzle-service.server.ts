@@ -20,7 +20,7 @@ import {
 	getYesterdayDateKey,
 } from "@/lib/puzzle-dates";
 import {
-	applyPuzzleEvents,
+	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 } from "@/lib/puzzle-progress";
 import {
@@ -72,6 +72,39 @@ function serializeProgressRow(
 		completedAt: row.completedAt?.toISOString() ?? null,
 		lastSyncedAt: row.lastSyncedAt.toISOString(),
 	};
+}
+
+function getStoredEventAt(row: typeof userPuzzleEvents.$inferSelect): string {
+	const eventAt =
+		typeof row.payload === "object" &&
+		row.payload !== null &&
+		"_eventAt" in row.payload &&
+		typeof row.payload._eventAt === "string"
+			? row.payload._eventAt
+			: null;
+
+	return eventAt ?? row.createdAt.toISOString();
+}
+
+function toPuzzleClientEvent(
+	row: typeof userPuzzleEvents.$inferSelect,
+): PuzzleClientEvent | null {
+	const at = getStoredEventAt(row);
+
+	switch (row.type) {
+		case "guess_added":
+		case "hint_used":
+		case "letters_shuffled":
+		case "progress_reset":
+			return {
+				id: row.clientEventId,
+				at,
+				type: row.type,
+				payload: row.payload,
+			} as PuzzleClientEvent;
+		default:
+			return null;
+	}
 }
 
 async function getDictionaryVersion() {
@@ -283,15 +316,6 @@ export async function syncPuzzleEventsForUser(options: {
 		privateSnapshot,
 	});
 
-	const existingProgress = await getUserPuzzleProgressData(puzzleId, userId);
-	const baseProgress =
-		existingProgress ?? createEmptyProgressState(publicSnapshot);
-	const nextProgress = applyPuzzleEvents(
-		baseProgress,
-		filteredEvents,
-		privateSnapshot.wordSlots.length,
-	);
-
 	await Promise.all(
 		filteredEvents.map((event) =>
 			db
@@ -303,10 +327,28 @@ export async function syncPuzzleEventsForUser(options: {
 					deviceId,
 					clientEventId: event.id,
 					type: event.type,
-					payload: event.payload,
+					payload: {
+						...event.payload,
+						_eventAt: event.at,
+					},
 				})
 				.onConflictDoNothing(),
 		),
+	);
+
+	const allEvents = await db.query.userPuzzleEvents.findMany({
+		where: and(
+			eq(userPuzzleEvents.userId, userId),
+			eq(userPuzzleEvents.puzzleId, puzzleId),
+		),
+	});
+
+	const nextProgress = applyPuzzleEventsChronologically(
+		createEmptyProgressState(publicSnapshot),
+		allEvents
+			.map((row) => toPuzzleClientEvent(row))
+			.filter((event): event is PuzzleClientEvent => event !== null),
+		privateSnapshot.wordSlots.length,
 	);
 
 	await db

@@ -15,9 +15,10 @@ import type {
 	DailyPuzzlePrivate,
 	DailyPuzzlePublic,
 	HistorySummaryEntry,
-	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+
+type StoredPuzzleEventPayload = Record<string, unknown>;
 
 export const dailyPuzzles = pgTable(
 	"daily_puzzles",
@@ -103,7 +104,7 @@ export const userPuzzleEvents = pgTable(
 		deviceId: text("device_id").notNull(),
 		clientEventId: text("client_event_id").notNull(),
 		type: text("type").notNull(),
-		payload: jsonb("payload").$type<PuzzleClientEvent["payload"]>().notNull(),
+		payload: jsonb("payload").$type<StoredPuzzleEventPayload>().notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),

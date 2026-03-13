@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { authClient } from "@/lib/auth-client";
 import {
 	buildAnonymousImportPayload,
 	getDeviceId,
@@ -29,6 +28,7 @@ import type {
 	DailyPuzzlePreview,
 	HistorySummaryEntry,
 } from "@/lib/puzzle-types";
+import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
@@ -49,8 +49,7 @@ type HistoryData = {
 
 export function History({ initialData }: { initialData: HistoryData }) {
 	const rootData = rootRoute.useLoaderData();
-	const session = authClient.useSession();
-	const activeUser = session.data?.user ?? rootData.sessionUser;
+	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
 	const fetchHistory = useServerFn(getHistoryPageData);
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);

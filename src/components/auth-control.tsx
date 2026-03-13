@@ -1,15 +1,16 @@
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
 
 export function AuthControl() {
 	const rootData = rootRoute.useLoaderData();
-	const session = authClient.useSession();
-	const activeUser = session.data?.user ?? rootData.sessionUser;
+	const router = useRouter();
+	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const { captureEvent, resetUser } = useObservability();
 
 	if (session.isPending) {
@@ -52,7 +53,8 @@ export function AuthControl() {
 					captureEvent("auth_sign_out_clicked");
 					resetUser();
 					await authClient.signOut();
-					window.location.reload();
+					await session.refetch();
+					await router.invalidate({ sync: true });
 				}}
 				aria-label="Tancar sessió"
 			>

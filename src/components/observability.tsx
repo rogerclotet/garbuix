@@ -3,8 +3,8 @@ import { getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { PostHogConfig } from "posthog-js";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { Metric } from "web-vitals";
-import { authClient } from "@/lib/auth-client";
 import { isObservabilityEnabled } from "@/lib/observability-shared";
+import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
@@ -56,11 +56,10 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 
 function ObservabilityRuntime() {
 	const rootData = rootRoute.useLoaderData();
-	const session = authClient.useSession();
 	const location = useRouterState({
 		select: (state) => state.location,
 	});
-	const activeUser = session.data?.user ?? rootData.sessionUser;
+	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
 	const lastIdentifiedUserIdRef = useRef<string | null>(null);
 	const { captureEvent, identifyUser, resetUser, toWebVitalProperties } =
 		useObservability();

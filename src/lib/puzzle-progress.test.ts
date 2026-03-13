@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	applyPuzzleEvent,
+	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 } from "@/lib/puzzle-progress";
 
@@ -98,5 +99,48 @@ describe("puzzle-progress", () => {
 		expect(state.guessedWordIds).toEqual([]);
 		expect(state.hintedCells).toEqual([]);
 		expect(state.completedAt).toBeNull();
+	});
+
+	it("replays out-of-order events chronologically", () => {
+		const initial = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+
+		const state = applyPuzzleEventsChronologically(
+			initial,
+			[
+				{
+					id: "guess-after-reset",
+					at: "2026-03-10T10:12:00.000Z",
+					type: "guess_added",
+					payload: {
+						guessHash: "guess-2",
+						matchedWordId: 1,
+						unlockToken: "unlock-2",
+					},
+				},
+				{
+					id: "older-reset",
+					at: "2026-03-10T10:10:00.000Z",
+					type: "progress_reset",
+					payload: {},
+				},
+				{
+					id: "guess-before-online-guess",
+					at: "2026-03-10T10:11:00.000Z",
+					type: "guess_added",
+					payload: {
+						guessHash: "guess-1",
+						matchedWordId: 0,
+						unlockToken: "unlock-1",
+					},
+				},
+			],
+			3,
+		);
+
+		expect(state.guessCount).toBe(2);
+		expect(state.guessedWordIds).toEqual([0, 1]);
 	});
 });

@@ -106,3 +106,23 @@ export function applyPuzzleEvents(
 		initialState,
 	);
 }
+
+export function sortPuzzleEvents(events: PuzzleClientEvent[]) {
+	return [...events].sort((left, right) => {
+		const timestampDelta =
+			new Date(left.at).getTime() - new Date(right.at).getTime();
+		if (timestampDelta !== 0) {
+			return timestampDelta;
+		}
+
+		return left.id.localeCompare(right.id);
+	});
+}
+
+export function applyPuzzleEventsChronologically(
+	initialState: PuzzleProgressState,
+	events: PuzzleClientEvent[],
+	totalWords: number,
+) {
+	return applyPuzzleEvents(initialState, sortPuzzleEvents(events), totalWords);
+}

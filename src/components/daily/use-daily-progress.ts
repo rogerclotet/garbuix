@@ -13,7 +13,7 @@ import {
 } from "@/lib/puzzle-local";
 import {
 	applyPuzzleEvent,
-	applyPuzzleEvents,
+	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 } from "@/lib/puzzle-progress";
 import {
@@ -63,7 +63,11 @@ export function useDailyProgress({
 	const derivedProgress = useMemo(
 		() =>
 			activeUser
-				? applyPuzzleEvents(baseProgress, queuedEvents, totalWords)
+				? applyPuzzleEventsChronologically(
+						baseProgress,
+						queuedEvents,
+						totalWords,
+					)
 				: baseProgress,
 		[activeUser, baseProgress, queuedEvents, totalWords],
 	);

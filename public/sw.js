@@ -4,13 +4,33 @@ const STATIC_CACHE = `paraules-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `paraules-runtime-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
-	"/",
 	"/manifest.json",
 	"/icons/favicon-196.png",
 	"/icons/apple-icon-180.png",
 	"/icons/manifest-icon-192.maskable.png",
 	"/icons/manifest-icon-512.maskable.png",
 ];
+
+const CACHEABLE_DESTINATIONS = new Set([
+	"style",
+	"script",
+	"worker",
+	"font",
+	"image",
+	"manifest",
+]);
+
+function isCacheableAssetRequest(request, url) {
+	if (CACHEABLE_DESTINATIONS.has(request.destination)) {
+		return true;
+	}
+
+	return (
+		url.pathname === "/favicon.ico" ||
+		url.pathname === "/manifest.json" ||
+		url.pathname.startsWith("/icons/")
+	);
+}
 
 self.addEventListener("install", (event) => {
 	event.waitUntil(
@@ -58,22 +78,17 @@ self.addEventListener("fetch", (event) => {
 		return;
 	}
 
+	if (url.pathname.startsWith("/api/")) {
+		event.respondWith(fetch(request, { cache: "no-store" }));
+		return;
+	}
+
 	if (request.mode === "navigate") {
-		event.respondWith(
-			fetch(request)
-				.then((response) => {
-					const copy = response.clone();
-					event.waitUntil(
-						caches
-							.open(RUNTIME_CACHE)
-							.then((cache) => cache.put(request, copy)),
-					);
-					return response;
-				})
-				.catch(() =>
-					caches.match(request).then((cached) => cached || caches.match("/")),
-				),
-		);
+		event.respondWith(fetch(request));
+		return;
+	}
+
+	if (!isCacheableAssetRequest(request, url)) {
 		return;
 	}
 
