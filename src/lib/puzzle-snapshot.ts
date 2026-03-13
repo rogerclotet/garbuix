@@ -7,6 +7,7 @@ import {
 } from "@/lib/puzzle-crypto";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type {
+	DailyPuzzleHintCapsule,
 	DailyPuzzlePreview,
 	DailyPuzzlePrivate,
 	DailyPuzzlePublic,
@@ -22,22 +23,57 @@ function toGridLetters(grid: CrosswordGrid["grid"]) {
 	return grid.map((row) => row.map((cell) => cell?.letter ?? null));
 }
 
-function toHintCandidates(crossword: CrosswordGrid, seed: number) {
+function toHintCandidates(
+	gridLetters: DailyPuzzlePrivate["gridLetters"],
+	seed: number,
+) {
 	const random = new SeededRandom(seed + 97_331);
 	const cells: Array<{ cellKey: string; letter: string }> = [];
 
-	for (let row = 0; row < crossword.grid.length; row += 1) {
-		for (let col = 0; col < crossword.grid[row].length; col += 1) {
-			const cell = crossword.grid[row][col];
-			if (!cell) continue;
+	for (let row = 0; row < gridLetters.length; row += 1) {
+		for (let col = 0; col < gridLetters[row].length; col += 1) {
+			const letter = gridLetters[row][col];
+			if (!letter) continue;
 			cells.push({
 				cellKey: `${row},${col}`,
-				letter: cell.letter,
+				letter,
 			});
 		}
 	}
 
-	return random.shuffleArray(cells).slice(0, Math.min(12, cells.length));
+	return random.shuffleArray(cells);
+}
+
+function createHintSalt(puzzleId: string, cellKey: string) {
+	return `${puzzleId}:hint:${cellKey}`;
+}
+
+export async function ensureHintCapsulesCoverGrid(options: {
+	puzzleId: string;
+	seed: number;
+	gridLetters: DailyPuzzlePrivate["gridLetters"];
+	existingHintCapsules?: DailyPuzzleHintCapsule[];
+}) {
+	const { existingHintCapsules = [], gridLetters, puzzleId, seed } = options;
+	const existingByCellKey = new Map(
+		existingHintCapsules.map((capsule) => [capsule.cellKey, capsule]),
+	);
+
+	return Promise.all(
+		toHintCandidates(gridLetters, seed).map(async ({ cellKey, letter }) => {
+			const existing = existingByCellKey.get(cellKey);
+			if (existing) {
+				return existing;
+			}
+
+			const hintSalt = createHintSalt(puzzleId, cellKey);
+			return {
+				cellKey,
+				hintSalt,
+				hintCapsule: await sealHintCapsule(letter, hintSalt, cellKey),
+			};
+		}),
+	);
 }
 
 export async function buildPuzzleSnapshots(options: {
@@ -58,6 +94,7 @@ export async function buildPuzzleSnapshots(options: {
 		puzzleId,
 		seed,
 	} = options;
+	const gridLetters = toGridLetters(crossword.grid);
 	const wordSlotsPublic: DailyPuzzlePublic["wordSlots"] = [];
 	const wordSlotsPrivate: DailyPuzzlePrivate["wordSlots"] = [];
 
@@ -92,16 +129,11 @@ export async function buildPuzzleSnapshots(options: {
 		});
 	}
 
-	const hintCapsules = await Promise.all(
-		toHintCandidates(crossword, seed).map(async ({ cellKey, letter }) => {
-			const hintSalt = crypto.randomUUID();
-			return {
-				cellKey,
-				hintSalt,
-				hintCapsule: await sealHintCapsule(letter, hintSalt, cellKey),
-			};
-		}),
-	);
+	const hintCapsules = await ensureHintCapsulesCoverGrid({
+		puzzleId,
+		seed,
+		gridLetters,
+	});
 
 	const publicSnapshot: DailyPuzzlePublic = {
 		id: puzzleId,
@@ -123,7 +155,7 @@ export async function buildPuzzleSnapshots(options: {
 		seed,
 		rows: crossword.rows,
 		cols: crossword.cols,
-		gridLetters: toGridLetters(crossword.grid),
+		gridLetters,
 		letters,
 		wordSlots: wordSlotsPrivate,
 	};

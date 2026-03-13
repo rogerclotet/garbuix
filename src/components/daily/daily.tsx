@@ -19,6 +19,7 @@ import {
 	buildCellLetters,
 	buildRevealedCells,
 	getGuessKeyboardAction,
+	getNextHintCellKey,
 } from "./daily-helpers";
 import { DailyResetProgressDialog } from "./daily-reset-progress-dialog";
 import type { DailyData } from "./daily-types";
@@ -162,6 +163,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const cellLetters = useMemo(
 		() => buildCellLetters(puzzle.wordSlots, revealedAnswers, hintLetters),
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
+	);
+
+	const nextHintCellKey = useMemo(
+		() => getNextHintCellKey(puzzle, revealedCells),
+		[puzzle, revealedCells],
 	);
 
 	const triggerHaptic = useCallback((duration = 8) => {
@@ -347,14 +353,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleHint = useCallback(() => {
 		triggerHaptic(8);
 		if (derivedProgress.hintsUsed >= 3) return;
-
-		const nextHint = puzzle.hintCapsules.find(
-			(capsule) =>
-				!revealedCells.has(capsule.cellKey) &&
-				!derivedProgress.hintedCells.includes(capsule.cellKey),
-		);
-
-		if (!nextHint) return;
+		if (!nextHintCellKey) return;
 		captureEvent("puzzle_hint_used", {
 			date_key: puzzle.dateKey,
 			hints_used_after: derivedProgress.hintsUsed + 1,
@@ -362,18 +361,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		});
 		applyLocalEvent(
 			createPuzzleEvent("hint_used", {
-				cellKey: nextHint.cellKey,
+				cellKey: nextHintCellKey,
 			}),
 		);
 	}, [
 		applyLocalEvent,
 		captureEvent,
-		derivedProgress.hintedCells,
 		derivedProgress.hintsUsed,
+		nextHintCellKey,
 		puzzle.dateKey,
-		puzzle.hintCapsules,
 		puzzle.id,
-		revealedCells,
 		triggerHaptic,
 	]);
 
@@ -496,6 +493,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 					<div className="lg:space-y-6">
 						<DailyControls
+							canUseHint={
+								derivedProgress.hintsUsed < 3 && nextHintCellKey != null
+							}
 							currentGuess={currentGuess}
 							hintsUsed={derivedProgress.hintsUsed}
 							isComplete={isComplete}

@@ -72,6 +72,16 @@ export function buildCellLetters(
 	return letters;
 }
 
+export function getNextHintCellKey(
+	puzzle: DailyPuzzlePublic,
+	revealedCells: Set<string>,
+) {
+	return (
+		puzzle.hintCapsules.find((capsule) => !revealedCells.has(capsule.cellKey))
+			?.cellKey ?? null
+	);
+}
+
 export type GuessKeyboardAction =
 	| { type: "append_letter"; letter: string }
 	| { type: "backspace" }

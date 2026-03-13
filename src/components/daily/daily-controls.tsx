@@ -3,6 +3,7 @@ import type { MouseEvent, PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 
 type DailyControlsProps = {
+	canUseHint: boolean;
 	currentGuess: string;
 	hintsUsed: number;
 	isComplete: boolean;
@@ -23,6 +24,7 @@ type DailyControlsProps = {
 };
 
 export function DailyControls({
+	canUseHint,
 	currentGuess,
 	hintsUsed,
 	isComplete,
@@ -105,11 +107,11 @@ export function DailyControls({
 								onPointerDown={(event) => runPressAction(event, onHint)}
 								onClick={(event) => runClickAction(event, onHint)}
 								className="gap-2 h-9 sm:h-10 touch-manipulation"
-								disabled={hintsUsed >= 3 || isComplete}
+								disabled={!canUseHint || isComplete}
 								size="lg"
 							>
 								<Lightbulb
-									className={`w-4 h-4 ${hintsUsed < 3 ? "text-amber-500" : "text-gray-400"}`}
+									className={`w-4 h-4 ${canUseHint ? "text-amber-500" : "text-gray-400"}`}
 								/>
 								Pista ({3 - hintsUsed})
 							</Button>

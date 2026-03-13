@@ -23,7 +23,11 @@ import {
 	applyPuzzleEvents,
 	createEmptyProgressState,
 } from "@/lib/puzzle-progress";
-import { buildPuzzleSnapshots, toPuzzlePreview } from "@/lib/puzzle-snapshot";
+import {
+	buildPuzzleSnapshots,
+	ensureHintCapsulesCoverGrid,
+	toPuzzlePreview,
+} from "@/lib/puzzle-snapshot";
 import { filterSyncablePuzzleEvents } from "@/lib/puzzle-sync";
 import type {
 	AnonymousImportPayload,
@@ -164,9 +168,18 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	const puzzle = await ensureDailyPuzzleSnapshot(dateKey);
 	const sessionData = await getAuthSession();
+	const hintCapsules = await ensureHintCapsulesCoverGrid({
+		puzzleId: puzzle.publicSnapshotJson.id,
+		seed: puzzle.publicSnapshotJson.seed,
+		gridLetters: puzzle.privateSnapshotJson.gridLetters,
+		existingHintCapsules: puzzle.publicSnapshotJson.hintCapsules,
+	});
 
 	return {
-		puzzle: puzzle.publicSnapshotJson,
+		puzzle: {
+			...puzzle.publicSnapshotJson,
+			hintCapsules,
+		},
 		rolloverAt: getNextRolloverAt().toISOString(),
 		sessionUser: toSessionUser(sessionData),
 	};
