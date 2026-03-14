@@ -1,6 +1,6 @@
 import type { AnyRouteMatch } from "@tanstack/react-router";
 
-export const links = [
+const rawLinks = [
 	{
 		rel: "manifest",
 		href: "/manifest.json",
@@ -262,3 +262,9 @@ export const links = [
 			"(prefers-color-scheme: dark) and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)",
 	},
 ] satisfies AnyRouteMatch["links"];
+
+export const links = rawLinks.filter(
+	(link) =>
+		link.rel !== "apple-touch-startup-image" ||
+		!link.media?.includes("(orientation: landscape)"),
+);

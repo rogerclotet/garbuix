@@ -11,6 +11,7 @@ import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
 import { links } from "@/components/meta";
 import { ObservabilityProvider } from "@/components/observability";
+import { OrientationLock } from "@/components/orientation-lock";
 import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
@@ -91,6 +92,7 @@ function RootDocument() {
 				<ThemeProvider storageKey="paraules-theme" attribute="class">
 					<ObservabilityProvider>
 						<ThemeMeta />
+						<OrientationLock />
 						<ServiceWorkerRegister />
 						<div className="flex min-h-svh flex-col">
 							<Header />
