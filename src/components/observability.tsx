@@ -13,6 +13,47 @@ type PostHogOptions = Partial<PostHogConfig> & {
 	__add_tracing_headers?: string[];
 };
 
+type BeforeInstallPromptEvent = Event & {
+	platforms?: string[];
+	prompt?: () => Promise<void>;
+	userChoice?: Promise<{
+		outcome: "accepted" | "dismissed";
+		platform: string;
+	}>;
+};
+
+type NavigatorWithStandalone = Navigator & {
+	standalone?: boolean;
+};
+
+function getDisplayMode() {
+	if (typeof window === "undefined") {
+		return "unknown";
+	}
+
+	if (window.matchMedia("(display-mode: standalone)").matches) {
+		return "standalone";
+	}
+
+	if (window.matchMedia("(display-mode: fullscreen)").matches) {
+		return "fullscreen";
+	}
+
+	if (window.matchMedia("(display-mode: minimal-ui)").matches) {
+		return "minimal-ui";
+	}
+
+	if (window.matchMedia("(display-mode: window-controls-overlay)").matches) {
+		return "window-controls-overlay";
+	}
+
+	if ((navigator as NavigatorWithStandalone).standalone) {
+		return "ios-standalone";
+	}
+
+	return "browser";
+}
+
 export function ObservabilityProvider({ children }: { children: ReactNode }) {
 	const rootData = rootRoute.useLoaderData();
 	const config = rootData.observability;
@@ -69,13 +110,33 @@ function ObservabilityRuntime() {
 			return;
 		}
 
+		const displayMode = getDisplayMode();
 		captureEvent("$pageview", {
 			$current_url: window.location.href,
+			display_mode: displayMode,
+			is_standalone: displayMode !== "browser",
 			pathname: location.pathname,
 			search: location.searchStr,
 			title: document.title,
 		});
 	}, [captureEvent, location.pathname, location.searchStr]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") {
+			return;
+		}
+
+		const displayMode = getDisplayMode();
+		if (displayMode === "browser") {
+			return;
+		}
+
+		captureEvent("pwa_launched", {
+			display_mode: displayMode,
+			pathname: window.location.pathname,
+			referrer: document.referrer || null,
+		});
+	}, [captureEvent]);
 
 	useEffect(() => {
 		if (activeUser) {
@@ -89,6 +150,54 @@ function ObservabilityRuntime() {
 			resetUser();
 		}
 	}, [activeUser, identifyUser, resetUser]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") {
+			return;
+		}
+
+		const onBeforeInstallPrompt = (event: Event) => {
+			const installEvent = event as BeforeInstallPromptEvent;
+
+			captureEvent("pwa_install_prompt_available", {
+				display_mode: getDisplayMode(),
+				pathname: window.location.pathname,
+				platforms: installEvent.platforms ?? [],
+			});
+
+			void installEvent.userChoice
+				?.then((choice) => {
+					captureEvent("pwa_install_prompt_choice", {
+						display_mode: getDisplayMode(),
+						outcome: choice.outcome,
+						pathname: window.location.pathname,
+						platform: choice.platform,
+					});
+				})
+				.catch(() => {});
+		};
+
+		const onAppInstalled = () => {
+			captureEvent("pwa_installed", {
+				display_mode: getDisplayMode(),
+				pathname: window.location.pathname,
+			});
+		};
+
+		window.addEventListener(
+			"beforeinstallprompt",
+			onBeforeInstallPrompt as EventListener,
+		);
+		window.addEventListener("appinstalled", onAppInstalled);
+
+		return () => {
+			window.removeEventListener(
+				"beforeinstallprompt",
+				onBeforeInstallPrompt as EventListener,
+			);
+			window.removeEventListener("appinstalled", onAppInstalled);
+		};
+	}, [captureEvent]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
