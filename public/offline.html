@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ca">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#8521dc" />
+		<title>Paraules</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+				font-family:
+					InterVariable,
+					Inter,
+					system-ui,
+					sans-serif;
+				background: #fffbff;
+				color: #1d1b1e;
+			}
+
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				padding: 24px;
+				background:
+					radial-gradient(circle at top, rgba(133, 33, 220, 0.14), transparent 42%),
+					#fffbff;
+			}
+
+			main {
+				max-width: 420px;
+				padding: 28px 24px;
+				border: 1px solid #ccc4ce;
+				border-radius: 24px;
+				background: rgba(255, 251, 255, 0.92);
+				box-shadow: 0 16px 40px rgba(29, 27, 30, 0.08);
+			}
+
+			h1 {
+				margin: 0 0 12px;
+				font-size: 1.5rem;
+				line-height: 1.2;
+			}
+
+			p {
+				margin: 0;
+				line-height: 1.5;
+				color: #4a454e;
+			}
+
+			@media (prefers-color-scheme: dark) {
+				:root {
+					background: #1d1b1e;
+					color: #e7e1e5;
+				}
+
+				body {
+					background:
+						radial-gradient(
+							circle at top,
+							rgba(220, 184, 255, 0.18),
+							transparent 42%
+						),
+						#1d1b1e;
+				}
+
+				main {
+					border-color: #4a454e;
+					background: rgba(29, 27, 30, 0.92);
+					box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+				}
+
+				p {
+					color: #ccc4ce;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>Sense connexió</h1>
+			<p>Torna a obrir Paraules quan recuperis internet per continuar jugant.</p>
+		</main>
+	</body>
+</html>

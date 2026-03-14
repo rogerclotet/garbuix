@@ -1,6 +1,9 @@
 {
+	"id": "/",
 	"short_name": "Paraules",
 	"name": "Paraules: Joc de Mots Encreuats en Català",
+	"description": "Resol mots encreuats en català cada dia.",
+	"scope": "/",
 	"start_url": "/",
 	"display": "standalone",
 	"orientation": "portrait",

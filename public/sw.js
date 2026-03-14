@@ -2,8 +2,10 @@ const CACHE_VERSION =
 	new URL(self.location.href).searchParams.get("v") ?? "dev";
 const STATIC_CACHE = `paraules-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `paraules-runtime-${CACHE_VERSION}`;
+const OFFLINE_FALLBACK_URL = "/offline.html";
 
 const PRECACHE_URLS = [
+	OFFLINE_FALLBACK_URL,
 	"/manifest.json",
 	"/icons/favicon-196.png",
 	"/icons/apple-icon-180.png",
@@ -30,6 +32,10 @@ function isCacheableAssetRequest(request, url) {
 		url.pathname === "/manifest.json" ||
 		url.pathname.startsWith("/icons/")
 	);
+}
+
+function shouldCacheResponse(response) {
+	return response.ok || response.type === "opaque";
 }
 
 self.addEventListener("install", (event) => {
@@ -84,7 +90,38 @@ self.addEventListener("fetch", (event) => {
 	}
 
 	if (request.mode === "navigate") {
-		event.respondWith(fetch(request));
+		event.respondWith(
+			fetch(request)
+				.then((response) => {
+					if (shouldCacheResponse(response)) {
+						const copy = response.clone();
+						event.waitUntil(
+							caches
+								.open(RUNTIME_CACHE)
+								.then((cache) => cache.put(request, copy)),
+						);
+					}
+
+					return response;
+				})
+				.catch(async () => {
+					const cachedNavigation = await caches.match(request);
+					if (cachedNavigation) {
+						return cachedNavigation;
+					}
+
+					return (
+						(await caches.match(OFFLINE_FALLBACK_URL)) ||
+						new Response("Offline", {
+							status: 503,
+							statusText: "Offline",
+							headers: {
+								"Content-Type": "text/plain; charset=utf-8",
+							},
+						})
+					);
+				}),
+		);
 		return;
 	}
 
@@ -99,10 +136,14 @@ self.addEventListener("fetch", (event) => {
 			}
 
 			return fetch(request).then((response) => {
-				const copy = response.clone();
-				event.waitUntil(
-					caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)),
-				);
+				if (shouldCacheResponse(response)) {
+					const copy = response.clone();
+					event.waitUntil(
+						caches
+							.open(RUNTIME_CACHE)
+							.then((cache) => cache.put(request, copy)),
+					);
+				}
 				return response;
 			});
 		}),
