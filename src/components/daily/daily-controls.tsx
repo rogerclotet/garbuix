@@ -42,8 +42,8 @@ export function DailyControls({
 	}
 
 	return (
-		<div className="fixed right-0 bottom-0 left-0 z-40 lg:static">
-			<div className="rounded-t-2xl rounded-b-none border-x border-t bg-card shadow-[0_-8px_24px_rgb(0,0,0,0.12)] pb-[env(safe-area-inset-bottom)] lg:rounded-xl lg:border lg:shadow-none lg:pb-0">
+		<div className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:touch-auto lg:overscroll-auto">
+			<div className="rounded-t-2xl rounded-b-none border-x border-t bg-card shadow-[0_-8px_24px_rgb(0,0,0,0.12)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-xl lg:border lg:shadow-none lg:pb-0 lg:select-auto">
 				<div className="hidden lg:block px-6 pt-6">
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
