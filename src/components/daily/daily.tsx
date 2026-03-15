@@ -8,7 +8,14 @@ import {
 	decodeRevealedAnswers,
 	resolveGuess,
 } from "@/lib/puzzle-client";
-import { getDeviceId } from "@/lib/puzzle-local";
+import {
+	getDeviceId,
+	getSortedAnonymousHistoryEntries,
+} from "@/lib/puzzle-local";
+import {
+	calculateHistoryStreaks,
+	upsertHistoryEntry,
+} from "@/lib/puzzle-streaks";
 import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
@@ -17,6 +24,7 @@ import { DailyControls } from "./daily-controls";
 import { DailyGrid } from "./daily-grid";
 import {
 	buildCellLetters,
+	buildHistoryEntry,
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
@@ -168,6 +176,19 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		() => getNextHintCellKey(puzzle, revealedCells),
 		[puzzle, revealedCells],
 	);
+	const streakStats = useMemo(() => {
+		const baseEntries = activeUser
+			? (initialData.historyEntries ?? [])
+			: getSortedAnonymousHistoryEntries();
+		const streakEntries = upsertHistoryEntry(
+			baseEntries,
+			buildHistoryEntry(puzzle, derivedProgress),
+		);
+
+		return calculateHistoryStreaks(streakEntries, {
+			referenceDateKey: puzzle.dateKey,
+		});
+	}, [activeUser, derivedProgress, initialData.historyEntries, puzzle]);
 
 	const triggerHaptic = useCallback((duration = 8) => {
 		if (typeof window === "undefined" || typeof navigator === "undefined") {
@@ -483,6 +504,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										{derivedProgress.hintsUsed} pista
 										{derivedProgress.hintsUsed === 1 ? "" : "es"}
 									</span>
+									{streakStats.currentStreak >= 3 ? (
+										<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
+									) : null}
 								</div>
 							</div>
 						</div>

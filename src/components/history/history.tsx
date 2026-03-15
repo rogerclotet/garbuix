@@ -24,6 +24,7 @@ import {
 	getHistoryPageData,
 	importAnonymousProgress,
 } from "@/lib/puzzle-server-fns";
+import { calculateHistoryStreaks } from "@/lib/puzzle-streaks";
 import type {
 	DailyPuzzlePreview,
 	HistorySummaryEntry,
@@ -145,6 +146,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	const stats = useMemo(() => {
 		const totalDays = entries.length;
 		const completedDays = entries.filter((entry) => entry.completed).length;
+		const { bestStreak, currentStreak } = calculateHistoryStreaks(entries);
 		const completionRate = totalDays
 			? Math.round((completedDays / totalDays) * 100)
 			: 0;
@@ -157,10 +159,39 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		return {
 			totalDays,
 			completedDays,
+			currentStreak,
+			bestStreak,
 			completionRate,
 			avgGuesses,
 		};
 	}, [entries]);
+
+	const statCards = [
+		{
+			label: "Dies jugats",
+			value: stats.totalDays,
+		},
+		{
+			label: "Dies completats",
+			value: stats.completedDays,
+		},
+		{
+			label: "Percentatge completat",
+			value: `${stats.completionRate}%`,
+		},
+		{
+			label: "Ratxa actual",
+			value: stats.currentStreak,
+		},
+		{
+			label: "Millor ratxa",
+			value: stats.bestStreak,
+		},
+		{
+			label: "Mitjana intents",
+			value: stats.avgGuesses.toFixed(1),
+		},
+	];
 
 	return (
 		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-16">
@@ -196,59 +227,23 @@ export function History({ initialData }: { initialData: HistoryData }) {
 							</Card>
 						) : (
 							<>
-								<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm text-muted-foreground font-medium">
-												Dies jugats
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="text-3xl font-bold">
-												{stats.totalDays}
+								<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+									{statCards.map((stat) => (
+										<Card
+											key={stat.label}
+											className="gap-0 px-3 py-3 sm:min-h-32 sm:px-4 sm:py-4"
+										>
+											<div className="flex items-center justify-between gap-3 sm:h-full sm:flex-col sm:items-start">
+												<CardTitle className="text-sm text-muted-foreground font-medium leading-tight">
+													{stat.label}
+												</CardTitle>
+												<div className="shrink-0 text-2xl leading-none font-bold sm:mt-auto sm:text-3xl">
+													{stat.value}
+												</div>
 											</div>
-										</CardContent>
-									</Card>
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm text-muted-foreground font-medium">
-												Dies completats
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="text-3xl font-bold">
-												{stats.completedDays}
-											</div>
-										</CardContent>
-									</Card>
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm text-muted-foreground font-medium">
-												Percentatge completat
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="text-3xl font-bold">
-												{stats.completionRate}%
-											</div>
-										</CardContent>
-									</Card>
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm text-muted-foreground font-medium">
-												Mitjana intents
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="text-3xl font-bold">
-												{stats.avgGuesses.toFixed(1)}
-											</div>
-										</CardContent>
-									</Card>
+										</Card>
+									))}
 								</div>
-								<p className="text-sm text-muted-foreground">
-									Has completat {stats.completedDays} de {stats.totalDays} dies.
-								</p>
 
 								<Card>
 									<CardHeader>

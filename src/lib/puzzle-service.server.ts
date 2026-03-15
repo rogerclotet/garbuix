@@ -201,6 +201,9 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	const puzzle = await ensureDailyPuzzleSnapshot(dateKey);
 	const sessionData = await getAuthSession();
+	const historyEntries = sessionData
+		? await getHistoryEntriesForUser(sessionData.user.id)
+		: null;
 	const hintCapsules = await ensureHintCapsulesCoverGrid({
 		puzzleId: puzzle.publicSnapshotJson.id,
 		seed: puzzle.publicSnapshotJson.seed,
@@ -209,6 +212,7 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	});
 
 	return {
+		historyEntries,
 		puzzle: {
 			...puzzle.publicSnapshotJson,
 			hintCapsules,
