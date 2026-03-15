@@ -1,6 +1,7 @@
 import { getRouteApi, Link, useRouter } from "@tanstack/react-router";
-import { EllipsisVertical, History, LogIn, LogOut, Moon } from "lucide-react";
+import { History, LogIn, LogOut, Menu, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,10 +26,13 @@ export function UserMenu() {
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const { captureEvent, resetUser } = useObservability();
 	const isDark = (resolvedTheme ?? theme) === "dark";
+	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
 	const triggerLabel = activeUser
 		? `Obrir el menú de ${activeUser.name}`
 		: "Obrir el menú";
+	const imageSrc = activeUser?.image ?? null;
+	const showUserImage = Boolean(imageSrc) && failedImageSrc !== imageSrc;
 
 	const handleSignIn = async () => {
 		captureEvent("auth_sign_in_started", {
@@ -53,19 +57,29 @@ export function UserMenu() {
 			<DropdownMenuTrigger asChild>
 				<Button
 					variant="ghost"
-					size="icon"
+					size="icon-lg"
 					className="rounded-full text-primary-foreground hover:bg-white/10 hover:text-primary-foreground focus-visible:border-white/30 focus-visible:ring-white/20"
 					aria-label={triggerLabel}
 				>
-					{activeUser?.image ? (
-						<Avatar className="size-8 border border-white/20">
-							<AvatarImage src={activeUser.image} alt={activeUser.name} />
-							<AvatarFallback className="bg-white/10 text-primary-foreground">
-								<EllipsisVertical className="size-4" />
-							</AvatarFallback>
+					{activeUser ? (
+						<Avatar className="size-9 border border-white/20">
+							{showUserImage ? (
+								<AvatarImage
+									src={activeUser.image ?? undefined}
+									alt={activeUser.name}
+									referrerPolicy="no-referrer"
+									onError={() => {
+										setFailedImageSrc(imageSrc);
+									}}
+								/>
+							) : (
+								<AvatarFallback className="bg-white/10 text-primary-foreground">
+									<Menu className="size-4" />
+								</AvatarFallback>
+							)}
 						</Avatar>
 					) : (
-						<EllipsisVertical className="size-4" />
+						<Menu className="size-4" />
 					)}
 				</Button>
 			</DropdownMenuTrigger>
@@ -98,7 +112,7 @@ export function UserMenu() {
 				<DropdownMenuSeparator />
 				{session.isPending ? (
 					<DropdownMenuItem disabled>
-						<EllipsisVertical className="size-4" />
+						<Menu className="size-4" />
 						<span>Compte...</span>
 					</DropdownMenuItem>
 				) : activeUser ? (
