@@ -29,6 +29,36 @@ import { useObservability } from "@/lib/use-observability";
 import { buildHistoryEntry } from "./daily-helpers";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
+const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
+const SYNC_INITIAL_RETRY_DELAY_MS = 2_000;
+const SYNC_MAX_RETRY_DELAY_MS = 30_000;
+
+function isLikelyOfflineOrNetworkError(error: unknown) {
+	if (typeof navigator !== "undefined" && !navigator.onLine) {
+		return true;
+	}
+
+	if (error instanceof DOMException && error.name === "AbortError") {
+		return true;
+	}
+
+	const message =
+		error instanceof Error
+			? error.message
+			: typeof error === "string"
+				? error
+				: "";
+
+	const normalizedMessage = message.toLowerCase();
+
+	return (
+		normalizedMessage.includes("failed to fetch") ||
+		normalizedMessage.includes("networkerror") ||
+		normalizedMessage.includes("network error") ||
+		normalizedMessage.includes("load failed")
+	);
+}
+
 type UseDailyProgressOptions = {
 	activeUser: DailySessionUser;
 	deviceId: string;
@@ -58,7 +88,10 @@ export function useDailyProgress({
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
 	const [isSyncing, setIsSyncing] = useState(false);
+	const [nextSyncRetryAt, setNextSyncRetryAt] = useState<number | null>(null);
 	const importAttemptedRef = useRef<string | null>(null);
+	const syncFailureCountRef = useRef(0);
+	const hasActiveSyncFailureToastRef = useRef(false);
 
 	const derivedProgress = useMemo(
 		() =>
@@ -78,14 +111,31 @@ export function useDailyProgress({
 		}
 
 		const empty = createEmptyProgressState(puzzle);
-		return (
-			(await fetchUserProgress({
-				data: { puzzleId: puzzle.id },
-			})) ??
-			initialData.progress ??
-			empty
-		);
-	}, [activeUser, fetchUserProgress, initialData.progress, puzzle]);
+		try {
+			return (
+				(await fetchUserProgress({
+					data: { puzzleId: puzzle.id },
+				})) ??
+				initialData.progress ??
+				empty
+			);
+		} catch (error) {
+			if (!isLikelyOfflineOrNetworkError(error)) {
+				captureException(error, {
+					puzzle_date: puzzle.dateKey,
+					puzzle_id: puzzle.id,
+					scope: "puzzle_progress_fetch",
+				});
+			}
+			return initialData.progress ?? empty;
+		}
+	}, [
+		activeUser,
+		captureException,
+		fetchUserProgress,
+		initialData.progress,
+		puzzle,
+	]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -144,10 +194,12 @@ export function useDailyProgress({
 							toast.success("S'han sincronitzat els resultats locals");
 						} catch (error) {
 							console.error("Failed to import anonymous progress", error);
-							captureException(error, {
-								puzzle_date: puzzle.dateKey,
-								scope: "anonymous_progress_import",
-							});
+							if (!isLikelyOfflineOrNetworkError(error)) {
+								captureException(error, {
+									puzzle_date: puzzle.dateKey,
+									scope: "anonymous_progress_import",
+								});
+							}
 						}
 					} else {
 						markAnonymousDataImported(activeUser.id);
@@ -238,8 +290,29 @@ export function useDailyProgress({
 	}, []);
 
 	useEffect(() => {
+		if (activeUser || !hasActiveSyncFailureToastRef.current) {
+			return;
+		}
+
+		hasActiveSyncFailureToastRef.current = false;
+		syncFailureCountRef.current = 0;
+		setNextSyncRetryAt(null);
+		toast.dismiss(SYNC_FAILURE_TOAST_ID);
+	}, [activeUser]);
+
+	useEffect(() => {
 		if (!activeUser || queuedEvents.length === 0 || !isOnline || isSyncing) {
 			return;
+		}
+
+		if (nextSyncRetryAt && nextSyncRetryAt > Date.now()) {
+			const retryTimer = window.setTimeout(() => {
+				setNextSyncRetryAt(null);
+			}, nextSyncRetryAt - Date.now());
+
+			return () => {
+				window.clearTimeout(retryTimer);
+			};
 		}
 
 		let cancelled = false;
@@ -255,6 +328,13 @@ export function useDailyProgress({
 		})
 			.then((result) => {
 				if (cancelled) return;
+				if (hasActiveSyncFailureToastRef.current) {
+					hasActiveSyncFailureToastRef.current = false;
+					toast.dismiss(SYNC_FAILURE_TOAST_ID);
+					toast.success("S'ha recuperat la sincronitzacio del progrés.");
+				}
+				syncFailureCountRef.current = 0;
+				setNextSyncRetryAt(null);
 				setBaseProgress(result.progress);
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !result.ackedEventIds.includes(event.id)),
@@ -267,8 +347,36 @@ export function useDailyProgress({
 			})
 			.catch((error) => {
 				console.error("Failed to sync puzzle events", error);
+				const failureCount = syncFailureCountRef.current + 1;
+				const retryDelayMs = Math.min(
+					SYNC_INITIAL_RETRY_DELAY_MS * 2 ** (failureCount - 1),
+					SYNC_MAX_RETRY_DELAY_MS,
+				);
+				const isNetworkError = isLikelyOfflineOrNetworkError(error);
+
+				syncFailureCountRef.current = failureCount;
+				setNextSyncRetryAt(Date.now() + retryDelayMs);
+				if (isNetworkError) {
+					if (hasActiveSyncFailureToastRef.current) {
+						hasActiveSyncFailureToastRef.current = false;
+						toast.dismiss(SYNC_FAILURE_TOAST_ID);
+					}
+					return;
+				}
+
+				hasActiveSyncFailureToastRef.current = true;
+				toast.error(
+					"No s'ha pogut sincronitzar el teu progrés. El guardarem al dispositiu i ho tornarem a provar automàticament.",
+					{
+						duration: Number.POSITIVE_INFINITY,
+						id: SYNC_FAILURE_TOAST_ID,
+					},
+				);
 				captureException(error, {
+					failure_count: failureCount,
 					puzzle_id: puzzle.id,
+					queued_event_count: pendingEvents.length,
+					retry_delay_ms: retryDelayMs,
 					scope: "puzzle_event_sync",
 				});
 			})
@@ -288,6 +396,7 @@ export function useDailyProgress({
 		deviceId,
 		isOnline,
 		isSyncing,
+		nextSyncRetryAt,
 		puzzle.id,
 		queuedEvents,
 		syncEvents,
