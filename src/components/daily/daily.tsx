@@ -454,27 +454,60 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	]);
 
 	return (
-		<div className="min-h-full p-2 pb-[calc(21rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
+		<div
+			className={`min-h-full p-2 sm:p-4 lg:p-8 ${
+				isComplete
+					? "pb-6 sm:pb-8 lg:pb-8"
+					: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
+			}`}
+		>
 			<div className="max-w-7xl mx-auto">
-				<div className="mb-6">
-					<div className="flex items-center justify-between mb-2 text-sm font-medium opacity-70">
-						<span>
-							{derivedProgress.guessedWordIds.length} / {totalWords} paraules
-							trobades
-						</span>
-						<div className="flex gap-4">
-							<span>
-								{derivedProgress.guessCount} intent
-								{derivedProgress.guessCount === 1 ? "" : "s"}
-							</span>
+				<div className={`mb-6 ${isComplete ? "pt-2 sm:pt-0" : ""}`}>
+					{isComplete ? (
+						<div className="rounded-2xl border bg-card px-4 py-4 sm:px-5">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+								<div className="space-y-1">
+									<p className="text-sm font-medium text-muted-foreground">
+										Felicitats!
+									</p>
+									<h2 className="text-xl font-semibold tracking-tight">
+										Has completat el joc
+									</h2>
+								</div>
+								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-muted-foreground sm:justify-end">
+									<span>
+										{derivedProgress.guessCount} intent
+										{derivedProgress.guessCount === 1 ? "" : "s"}
+									</span>
+									<span>
+										{derivedProgress.hintsUsed} pista
+										{derivedProgress.hintsUsed === 1 ? "" : "es"}
+									</span>
+								</div>
+							</div>
 						</div>
-					</div>
+					) : (
+						<>
+							<div className="mb-2 flex items-center justify-between text-sm font-medium opacity-70">
+								<span>
+									{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
+									paraules trobades
+								</span>
+								<div className="flex gap-4">
+									<span>
+										{derivedProgress.guessCount} intent
+										{derivedProgress.guessCount === 1 ? "" : "s"}
+									</span>
+								</div>
+							</div>
 
-					<Progress
-						value={derivedProgress.guessedWordIds.length}
-						max={totalWords}
-						className="h-3"
-					/>
+							<Progress
+								value={derivedProgress.guessedWordIds.length}
+								max={totalWords}
+								className="h-3"
+							/>
+						</>
+					)}
 				</div>
 
 				<div className="grid lg:grid-cols-3 gap-6">
@@ -526,23 +559,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								/>
 							</CardContent>
 						</Card>
-
-						{isComplete && (
-							<Card className="bg-linear-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-300 dark:border-yellow-700">
-								<CardHeader>
-									<CardTitle className="text-center text-2xl dark:text-yellow-300">
-										🎉 Felicitats! 🎉
-									</CardTitle>
-								</CardHeader>
-								<CardContent className="text-center">
-									<p className="text-gray-700 dark:text-gray-300 mb-4">
-										Has guanyat en {derivedProgress.guessCount} intents!
-										{derivedProgress.hintsUsed > 0 &&
-											` I has fet servir ${derivedProgress.hintsUsed} pistes.`}
-									</p>
-								</CardContent>
-							</Card>
-						)}
 
 						<div className="mt-4 flex justify-center">
 							<DailyResetProgressDialog

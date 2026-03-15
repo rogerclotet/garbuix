@@ -18,7 +18,7 @@ export function DailyWordList({
 	const guessedWordIdSet = new Set(guessedWordIds);
 
 	return (
-		<div className="space-y-2 max-h-96 overflow-y-auto">
+		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
 			{puzzle.wordSlots
 				.filter((slot) => guessedWordIdSet.has(slot.id))
 				.map((slot) => (
