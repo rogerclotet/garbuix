@@ -110,6 +110,7 @@ export function ServiceWorkerRegister() {
 			toast.info("Hi ha una nova versió disponible.", {
 				id: UPDATE_TOAST_ID,
 				duration: Number.POSITIVE_INFINITY,
+				className: "update-toast",
 				action: {
 					label: "Actualitza",
 					onClick: () => {
