@@ -38,7 +38,7 @@ import type {
 	SessionUser,
 } from "@/lib/puzzle-types";
 
-export const PUZZLE_ALGORITHM_VERSION = "1";
+export const PUZZLE_ALGORITHM_VERSION = "2";
 
 const serverWords = allWords as Word[];
 

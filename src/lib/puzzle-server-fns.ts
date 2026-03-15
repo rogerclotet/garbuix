@@ -35,6 +35,39 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 		);
 	});
 
+export const getDailyPuzzlePageData = createServerFn({ method: "GET" })
+	.inputValidator(
+		z
+			.object({
+				dateKey: z.string().optional(),
+			})
+			.optional(),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"getDailyPuzzlePageData",
+			async () => {
+				const dailyData = await getDailyPuzzlePublicData(data?.dateKey);
+				const progress = dailyData.sessionUser
+					? await getUserPuzzleProgressData(
+							dailyData.puzzle.id,
+							dailyData.sessionUser.id,
+						)
+					: null;
+
+				return {
+					...dailyData,
+					progress,
+				};
+			},
+			{
+				properties: {
+					date_key: data?.dateKey,
+				},
+			},
+		);
+	});
+
 export const getSessionUser = createServerFn({ method: "GET" }).handler(
 	async () => observeServerAction("getSessionUser", () => getSessionUserData()),
 );

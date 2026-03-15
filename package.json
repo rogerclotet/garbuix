@@ -12,6 +12,7 @@
 		"db:migrate": "drizzle-kit migrate",
 		"preview": "vite preview",
 		"backfill:puzzles": "tsx scripts/backfill-daily-puzzles.ts",
+		"analyze:randomness": "tsx scripts/analyze-daily-randomness.ts",
 		"test": "vitest run",
 		"format": "biome format",
 		"lint": "biome lint",

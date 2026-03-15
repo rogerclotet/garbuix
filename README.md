@@ -93,10 +93,26 @@ docker compose --profile ops run --rm backfill
 - `pnpm run download-dict` - Force-refresh and rebuild the Catalan dictionary
 - `pnpm run db:migrate` - Apply Drizzle migrations
 - `pnpm run backfill:puzzles` - Persist daily puzzle snapshots for a date range
+- `pnpm run analyze:randomness` - Simulate daily generation and report letter/word repetition over time
 - `pnpm run format` - Format code with Biome
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome
 - `pnpm run typecheck` - Check TypeScript types
+
+### Randomness Analysis
+
+Use the analysis script to measure how often letter sets and words repeat across a date range:
+
+```bash
+pnpm run analyze:randomness -- --days 90 --top 8
+```
+
+Useful flags:
+
+- `--days <n>`: number of days to simulate, ending today by default
+- `--from <YYYY-MM-DD>`: start from a specific date instead of ending today
+- `--top <n>`: how many repeated letter sets and words to print
+- `--monte-carlo-runs <n>`: rerun the crossword builder for the top repeated letter sets to estimate how "sticky" certain words are within the same six letters; use `0` to skip this slower section
 
 ## How It Works
 

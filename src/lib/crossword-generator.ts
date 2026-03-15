@@ -1,10 +1,23 @@
 // Crossword generator for Catalan word game
 
 import type { Word } from "@/data/types";
+import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
 
 const DEFAULT_MIN_WORDS = 10;
 const DEFAULT_MAX_WORDS = 15;
 const MIN_GRID_COLS = 8;
+const LETTER_CANDIDATE_POOL_SIZE = 192;
+const LETTER_CANDIDATE_RANK_BIAS = 2.1;
+const LETTER_SET_HISTORY_WINDOW_DAYS = 28;
+const WORD_HISTORY_WINDOW_DAYS = 45;
+const HISTORY_LOOKBACK_DAYS = Math.max(
+	LETTER_SET_HISTORY_WINDOW_DAYS,
+	WORD_HISTORY_WINDOW_DAYS,
+);
+const EXACT_LETTER_SET_REPEAT_PENALTY = 14;
+const LETTER_OVERLAP_PENALTY = 1.15;
+const WORD_REPEAT_PENALTY = 1.85;
+const HIGH_WORD_REPEAT_PENALTY = 0.45;
 
 /**
  * Seeded random number generator for reproducible crosswords
@@ -55,6 +68,23 @@ export interface CrosswordGrid {
 	rows: number;
 	cols: number;
 }
+
+type DailyPuzzleHistorySummary = {
+	letters: string[];
+	letterSetKey: string;
+	selectedWordKeys: string[];
+};
+
+export type DailyPuzzleHistoryEntry = DailyPuzzleHistorySummary & {
+	daysAgo: number;
+};
+
+type DailyGenerationResult = {
+	crossword: CrosswordGrid;
+	letters: string[];
+	shuffledLetters: string[];
+	summary: DailyPuzzleHistorySummary;
+};
 
 interface Candidate {
 	word: Word;
@@ -184,6 +214,116 @@ function scoreWordLengthProfile(profile: WordLengthProfile): number {
 		Math.min(profile.uniqueLengths, 5) * 2 -
 		fourLetterPenalty -
 		shortPenalty
+	);
+}
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+	const date = new Date(`${dateKey}T12:00:00.000Z`);
+	date.setUTCDate(date.getUTCDate() + days);
+	return date.toISOString().slice(0, 10);
+}
+
+function buildLetterSetKey(letters: string[]): string {
+	return [...letters].sort().join("");
+}
+
+function getRecencyWeight(daysAgo: number, windowDays: number): number {
+	if (daysAgo <= 0 || daysAgo > windowDays) {
+		return 0;
+	}
+
+	return (windowDays - daysAgo + 1) / windowDays;
+}
+
+function countIntersection(left: Iterable<string>, right: Set<string>): number {
+	let count = 0;
+	for (const value of left) {
+		if (right.has(value)) {
+			count++;
+		}
+	}
+	return count;
+}
+
+function summarizeDailyGeneration(
+	letters: string[],
+	crossword: CrosswordGrid,
+): DailyPuzzleHistorySummary {
+	return {
+		letters,
+		letterSetKey: buildLetterSetKey(letters),
+		selectedWordKeys: crossword.words.map((placement) =>
+			normalizeWord(placement.word.name),
+		),
+	};
+}
+
+export function calculateCandidateFreshnessPenalty(
+	letters: string[],
+	selectedWordNames: string[],
+	recentHistory: DailyPuzzleHistoryEntry[],
+): number {
+	const letterSetKey = buildLetterSetKey(letters);
+	const letterSet = new Set(letters);
+	const selectedWordKeys = selectedWordNames.map((word) => normalizeWord(word));
+	const perWordRepeatWeight = new Map<string, number>();
+	let penalty = 0;
+
+	for (const historyEntry of recentHistory) {
+		const letterWeight = getRecencyWeight(
+			historyEntry.daysAgo,
+			LETTER_SET_HISTORY_WINDOW_DAYS,
+		);
+
+		if (letterWeight > 0) {
+			if (historyEntry.letterSetKey === letterSetKey) {
+				penalty += EXACT_LETTER_SET_REPEAT_PENALTY * letterWeight;
+			}
+
+			const overlapCount = countIntersection(historyEntry.letters, letterSet);
+			penalty +=
+				Math.max(0, overlapCount - 2) * LETTER_OVERLAP_PENALTY * letterWeight;
+		}
+
+		const wordWeight = getRecencyWeight(
+			historyEntry.daysAgo,
+			WORD_HISTORY_WINDOW_DAYS,
+		);
+		if (wordWeight === 0) {
+			continue;
+		}
+
+		const historicalWords = new Set(historyEntry.selectedWordKeys);
+		for (const wordKey of selectedWordKeys) {
+			if (!historicalWords.has(wordKey)) {
+				continue;
+			}
+
+			penalty += WORD_REPEAT_PENALTY * wordWeight;
+			perWordRepeatWeight.set(
+				wordKey,
+				(perWordRepeatWeight.get(wordKey) ?? 0) + wordWeight,
+			);
+		}
+	}
+
+	for (const repeatWeight of perWordRepeatWeight.values()) {
+		if (repeatWeight > 1.5) {
+			penalty += (repeatWeight - 1.5) * HIGH_WORD_REPEAT_PENALTY;
+		}
+	}
+
+	return penalty;
+}
+
+function createRankBiasedIndex(length: number, random: SeededRandom): number {
+	if (length <= 1) {
+		return 0;
+	}
+
+	return Math.min(
+		length - 1,
+		Math.floor(random.next() ** LETTER_CANDIDATE_RANK_BIAS * length),
 	);
 }
 
@@ -716,9 +856,9 @@ export function getRandomLetterSet(
 		const prioritizedCandidates = prioritizeWords(candidates, random);
 		const pool = prioritizedCandidates.slice(
 			0,
-			Math.min(prioritizedCandidates.length, 64),
+			Math.min(prioritizedCandidates.length, LETTER_CANDIDATE_POOL_SIZE),
 		);
-		const randomWord = pool[Math.floor(random.next() * pool.length)];
+		const randomWord = pool[createRankBiasedIndex(pool.length, random)];
 		const normalized = normalizeWord(randomWord.name);
 		const chars = Array.from(new Set(normalized.split("")));
 		return random.shuffleArray(chars).slice(0, 6);
@@ -733,11 +873,86 @@ export function generateDailyCrosswordForSeed(
 	seed: number,
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
+	options: {
+		cache?: Map<number, DailyGenerationResult | null>;
+		baselineCache?: Map<number, DailyGenerationResult | null>;
+	} = {},
 ): {
 	crossword: CrosswordGrid;
 	letters: string[];
 	shuffledLetters: string[];
 } | null {
+	return generateDailyCrosswordForSeedInternal(
+		words,
+		seed,
+		minWords,
+		maxWords,
+		options.cache ?? new Map(),
+		options.baselineCache ?? new Map(),
+	);
+}
+
+function generateDailyCrosswordForSeedInternal(
+	words: Word[],
+	seed: number,
+	minWords = DEFAULT_MIN_WORDS,
+	maxWords = DEFAULT_MAX_WORDS,
+	cache: Map<number, DailyGenerationResult | null> = new Map(),
+	baselineCache: Map<number, DailyGenerationResult | null> = new Map(),
+): DailyGenerationResult | null {
+	const cached = cache.get(seed);
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	const recentHistory = getRecentDailyHistory(
+		words,
+		seed,
+		minWords,
+		maxWords,
+		baselineCache,
+	);
+	const generated = selectBestDailyCrosswordForSeed(
+		words,
+		seed,
+		minWords,
+		maxWords,
+		recentHistory,
+	);
+	cache.set(seed, generated);
+	return generated;
+}
+
+function generateBaselineDailyCrosswordForSeed(
+	words: Word[],
+	seed: number,
+	minWords = DEFAULT_MIN_WORDS,
+	maxWords = DEFAULT_MAX_WORDS,
+	cache: Map<number, DailyGenerationResult | null> = new Map(),
+): DailyGenerationResult | null {
+	const cached = cache.get(seed);
+	if (cached !== undefined) {
+		return cached;
+	}
+
+	const generated = selectBestDailyCrosswordForSeed(
+		words,
+		seed,
+		minWords,
+		maxWords,
+		[],
+	);
+	cache.set(seed, generated);
+	return generated;
+}
+
+function selectBestDailyCrosswordForSeed(
+	words: Word[],
+	seed: number,
+	minWords = DEFAULT_MIN_WORDS,
+	maxWords = DEFAULT_MAX_WORDS,
+	recentHistory: DailyPuzzleHistoryEntry[] = [],
+): DailyGenerationResult | null {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
@@ -770,37 +985,88 @@ export function generateDailyCrosswordForSeed(
 			}
 
 			const usedLetters = new Set(
-				result.words.flatMap((w) => normalizeWord(w.word.name).split("")),
+				result.words.flatMap((placement) =>
+					normalizeWord(placement.word.name).split(""),
+				),
 			);
 
-			if (letters.every((l) => usedLetters.has(l))) {
-				const score = scoreWordLengthProfile(
-					getWordLengthProfile(result.words.map((placement) => placement.word)),
-				);
+			if (!letters.every((letter) => usedLetters.has(letter))) {
+				attempts++;
+				continue;
+			}
 
-				if (score > bestScore) {
-					bestScore = score;
-					bestCrossword = result;
-					bestLetters = letters;
-				}
+			const selectedWords = result.words.map(
+				(placement) => placement.word.name,
+			);
+			const baseScore = scoreWordLengthProfile(
+				getWordLengthProfile(result.words.map((placement) => placement.word)),
+			);
+			const freshnessPenalty = calculateCandidateFreshnessPenalty(
+				letters,
+				selectedWords,
+				recentHistory,
+			);
+			const score = baseScore - freshnessPenalty;
 
-				if (score >= STRONG_DIVERSITY_SCORE) {
-					break;
-				}
+			if (score > bestScore) {
+				bestScore = score;
+				bestCrossword = result;
+				bestLetters = letters;
+			}
+
+			if (baseScore >= STRONG_DIVERSITY_SCORE && freshnessPenalty <= 2) {
+				break;
 			}
 		} catch (_e) {
 			// continue
 		}
+
 		attempts++;
 	}
 
-	if (!bestCrossword) return null;
+	if (!bestCrossword) {
+		return null;
+	}
 
 	return {
 		crossword: bestCrossword,
 		letters: bestLetters,
 		shuffledLetters: random.shuffleArray(bestLetters),
+		summary: summarizeDailyGeneration(bestLetters, bestCrossword),
 	};
+}
+
+function getRecentDailyHistory(
+	words: Word[],
+	seed: number,
+	minWords: number,
+	maxWords: number,
+	baselineCache: Map<number, DailyGenerationResult | null>,
+): DailyPuzzleHistoryEntry[] {
+	const dateKey = seedToDateKey(seed);
+	const history: DailyPuzzleHistoryEntry[] = [];
+
+	for (let daysAgo = 1; daysAgo <= HISTORY_LOOKBACK_DAYS; daysAgo++) {
+		const historicalSeed = dateKeyToSeed(addDaysToDateKey(dateKey, -daysAgo));
+		const generated = generateBaselineDailyCrosswordForSeed(
+			words,
+			historicalSeed,
+			minWords,
+			maxWords,
+			baselineCache,
+		);
+
+		if (!generated) {
+			continue;
+		}
+
+		history.push({
+			daysAgo,
+			...generated.summary,
+		});
+	}
+
+	return history;
 }
 
 /**
