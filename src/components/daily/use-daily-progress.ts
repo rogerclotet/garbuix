@@ -15,6 +15,7 @@ import {
 	applyPuzzleEvent,
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
+	getCompatibleProgress,
 } from "@/lib/puzzle-progress";
 import {
 	getUserPuzzleProgress,
@@ -80,7 +81,9 @@ export function useDailyProgress({
 	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(() => {
 		const empty = createEmptyProgressState(puzzle);
 		return (
-			initialData.progress ?? getAnonymousProgress(puzzle.dateKey) ?? empty
+			getCompatibleProgress(initialData.progress, puzzle) ??
+			getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
+			empty
 		);
 	});
 	const [queuedEvents, setQueuedEvents] = useState<PuzzleClientEvent[]>([]);
@@ -116,7 +119,7 @@ export function useDailyProgress({
 				(await fetchUserProgress({
 					data: { puzzleId: puzzle.id },
 				})) ??
-				initialData.progress ??
+				getCompatibleProgress(initialData.progress, puzzle) ??
 				empty
 			);
 		} catch (error) {
@@ -127,7 +130,7 @@ export function useDailyProgress({
 					scope: "puzzle_progress_fetch",
 				});
 			}
-			return initialData.progress ?? empty;
+			return getCompatibleProgress(initialData.progress, puzzle) ?? empty;
 		}
 	}, [
 		activeUser,
@@ -145,15 +148,19 @@ export function useDailyProgress({
 
 			if (activeUser) {
 				const cached = getAccountPuzzleCache(activeUser.id, puzzle.dateKey);
-				if (cached) {
+				if (cached?.puzzleId === puzzle.id) {
 					if (!cancelled) {
 						setBaseProgress(
-							cached.baseProgress ?? initialData.progress ?? empty,
+							getCompatibleProgress(cached.baseProgress, puzzle) ??
+								getCompatibleProgress(initialData.progress, puzzle) ??
+								empty,
 						);
 						setQueuedEvents(cached.queuedEvents ?? []);
 					}
 				} else if (!cancelled) {
-					setBaseProgress(initialData.progress ?? empty);
+					setBaseProgress(
+						getCompatibleProgress(initialData.progress, puzzle) ?? empty,
+					);
 					setQueuedEvents([]);
 				}
 
@@ -211,7 +218,10 @@ export function useDailyProgress({
 
 			if (!cancelled) {
 				setQueuedEvents([]);
-				setBaseProgress(getAnonymousProgress(puzzle.dateKey) ?? empty);
+				setBaseProgress(
+					getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
+						empty,
+				);
 			}
 		};
 
@@ -265,6 +275,7 @@ export function useDailyProgress({
 	useEffect(() => {
 		if (activeUser) {
 			saveAccountPuzzleCache(activeUser.id, puzzle.dateKey, {
+				puzzleId: puzzle.id,
 				baseProgress,
 				queuedEvents,
 			});

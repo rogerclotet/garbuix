@@ -3,6 +3,7 @@ import {
 	applyPuzzleEvent,
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
+	getCompatibleProgress,
 } from "@/lib/puzzle-progress";
 
 describe("puzzle-progress", () => {
@@ -142,5 +143,17 @@ describe("puzzle-progress", () => {
 
 		expect(state.guessCount).toBe(2);
 		expect(state.guessedWordIds).toEqual([0, 1]);
+	});
+
+	it("rejects progress from a different puzzle snapshot", () => {
+		const progress = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+
+		expect(getCompatibleProgress(progress, { id: "puzzle-1" })).toEqual(
+			progress,
+		);
+		expect(getCompatibleProgress(progress, { id: "puzzle-2" })).toBeNull();
 	});
 });

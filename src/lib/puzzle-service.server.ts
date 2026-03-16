@@ -22,6 +22,7 @@ import {
 import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
+	getCompatibleProgress,
 } from "@/lib/puzzle-progress";
 import {
 	buildPuzzleSnapshots,
@@ -525,6 +526,37 @@ export async function importAnonymousProgressForUser(options: {
 		}
 
 		const puzzle = await ensureDailyPuzzleSnapshot(historyEntry.dateKey);
+		if (!getCompatibleProgress(activeProgress, puzzle.publicSnapshotJson)) {
+			await db
+				.insert(legacyImportedResults)
+				.values({
+					id: crypto.randomUUID(),
+					userId,
+					dateKey: historyEntry.dateKey,
+					seed: historyEntry.seed,
+					totalWords: historyEntry.totalWords,
+					guessedWords: historyEntry.guessedWords,
+					guessCount: historyEntry.guessCount,
+					hintsUsed: historyEntry.hintsUsed,
+					completed: historyEntry.completed,
+					lastUpdated: new Date(historyEntry.lastUpdated),
+				})
+				.onConflictDoUpdate({
+					target: [legacyImportedResults.userId, legacyImportedResults.dateKey],
+					set: {
+						seed: historyEntry.seed,
+						totalWords: historyEntry.totalWords,
+						guessedWords: historyEntry.guessedWords,
+						guessCount: historyEntry.guessCount,
+						hintsUsed: historyEntry.hintsUsed,
+						completed: historyEntry.completed,
+						lastUpdated: new Date(historyEntry.lastUpdated),
+					},
+				});
+			skippedLegacyDates.push(historyEntry.dateKey);
+			continue;
+		}
+
 		const existingProgress = await getUserPuzzleProgressData(puzzle.id, userId);
 		const merged = mergeProgressState(existingProgress, activeProgress);
 

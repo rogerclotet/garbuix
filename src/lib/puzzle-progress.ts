@@ -21,6 +21,17 @@ export function createEmptyProgressState(
 	};
 }
 
+export function getCompatibleProgress(
+	progress: PuzzleProgressState | null | undefined,
+	puzzle: Pick<DailyPuzzlePublic, "id">,
+) {
+	if (!progress || progress.puzzleId !== puzzle.id) {
+		return null;
+	}
+
+	return progress;
+}
+
 export function applyPuzzleEvent(
 	state: PuzzleProgressState,
 	event: PuzzleClientEvent,

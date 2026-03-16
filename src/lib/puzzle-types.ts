@@ -141,6 +141,7 @@ export type AnonymousImportPayload = {
 };
 
 export type AccountPuzzleCache = {
+	puzzleId: string;
 	baseProgress: PuzzleProgressState | null;
 	queuedEvents: PuzzleClientEvent[];
 };
