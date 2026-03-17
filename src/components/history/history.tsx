@@ -277,8 +277,9 @@ export function History({ initialData }: { initialData: HistoryData }) {
 															<span className="text-sm text-muted-foreground">
 																{entry.guessCount} intent
 																{entry.guessCount === 1 ? "" : "s"} ·{" "}
-																{entry.hintsUsed} pista
-																{entry.hintsUsed === 1 ? "" : "s"}
+																{entry.hintsUsed === 1
+																	? `${entry.hintsUsed} pista`
+																	: `${entry.hintsUsed} pistes`}
 															</span>
 														</div>
 														<div className="space-y-2">

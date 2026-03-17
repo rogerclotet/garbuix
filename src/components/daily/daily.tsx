@@ -501,8 +501,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										{derivedProgress.guessCount === 1 ? "" : "s"}
 									</span>
 									<span>
-										{derivedProgress.hintsUsed} pista
-										{derivedProgress.hintsUsed === 1 ? "" : "es"}
+										{derivedProgress.hintsUsed === 1
+											? `${derivedProgress.hintsUsed} pista`
+											: `${derivedProgress.hintsUsed} pistes`}
 									</span>
 									{streakStats.currentStreak >= 3 ? (
 										<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
