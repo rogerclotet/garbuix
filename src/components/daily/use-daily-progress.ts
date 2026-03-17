@@ -33,6 +33,7 @@ import type { DailyData, DailySessionUser } from "./daily-types";
 const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
 const SYNC_INITIAL_RETRY_DELAY_MS = 2_000;
 const SYNC_MAX_RETRY_DELAY_MS = 30_000;
+const PROGRESS_REVALIDATION_DELAYS_MS = [3_000, 10_000, 30_000];
 
 function isLikelyOfflineOrNetworkError(error: unknown) {
 	if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -271,6 +272,30 @@ export function useDailyProgress({
 			window.removeEventListener("pageshow", handleFocus);
 		};
 	}, [activeUser, fetchLatestProgress]);
+
+	useEffect(() => {
+		if (!activeUser || !isOnline || typeof window === "undefined") {
+			return;
+		}
+
+		let cancelled = false;
+		const timeoutIds = PROGRESS_REVALIDATION_DELAYS_MS.map((delayMs) =>
+			window.setTimeout(() => {
+				void fetchLatestProgress().then((latestProgress) => {
+					if (!cancelled && latestProgress) {
+						setBaseProgress(latestProgress);
+					}
+				});
+			}, delayMs),
+		);
+
+		return () => {
+			cancelled = true;
+			for (const timeoutId of timeoutIds) {
+				window.clearTimeout(timeoutId);
+			}
+		};
+	}, [activeUser, fetchLatestProgress, isOnline]);
 
 	useEffect(() => {
 		if (activeUser) {
