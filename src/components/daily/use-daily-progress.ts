@@ -16,6 +16,7 @@ import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 	getCompatibleProgress,
+	pickPreferredProgressState,
 } from "@/lib/puzzle-progress";
 import {
 	getUserPuzzleProgress,
@@ -150,13 +151,22 @@ export function useDailyProgress({
 			if (activeUser) {
 				const cached = getAccountPuzzleCache(activeUser.id, puzzle.dateKey);
 				if (cached?.puzzleId === puzzle.id) {
+					const cachedQueuedEvents = cached.queuedEvents ?? [];
+					const cachedBaseProgress =
+						getCompatibleProgress(cached.baseProgress, puzzle) ?? null;
+					const serverBaseProgress =
+						getCompatibleProgress(initialData.progress, puzzle) ?? null;
+					const preferredCachedBase =
+						cachedQueuedEvents.length > 0
+							? (pickPreferredProgressState(
+									serverBaseProgress,
+									cachedBaseProgress,
+								) ?? empty)
+							: (serverBaseProgress ?? cachedBaseProgress ?? empty);
+
 					if (!cancelled) {
-						setBaseProgress(
-							getCompatibleProgress(cached.baseProgress, puzzle) ??
-								getCompatibleProgress(initialData.progress, puzzle) ??
-								empty,
-						);
-						setQueuedEvents(cached.queuedEvents ?? []);
+						setBaseProgress(preferredCachedBase);
+						setQueuedEvents(cachedQueuedEvents);
 					}
 				} else if (!cancelled) {
 					setBaseProgress(
@@ -167,7 +177,11 @@ export function useDailyProgress({
 
 				const latestProgress = await fetchLatestProgress();
 				if (!cancelled && latestProgress) {
-					setBaseProgress(latestProgress);
+					setBaseProgress(
+						(current) =>
+							pickPreferredProgressState(current, latestProgress) ??
+							latestProgress,
+					);
 				}
 
 				if (
@@ -197,7 +211,10 @@ export function useDailyProgress({
 							});
 							const refreshed = await fetchLatestProgress();
 							if (!cancelled && refreshed) {
-								setBaseProgress(refreshed);
+								setBaseProgress(
+									(current) =>
+										pickPreferredProgressState(current, refreshed) ?? refreshed,
+								);
 							}
 							toast.success("S'han sincronitzat els resultats locals");
 						} catch (error) {
@@ -255,7 +272,11 @@ export function useDailyProgress({
 
 			const latestProgress = await fetchLatestProgress();
 			if (!cancelled && latestProgress) {
-				setBaseProgress(latestProgress);
+				setBaseProgress(
+					(current) =>
+						pickPreferredProgressState(current, latestProgress) ??
+						latestProgress,
+				);
 			}
 		};
 
@@ -283,7 +304,11 @@ export function useDailyProgress({
 			window.setTimeout(() => {
 				void fetchLatestProgress().then((latestProgress) => {
 					if (!cancelled && latestProgress) {
-						setBaseProgress(latestProgress);
+						setBaseProgress(
+							(current) =>
+								pickPreferredProgressState(current, latestProgress) ??
+								latestProgress,
+						);
 					}
 				});
 			}, delayMs),

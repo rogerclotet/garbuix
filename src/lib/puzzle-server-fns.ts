@@ -35,7 +35,7 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 		);
 	});
 
-export const getDailyPuzzlePageData = createServerFn({ method: "GET" })
+export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 	.inputValidator(
 		z
 			.object({
@@ -68,11 +68,11 @@ export const getDailyPuzzlePageData = createServerFn({ method: "GET" })
 		);
 	});
 
-export const getSessionUser = createServerFn({ method: "GET" }).handler(
+export const getSessionUser = createServerFn({ method: "POST" }).handler(
 	async () => observeServerAction("getSessionUser", () => getSessionUserData()),
 );
 
-export const getUserPuzzleProgress = createServerFn({ method: "GET" })
+export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
 			puzzleId: z.string(),
@@ -131,7 +131,7 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 		);
 	});
 
-export const getHistoryPageData = createServerFn({ method: "GET" })
+export const getHistoryPageData = createServerFn({ method: "POST" })
 	.inputValidator(
 		z
 			.object({

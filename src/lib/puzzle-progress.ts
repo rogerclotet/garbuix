@@ -32,6 +32,60 @@ export function getCompatibleProgress(
 	return progress;
 }
 
+function toTimestamp(value: string | null | undefined) {
+	if (!value) {
+		return Number.NEGATIVE_INFINITY;
+	}
+
+	const timestamp = Date.parse(value);
+	return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+}
+
+export function pickPreferredProgressState(
+	left: PuzzleProgressState | null | undefined,
+	right: PuzzleProgressState | null | undefined,
+) {
+	if (!left) {
+		return right ?? null;
+	}
+
+	if (!right) {
+		return left;
+	}
+
+	const leftSyncedAt = toTimestamp(left.lastSyncedAt);
+	const rightSyncedAt = toTimestamp(right.lastSyncedAt);
+	if (leftSyncedAt !== rightSyncedAt) {
+		return leftSyncedAt > rightSyncedAt ? left : right;
+	}
+
+	const leftCompletedAt = toTimestamp(left.completedAt);
+	const rightCompletedAt = toTimestamp(right.completedAt);
+	if (leftCompletedAt !== rightCompletedAt) {
+		return leftCompletedAt > rightCompletedAt ? left : right;
+	}
+
+	if (left.guessedWordIds.length !== right.guessedWordIds.length) {
+		return left.guessedWordIds.length > right.guessedWordIds.length
+			? left
+			: right;
+	}
+
+	if (left.guessCount !== right.guessCount) {
+		return left.guessCount > right.guessCount ? left : right;
+	}
+
+	if (left.hintsUsed !== right.hintsUsed) {
+		return left.hintsUsed > right.hintsUsed ? left : right;
+	}
+
+	if (left.guessHashes.length !== right.guessHashes.length) {
+		return left.guessHashes.length > right.guessHashes.length ? left : right;
+	}
+
+	return right;
+}
+
 export function applyPuzzleEvent(
 	state: PuzzleProgressState,
 	event: PuzzleClientEvent,

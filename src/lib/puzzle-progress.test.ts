@@ -4,6 +4,7 @@ import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 	getCompatibleProgress,
+	pickPreferredProgressState,
 } from "@/lib/puzzle-progress";
 
 describe("puzzle-progress", () => {
@@ -155,5 +156,43 @@ describe("puzzle-progress", () => {
 			progress,
 		);
 		expect(getCompatibleProgress(progress, { id: "puzzle-2" })).toBeNull();
+	});
+
+	it("prefers the more recent progress snapshot", () => {
+		const older = {
+			...createEmptyProgressState({
+				id: "puzzle-1",
+				initialShuffledLetters: ["a", "b", "c"],
+			}),
+			guessHashes: ["guess-1"],
+			guessedWordIds: [0],
+			guessCount: 1,
+			lastSyncedAt: "2026-03-10T10:00:00.000Z",
+		};
+		const newer = {
+			...older,
+			guessHashes: ["guess-1", "guess-2"],
+			guessedWordIds: [0, 1],
+			guessCount: 2,
+			lastSyncedAt: "2026-03-10T10:05:00.000Z",
+		};
+
+		expect(pickPreferredProgressState(older, newer)).toEqual(newer);
+		expect(pickPreferredProgressState(newer, older)).toEqual(newer);
+	});
+
+	it("falls back to richer progress when timestamps are missing", () => {
+		const sparse = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+		const richer = {
+			...sparse,
+			guessHashes: ["guess-1", "guess-2"],
+			guessedWordIds: [0],
+			guessCount: 2,
+		};
+
+		expect(pickPreferredProgressState(sparse, richer)).toEqual(richer);
 	});
 });
