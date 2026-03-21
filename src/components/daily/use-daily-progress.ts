@@ -5,6 +5,7 @@ import {
 	buildAnonymousImportPayload,
 	getAccountPuzzleCache,
 	getAnonymousProgress,
+	getStaleAccountCachesWithEvents,
 	hasImportedAnonymousData,
 	markAnonymousDataImported,
 	saveAccountPuzzleCache,
@@ -97,6 +98,7 @@ export function useDailyProgress({
 	const importAttemptedRef = useRef<string | null>(null);
 	const syncFailureCountRef = useRef(0);
 	const hasActiveSyncFailureToastRef = useRef(false);
+	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
 
 	const derivedProgress = useMemo(
 		() =>
@@ -462,6 +464,46 @@ export function useDailyProgress({
 		queuedEvents,
 		syncEvents,
 	]);
+
+	useEffect(() => {
+		if (!activeUser || !isOnline) return;
+
+		const staleCaches = getStaleAccountCachesWithEvents(
+			activeUser.id,
+			puzzle.dateKey,
+		);
+		if (staleCaches.length === 0) return;
+
+		for (const { dateKey, cache } of staleCaches) {
+			if (syncedOrphanedDaysRef.current.has(dateKey)) continue;
+			syncedOrphanedDaysRef.current.add(dateKey);
+
+			void syncEvents({
+				data: {
+					puzzleId: cache.puzzleId,
+					deviceId,
+					events: cache.queuedEvents ?? [],
+				},
+			})
+				.then((result) => {
+					const remainingEvents = (cache.queuedEvents ?? []).filter(
+						(event) => !result.ackedEventIds.includes(event.id),
+					);
+					saveAccountPuzzleCache(activeUser.id, dateKey, {
+						...cache,
+						queuedEvents: remainingEvents,
+					});
+				})
+				.catch((error) => {
+					console.error(
+						"Failed to sync stale puzzle events for",
+						dateKey,
+						error,
+					);
+					syncedOrphanedDaysRef.current.delete(dateKey);
+				});
+		}
+	}, [activeUser, deviceId, isOnline, puzzle.dateKey, syncEvents]);
 
 	const applyLocalEvent = (event: PuzzleClientEvent) => {
 		if (activeUser) {

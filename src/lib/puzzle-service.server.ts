@@ -453,7 +453,25 @@ export async function getHistoryEntriesForUser(userId: string) {
 		});
 	}
 
-	return entries.sort((left, right) =>
+	const deduped = new Map<string, HistorySummaryEntry>();
+	for (const entry of entries) {
+		const existing = deduped.get(entry.dateKey);
+		if (!existing) {
+			deduped.set(entry.dateKey, entry);
+			continue;
+		}
+		// Prefer non-legacy (full progress) over legacy (summary-only)
+		if (!entry.legacy && existing.legacy) {
+			deduped.set(entry.dateKey, entry);
+			continue;
+		}
+		// Among same type, prefer more recently updated
+		if (entry.lastUpdated > existing.lastUpdated) {
+			deduped.set(entry.dateKey, entry);
+		}
+	}
+
+	return Array.from(deduped.values()).sort((left, right) =>
 		right.dateKey.localeCompare(left.dateKey),
 	);
 }

@@ -78,6 +78,25 @@ export function clearAccountPuzzleCache(userId: string, dateKey: string) {
 	window.localStorage.removeItem(`${ACCOUNT_CACHE_PREFIX}${userId}:${dateKey}`);
 }
 
+export function getStaleAccountCachesWithEvents(
+	userId: string,
+	currentDateKey: string,
+) {
+	if (typeof window === "undefined") return [];
+	const prefix = `${ACCOUNT_CACHE_PREFIX}${userId}:`;
+	const results: Array<{ dateKey: string; cache: AccountPuzzleCache }> = [];
+	for (let index = 0; index < window.localStorage.length; index += 1) {
+		const key = window.localStorage.key(index);
+		if (!key?.startsWith(prefix)) continue;
+		const dateKey = key.slice(prefix.length);
+		if (dateKey === currentDateKey) continue;
+		const cache = readJson<AccountPuzzleCache>(key);
+		if (!cache?.queuedEvents?.length) continue;
+		results.push({ dateKey, cache });
+	}
+	return results;
+}
+
 export function hasImportedAnonymousData(userId: string) {
 	if (typeof window === "undefined") return false;
 	return (
