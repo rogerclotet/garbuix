@@ -28,9 +28,14 @@ export function DailyWordList({
 					>
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
-							<span className="font-medium text-green-900 dark:text-green-300 tracking-widest">
+							<a
+								href={`https://optimot.cat/cerca/${revealedAnswers[slot.id]}`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="font-medium text-green-900 dark:text-green-300 tracking-widest hover:underline"
+							>
 								{revealedAnswers[slot.id]?.toUpperCase()}
-							</span>
+							</a>
 							<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
 								{slot.length} lletres
 							</span>
