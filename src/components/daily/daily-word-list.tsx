@@ -29,7 +29,7 @@ export function DailyWordList({
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
 							<a
-								href={`https://optimot.cat/cerca/${revealedAnswers[slot.id]}`}
+								href={`https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(revealedAnswers[slot.id] ?? "")}&tipusCerca=cerca.queSignifica`}
 								target="_blank"
 								rel="noopener noreferrer"
 								className="font-medium text-green-900 dark:text-green-300 tracking-widest hover:underline"
