@@ -1,17 +1,36 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useMemo } from "react";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
+import { getSlotCellKey } from "./daily-helpers";
 
 type DailyGridProps = {
 	puzzle: DailyPuzzlePublic;
 	revealedCells: Set<string>;
 	cellLetters: Map<string, string>;
+	highlightedWordId: number | null;
 };
 
 export function DailyGrid({
 	puzzle,
 	revealedCells,
 	cellLetters,
+	highlightedWordId,
 }: DailyGridProps) {
+	const highlightedCellOrder = useMemo(() => {
+		const slot = puzzle.wordSlots.find(
+			(wordSlot) => wordSlot.id === highlightedWordId,
+		);
+		if (!slot) {
+			return new Map<string, number>();
+		}
+
+		return new Map<string, number>(
+			Array.from({ length: slot.length }, (_, index) => [
+				getSlotCellKey(slot, index),
+				index,
+			]),
+		);
+	}, [highlightedWordId, puzzle.wordSlots]);
+
 	return (
 		<div
 			className="flex items-center justify-center w-full @container"
@@ -27,6 +46,8 @@ export function DailyGrid({
 					row.map((cell, colIdx) => {
 						const key = `${rowIdx},${colIdx}`;
 						const isRevealed = revealedCells.has(key);
+						const highlightedLetterIndex = highlightedCellOrder.get(key);
+						const isJustGuessed = highlightedLetterIndex != null;
 
 						if (!cell) {
 							return <div key={key} className="aspect-square bg-transparent" />;
@@ -35,13 +56,30 @@ export function DailyGrid({
 						return (
 							<div
 								key={key}
+								style={
+									isJustGuessed
+										? ({
+												"--guess-letter-delay": `${highlightedLetterIndex * 34}ms`,
+											} as CSSProperties)
+										: undefined
+								}
 								className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-colors duration-300 ${
 									isRevealed
 										? "bg-primary/18 border-primary/70 text-secondary-foreground"
 										: "bg-muted/80 border-muted-foreground/30 dark:bg-muted/90 dark:border-muted-foreground/45"
-								}`}
+								} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 							>
-								{isRevealed ? cellLetters.get(key)?.toUpperCase() : ""}
+								{isRevealed ? (
+									<span
+										className={
+											isJustGuessed ? "grid-word-just-guessed-letter" : ""
+										}
+									>
+										{cellLetters.get(key)?.toUpperCase()}
+									</span>
+								) : (
+									""
+								)}
 							</div>
 						);
 					}),

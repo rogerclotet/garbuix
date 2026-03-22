@@ -24,10 +24,10 @@ export function DailyWordList({
 				.map((slot) => (
 					<div
 						key={slot.id}
-						className="flex flex-col gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+						className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20"
 					>
 						<div className="flex items-center gap-2">
-							<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+							<CheckCircle2 className="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
 							<a
 								href={`https://optimot.cat/cerca/${revealedAnswers[slot.id]}`}
 								target="_blank"

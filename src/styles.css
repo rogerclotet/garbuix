@@ -142,6 +142,81 @@ code {
 	margin-left: 0;
 }
 
+@keyframes grid-word-just-guessed-cell-flash {
+	0% {
+		transform: scale(0.96);
+		background-color: color-mix(
+			in srgb,
+			var(--color-primary) 24%,
+			var(--color-background)
+		);
+		box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 14%, transparent);
+	}
+
+	45% {
+		transform: scale(1.08);
+		background-color: color-mix(
+			in srgb,
+			var(--color-primary) 32%,
+			var(--color-background)
+		);
+		box-shadow:
+			0 0 0 0.2rem color-mix(in srgb, #22c55e 12%, transparent),
+			0 0.4rem 0.8rem -0.7rem color-mix(in srgb, #166534 16%, transparent);
+	}
+
+	100% {
+		transform: scale(1);
+		background-color: color-mix(
+			in srgb,
+			var(--color-primary) 18%,
+			var(--color-background)
+		);
+		box-shadow: 0 0 0 0 transparent;
+	}
+}
+
+@keyframes grid-word-just-guessed-letter-bounce {
+	0% {
+		transform: translateY(0.06em) scale(0.72);
+		opacity: 0;
+	}
+
+	55% {
+		transform: translateY(-0.14em) scale(1.26);
+		opacity: 1;
+	}
+
+	100% {
+		transform: translateY(0) scale(1);
+		opacity: 1;
+	}
+}
+
+.grid-word-just-guessed-cell {
+	animation: grid-word-just-guessed-cell-flash 260ms ease-out both;
+	animation-delay: var(--guess-letter-delay, 0ms);
+	will-change: transform, box-shadow, background-color;
+}
+
+.grid-word-just-guessed-letter {
+	display: inline-block;
+	animation: grid-word-just-guessed-letter-bounce 220ms
+		cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+	animation-delay: var(--guess-letter-delay, 0ms);
+	will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.grid-word-just-guessed-cell {
+		animation: none;
+	}
+
+	.grid-word-just-guessed-letter {
+		animation: none;
+	}
+}
+
 @media (max-width: 640px) {
 	.update-toast[data-sonner-toast][data-styled="true"] {
 		display: grid;

@@ -59,7 +59,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		Record<number, string>
 	>({});
 	const [hintLetters, setHintLetters] = useState<Record<string, string>>({});
+	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
+		null,
+	);
 	const lastPointerPressAtRef = useRef(0);
+	const highlightResetTimerRef = useRef<number | null>(null);
 	const completionTrackedRef = useRef(false);
 	const { captureEvent, captureException } = useObservability();
 	const { applyLocalEvent, derivedProgress } = useDailyProgress({
@@ -95,6 +99,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			cancelled = true;
 		};
 	}, [captureException, derivedProgress, puzzle]);
+
+	useEffect(() => {
+		return () => {
+			if (highlightResetTimerRef.current != null) {
+				window.clearTimeout(highlightResetTimerRef.current);
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
@@ -294,6 +306,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		);
 
 		if (result.displayWord) {
+			if (result.matchedSlotId != null) {
+				setHighlightedWordId(result.matchedSlotId);
+				if (highlightResetTimerRef.current != null) {
+					window.clearTimeout(highlightResetTimerRef.current);
+				}
+				highlightResetTimerRef.current = window.setTimeout(() => {
+					setHighlightedWordId((current) =>
+						current === result.matchedSlotId ? null : current,
+					);
+					highlightResetTimerRef.current = null;
+				}, 1400);
+			}
 			captureEvent("puzzle_guess_result", {
 				date_key: puzzle.dateKey,
 				guess_length: guess.length,
@@ -543,6 +567,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									puzzle={puzzle}
 									revealedCells={revealedCells}
 									cellLetters={cellLetters}
+									highlightedWordId={highlightedWordId}
 								/>
 							</CardContent>
 						</Card>
