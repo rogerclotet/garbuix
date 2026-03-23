@@ -95,10 +95,12 @@ export function useDailyProgress({
 	);
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [nextSyncRetryAt, setNextSyncRetryAt] = useState<number | null>(null);
+	const [manualSyncVersion, setManualSyncVersion] = useState(0);
 	const importAttemptedRef = useRef<string | null>(null);
 	const syncFailureCountRef = useRef(0);
 	const hasActiveSyncFailureToastRef = useRef(false);
 	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
+	const handledManualSyncVersionRef = useRef(0);
 
 	const derivedProgress = useMemo(
 		() =>
@@ -144,6 +146,16 @@ export function useDailyProgress({
 		puzzle,
 	]);
 
+	const refreshProgressFromServer = useCallback(async () => {
+		const latestProgress = await fetchLatestProgress();
+		if (latestProgress) {
+			setBaseProgress(
+				(current) =>
+					pickPreferredProgressState(current, latestProgress) ?? latestProgress,
+			);
+		}
+	}, [fetchLatestProgress]);
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -177,13 +189,8 @@ export function useDailyProgress({
 					setQueuedEvents([]);
 				}
 
-				const latestProgress = await fetchLatestProgress();
-				if (!cancelled && latestProgress) {
-					setBaseProgress(
-						(current) =>
-							pickPreferredProgressState(current, latestProgress) ??
-							latestProgress,
-					);
+				if (!cancelled) {
+					await refreshProgressFromServer();
 				}
 
 				if (
@@ -211,12 +218,8 @@ export function useDailyProgress({
 								imported_dates: result.importedDates.length,
 								legacy_dates: result.skippedLegacyDates.length,
 							});
-							const refreshed = await fetchLatestProgress();
-							if (!cancelled && refreshed) {
-								setBaseProgress(
-									(current) =>
-										pickPreferredProgressState(current, refreshed) ?? refreshed,
-								);
+							if (!cancelled) {
+								await refreshProgressFromServer();
 							}
 							toast.success("S'han sincronitzat els resultats locals");
 						} catch (error) {
@@ -255,10 +258,10 @@ export function useDailyProgress({
 		captureEvent,
 		captureException,
 		deviceId,
-		fetchLatestProgress,
 		importProgress,
 		initialData.progress,
 		puzzle,
+		refreshProgressFromServer,
 	]);
 
 	useEffect(() => {
@@ -272,13 +275,9 @@ export function useDailyProgress({
 				return;
 			}
 
-			const latestProgress = await fetchLatestProgress();
-			if (!cancelled && latestProgress) {
-				setBaseProgress(
-					(current) =>
-						pickPreferredProgressState(current, latestProgress) ??
-						latestProgress,
-				);
+			await refreshProgressFromServer();
+			if (cancelled) {
+				return;
 			}
 		};
 
@@ -294,7 +293,7 @@ export function useDailyProgress({
 			window.removeEventListener("focus", handleFocus);
 			window.removeEventListener("pageshow", handleFocus);
 		};
-	}, [activeUser, fetchLatestProgress]);
+	}, [activeUser, refreshProgressFromServer]);
 
 	useEffect(() => {
 		if (!activeUser || !isOnline || typeof window === "undefined") {
@@ -304,13 +303,9 @@ export function useDailyProgress({
 		let cancelled = false;
 		const timeoutIds = PROGRESS_REVALIDATION_DELAYS_MS.map((delayMs) =>
 			window.setTimeout(() => {
-				void fetchLatestProgress().then((latestProgress) => {
-					if (!cancelled && latestProgress) {
-						setBaseProgress(
-							(current) =>
-								pickPreferredProgressState(current, latestProgress) ??
-								latestProgress,
-						);
+				void refreshProgressFromServer().then(() => {
+					if (cancelled) {
+						return;
 					}
 				});
 			}, delayMs),
@@ -322,7 +317,7 @@ export function useDailyProgress({
 				window.clearTimeout(timeoutId);
 			}
 		};
-	}, [activeUser, fetchLatestProgress, isOnline]);
+	}, [activeUser, isOnline, refreshProgressFromServer]);
 
 	useEffect(() => {
 		if (activeUser) {
@@ -368,7 +363,14 @@ export function useDailyProgress({
 			return;
 		}
 
-		if (nextSyncRetryAt && nextSyncRetryAt > Date.now()) {
+		const forceSyncRequested =
+			manualSyncVersion !== handledManualSyncVersionRef.current;
+
+		if (
+			!forceSyncRequested &&
+			nextSyncRetryAt &&
+			nextSyncRetryAt > Date.now()
+		) {
 			const retryTimer = window.setTimeout(() => {
 				setNextSyncRetryAt(null);
 			}, nextSyncRetryAt - Date.now());
@@ -380,6 +382,7 @@ export function useDailyProgress({
 
 		let cancelled = false;
 		const pendingEvents = [...queuedEvents];
+		handledManualSyncVersionRef.current = manualSyncVersion;
 
 		setIsSyncing(true);
 		void syncEvents({
@@ -459,6 +462,7 @@ export function useDailyProgress({
 		deviceId,
 		isOnline,
 		isSyncing,
+		manualSyncVersion,
 		nextSyncRetryAt,
 		puzzle.id,
 		queuedEvents,
@@ -516,8 +520,31 @@ export function useDailyProgress({
 		);
 	};
 
+	const forceSync = useCallback(async () => {
+		if (!activeUser || !isOnline) {
+			return;
+		}
+
+		if (queuedEvents.length > 0) {
+			setNextSyncRetryAt(null);
+			setManualSyncVersion((current) => current + 1);
+			return;
+		}
+
+		await refreshProgressFromServer();
+	}, [activeUser, isOnline, queuedEvents.length, refreshProgressFromServer]);
+
 	return {
 		applyLocalEvent,
 		derivedProgress,
+		syncDebug: {
+			canSync: Boolean(activeUser),
+			forceSync,
+			isOnline,
+			isSyncing,
+			lastSyncedAt: derivedProgress.lastSyncedAt,
+			nextSyncRetryAt,
+			queuedEventCount: queuedEvents.length,
+		},
 	};
 }

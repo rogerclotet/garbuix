@@ -29,7 +29,7 @@ import {
 	getGuessKeyboardAction,
 	getNextHintCellKey,
 } from "./daily-helpers";
-import { DailyResetProgressDialog } from "./daily-reset-progress-dialog";
+import { DailySyncDebug } from "./daily-sync-debug";
 import type { DailyData } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { useDailyProgress } from "./use-daily-progress";
@@ -66,7 +66,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const completionTrackedRef = useRef(false);
 	const { captureEvent, captureException } = useObservability();
-	const { applyLocalEvent, derivedProgress } = useDailyProgress({
+	const { applyLocalEvent, derivedProgress, syncDebug } = useDailyProgress({
 		activeUser,
 		deviceId,
 		initialData,
@@ -418,22 +418,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		triggerHaptic,
 	]);
 
-	const handleResetDailyProgress = useCallback(() => {
-		triggerHaptic(10);
-		completionTrackedRef.current = false;
-		captureEvent("puzzle_progress_reset", {
-			date_key: puzzle.dateKey,
-			puzzle_id: puzzle.id,
-		});
-		applyLocalEvent(createPuzzleEvent("progress_reset", {}));
-		toast.success("S'ha reiniciat el progrés d'avui");
-	}, [applyLocalEvent, captureEvent, puzzle.dateKey, puzzle.id, triggerHaptic]);
-
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
-	const hasProgress =
-		derivedProgress.guessedWordIds.length > 0 ||
-		derivedProgress.guessCount > 0 ||
-		derivedProgress.hintsUsed > 0;
 
 	useEffect(() => {
 		if (typeof window === "undefined" || isComplete) {
@@ -502,8 +487,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		<div
 			className={`min-h-full p-2 sm:p-4 lg:p-8 ${
 				isComplete
-					? "pb-6 sm:pb-8 lg:pb-8"
-					: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
+					? "pb-6 sm:pb-8 lg:pb-24"
+					: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
 			}`}
 		>
 			<div className="max-w-7xl mx-auto">
@@ -609,13 +594,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								/>
 							</CardContent>
 						</Card>
-
-						<div className="mt-4 flex justify-center">
-							<DailyResetProgressDialog
-								hasProgress={hasProgress}
-								onReset={handleResetDailyProgress}
-							/>
-						</div>
+						<DailySyncDebug
+							canSync={syncDebug.canSync}
+							isOnline={syncDebug.isOnline}
+							isSyncing={syncDebug.isSyncing}
+							lastSyncedAt={syncDebug.lastSyncedAt}
+							nextSyncRetryAt={syncDebug.nextSyncRetryAt}
+							onManualSync={() => {
+								void syncDebug.forceSync();
+							}}
+							queuedEventCount={syncDebug.queuedEventCount}
+						/>
 					</div>
 				</div>
 			</div>
