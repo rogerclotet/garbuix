@@ -29,7 +29,10 @@ import {
 	ensureHintCapsulesCoverGrid,
 	toPuzzlePreview,
 } from "@/lib/puzzle-snapshot";
-import { filterSyncablePuzzleEvents } from "@/lib/puzzle-sync";
+import {
+	collectAckedEventIds,
+	filterSyncablePuzzleEvents,
+} from "@/lib/puzzle-sync";
 import type {
 	AnonymousImportPayload,
 	DailyPuzzlePublic,
@@ -391,7 +394,12 @@ export async function syncPuzzleEventsForUser(options: {
 			},
 		});
 
-	const ackedEventIds = filteredEvents.map((event) => event.id);
+	const ackedEventIds = collectAckedEventIds({
+		existingEventIds: new Set(
+			existingEvents.map((event) => event.clientEventId),
+		),
+		filteredEvents,
+	});
 
 	captureServerEvent({
 		distinctId: userId,

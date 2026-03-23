@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createUnlockToken } from "@/lib/puzzle-crypto";
-import { filterSyncablePuzzleEvents } from "@/lib/puzzle-sync";
+import {
+	collectAckedEventIds,
+	filterSyncablePuzzleEvents,
+} from "@/lib/puzzle-sync";
 
 describe("puzzle-sync", () => {
 	it("filters duplicate, existing, and invalid sync events", async () => {
@@ -100,5 +103,31 @@ describe("puzzle-sync", () => {
 
 		expect(filtered).toHaveLength(1);
 		expect(filtered[0]?.id).toBe("event-1");
+	});
+
+	it("acks events that were already stored server-side", () => {
+		const ackedEventIds = collectAckedEventIds({
+			existingEventIds: new Set(["existing-1", "existing-2"]),
+			filteredEvents: [
+				{
+					id: "new-1",
+					at: "2026-03-10T10:01:00.000Z",
+					type: "letters_shuffled",
+					payload: {
+						shuffledLetters: ["a", "b", "c"],
+					},
+				},
+				{
+					id: "existing-2",
+					at: "2026-03-10T10:02:00.000Z",
+					type: "hint_used",
+					payload: {
+						cellKey: "0,0",
+					},
+				},
+			],
+		});
+
+		expect(ackedEventIds).toEqual(["existing-1", "existing-2", "new-1"]);
 	});
 });

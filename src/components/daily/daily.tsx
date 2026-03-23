@@ -594,19 +594,20 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								/>
 							</CardContent>
 						</Card>
-						<DailySyncDebug
-							canSync={syncDebug.canSync}
-							isOnline={syncDebug.isOnline}
-							isSyncing={syncDebug.isSyncing}
-							lastSyncedAt={syncDebug.lastSyncedAt}
-							nextSyncRetryAt={syncDebug.nextSyncRetryAt}
-							onManualSync={() => {
-								void syncDebug.forceSync();
-							}}
-							queuedEventCount={syncDebug.queuedEventCount}
-						/>
 					</div>
 				</div>
+
+				<DailySyncDebug
+					canSync={syncDebug.canSync}
+					isOnline={syncDebug.isOnline}
+					isSyncing={syncDebug.isSyncing}
+					lastSyncedAt={syncDebug.lastSyncedAt}
+					nextSyncRetryAt={syncDebug.nextSyncRetryAt}
+					onManualSync={() => {
+						void syncDebug.forceSync();
+					}}
+					queuedEventCount={syncDebug.queuedEventCount}
+				/>
 			</div>
 		</div>
 	);

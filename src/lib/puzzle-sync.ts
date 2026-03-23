@@ -47,3 +47,15 @@ export async function filterSyncablePuzzleEvents(options: {
 
 	return filteredEvents;
 }
+
+export function collectAckedEventIds(options: {
+	existingEventIds: Set<string>;
+	filteredEvents: PuzzleClientEvent[];
+}) {
+	return Array.from(
+		new Set([
+			...options.existingEventIds,
+			...options.filteredEvents.map((event) => event.id),
+		]),
+	);
+}
