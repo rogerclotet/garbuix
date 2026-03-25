@@ -601,12 +601,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					canSync={syncDebug.canSync}
 					isOnline={syncDebug.isOnline}
 					isSyncing={syncDebug.isSyncing}
+					lastServerSnapshot={syncDebug.lastServerSnapshot}
 					lastSyncedAt={syncDebug.lastSyncedAt}
+					lastSyncAttempt={syncDebug.lastSyncAttempt}
 					nextSyncRetryAt={syncDebug.nextSyncRetryAt}
 					onManualSync={() => {
 						void syncDebug.forceSync();
 					}}
 					queuedEventCount={syncDebug.queuedEventCount}
+					recentQueueSample={syncDebug.recentQueueSample}
+					shortDeviceId={syncDebug.shortDeviceId}
 				/>
 			</div>
 		</div>

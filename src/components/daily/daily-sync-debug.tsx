@@ -5,10 +5,31 @@ type DailySyncDebugProps = {
 	canSync: boolean;
 	isOnline: boolean;
 	isSyncing: boolean;
+	lastServerSnapshot: {
+		at: string;
+		guessCount: number;
+		guessedWordCount: number;
+		hintsUsed: number;
+		lastSyncedAt: string | null;
+	} | null;
 	lastSyncedAt: string | null;
+	lastSyncAttempt: {
+		acknowledgedCount: number;
+		endedAt: string;
+		errorMessage: string | null;
+		pendingCount: number;
+		pendingSample: string[];
+		redundantClearedCount: number;
+		serverGuessCount: number;
+		serverGuessedWordCount: number;
+		serverHintsUsed: number;
+		startedAt: string;
+	} | null;
 	nextSyncRetryAt: number | null;
 	onManualSync: () => void;
 	queuedEventCount: number;
+	recentQueueSample: string[];
+	shortDeviceId: string;
 };
 
 function formatTimestamp(value: string | number | null) {
@@ -31,10 +52,14 @@ export function DailySyncDebug({
 	canSync,
 	isOnline,
 	isSyncing,
+	lastServerSnapshot,
 	lastSyncedAt,
+	lastSyncAttempt,
 	nextSyncRetryAt,
 	onManualSync,
 	queuedEventCount,
+	recentQueueSample,
+	shortDeviceId,
 }: DailySyncDebugProps) {
 	const syncedLabel =
 		!canSync || !isOnline
@@ -58,6 +83,28 @@ export function DailySyncDebug({
 								? `Pròxim reintent: ${formatTimestamp(nextSyncRetryAt)}`
 								: "Sense reintents pendents"}
 						</p>
+						{lastServerSnapshot ? (
+							<p>
+								Servidor #{shortDeviceId}: {lastServerSnapshot.guessedWordCount}{" "}
+								paraules · {lastServerSnapshot.guessCount} intents ·{" "}
+								{lastServerSnapshot.hintsUsed} pistes · lectura:{" "}
+								{formatTimestamp(lastServerSnapshot.at)}
+							</p>
+						) : null}
+						{lastSyncAttempt ? (
+							<p>
+								Darrer sync: {formatTimestamp(lastSyncAttempt.startedAt)} ·
+								enviats: {lastSyncAttempt.pendingCount} · ack:{" "}
+								{lastSyncAttempt.acknowledgedCount} · redundants:{" "}
+								{lastSyncAttempt.redundantClearedCount}
+								{lastSyncAttempt.errorMessage
+									? ` · error: ${lastSyncAttempt.errorMessage}`
+									: ""}
+							</p>
+						) : null}
+						{recentQueueSample.length > 0 ? (
+							<p>Cua: {recentQueueSample.join(", ")}</p>
+						) : null}
 					</div>
 
 					<Button
