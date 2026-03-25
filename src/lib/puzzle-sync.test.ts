@@ -6,7 +6,7 @@ import {
 } from "@/lib/puzzle-sync";
 
 describe("puzzle-sync", () => {
-	it("filters duplicate, existing, and invalid sync events", async () => {
+	it("deduplicates events and sanitizes invalid matched guesses", async () => {
 		const slotSalt = "slot-1";
 		const unlockToken = await createUnlockToken(slotSalt, "cas");
 		const publicSnapshot = {
@@ -53,7 +53,7 @@ describe("puzzle-sync", () => {
 			],
 		};
 
-		const filtered = await filterSyncablePuzzleEvents({
+		const result = await filterSyncablePuzzleEvents({
 			existingEventIds: new Set(["already-synced"]),
 			publicSnapshot,
 			privateSnapshot,
@@ -101,8 +101,23 @@ describe("puzzle-sync", () => {
 			],
 		});
 
-		expect(filtered).toHaveLength(1);
+		expect(result.diagnostics.acceptedCount).toBe(2);
+		expect(result.diagnostics.existingOnServerCount).toBe(1);
+		expect(result.diagnostics.duplicateInPayloadCount).toBe(1);
+		expect(result.diagnostics.sanitizedInvalidUnlockTokenCount).toBe(1);
+		const filtered = result.filteredEvents;
+		expect(filtered).toHaveLength(2);
 		expect(filtered[0]?.id).toBe("event-1");
+		expect(filtered[1]).toEqual({
+			id: "event-2",
+			at: "2026-03-10T10:03:00.000Z",
+			type: "guess_added",
+			payload: {
+				guessHash: "guess-3",
+				matchedWordId: null,
+				unlockToken: null,
+			},
+		});
 	});
 
 	it("acks events that were already stored server-side", () => {

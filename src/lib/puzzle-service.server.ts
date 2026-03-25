@@ -317,7 +317,7 @@ export async function syncPuzzleEventsForUser(options: {
 		existingEvents.map((event) => event.clientEventId),
 	);
 
-	const filteredEvents = await filterSyncablePuzzleEvents({
+	const { diagnostics, filteredEvents } = await filterSyncablePuzzleEvents({
 		events,
 		existingEventIds: existingEventIdSet,
 		publicSnapshot,
@@ -410,12 +410,16 @@ export async function syncPuzzleEventsForUser(options: {
 			device_id: deviceId,
 			guessed_word_count: nextProgress.guessedWordIds.length,
 			puzzle_id: puzzleId,
+			sanitized_invalid_unlock_token_count:
+				diagnostics.sanitizedInvalidUnlockTokenCount,
+			sanitized_missing_word_count: diagnostics.sanitizedMissingWordCount,
 			received_event_count: events.length,
 		},
 	});
 
 	return {
 		ackedEventIds,
+		diagnostics,
 		progress: {
 			...nextProgress,
 			lastSyncedAt: new Date().toISOString(),

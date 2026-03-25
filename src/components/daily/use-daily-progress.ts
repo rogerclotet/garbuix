@@ -72,10 +72,15 @@ type UseDailyProgressOptions = {
 
 type SyncAttemptDebug = {
 	acknowledgedCount: number;
+	acceptedCount: number;
+	duplicateInPayloadCount: number;
 	endedAt: string;
 	errorMessage: string | null;
+	existingOnServerCount: number;
 	pendingCount: number;
 	pendingSample: PuzzleClientEvent["type"][];
+	sanitizedInvalidUnlockTokenCount: number;
+	sanitizedMissingWordCount: number;
 	redundantClearedCount: number;
 	serverGuessCount: number;
 	serverGuessedWordCount: number;
@@ -431,10 +436,15 @@ export function useDailyProgress({
 		setIsSyncing(true);
 		setLastSyncAttempt({
 			acknowledgedCount: 0,
+			acceptedCount: 0,
+			duplicateInPayloadCount: 0,
 			endedAt: syncStartedAt,
 			errorMessage: null,
+			existingOnServerCount: 0,
 			pendingCount: pendingEvents.length,
 			pendingSample: pendingEvents.slice(-5).map((event) => event.type),
+			sanitizedInvalidUnlockTokenCount: 0,
+			sanitizedMissingWordCount: 0,
 			redundantClearedCount: 0,
 			serverGuessCount: baseProgress.guessCount,
 			serverGuessedWordCount: baseProgress.guessedWordIds.length,
@@ -482,10 +492,17 @@ export function useDailyProgress({
 				});
 				setLastSyncAttempt({
 					acknowledgedCount: result.ackedEventIds.length,
+					acceptedCount: result.diagnostics.acceptedCount,
+					duplicateInPayloadCount: result.diagnostics.duplicateInPayloadCount,
 					endedAt: new Date().toISOString(),
 					errorMessage: null,
+					existingOnServerCount: result.diagnostics.existingOnServerCount,
 					pendingCount: pendingEvents.length,
 					pendingSample: pendingEvents.slice(-5).map((event) => event.type),
+					sanitizedInvalidUnlockTokenCount:
+						result.diagnostics.sanitizedInvalidUnlockTokenCount,
+					sanitizedMissingWordCount:
+						result.diagnostics.sanitizedMissingWordCount,
 					redundantClearedCount,
 					serverGuessCount: result.progress.guessCount,
 					serverGuessedWordCount: result.progress.guessedWordIds.length,
@@ -515,11 +532,16 @@ export function useDailyProgress({
 				setNextSyncRetryAt(Date.now() + retryDelayMs);
 				setLastSyncAttempt({
 					acknowledgedCount: 0,
+					acceptedCount: 0,
+					duplicateInPayloadCount: 0,
 					endedAt: new Date().toISOString(),
 					errorMessage:
 						error instanceof Error ? error.message : "unknown sync error",
+					existingOnServerCount: 0,
 					pendingCount: pendingEvents.length,
 					pendingSample: pendingEvents.slice(-5).map((event) => event.type),
+					sanitizedInvalidUnlockTokenCount: 0,
+					sanitizedMissingWordCount: 0,
 					redundantClearedCount: 0,
 					serverGuessCount: baseProgress.guessCount,
 					serverGuessedWordCount: baseProgress.guessedWordIds.length,

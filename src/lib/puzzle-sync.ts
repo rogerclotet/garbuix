@@ -5,6 +5,28 @@ import type {
 	PuzzleClientEvent,
 } from "@/lib/puzzle-types";
 
+type EventTypeCounts = Record<PuzzleClientEvent["type"], number>;
+
+export type PuzzleSyncDiagnostics = {
+	acceptedByType: EventTypeCounts;
+	acceptedCount: number;
+	duplicateInPayloadCount: number;
+	existingOnServerCount: number;
+	receivedByType: EventTypeCounts;
+	receivedCount: number;
+	sanitizedInvalidUnlockTokenCount: number;
+	sanitizedMissingWordCount: number;
+};
+
+function createEmptyEventTypeCounts(): EventTypeCounts {
+	return {
+		guess_added: 0,
+		hint_used: 0,
+		letters_shuffled: 0,
+		progress_reset: 0,
+	};
+}
+
 export async function filterSyncablePuzzleEvents(options: {
 	events: PuzzleClientEvent[];
 	existingEventIds: Set<string>;
@@ -14,11 +36,31 @@ export async function filterSyncablePuzzleEvents(options: {
 	const { events, existingEventIds, privateSnapshot, publicSnapshot } = options;
 	const filteredEvents: PuzzleClientEvent[] = [];
 	const seenEventIds = new Set<string>();
+	const diagnostics: PuzzleSyncDiagnostics = {
+		acceptedByType: createEmptyEventTypeCounts(),
+		acceptedCount: 0,
+		duplicateInPayloadCount: 0,
+		existingOnServerCount: 0,
+		receivedByType: createEmptyEventTypeCounts(),
+		receivedCount: events.length,
+		sanitizedInvalidUnlockTokenCount: 0,
+		sanitizedMissingWordCount: 0,
+	};
 
 	for (const event of events) {
-		if (existingEventIds.has(event.id) || seenEventIds.has(event.id)) {
+		diagnostics.receivedByType[event.type] += 1;
+
+		if (existingEventIds.has(event.id)) {
+			diagnostics.existingOnServerCount += 1;
 			continue;
 		}
+
+		if (seenEventIds.has(event.id)) {
+			diagnostics.duplicateInPayloadCount += 1;
+			continue;
+		}
+
+		let acceptedEvent = event;
 
 		if (event.type === "guess_added" && event.payload.matchedWordId != null) {
 			const slot = publicSnapshot.wordSlots.find(
@@ -29,23 +71,44 @@ export async function filterSyncablePuzzleEvents(options: {
 			);
 
 			if (!slot || !privateWord) {
-				continue;
-			}
-
-			const expectedUnlockToken = await createUnlockToken(
-				slot.slotSalt,
-				privateWord.normalizedWord,
-			);
-			if (event.payload.unlockToken !== expectedUnlockToken) {
-				continue;
+				diagnostics.sanitizedMissingWordCount += 1;
+				acceptedEvent = {
+					...event,
+					payload: {
+						guessHash: event.payload.guessHash,
+						matchedWordId: null,
+						unlockToken: null,
+					},
+				};
+			} else {
+				const expectedUnlockToken = await createUnlockToken(
+					slot.slotSalt,
+					privateWord.normalizedWord,
+				);
+				if (event.payload.unlockToken !== expectedUnlockToken) {
+					diagnostics.sanitizedInvalidUnlockTokenCount += 1;
+					acceptedEvent = {
+						...event,
+						payload: {
+							guessHash: event.payload.guessHash,
+							matchedWordId: null,
+							unlockToken: null,
+						},
+					};
+				}
 			}
 		}
 
-		filteredEvents.push(event);
+		filteredEvents.push(acceptedEvent);
+		diagnostics.acceptedByType[event.type] += 1;
+		diagnostics.acceptedCount += 1;
 		seenEventIds.add(event.id);
 	}
 
-	return filteredEvents;
+	return {
+		diagnostics,
+		filteredEvents,
+	};
 }
 
 export function collectAckedEventIds(options: {

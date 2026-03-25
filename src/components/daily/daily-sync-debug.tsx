@@ -15,10 +15,15 @@ type DailySyncDebugProps = {
 	lastSyncedAt: string | null;
 	lastSyncAttempt: {
 		acknowledgedCount: number;
+		acceptedCount: number;
+		duplicateInPayloadCount: number;
 		endedAt: string;
 		errorMessage: string | null;
+		existingOnServerCount: number;
 		pendingCount: number;
 		pendingSample: string[];
+		sanitizedInvalidUnlockTokenCount: number;
+		sanitizedMissingWordCount: number;
 		redundantClearedCount: number;
 		serverGuessCount: number;
 		serverGuessedWordCount: number;
@@ -100,6 +105,15 @@ export function DailySyncDebug({
 								{lastSyncAttempt.errorMessage
 									? ` · error: ${lastSyncAttempt.errorMessage}`
 									: ""}
+							</p>
+						) : null}
+						{lastSyncAttempt ? (
+							<p>
+								Acceptats: {lastSyncAttempt.acceptedCount} · existents:{" "}
+								{lastSyncAttempt.existingOnServerCount} · duplicats:{" "}
+								{lastSyncAttempt.duplicateInPayloadCount} · unlock sanejat:{" "}
+								{lastSyncAttempt.sanitizedInvalidUnlockTokenCount} · paraula
+								sanejada: {lastSyncAttempt.sanitizedMissingWordCount}
 							</p>
 						) : null}
 						{recentQueueSample.length > 0 ? (
