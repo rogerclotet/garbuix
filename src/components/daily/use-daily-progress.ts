@@ -17,6 +17,7 @@ import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 	getCompatibleProgress,
+	isSameProgressState,
 	pickPreferredProgressState,
 } from "@/lib/puzzle-progress";
 import {
@@ -401,9 +402,22 @@ export function useDailyProgress({
 				}
 				syncFailureCountRef.current = 0;
 				setNextSyncRetryAt(null);
+				const replayedServerProgress = applyPuzzleEventsChronologically(
+					result.progress,
+					pendingEvents,
+					totalWords,
+				);
+				const shouldDropRedundantEvents =
+					result.ackedEventIds.length === 0 &&
+					isSameProgressState(result.progress, replayedServerProgress);
+				const eventIdsToClear = new Set(
+					shouldDropRedundantEvents
+						? pendingEvents.map((event) => event.id)
+						: result.ackedEventIds,
+				);
 				setBaseProgress(result.progress);
 				setQueuedEvents((previous) =>
-					previous.filter((event) => !result.ackedEventIds.includes(event.id)),
+					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
 				captureEvent("puzzle_events_synced", {
 					acked_events: result.ackedEventIds.length,
@@ -467,6 +481,7 @@ export function useDailyProgress({
 		puzzle.id,
 		queuedEvents,
 		syncEvents,
+		totalWords,
 	]);
 
 	useEffect(() => {

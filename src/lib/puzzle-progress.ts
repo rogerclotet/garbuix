@@ -86,6 +86,26 @@ export function pickPreferredProgressState(
 	return right;
 }
 
+export function isSameProgressState(
+	left: PuzzleProgressState,
+	right: PuzzleProgressState,
+) {
+	return (
+		left.puzzleId === right.puzzleId &&
+		left.guessCount === right.guessCount &&
+		left.hintsUsed === right.hintsUsed &&
+		left.completedAt === right.completedAt &&
+		JSON.stringify(left.guessHashes) === JSON.stringify(right.guessHashes) &&
+		JSON.stringify(left.guessedWordIds) ===
+			JSON.stringify(right.guessedWordIds) &&
+		JSON.stringify(left.revealedWordTokens) ===
+			JSON.stringify(right.revealedWordTokens) &&
+		JSON.stringify(left.hintedCells) === JSON.stringify(right.hintedCells) &&
+		JSON.stringify(left.shuffledLetters) ===
+			JSON.stringify(right.shuffledLetters)
+	);
+}
+
 export function applyPuzzleEvent(
 	state: PuzzleProgressState,
 	event: PuzzleClientEvent,

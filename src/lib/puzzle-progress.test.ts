@@ -4,6 +4,7 @@ import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 	getCompatibleProgress,
+	isSameProgressState,
 	pickPreferredProgressState,
 } from "@/lib/puzzle-progress";
 
@@ -194,5 +195,24 @@ describe("puzzle-progress", () => {
 		};
 
 		expect(pickPreferredProgressState(sparse, richer)).toEqual(richer);
+	});
+
+	it("compares progress without treating lastSyncedAt as state", () => {
+		const left = {
+			...createEmptyProgressState({
+				id: "puzzle-1",
+				initialShuffledLetters: ["a", "b", "c"],
+			}),
+			guessHashes: ["guess-1"],
+			guessedWordIds: [0],
+			guessCount: 1,
+			lastSyncedAt: "2026-03-10T10:00:00.000Z",
+		};
+		const right = {
+			...left,
+			lastSyncedAt: "2026-03-10T10:05:00.000Z",
+		};
+
+		expect(isSameProgressState(left, right)).toBe(true);
 	});
 });
