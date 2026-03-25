@@ -142,6 +142,7 @@ export function useDailyProgress({
 	const hasActiveSyncFailureToastRef = useRef(false);
 	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
 	const handledManualSyncVersionRef = useRef(0);
+	const isSyncingRef = useRef(false);
 
 	const derivedProgress = useMemo(
 		() =>
@@ -407,7 +408,12 @@ export function useDailyProgress({
 	}, [activeUser]);
 
 	useEffect(() => {
-		if (!activeUser || queuedEvents.length === 0 || !isOnline || isSyncing) {
+		if (
+			!activeUser ||
+			queuedEvents.length === 0 ||
+			!isOnline ||
+			isSyncingRef.current
+		) {
 			return;
 		}
 
@@ -433,6 +439,7 @@ export function useDailyProgress({
 		handledManualSyncVersionRef.current = manualSyncVersion;
 		const syncStartedAt = new Date().toISOString();
 
+		isSyncingRef.current = true;
 		setIsSyncing(true);
 		setLastSyncAttempt({
 			acknowledgedCount: 0,
@@ -573,6 +580,7 @@ export function useDailyProgress({
 				});
 			})
 			.finally(() => {
+				isSyncingRef.current = false;
 				if (!cancelled) {
 					setIsSyncing(false);
 				}
@@ -587,7 +595,6 @@ export function useDailyProgress({
 		captureException,
 		deviceId,
 		isOnline,
-		isSyncing,
 		manualSyncVersion,
 		nextSyncRetryAt,
 		puzzle.id,
@@ -651,7 +658,7 @@ export function useDailyProgress({
 	};
 
 	const forceSync = useCallback(async () => {
-		if (!activeUser || !isOnline) {
+		if (!activeUser || !isOnline || isSyncingRef.current) {
 			return;
 		}
 
