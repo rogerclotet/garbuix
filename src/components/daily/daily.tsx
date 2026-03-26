@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
 	createPuzzleEvent,
@@ -484,44 +483,40 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 	return (
 		<div
-			className={`min-h-full p-2 sm:p-4 lg:p-8 ${
+			className={`min-h-full px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 ${
 				isComplete
 					? "pb-6 sm:pb-8 lg:pb-24"
 					: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
 			}`}
 		>
-			<div className="max-w-7xl mx-auto">
-				<div className={`mb-6 ${isComplete ? "pt-2 sm:pt-0" : ""}`}>
+			<div className="max-w-5xl mx-auto">
+				<div className={`mb-4 sm:mb-6 ${isComplete ? "pt-2 sm:pt-0" : ""}`}>
 					{isComplete ? (
-						<div className="rounded-2xl border bg-card px-4 py-4 sm:px-5">
-							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-								<div className="space-y-1">
-									<p className="text-sm font-medium text-muted-foreground">
-										Felicitats!
-									</p>
-									<h2 className="text-xl font-semibold tracking-tight">
-										Has completat el joc
-									</h2>
-								</div>
-								<div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-muted-foreground sm:justify-end">
-									<span>
-										{derivedProgress.guessCount} intent
-										{derivedProgress.guessCount === 1 ? "" : "s"}
-									</span>
-									<span>
-										{derivedProgress.hintsUsed === 1
-											? `${derivedProgress.hintsUsed} pista`
-											: `${derivedProgress.hintsUsed} pistes`}
-									</span>
-									{streakStats.currentStreak >= 3 ? (
-										<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
-									) : null}
-								</div>
+						<div className="space-y-1">
+							<p className="text-sm font-medium text-muted-foreground font-ui">
+								Felicitats!
+							</p>
+							<h2 className="text-xl font-semibold tracking-tight">
+								Has completat el joc
+							</h2>
+							<div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
+								<span>
+									{derivedProgress.guessCount} intent
+									{derivedProgress.guessCount === 1 ? "" : "s"}
+								</span>
+								<span>
+									{derivedProgress.hintsUsed === 1
+										? `${derivedProgress.hintsUsed} pista`
+										: `${derivedProgress.hintsUsed} pistes`}
+								</span>
+								{streakStats.currentStreak >= 3 ? (
+									<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
+								) : null}
 							</div>
 						</div>
 					) : (
 						<>
-							<div className="mb-2 flex items-center justify-between text-sm font-medium opacity-70">
+							<div className="mb-2 flex items-center justify-between text-sm font-medium text-muted-foreground font-ui">
 								<span>
 									{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
 									paraules trobades
@@ -537,27 +532,23 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							<Progress
 								value={derivedProgress.guessedWordIds.length}
 								max={totalWords}
-								className="h-3"
+								className="h-2"
 							/>
 						</>
 					)}
 				</div>
 
-				<div className="grid lg:grid-cols-3 gap-6">
-					<div className="lg:col-span-2">
-						<Card className="bg-background border-border/85">
-							<CardContent className="p-2 sm:p-4 md:p-6">
-								<DailyGrid
-									puzzle={puzzle}
-									revealedCells={revealedCells}
-									cellLetters={cellLetters}
-									highlightedWordId={highlightedWordId}
-								/>
-							</CardContent>
-						</Card>
+				<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
+					<div>
+						<DailyGrid
+							puzzle={puzzle}
+							revealedCells={revealedCells}
+							cellLetters={cellLetters}
+							highlightedWordId={highlightedWordId}
+						/>
 					</div>
 
-					<div className="lg:space-y-6">
+					<div className="mt-6 lg:mt-0 lg:space-y-6">
 						<DailyControls
 							canUseHint={
 								derivedProgress.hintsUsed < 3 && nextHintCellKey != null
@@ -577,22 +568,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							runPressAction={runPressAction}
 						/>
 
-						<Card>
-							<CardHeader>
-								<CardTitle>
-									Paraules trobades ({derivedProgress.guessedWordIds.length}/
-									{totalWords})
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<DailyWordList
-									puzzle={puzzle}
-									guessedWordIds={derivedProgress.guessedWordIds}
-									revealedAnswers={revealedAnswers}
-									cellLetters={cellLetters}
-								/>
-							</CardContent>
-						</Card>
+						<div>
+							<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
+								Paraules ({derivedProgress.guessedWordIds.length}/{totalWords})
+							</h3>
+							<DailyWordList
+								puzzle={puzzle}
+								guessedWordIds={derivedProgress.guessedWordIds}
+								revealedAnswers={revealedAnswers}
+								cellLetters={cellLetters}
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

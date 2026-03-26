@@ -7,8 +7,8 @@
 	"start_url": "/",
 	"display": "standalone",
 	"orientation": "portrait-primary",
-	"theme_color": "#8521dc",
-	"background_color": "#fffbff",
+	"theme_color": "#2a7d6e",
+	"background_color": "#faf8f5",
 	"icons": [
 		{
 			"src": "icons/manifest-icon-192.maskable.png",

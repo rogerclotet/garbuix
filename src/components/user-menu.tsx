@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
@@ -58,11 +57,11 @@ export function UserMenu() {
 				<Button
 					variant="ghost"
 					size="icon-lg"
-					className="size-11 rounded-full text-primary-foreground hover:bg-white/10 hover:text-primary-foreground focus-visible:border-white/30 focus-visible:ring-white/20 sm:size-9"
+					className="size-11 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
 					aria-label={triggerLabel}
 				>
 					{activeUser ? (
-						<Avatar className="size-10 border border-white/20 sm:size-9">
+						<Avatar className="size-10 border border-border sm:size-9">
 							{showUserImage ? (
 								<AvatarImage
 									src={activeUser.image ?? undefined}
@@ -73,7 +72,7 @@ export function UserMenu() {
 									}}
 								/>
 							) : (
-								<AvatarFallback className="bg-white/10 text-primary-foreground">
+								<AvatarFallback className="bg-muted text-muted-foreground">
 									<Menu className="size-5 sm:size-4" />
 								</AvatarFallback>
 							)}
@@ -102,16 +101,14 @@ export function UserMenu() {
 						<span>Historial</span>
 					</Link>
 				</DropdownMenuItem>
-				<DropdownMenuCheckboxItem
-					checked={isDark}
-					onSelect={(event) => {
-						event.preventDefault();
+				<DropdownMenuItem
+					onSelect={() => {
 						setTheme(isDark ? "light" : "dark");
 					}}
 				>
 					<Moon className="size-4" />
-					<span>Mode fosc</span>
-				</DropdownMenuCheckboxItem>
+					<span>{isDark ? "Mode clar" : "Mode fosc"}</span>
+				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				{session.isPending ? (
 					<DropdownMenuItem disabled>

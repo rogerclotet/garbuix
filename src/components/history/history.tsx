@@ -11,7 +11,6 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
 	buildAnonymousImportPayload,
@@ -194,12 +193,12 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	];
 
 	return (
-		<div className="min-h-screen p-2 sm:p-4 lg:p-8 pb-16">
+		<div className="min-h-screen px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-16">
 			<div className="max-w-5xl mx-auto space-y-6">
 				<div className="flex items-center justify-between">
 					<div>
 						<h2 className="text-2xl font-bold">Dies anteriors</h2>
-						<p className="text-sm text-muted-foreground">
+						<p className="text-sm text-muted-foreground font-ui">
 							Consulta els resultats dels dies passats i el teu progrés.
 						</p>
 					</div>
@@ -214,152 +213,142 @@ export function History({ initialData }: { initialData: HistoryData }) {
 				<div className="grid gap-6 lg:grid-cols-2">
 					<div className="order-2 lg:order-1 space-y-6">
 						{stats.totalDays === 0 ? (
-							<Card>
-								<CardHeader>
-									<CardTitle>Encara no hi ha historial</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<p className="text-sm text-muted-foreground">
-										Quan hagis jugat algun dia anterior, aquí veuràs les teves
-										estadístiques.
-									</p>
-								</CardContent>
-							</Card>
+							<div className="space-y-2">
+								<h3 className="text-base font-semibold">
+									Encara no hi ha historial
+								</h3>
+								<p className="text-sm text-muted-foreground font-ui">
+									Quan hagis jugat algun dia anterior, aquí veuràs les teves
+									estadístiques.
+								</p>
+							</div>
 						) : (
 							<>
 								<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
 									{statCards.map((stat) => (
-										<Card
+										<div
 											key={stat.label}
-											className="gap-0 px-3 py-3 sm:min-h-32 sm:px-4 sm:py-4"
+											className="rounded-xl bg-muted/50 px-3 py-3 sm:min-h-28 sm:px-4 sm:py-4"
 										>
 											<div className="flex items-center justify-between gap-3 sm:h-full sm:flex-col sm:items-start">
-												<CardTitle className="text-sm text-muted-foreground font-medium leading-tight">
+												<span className="text-sm text-muted-foreground font-medium leading-tight font-ui">
 													{stat.label}
-												</CardTitle>
+												</span>
 												<div className="shrink-0 text-2xl leading-none font-bold sm:mt-auto sm:text-3xl">
 													{stat.value}
 												</div>
 											</div>
-										</Card>
+										</div>
 									))}
 								</div>
 
-								<Card>
-									<CardHeader>
-										<CardTitle>Resultats recents</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="space-y-4">
-											{entries.map((entry) => {
-												const dateLabel = dateFormatter.format(
-													new Date(`${entry.dateKey}T12:00:00.000Z`),
-												);
-												const progressLabel = `${entry.guessedWords} / ${entry.totalWords}`;
+								<div className="space-y-4">
+									<h3 className="text-base font-semibold">Resultats recents</h3>
+									<div className="space-y-4">
+										{entries.map((entry) => {
+											const dateLabel = dateFormatter.format(
+												new Date(`${entry.dateKey}T12:00:00.000Z`),
+											);
+											const progressLabel = `${entry.guessedWords} / ${entry.totalWords}`;
 
-												return (
-													<div
-														key={`${entry.dateKey}:${entry.seed ?? "legacy"}`}
-														className="rounded-lg border border-border/60 bg-background/70 p-4 space-y-3"
-													>
-														<div className="flex flex-wrap items-center gap-3">
-															<div className="font-semibold">{dateLabel}</div>
-															<Badge
-																variant={
-																	entry.completed ? "secondary" : "outline"
-																}
-															>
-																{entry.completed ? "Completat" : "Incomplet"}
-															</Badge>
-															{entry.legacy ? (
-																<Badge variant="outline">Importat</Badge>
-															) : null}
-															<span className="text-sm text-muted-foreground">
-																{entry.guessCount} intent
-																{entry.guessCount === 1 ? "" : "s"} ·{" "}
-																{entry.hintsUsed === 1
-																	? `${entry.hintsUsed} pista`
-																	: `${entry.hintsUsed} pistes`}
-															</span>
-														</div>
-														<div className="space-y-2">
-															<div className="flex items-center justify-between text-sm text-muted-foreground">
-																<span>Paraules trobades</span>
-																<span>{progressLabel}</span>
-															</div>
-															<Progress
-																value={entry.guessedWords}
-																max={entry.totalWords}
-															/>
-														</div>
+											return (
+												<div
+													key={`${entry.dateKey}:${entry.seed ?? "legacy"}`}
+													className="rounded-lg border border-border/40 bg-muted/20 p-4 space-y-3"
+												>
+													<div className="flex flex-wrap items-center gap-3">
+														<div className="font-semibold">{dateLabel}</div>
+														<Badge
+															variant={
+																entry.completed ? "secondary" : "outline"
+															}
+														>
+															{entry.completed ? "Completat" : "Incomplet"}
+														</Badge>
+														{entry.legacy ? (
+															<Badge variant="outline">Importat</Badge>
+														) : null}
+														<span className="text-sm text-muted-foreground font-ui">
+															{entry.guessCount} intent
+															{entry.guessCount === 1 ? "" : "s"} ·{" "}
+															{entry.hintsUsed === 1
+																? `${entry.hintsUsed} pista`
+																: `${entry.hintsUsed} pistes`}
+														</span>
 													</div>
-												);
-											})}
-										</div>
-									</CardContent>
-								</Card>
+													<div className="space-y-2">
+														<div className="flex items-center justify-between text-sm text-muted-foreground font-ui">
+															<span>Paraules trobades</span>
+															<span>{progressLabel}</span>
+														</div>
+														<Progress
+															value={entry.guessedWords}
+															max={entry.totalWords}
+														/>
+													</div>
+												</div>
+											);
+										})}
+									</div>
+								</div>
 							</>
 						)}
 					</div>
 
 					<div className="order-1 lg:order-2">
-						<Card>
-							<CardHeader>
-								<CardTitle>Resultat d'ahir</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-									<span>
-										{dateFormatter.format(
-											new Date(
-												`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
-											),
-										)}
-									</span>
-								</div>
+						<div className="rounded-xl bg-muted/30 p-4 sm:p-5 space-y-4">
+							<div>
+								<h3 className="text-base font-semibold">Resultat d'ahir</h3>
+								<span className="text-sm text-muted-foreground font-ui">
+									{dateFormatter.format(
+										new Date(
+											`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
+										),
+									)}
+								</span>
+							</div>
 
+							<div
+								className="flex items-center justify-center w-full @container"
+								style={
+									{
+										"--cols": initialData.yesterdayPuzzle.preview.cols,
+									} as CSSProperties
+								}
+							>
 								<div
-									className="flex items-center justify-center w-full @container"
-									style={
-										{
-											"--cols": initialData.yesterdayPuzzle.preview.cols,
-										} as CSSProperties
-									}
+									className="grid gap-[3px] sm:gap-1 w-full max-w-sm mx-auto"
+									style={{
+										gridTemplateColumns: `repeat(${initialData.yesterdayPuzzle.preview.cols}, 1fr)`,
+									}}
 								>
-									<div
-										className="grid gap-0.5 sm:gap-1 w-full max-w-sm mx-auto"
-										style={{
-											gridTemplateColumns: `repeat(${initialData.yesterdayPuzzle.preview.cols}, 1fr)`,
-										}}
-									>
-										{initialData.yesterdayPuzzle.preview.gridLetters.map(
-											(row, rowIdx) =>
-												row.map((cell, colIdx) => {
-													const key = `${rowIdx},${colIdx}`;
+									{initialData.yesterdayPuzzle.preview.gridLetters.map(
+										(row, rowIdx) =>
+											row.map((cell, colIdx) => {
+												const key = `${rowIdx},${colIdx}`;
 
-													if (!cell) {
-														return (
-															<div
-																key={key}
-																className="aspect-square bg-transparent"
-															/>
-														);
-													}
-
+												if (!cell) {
 													return (
 														<div
 															key={key}
-															className="aspect-square border rounded-[0.2rem] sm:rounded-[0.3rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/40 text-secondary-foreground"
-														>
-															{cell.toUpperCase()}
-														</div>
+															className="aspect-square bg-transparent"
+														/>
 													);
-												}),
-										)}
-									</div>
+												}
+
+												return (
+													<div
+														key={key}
+														className="aspect-square border rounded-[0.2rem] sm:rounded-md flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
+													>
+														{cell.toUpperCase()}
+													</div>
+												);
+											}),
+									)}
 								</div>
-							</CardContent>
-						</Card>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>

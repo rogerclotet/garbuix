@@ -24,19 +24,19 @@ export function DailyWordList({
 				.map((slot) => (
 					<div
 						key={slot.id}
-						className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20"
+						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3"
 					>
 						<div className="flex items-center gap-2">
-							<CheckCircle2 className="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
+							<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
 							<a
 								href={`https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(revealedAnswers[slot.id] ?? "")}&tipusCerca=cerca.queSignifica`}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="font-medium text-green-900 dark:text-green-300 tracking-widest hover:underline"
+								className="font-medium text-foreground tracking-widest hover:underline"
 							>
 								{revealedAnswers[slot.id]?.toUpperCase()}
 							</a>
-							<span className="text-xs text-green-600 dark:text-green-400 ml-auto">
+							<span className="text-xs text-muted-foreground ml-auto font-ui">
 								{slot.length} lletres
 							</span>
 						</div>
@@ -48,13 +48,15 @@ export function DailyWordList({
 				.map((slot) => (
 					<div
 						key={slot.id}
-						className="flex items-center gap-2 p-3 rounded-lg border bg-border/20"
+						className="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-muted/40"
 					>
-						<div className="w-5 h-5 rounded-full border-2 shrink-0" />
+						<div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
 						<span className="font-mono text-muted-foreground tracking-widest">
 							{getDisplayedSlotWord(slot, cellLetters)}
 						</span>
-						<span className="text-xs ml-auto">{slot.length} lletres</span>
+						<span className="text-xs text-muted-foreground ml-auto font-ui">
+							{slot.length} lletres
+						</span>
 					</div>
 				))}
 		</div>

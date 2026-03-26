@@ -37,7 +37,7 @@ export function DailyGrid({
 			style={{ "--cols": puzzle.cols } as CSSProperties}
 		>
 			<div
-				className="grid gap-0.5 sm:gap-1 w-full max-w-2xl mx-auto"
+				className="grid gap-[3px] sm:gap-1 w-full max-w-2xl mx-auto"
 				style={{
 					gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
 				}}
@@ -63,10 +63,10 @@ export function DailyGrid({
 											} as CSSProperties)
 										: undefined
 								}
-								className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] sm:border-2 flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-colors duration-300 ${
+								className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-colors duration-300 ${
 									isRevealed
-										? "bg-primary/18 border-primary/70 text-secondary-foreground"
-										: "bg-muted/80 border-muted-foreground/30 dark:bg-muted/90 dark:border-muted-foreground/45"
+										? "bg-primary/12 border-primary/40 text-foreground"
+										: "bg-muted border-border/50"
 								} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 							>
 								{isRevealed ? (
