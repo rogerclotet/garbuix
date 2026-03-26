@@ -120,7 +120,7 @@ export function buildAnonymousImportPayload(): AnonymousImportPayload {
 	const activeProgressByDate: Record<string, PuzzleProgressState> = {};
 	for (let index = 0; index < window.localStorage.length; index += 1) {
 		const key = window.localStorage.key(index);
-		if (!key || !key.startsWith(ANON_PROGRESS_PREFIX)) continue;
+		if (!key?.startsWith(ANON_PROGRESS_PREFIX)) continue;
 		const dateKey = key.slice(ANON_PROGRESS_PREFIX.length);
 		const progress = readJson<PuzzleProgressState>(key);
 		if (!progress) continue;
