@@ -29,7 +29,6 @@ import {
 	getGuessKeyboardAction,
 	getNextHintCellKey,
 } from "./daily-helpers";
-import { DailySyncDebug } from "./daily-sync-debug";
 import type { DailyData } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { useDailyProgress } from "./use-daily-progress";
@@ -66,7 +65,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const completionTrackedRef = useRef(false);
 	const { captureEvent, captureException } = useObservability();
-	const { applyLocalEvent, derivedProgress, syncDebug } = useDailyProgress({
+	const { applyLocalEvent, derivedProgress } = useDailyProgress({
 		activeUser,
 		deviceId,
 		initialData,
@@ -596,22 +595,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						</Card>
 					</div>
 				</div>
-
-				<DailySyncDebug
-					canSync={syncDebug.canSync}
-					isOnline={syncDebug.isOnline}
-					isSyncing={syncDebug.isSyncing}
-					lastServerSnapshot={syncDebug.lastServerSnapshot}
-					lastSyncedAt={syncDebug.lastSyncedAt}
-					lastSyncAttempt={syncDebug.lastSyncAttempt}
-					nextSyncRetryAt={syncDebug.nextSyncRetryAt}
-					onManualSync={() => {
-						void syncDebug.forceSync();
-					}}
-					queuedEventCount={syncDebug.queuedEventCount}
-					recentQueueSample={syncDebug.recentQueueSample}
-					shortDeviceId={syncDebug.shortDeviceId}
-				/>
 			</div>
 		</div>
 	);

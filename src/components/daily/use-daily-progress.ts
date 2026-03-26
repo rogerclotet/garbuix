@@ -70,32 +70,6 @@ type UseDailyProgressOptions = {
 	initialData: DailyData;
 };
 
-type SyncAttemptDebug = {
-	acknowledgedCount: number;
-	acceptedCount: number;
-	duplicateInPayloadCount: number;
-	endedAt: string;
-	errorMessage: string | null;
-	existingOnServerCount: number;
-	pendingCount: number;
-	pendingSample: PuzzleClientEvent["type"][];
-	sanitizedInvalidUnlockTokenCount: number;
-	sanitizedMissingWordCount: number;
-	redundantClearedCount: number;
-	serverGuessCount: number;
-	serverGuessedWordCount: number;
-	serverHintsUsed: number;
-	startedAt: string;
-};
-
-type ServerSnapshotDebug = {
-	at: string;
-	guessCount: number;
-	guessedWordCount: number;
-	hintsUsed: number;
-	lastSyncedAt: string | null;
-};
-
 export function useDailyProgress({
 	activeUser,
 	deviceId,
@@ -120,28 +94,11 @@ export function useDailyProgress({
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
-	const [isSyncing, setIsSyncing] = useState(false);
 	const [nextSyncRetryAt, setNextSyncRetryAt] = useState<number | null>(null);
-	const [manualSyncVersion, setManualSyncVersion] = useState(0);
-	const [lastServerSnapshot, setLastServerSnapshot] =
-		useState<ServerSnapshotDebug | null>(() =>
-			initialData.progress
-				? {
-						at: new Date().toISOString(),
-						guessCount: initialData.progress.guessCount,
-						guessedWordCount: initialData.progress.guessedWordIds.length,
-						hintsUsed: initialData.progress.hintsUsed,
-						lastSyncedAt: initialData.progress.lastSyncedAt,
-					}
-				: null,
-		);
-	const [lastSyncAttempt, setLastSyncAttempt] =
-		useState<SyncAttemptDebug | null>(null);
 	const importAttemptedRef = useRef<string | null>(null);
 	const syncFailureCountRef = useRef(0);
 	const hasActiveSyncFailureToastRef = useRef(false);
 	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
-	const handledManualSyncVersionRef = useRef(0);
 	const isSyncingRef = useRef(false);
 
 	const derivedProgress = useMemo(
@@ -191,13 +148,6 @@ export function useDailyProgress({
 	const refreshProgressFromServer = useCallback(async () => {
 		const latestProgress = await fetchLatestProgress();
 		if (latestProgress) {
-			setLastServerSnapshot({
-				at: new Date().toISOString(),
-				guessCount: latestProgress.guessCount,
-				guessedWordCount: latestProgress.guessedWordIds.length,
-				hintsUsed: latestProgress.hintsUsed,
-				lastSyncedAt: latestProgress.lastSyncedAt,
-			});
 			setBaseProgress(
 				(current) =>
 					pickPreferredProgressState(current, latestProgress) ?? latestProgress,
@@ -417,14 +367,7 @@ export function useDailyProgress({
 			return;
 		}
 
-		const forceSyncRequested =
-			manualSyncVersion !== handledManualSyncVersionRef.current;
-
-		if (
-			!forceSyncRequested &&
-			nextSyncRetryAt &&
-			nextSyncRetryAt > Date.now()
-		) {
+		if (nextSyncRetryAt && nextSyncRetryAt > Date.now()) {
 			const retryTimer = window.setTimeout(() => {
 				setNextSyncRetryAt(null);
 			}, nextSyncRetryAt - Date.now());
@@ -436,28 +379,7 @@ export function useDailyProgress({
 
 		let cancelled = false;
 		const pendingEvents = [...queuedEvents];
-		handledManualSyncVersionRef.current = manualSyncVersion;
-		const syncStartedAt = new Date().toISOString();
-
 		isSyncingRef.current = true;
-		setIsSyncing(true);
-		setLastSyncAttempt({
-			acknowledgedCount: 0,
-			acceptedCount: 0,
-			duplicateInPayloadCount: 0,
-			endedAt: syncStartedAt,
-			errorMessage: null,
-			existingOnServerCount: 0,
-			pendingCount: pendingEvents.length,
-			pendingSample: pendingEvents.slice(-5).map((event) => event.type),
-			sanitizedInvalidUnlockTokenCount: 0,
-			sanitizedMissingWordCount: 0,
-			redundantClearedCount: 0,
-			serverGuessCount: baseProgress.guessCount,
-			serverGuessedWordCount: baseProgress.guessedWordIds.length,
-			serverHintsUsed: baseProgress.hintsUsed,
-			startedAt: syncStartedAt,
-		});
 		void syncEvents({
 			data: {
 				puzzleId: puzzle.id,
@@ -482,40 +404,11 @@ export function useDailyProgress({
 				const shouldDropRedundantEvents =
 					result.ackedEventIds.length === 0 &&
 					isSameProgressState(result.progress, replayedServerProgress);
-				const redundantClearedCount = shouldDropRedundantEvents
-					? pendingEvents.length
-					: 0;
 				const eventIdsToClear = new Set(
 					shouldDropRedundantEvents
 						? pendingEvents.map((event) => event.id)
 						: result.ackedEventIds,
 				);
-				setLastServerSnapshot({
-					at: new Date().toISOString(),
-					guessCount: result.progress.guessCount,
-					guessedWordCount: result.progress.guessedWordIds.length,
-					hintsUsed: result.progress.hintsUsed,
-					lastSyncedAt: result.progress.lastSyncedAt,
-				});
-				setLastSyncAttempt({
-					acknowledgedCount: result.ackedEventIds.length,
-					acceptedCount: result.diagnostics.acceptedCount,
-					duplicateInPayloadCount: result.diagnostics.duplicateInPayloadCount,
-					endedAt: new Date().toISOString(),
-					errorMessage: null,
-					existingOnServerCount: result.diagnostics.existingOnServerCount,
-					pendingCount: pendingEvents.length,
-					pendingSample: pendingEvents.slice(-5).map((event) => event.type),
-					sanitizedInvalidUnlockTokenCount:
-						result.diagnostics.sanitizedInvalidUnlockTokenCount,
-					sanitizedMissingWordCount:
-						result.diagnostics.sanitizedMissingWordCount,
-					redundantClearedCount,
-					serverGuessCount: result.progress.guessCount,
-					serverGuessedWordCount: result.progress.guessedWordIds.length,
-					serverHintsUsed: result.progress.hintsUsed,
-					startedAt: syncStartedAt,
-				});
 				setBaseProgress(result.progress);
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
@@ -537,24 +430,11 @@ export function useDailyProgress({
 
 				syncFailureCountRef.current = failureCount;
 				setNextSyncRetryAt(Date.now() + retryDelayMs);
-				setLastSyncAttempt({
-					acknowledgedCount: 0,
-					acceptedCount: 0,
-					duplicateInPayloadCount: 0,
-					endedAt: new Date().toISOString(),
-					errorMessage:
-						error instanceof Error ? error.message : "unknown sync error",
-					existingOnServerCount: 0,
-					pendingCount: pendingEvents.length,
-					pendingSample: pendingEvents.slice(-5).map((event) => event.type),
-					sanitizedInvalidUnlockTokenCount: 0,
-					sanitizedMissingWordCount: 0,
-					redundantClearedCount: 0,
-					serverGuessCount: baseProgress.guessCount,
-					serverGuessedWordCount: baseProgress.guessedWordIds.length,
-					serverHintsUsed: baseProgress.hintsUsed,
-					startedAt: syncStartedAt,
-				});
+				if (failureCount >= 3 && !isNetworkError) {
+					console.warn(
+						`[sync] ${pendingEvents.length} pending event(s) not reaching server after ${failureCount} attempt(s)`,
+					);
+				}
 				if (isNetworkError) {
 					if (hasActiveSyncFailureToastRef.current) {
 						hasActiveSyncFailureToastRef.current = false;
@@ -581,9 +461,6 @@ export function useDailyProgress({
 			})
 			.finally(() => {
 				isSyncingRef.current = false;
-				if (!cancelled) {
-					setIsSyncing(false);
-				}
 			});
 
 		return () => {
@@ -595,15 +472,11 @@ export function useDailyProgress({
 		captureException,
 		deviceId,
 		isOnline,
-		manualSyncVersion,
 		nextSyncRetryAt,
 		puzzle.id,
 		queuedEvents,
 		syncEvents,
 		totalWords,
-		baseProgress.guessCount,
-		baseProgress.guessedWordIds.length,
-		baseProgress.hintsUsed,
 	]);
 
 	useEffect(() => {
@@ -657,35 +530,8 @@ export function useDailyProgress({
 		);
 	};
 
-	const forceSync = useCallback(async () => {
-		if (!activeUser || !isOnline || isSyncingRef.current) {
-			return;
-		}
-
-		if (queuedEvents.length > 0) {
-			setNextSyncRetryAt(null);
-			setManualSyncVersion((current) => current + 1);
-			return;
-		}
-
-		await refreshProgressFromServer();
-	}, [activeUser, isOnline, queuedEvents.length, refreshProgressFromServer]);
-
 	return {
 		applyLocalEvent,
 		derivedProgress,
-		syncDebug: {
-			canSync: Boolean(activeUser),
-			forceSync,
-			isOnline,
-			isSyncing,
-			lastSyncedAt: derivedProgress.lastSyncedAt,
-			lastSyncAttempt,
-			lastServerSnapshot,
-			nextSyncRetryAt,
-			queuedEventCount: queuedEvents.length,
-			recentQueueSample: queuedEvents.slice(-5).map((event) => event.type),
-			shortDeviceId: deviceId.slice(-6),
-		},
 	};
 }
