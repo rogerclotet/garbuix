@@ -1,6 +1,9 @@
 import { CornerDownLeft, Delete, Lightbulb, Shuffle } from "lucide-react";
 import type { MouseEvent, PointerEvent } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+
+const HINT_HOLD_MS = 600;
 
 type DailyControlsProps = {
 	canUseHint: boolean;
@@ -37,6 +40,41 @@ export function DailyControls({
 	runClickAction,
 	runPressAction,
 }: DailyControlsProps) {
+	const [hintHoldProgress, setHintHoldProgress] = useState(0);
+	const hintHoldFrameRef = useRef<number | null>(null);
+
+	const cancelHintHold = () => {
+		if (hintHoldFrameRef.current != null) {
+			cancelAnimationFrame(hintHoldFrameRef.current);
+			hintHoldFrameRef.current = null;
+		}
+		setHintHoldProgress(0);
+	};
+
+	const handleHintPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+		if (!canUseHint || isComplete) return;
+		if (event.pointerType === "mouse" && event.button !== 0) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+
+		const startTime = performance.now();
+
+		const tick = (now: number) => {
+			const progress = Math.min((now - startTime) / HINT_HOLD_MS, 1);
+			setHintHoldProgress(progress);
+
+			if (progress < 1) {
+				hintHoldFrameRef.current = requestAnimationFrame(tick);
+			} else {
+				hintHoldFrameRef.current = null;
+				setHintHoldProgress(0);
+				onHint();
+			}
+		};
+
+		hintHoldFrameRef.current = requestAnimationFrame(tick);
+	};
+
 	if (isComplete) {
 		return null;
 	}
@@ -104,16 +142,24 @@ export function DailyControls({
 							</Button>
 							<Button
 								variant="ghost"
-								onPointerDown={(event) => runPressAction(event, onHint)}
-								onClick={(event) => runClickAction(event, onHint)}
-								className="gap-2 h-9 sm:h-10 touch-manipulation"
+								onPointerDown={handleHintPointerDown}
+								onPointerUp={cancelHintHold}
+								onPointerLeave={cancelHintHold}
+								onPointerCancel={cancelHintHold}
+								onContextMenu={(e) => e.preventDefault()}
+								className="gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
 								disabled={!canUseHint || isComplete}
 								size="lg"
 							>
-								<Lightbulb
-									className={`w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+								<span
+									className="absolute inset-0 bg-amber-400/25 origin-left"
+									style={{ transform: `scaleX(${hintHoldProgress})` }}
+									aria-hidden
 								/>
-								Pista ({3 - hintsUsed})
+								<Lightbulb
+									className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+								/>
+								<span className="relative">Pista ({3 - hintsUsed})</span>
 							</Button>
 							<Button
 								variant="ghost"
