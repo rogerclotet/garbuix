@@ -54,6 +54,46 @@ function getThemeColors() {
 	};
 }
 
+function drawLogo(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	height: number,
+	color: string,
+) {
+	// The logo SVG viewBox is 68x92. Scale to fit the given height.
+	const scale = height / 92;
+	ctx.save();
+	ctx.translate(x, y);
+	ctx.scale(scale, scale);
+	ctx.fillStyle = color;
+
+	// 8 squircles at specific positions forming a 'P'
+	const positions = [
+		[0, 0],
+		[24, 0],
+		[48, 0], // top row
+		[48, 24],
+		[48, 48], // right column
+		[24, 48],
+		[0, 48], // middle row back
+		[0, 72], // stem
+	];
+
+	for (const [sx, sy] of positions) {
+		ctx.beginPath();
+		ctx.moveTo(sx + 10, sy);
+		ctx.bezierCurveTo(sx + 18, sy, sx + 20, sy + 2, sx + 20, sy + 10);
+		ctx.bezierCurveTo(sx + 20, sy + 18, sx + 18, sy + 20, sx + 10, sy + 20);
+		ctx.bezierCurveTo(sx + 2, sy + 20, sx, sy + 18, sx, sy + 10);
+		ctx.bezierCurveTo(sx, sy + 2, sx + 2, sy, sx + 10, sy);
+		ctx.closePath();
+		ctx.fill();
+	}
+
+	ctx.restore();
+}
+
 function roundRect(
 	ctx: CanvasRenderingContext2D,
 	x: number,
@@ -101,11 +141,13 @@ export function renderProgressCanvas(
 	ctx.fillStyle = colors.bg;
 	ctx.fillRect(0, 0, canvasW, canvasH);
 
-	// Header
+	// Header: logo + date
+	drawLogo(ctx, PADDING, PADDING + 2, 24, colors.foreground);
+
 	ctx.fillStyle = colors.foreground;
 	ctx.font = "bold 18px system-ui, -apple-system, sans-serif";
 	ctx.textBaseline = "middle";
-	ctx.fillText(`Paraules — ${puzzle.dateKey}`, PADDING, PADDING + 14);
+	ctx.fillText(puzzle.dateKey, PADDING + 24 + 10, PADDING + 14);
 
 	ctx.fillStyle = colors.mutedFg;
 	ctx.font = "14px system-ui, -apple-system, sans-serif";
@@ -210,7 +252,7 @@ export async function shareProgress(
 		}, "image/png");
 	});
 
-	const text = `Paraules ${puzzle.dateKey} — ${guessedCount}/${totalWords} paraules`;
+	const text = `${guessedCount}/${totalWords} https://paraules.clotet.dev`;
 
 	if (
 		typeof navigator !== "undefined" &&
