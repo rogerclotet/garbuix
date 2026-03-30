@@ -1,5 +1,7 @@
+import { RefreshCw, X } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { APP_VERSION } from "@/lib/app-version";
 
 const UPDATE_TOAST_ID = "app-update-available";
@@ -107,22 +109,57 @@ export function ServiceWorkerRegister() {
 			}
 
 			updateToastVisible = true;
-			toast.info("Hi ha una nova versió disponible.", {
-				id: UPDATE_TOAST_ID,
-				duration: Number.POSITIVE_INFINITY,
-				className: "update-toast",
-				action: {
-					label: "Actualitza",
-					onClick: () => {
-						void activateUpdate();
-					},
+			toast.custom(
+				(id) => (
+					<div className="w-full rounded-xl border border-border bg-popover text-popover-foreground shadow-lg p-4 font-ui">
+						<div className="flex items-start gap-3">
+							<div className="flex-1 min-w-0">
+								<p className="text-sm font-semibold leading-tight">
+									Nova versió disponible
+								</p>
+								<p className="text-xs text-muted-foreground mt-0.5">
+									Actualitza per obtenir les últimes millores.
+								</p>
+							</div>
+							<button
+								type="button"
+								className="shrink-0 -mt-1 -mr-1 p-1 rounded-md text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+								onClick={() => {
+									toast.dismiss(id);
+									resetUpdateToast();
+								}}
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+						<div className="flex gap-2 mt-3">
+							<Button
+								size="sm"
+								className="flex-1 gap-1.5 h-9 text-sm font-semibold"
+								onClick={() => void activateUpdate()}
+							>
+								<RefreshCw className="w-3.5 h-3.5" />
+								Actualitza
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-9 text-sm text-muted-foreground"
+								onClick={() => {
+									toast.dismiss(id);
+									resetUpdateToast();
+								}}
+							>
+								Més tard
+							</Button>
+						</div>
+					</div>
+				),
+				{
+					id: UPDATE_TOAST_ID,
+					duration: Number.POSITIVE_INFINITY,
 				},
-				cancel: {
-					label: "Més tard",
-					onClick: resetUpdateToast,
-				},
-				onDismiss: resetUpdateToast,
-			});
+			);
 		};
 
 		const onControllerChange = () => {
