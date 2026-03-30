@@ -1,5 +1,7 @@
+import { Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
 	createPuzzleEvent,
@@ -30,6 +32,7 @@ import {
 } from "./daily-helpers";
 import type { DailyData } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
+import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
 
 const POINTER_CLICK_DEDUP_MS = 350;
@@ -418,6 +421,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
+	const handleShare = useCallback(async () => {
+		try {
+			const result = await shareProgress(
+				puzzle,
+				revealedCells,
+				derivedProgress.guessedWordIds.length,
+				totalWords,
+			);
+			if (result === "copied") {
+				toast.success("Imatge copiada!");
+			}
+		} catch {
+			toast.error("No s'ha pogut compartir");
+		}
+	}, [
+		puzzle,
+		revealedCells,
+		derivedProgress.guessedWordIds.length,
+		totalWords,
+	]);
+
 	useEffect(() => {
 		if (typeof window === "undefined" || isComplete) {
 			return;
@@ -499,7 +523,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							<h2 className="text-xl font-semibold tracking-tight">
 								Has completat el joc
 							</h2>
-							<div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
 								<span>
 									{derivedProgress.guessCount} intent
 									{derivedProgress.guessCount === 1 ? "" : "s"}
@@ -512,6 +536,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								{streakStats.currentStreak >= 3 ? (
 									<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
 								) : null}
+								<Button
+									variant="ghost"
+									size="sm"
+									className="gap-1.5 h-7 px-2 ml-auto"
+									onClick={() => void handleShare()}
+								>
+									<Share2 className="w-3.5 h-3.5" />
+									Compartir
+								</Button>
 							</div>
 						</div>
 					) : (
@@ -521,11 +554,19 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
 									paraules trobades
 								</span>
-								<div className="flex gap-4">
+								<div className="flex items-center gap-3">
 									<span>
 										{derivedProgress.guessCount} intent
 										{derivedProgress.guessCount === 1 ? "" : "s"}
 									</span>
+									<Button
+										variant="ghost"
+										size="sm"
+										className="gap-1.5 h-7 px-2 -mr-2"
+										onClick={() => void handleShare()}
+									>
+										<Share2 className="w-3.5 h-3.5" />
+									</Button>
 								</div>
 							</div>
 
