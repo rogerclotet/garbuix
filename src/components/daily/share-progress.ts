@@ -8,6 +8,16 @@ const HEADER_HEIGHT = 48;
 const FOOTER_HEIGHT = 32;
 const DOT_RADIUS = 6;
 
+function formatShareDate(dateKey: string): string {
+	const [year, month, day] = dateKey.split("-");
+
+	if (!year || !month || !day) {
+		return dateKey;
+	}
+
+	return `${day}/${month}/${year}`;
+}
+
 function getCSSColor(varName: string, fallback: string): string {
 	if (typeof document === "undefined") return fallback;
 	const value = getComputedStyle(document.documentElement)
@@ -147,7 +157,11 @@ export function renderProgressCanvas(
 	ctx.fillStyle = colors.foreground;
 	ctx.font = "bold 18px system-ui, -apple-system, sans-serif";
 	ctx.textBaseline = "middle";
-	ctx.fillText(puzzle.dateKey, PADDING + 24 + 10, PADDING + 14);
+	ctx.fillText(
+		formatShareDate(puzzle.dateKey),
+		PADDING + 24 + 10,
+		PADDING + 14,
+	);
 
 	ctx.fillStyle = colors.mutedFg;
 	ctx.font = "14px system-ui, -apple-system, sans-serif";
