@@ -244,3 +244,36 @@ export function applyPuzzleEventsChronologically(
 ) {
 	return applyPuzzleEvents(initialState, sortPuzzleEvents(events), totalWords);
 }
+
+export function buildSyncedProgressState(options: {
+	existingProgress: PuzzleProgressState | null;
+	initialProgress: PuzzleProgressState;
+	incomingEvents: PuzzleClientEvent[];
+	totalWords: number;
+	historicalEvents?: PuzzleClientEvent[];
+}) {
+	const {
+		existingProgress,
+		historicalEvents = [],
+		incomingEvents,
+		initialProgress,
+		totalWords,
+	} = options;
+	const baseProgress =
+		existingProgress ??
+		applyPuzzleEventsChronologically(
+			initialProgress,
+			historicalEvents,
+			totalWords,
+		);
+
+	if (incomingEvents.length === 0) {
+		return baseProgress;
+	}
+
+	return applyPuzzleEventsChronologically(
+		baseProgress,
+		incomingEvents,
+		totalWords,
+	);
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	applyPuzzleEvent,
 	applyPuzzleEventsChronologically,
+	buildSyncedProgressState,
 	createEmptyProgressState,
 	getCompatibleProgress,
 	isSameProgressState,
@@ -240,5 +241,45 @@ describe("puzzle-progress", () => {
 
 		expect(merged.guessHashes).toEqual(["guess-1", "guess-2", "guess-3"]);
 		expect(merged.guessedWordIds).toEqual([4, 1, 3]);
+	});
+
+	it("preserves imported progress when the first synced event is a shuffle", () => {
+		const imported = {
+			...createEmptyProgressState({
+				id: "puzzle-1",
+				initialShuffledLetters: ["a", "b", "c"],
+			}),
+			guessHashes: ["guess-1", "guess-2"],
+			guessedWordIds: [0, 1],
+			revealedWordTokens: {
+				"0": "unlock-0",
+				"1": "unlock-1",
+			},
+			guessCount: 2,
+			lastSyncedAt: "2026-03-10T10:00:00.000Z",
+		};
+
+		const next = buildSyncedProgressState({
+			existingProgress: imported,
+			initialProgress: createEmptyProgressState({
+				id: "puzzle-1",
+				initialShuffledLetters: ["a", "b", "c"],
+			}),
+			incomingEvents: [
+				{
+					id: "shuffle-1",
+					at: "2026-03-10T10:05:00.000Z",
+					type: "letters_shuffled",
+					payload: {
+						shuffledLetters: ["c", "a", "b"],
+					},
+				},
+			],
+			totalWords: 3,
+		});
+
+		expect(next.guessedWordIds).toEqual([0, 1]);
+		expect(next.guessHashes).toEqual(["guess-1", "guess-2"]);
+		expect(next.shuffledLetters).toEqual(["c", "a", "b"]);
 	});
 });

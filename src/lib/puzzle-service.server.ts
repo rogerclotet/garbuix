@@ -20,7 +20,7 @@ import {
 	getYesterdayDateKey,
 } from "@/lib/puzzle-dates";
 import {
-	applyPuzzleEventsChronologically,
+	buildSyncedProgressState,
 	createEmptyProgressState,
 	getCompatibleProgress,
 	mergeProgressStates,
@@ -306,20 +306,29 @@ export async function syncPuzzleEventsForUser(options: {
 		),
 	);
 
-	const allEvents = await db.query.userPuzzleEvents.findMany({
-		where: and(
-			eq(userPuzzleEvents.userId, userId),
-			eq(userPuzzleEvents.puzzleId, puzzleId),
-		),
-	});
+	const existingProgress = await getUserPuzzleProgressData(puzzleId, userId);
+	let historicalEvents: PuzzleClientEvent[] = [];
 
-	const nextProgress = applyPuzzleEventsChronologically(
-		createEmptyProgressState(publicSnapshot),
-		allEvents
+	if (!existingProgress) {
+		const allEvents = await db.query.userPuzzleEvents.findMany({
+			where: and(
+				eq(userPuzzleEvents.userId, userId),
+				eq(userPuzzleEvents.puzzleId, puzzleId),
+			),
+		});
+
+		historicalEvents = allEvents
 			.map((row) => toPuzzleClientEvent(row))
-			.filter((event): event is PuzzleClientEvent => event !== null),
-		privateSnapshot.wordSlots.length,
-	);
+			.filter((event): event is PuzzleClientEvent => event !== null);
+	}
+
+	const nextProgress = buildSyncedProgressState({
+		existingProgress,
+		historicalEvents,
+		incomingEvents: filteredEvents,
+		initialProgress: createEmptyProgressState(publicSnapshot),
+		totalWords: privateSnapshot.wordSlots.length,
+	});
 
 	await db
 		.insert(userPuzzleProgress)
