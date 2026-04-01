@@ -97,10 +97,21 @@ export async function buildPuzzleSnapshots(options: {
 	const gridLetters = toGridLetters(crossword.grid);
 	const wordSlotsPublic: DailyPuzzlePublic["wordSlots"] = [];
 	const wordSlotsPrivate: DailyPuzzlePrivate["wordSlots"] = [];
+	const normalizedWordsByDisplayWord = new Map<string, string>();
 
 	for (const wordPlacement of crossword.words) {
 		const slotSalt = crypto.randomUUID();
 		const normalizedWord = normalizeWord(wordPlacement.word.name);
+		const existingDisplayWord =
+			normalizedWordsByDisplayWord.get(normalizedWord);
+
+		if (existingDisplayWord) {
+			throw new Error(
+				`Duplicate normalized answer "${normalizedWord}" for "${existingDisplayWord}" and "${wordPlacement.word.name}"`,
+			);
+		}
+
+		normalizedWordsByDisplayWord.set(normalizedWord, wordPlacement.word.name);
 		const answerHash = await createAnswerHash(slotSalt, normalizedWord);
 		const unlockToken = await createUnlockToken(slotSalt, normalizedWord);
 		const answerCapsule = await sealAnswerCapsule(

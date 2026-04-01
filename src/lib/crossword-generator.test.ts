@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import allWords from "@/data/catalan-words.json";
 import {
 	calculateCandidateFreshnessPenalty,
 	type DailyPuzzleHistoryEntry,
+	generateDailyCrosswordForSeed,
+	normalizeWord,
 } from "@/lib/crossword-generator";
 
 describe("crossword-generator freshness scoring", () => {
@@ -79,5 +82,27 @@ describe("crossword-generator freshness scoring", () => {
 		);
 
 		expect(frequentRepeatPenalty).toBeGreaterThan(singleRepeatPenalty);
+	});
+
+	it("does not include duplicate normalized answers in the same daily puzzle", () => {
+		const result = generateDailyCrosswordForSeed(allWords, 260401);
+
+		expect(result).not.toBeNull();
+
+		const crossword = result?.crossword;
+
+		expect(crossword).toBeDefined();
+		if (!crossword) {
+			throw new Error("Expected crossword to be generated");
+		}
+
+		const normalizedWords = crossword.words.map((placement) =>
+			normalizeWord(placement.word.name),
+		);
+
+		expect(new Set(normalizedWords).size).toBe(normalizedWords.length);
+		expect(crossword.words.map((placement) => placement.word.name)).not.toEqual(
+			expect.arrayContaining(["consol", "cònsol"]),
+		);
 	});
 });

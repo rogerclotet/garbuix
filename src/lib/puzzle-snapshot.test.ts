@@ -115,4 +115,57 @@ describe("puzzle-snapshot", () => {
 			new Set(["0,0", "0,1", "0,2"]),
 		);
 	});
+
+	it("rejects duplicate normalized answers in the same puzzle", async () => {
+		await expect(
+			buildPuzzleSnapshots({
+				puzzleId: "puzzle-4",
+				dateKey: "2026-04-01",
+				seed: 260401,
+				algorithmVersion: "1",
+				letters: ["c", "o", "n", "s", "l"],
+				initialShuffledLetters: ["l", "s", "n", "o", "c"],
+				crossword: {
+					rows: 2,
+					cols: 6,
+					grid: [
+						Array.from("consol").map((letter) => ({
+							letter,
+							wordIds: [0],
+						})),
+						Array.from("cònsol").map((letter) => ({
+							letter,
+							wordIds: [1],
+						})),
+					],
+					words: [
+						{
+							id: 0,
+							startRow: 0,
+							startCol: 0,
+							direction: "horizontal",
+							revealed: false,
+							word: {
+								name: "consol",
+								areatematica: "Nom",
+								frequency: 1,
+							},
+						},
+						{
+							id: 1,
+							startRow: 1,
+							startCol: 0,
+							direction: "horizontal",
+							revealed: false,
+							word: {
+								name: "cònsol",
+								areatematica: "Nom",
+								frequency: 1,
+							},
+						},
+					],
+				},
+			}),
+		).rejects.toThrow(/Duplicate normalized answer "consol"/);
+	});
 });

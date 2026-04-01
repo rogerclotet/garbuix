@@ -155,6 +155,33 @@ function getWordPriority(word: Word): number {
 	return frequencyScore + lengthBonus + partOfSpeechBonus;
 }
 
+function compareWordsForSelection(left: Word, right: Word): number {
+	const priorityDelta = getWordPriority(right) - getWordPriority(left);
+	if (priorityDelta !== 0) {
+		return priorityDelta;
+	}
+
+	if (right.frequency !== left.frequency) {
+		return right.frequency - left.frequency;
+	}
+
+	return left.name.localeCompare(right.name, "ca");
+}
+
+function dedupeWordsByNormalizedForm(words: Word[]): Word[] {
+	const bestWordByNormalizedForm = new Map<string, Word>();
+
+	for (const word of words) {
+		const normalized = normalizeWord(word.name);
+		const existing = bestWordByNormalizedForm.get(normalized);
+		if (!existing || compareWordsForSelection(word, existing) < 0) {
+			bestWordByNormalizedForm.set(normalized, word);
+		}
+	}
+
+	return [...bestWordByNormalizedForm.values()];
+}
+
 function prioritizeWords(words: Word[], random: SeededRandom): Word[] {
 	return words
 		.map((word) => ({
@@ -358,10 +385,11 @@ export function generateCrossword(
 ): CrosswordGrid {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
+	const uniqueWords = dedupeWordsByNormalizedForm(words);
 
 	// Filter words: 4-12 letters, only letters
 	const candidateWords = prioritizeWords(
-		words
+		uniqueWords
 			.filter((w) => w.name.length >= 4 && w.name.length <= 12)
 			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
 		random,
