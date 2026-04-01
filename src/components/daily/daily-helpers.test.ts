@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getGuessKeyboardAction, getNextHintCellKey } from "./daily-helpers";
+import {
+	getGuessKeyboardAction,
+	getNextHintCellKey,
+	getSortedWordSlots,
+} from "./daily-helpers";
 
 describe("getGuessKeyboardAction", () => {
 	it("maps typed letters to the available puzzle letters", () => {
@@ -89,5 +93,69 @@ describe("getNextHintCellKey", () => {
 				new Set(["0,0", "0,1"]),
 			),
 		).toBeNull();
+	});
+});
+
+describe("getSortedWordSlots", () => {
+	it("puts the most revealed unfound words first and found words at the bottom", () => {
+		const wordSlots = [
+			{
+				id: 0,
+				startRow: 0,
+				startCol: 0,
+				direction: "horizontal" as const,
+				length: 4,
+				slotSalt: "salt-0",
+				answerHash: "hash-0",
+				answerCapsule: "capsule-0",
+			},
+			{
+				id: 1,
+				startRow: 1,
+				startCol: 0,
+				direction: "horizontal" as const,
+				length: 3,
+				slotSalt: "salt-1",
+				answerHash: "hash-1",
+				answerCapsule: "capsule-1",
+			},
+			{
+				id: 2,
+				startRow: 2,
+				startCol: 0,
+				direction: "horizontal" as const,
+				length: 5,
+				slotSalt: "salt-2",
+				answerHash: "hash-2",
+				answerCapsule: "capsule-2",
+			},
+			{
+				id: 3,
+				startRow: 3,
+				startCol: 0,
+				direction: "horizontal" as const,
+				length: 6,
+				slotSalt: "salt-3",
+				answerHash: "hash-3",
+				answerCapsule: "capsule-3",
+			},
+		];
+
+		const cellLetters = new Map<string, string>([
+			["0,0", "a"],
+			["0,1", "b"],
+			["2,0", "c"],
+			["2,1", "d"],
+			["2,2", "e"],
+		]);
+
+		const { notFoundSlots, foundSlots } = getSortedWordSlots(
+			wordSlots,
+			[1, 3],
+			cellLetters,
+		);
+
+		expect(notFoundSlots.map((slot) => slot.id)).toEqual([2, 0]);
+		expect(foundSlots.map((slot) => slot.id)).toEqual([3, 1]);
 	});
 });

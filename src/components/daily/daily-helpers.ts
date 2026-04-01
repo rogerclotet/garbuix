@@ -136,3 +136,62 @@ export function getDisplayedSlotWord(
 		return cellLetters.get(getSlotCellKey(slot, index))?.toUpperCase() ?? "_";
 	}).join("");
 }
+
+function countDisplayedSlotLetters(
+	slot: DailyPuzzleWordSlot,
+	cellLetters: Map<string, string>,
+) {
+	let revealedLetterCount = 0;
+
+	for (let index = 0; index < slot.length; index += 1) {
+		if (cellLetters.get(getSlotCellKey(slot, index))) {
+			revealedLetterCount += 1;
+		}
+	}
+
+	return revealedLetterCount;
+}
+
+export function getSortedWordSlots(
+	wordSlots: DailyPuzzleWordSlot[],
+	guessedWordIds: number[],
+	cellLetters: Map<string, string>,
+) {
+	const guessedWordOrder = new Map(
+		guessedWordIds.map((wordId, index) => [wordId, index]),
+	);
+	const foundSlots: DailyPuzzleWordSlot[] = [];
+	const notFoundSlots: DailyPuzzleWordSlot[] = [];
+
+	for (const slot of wordSlots) {
+		if (guessedWordOrder.has(slot.id)) {
+			foundSlots.push(slot);
+			continue;
+		}
+
+		notFoundSlots.push(slot);
+	}
+
+	foundSlots.sort(
+		(a, b) =>
+			(guessedWordOrder.get(b.id) ?? -1) - (guessedWordOrder.get(a.id) ?? -1),
+	);
+	notFoundSlots.sort((a, b) => {
+		const aRevealedLetterCount = countDisplayedSlotLetters(a, cellLetters);
+		const bRevealedLetterCount = countDisplayedSlotLetters(b, cellLetters);
+		if (aRevealedLetterCount !== bRevealedLetterCount) {
+			return bRevealedLetterCount - aRevealedLetterCount;
+		}
+
+		if (a.length !== b.length) {
+			return a.length - b.length;
+		}
+
+		return a.id - b.id;
+	});
+
+	return {
+		foundSlots,
+		notFoundSlots,
+	};
+}
