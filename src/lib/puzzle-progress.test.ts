@@ -5,6 +5,7 @@ import {
 	createEmptyProgressState,
 	getCompatibleProgress,
 	isSameProgressState,
+	mergeProgressStates,
 	pickPreferredProgressState,
 } from "@/lib/puzzle-progress";
 
@@ -214,5 +215,30 @@ describe("puzzle-progress", () => {
 		};
 
 		expect(isSameProgressState(left, right)).toBe(true);
+	});
+
+	it("merges guessed words without losing discovery order", () => {
+		const existing = {
+			...createEmptyProgressState({
+				id: "puzzle-1",
+				initialShuffledLetters: ["a", "b", "c"],
+			}),
+			guessHashes: ["guess-1", "guess-2"],
+			guessedWordIds: [4, 1],
+			guessCount: 2,
+			lastSyncedAt: "2026-03-10T10:00:00.000Z",
+		};
+		const incoming = {
+			...existing,
+			guessHashes: ["guess-2", "guess-3"],
+			guessedWordIds: [1, 3],
+			guessCount: 2,
+			lastSyncedAt: "2026-03-10T10:05:00.000Z",
+		};
+
+		const merged = mergeProgressStates(existing, incoming);
+
+		expect(merged.guessHashes).toEqual(["guess-1", "guess-2", "guess-3"]);
+		expect(merged.guessedWordIds).toEqual([4, 1, 3]);
 	});
 });

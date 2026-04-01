@@ -23,6 +23,7 @@ import {
 	applyPuzzleEventsChronologically,
 	createEmptyProgressState,
 	getCompatibleProgress,
+	mergeProgressStates,
 } from "@/lib/puzzle-progress";
 import {
 	buildPuzzleSnapshots,
@@ -242,45 +243,6 @@ export async function getUserPuzzleProgressData(
 	});
 
 	return row ? serializeProgressRow(row) : null;
-}
-
-function mergeProgressState(
-	existing: PuzzleProgressState | null,
-	incoming: PuzzleProgressState,
-): PuzzleProgressState {
-	const guessHashes = Array.from(
-		new Set([
-			...((existing?.guessHashes as string[]) ?? []),
-			...incoming.guessHashes,
-		]),
-	);
-	const guessedWordIds = Array.from(
-		new Set([
-			...((existing?.guessedWordIds as number[]) ?? []),
-			...incoming.guessedWordIds,
-		]),
-	).sort((left, right) => left - right);
-
-	return {
-		puzzleId: incoming.puzzleId,
-		guessHashes,
-		guessedWordIds,
-		revealedWordTokens: {
-			...(existing?.revealedWordTokens ?? {}),
-			...incoming.revealedWordTokens,
-		},
-		hintedCells: Array.from(
-			new Set([...(existing?.hintedCells ?? []), ...incoming.hintedCells]),
-		),
-		hintsUsed: Math.max(existing?.hintsUsed ?? 0, incoming.hintsUsed),
-		guessCount: guessHashes.length,
-		shuffledLetters:
-			incoming.shuffledLetters.length > 0
-				? incoming.shuffledLetters
-				: (existing?.shuffledLetters ?? []),
-		completedAt: existing?.completedAt ?? incoming.completedAt,
-		lastSyncedAt: incoming.lastSyncedAt,
-	};
 }
 
 export async function syncPuzzleEventsForUser(options: {
@@ -588,7 +550,7 @@ export async function importAnonymousProgressForUser(options: {
 		}
 
 		const existingProgress = await getUserPuzzleProgressData(puzzle.id, userId);
-		const merged = mergeProgressState(existingProgress, activeProgress);
+		const merged = mergeProgressStates(existingProgress, activeProgress);
 
 		await db
 			.insert(userPuzzleProgress)

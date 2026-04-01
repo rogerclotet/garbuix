@@ -106,6 +106,39 @@ export function isSameProgressState(
 	);
 }
 
+export function mergeProgressStates(
+	existing: PuzzleProgressState | null,
+	incoming: PuzzleProgressState,
+): PuzzleProgressState {
+	const guessHashes = Array.from(
+		new Set([...(existing?.guessHashes ?? []), ...incoming.guessHashes]),
+	);
+	const guessedWordIds = Array.from(
+		new Set([...(existing?.guessedWordIds ?? []), ...incoming.guessedWordIds]),
+	);
+
+	return {
+		puzzleId: incoming.puzzleId,
+		guessHashes,
+		guessedWordIds,
+		revealedWordTokens: {
+			...(existing?.revealedWordTokens ?? {}),
+			...incoming.revealedWordTokens,
+		},
+		hintedCells: Array.from(
+			new Set([...(existing?.hintedCells ?? []), ...incoming.hintedCells]),
+		),
+		hintsUsed: Math.max(existing?.hintsUsed ?? 0, incoming.hintsUsed),
+		guessCount: guessHashes.length,
+		shuffledLetters:
+			incoming.shuffledLetters.length > 0
+				? incoming.shuffledLetters
+				: (existing?.shuffledLetters ?? []),
+		completedAt: existing?.completedAt ?? incoming.completedAt,
+		lastSyncedAt: incoming.lastSyncedAt,
+	};
+}
+
 export function applyPuzzleEvent(
 	state: PuzzleProgressState,
 	event: PuzzleClientEvent,
