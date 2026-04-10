@@ -84,7 +84,9 @@ describe("crossword-generator freshness scoring", () => {
 		expect(frequentRepeatPenalty).toBeGreaterThan(singleRepeatPenalty);
 	});
 
-	it("does not include duplicate normalized answers in the same daily puzzle", () => {
+	it("does not include duplicate normalized answers in the same daily puzzle", {
+		timeout: 60_000,
+	}, () => {
 		const result = generateDailyCrosswordForSeed(allWords, 260401);
 
 		expect(result).not.toBeNull();

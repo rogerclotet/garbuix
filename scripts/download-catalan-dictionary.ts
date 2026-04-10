@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 const MIN_LENGTH = 4;
 const MAX_LENGTH = 12;
-const MIN_FREQUENCY = 200;
+const MIN_FREQUENCY = 150;
 const DATA_DIR = join(process.cwd(), "src", "data");
 const OUTPUT_FILE = join(DATA_DIR, "catalan-words.json");
 const SOURCE_BASE_URL =

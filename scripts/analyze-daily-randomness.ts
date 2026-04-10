@@ -241,14 +241,12 @@ function analyzeDays(from: string, days: number) {
 	const letterSetStats = new Map<string, LetterSetStats>();
 	const letterFrequency = new Map<string, number>();
 	const generationCache = new Map();
-	const baselineCache = new Map();
 
 	for (let offset = 0; offset < days; offset++) {
 		const dateKey = addDays(from, offset);
 		const seed = dateKeyToSeed(dateKey);
 		const generated = generateDailyCrosswordForSeed(words, seed, 10, 15, {
 			cache: generationCache,
-			baselineCache,
 		});
 
 		if (!generated) {
