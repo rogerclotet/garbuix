@@ -8,6 +8,22 @@ export function normalizeWord(word: string): string {
 		.replace(/[·]/g, "");
 }
 
+export function getPlayableWordLetters(word: string): string[] {
+	const letters: string[] = [];
+
+	for (const character of word) {
+		if (character === "·") {
+			continue;
+		}
+
+		if (normalizeWord(character).length === 1) {
+			letters.push(character);
+		}
+	}
+
+	return letters;
+}
+
 export function getWordLayout(word: string) {
 	const normalizedWord = normalizeWord(word);
 	const middleDotAfterIndices: number[] = [];

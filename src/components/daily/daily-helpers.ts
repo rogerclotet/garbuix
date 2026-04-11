@@ -1,4 +1,4 @@
-import { normalizeWord } from "@/lib/puzzle-text";
+import { getPlayableWordLetters, normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzlePublic,
 	DailyPuzzleWordSlot,
@@ -57,10 +57,10 @@ export function buildCellLetters(
 	for (const slot of wordSlots) {
 		const answer = revealedAnswers[slot.id];
 		if (!answer) continue;
-		const normalizedAnswer = normalizeWord(answer);
+		const displayLetters = getPlayableWordLetters(answer);
 
-		for (let index = 0; index < normalizedAnswer.length; index += 1) {
-			letters.set(getSlotCellKey(slot, index), normalizedAnswer[index] ?? "");
+		for (let index = 0; index < displayLetters.length; index += 1) {
+			letters.set(getSlotCellKey(slot, index), displayLetters[index] ?? "");
 		}
 	}
 

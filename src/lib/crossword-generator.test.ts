@@ -6,6 +6,39 @@ import {
 	generateDailyCrosswordForSeed,
 	normalizeWord,
 } from "@/lib/crossword-generator";
+import { getPlayableWordLetters } from "@/lib/puzzle-text";
+
+function hasConflictingDisplayIntersections(
+	result: NonNullable<ReturnType<typeof generateDailyCrosswordForSeed>>,
+) {
+	const lettersByCell = new Map<string, string>();
+
+	for (const placement of result.crossword.words) {
+		const letters = getPlayableWordLetters(placement.word.name);
+
+		for (let index = 0; index < letters.length; index += 1) {
+			const row =
+				placement.direction === "horizontal"
+					? placement.startRow
+					: placement.startRow + index;
+			const col =
+				placement.direction === "horizontal"
+					? placement.startCol + index
+					: placement.startCol;
+			const cellKey = `${row},${col}`;
+			const existing = lettersByCell.get(cellKey);
+			const letter = letters[index] ?? "";
+
+			if (existing && existing !== letter) {
+				return true;
+			}
+
+			lettersByCell.set(cellKey, letter);
+		}
+	}
+
+	return false;
+}
 
 describe("crossword-generator freshness scoring", () => {
 	it("returns no penalty when there is no recent history", () => {
@@ -106,5 +139,18 @@ describe("crossword-generator freshness scoring", () => {
 		expect(crossword.words.map((placement) => placement.word.name)).not.toEqual(
 			expect.arrayContaining(["consol", "cònsol"]),
 		);
+	});
+
+	it("avoids crossings that disagree on the displayed accent for a shared cell", {
+		timeout: 60_000,
+	}, () => {
+		const result = generateDailyCrosswordForSeed(allWords, 260411);
+
+		expect(result).not.toBeNull();
+		if (!result) {
+			throw new Error("Expected crossword to be generated");
+		}
+
+		expect(hasConflictingDisplayIntersections(result)).toBe(false);
 	});
 });

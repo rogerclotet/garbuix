@@ -2,7 +2,11 @@
 
 import type { Word } from "@/data/types";
 import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
-import { getWordLayout, normalizeWord } from "@/lib/puzzle-text";
+import {
+	getPlayableWordLetters,
+	getWordLayout,
+	normalizeWord,
+} from "@/lib/puzzle-text";
 
 const DEFAULT_MIN_WORDS = 10;
 const DEFAULT_MAX_WORDS = 15;
@@ -377,7 +381,7 @@ function createRankBiasedIndex(length: number, random: SeededRandom): number {
 }
 
 function getWordCells(word: WordLike): string[] {
-	return getWordLayout(word.name).letters;
+	return getPlayableWordLetters(word.name);
 }
 
 function getWordCellCount(word: WordLike): number {

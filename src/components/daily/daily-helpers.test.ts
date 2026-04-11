@@ -191,4 +191,28 @@ describe("getSortedWordSlots", () => {
 		expect(cellLetters.get("0,3")).toBe("l");
 		expect(cellLetters.has("0,10")).toBe(false);
 	});
+
+	it("preserves accents when revealed answers are shown on the grid", () => {
+		const slot = {
+			id: 0,
+			startRow: 0,
+			startCol: 0,
+			direction: "horizontal" as const,
+			length: 5,
+			slotSalt: "slot-0",
+			answerHash: "hash-0",
+			answerCapsule: "capsule-0",
+		};
+
+		const cellLetters = buildCellLetters(
+			[slot],
+			{
+				0: "camió",
+			},
+			{},
+		);
+
+		expect(getDisplayedSlotWord(slot, cellLetters)).toBe("CAMIÓ");
+		expect(cellLetters.get("0,4")).toBe("ó");
+	});
 });
