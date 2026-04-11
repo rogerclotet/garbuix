@@ -6,7 +6,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import babel from "@rolldown/plugin-babel";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
-import viteTsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vite";
 
 function readBuildVersion() {
@@ -34,14 +33,14 @@ const config = defineConfig(() => {
 		plugins: [
 			devtools(),
 			nitro(),
-			viteTsConfigPaths({
-				projects: ["./tsconfig.json"],
-			}),
 			tailwindcss(),
 			tanstackStart(),
 			viteReact(),
 			babel({ presets: [reactCompilerPreset()] }),
 		],
+		resolve: {
+			tsconfigPaths: true,
+		},
 		server: isDockerDev
 			? {
 					host: "0.0.0.0",
@@ -60,6 +59,15 @@ const config = defineConfig(() => {
 			: undefined,
 		ssr: {
 			noExternal: ["@posthog/react", "posthog-js"],
+		},
+		test: {
+			environmentMatchGlobs: [["src/components/**/*.test.tsx", "jsdom"]],
+			server: {
+				deps: {
+					fallbackCJS: true,
+					inline: ["react", "react-dom", "@testing-library/react"],
+				},
+			},
 		},
 	};
 });

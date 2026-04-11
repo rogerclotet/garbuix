@@ -12,6 +12,12 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 
+export type GuessFeedbackKind =
+	| "new_word"
+	| "already_found"
+	| "valid_but_not_in_puzzle"
+	| "not_in_dictionary";
+
 export async function resolveGuess(options: {
 	puzzle: DailyPuzzlePublic;
 	progress: PuzzleProgressState;
@@ -19,19 +25,24 @@ export async function resolveGuess(options: {
 }) {
 	const normalizedGuess = normalizeWord(options.guess.trim());
 	const guessHash = await createGuessHash(options.puzzle.id, normalizedGuess);
+	const matchedSlot = await findMatchingWordSlot(
+		options.puzzle,
+		normalizedGuess,
+	);
+	const isAlreadyFound =
+		matchedSlot != null &&
+		options.progress.guessedWordIds.includes(matchedSlot.id);
+	const isDuplicateGuess = options.progress.guessHashes.includes(guessHash);
 
-	if (options.progress.guessHashes.includes(guessHash)) {
-		const matchedSlot = await findMatchingWordSlot(
-			options.puzzle,
-			normalizedGuess,
-		);
+	if (isAlreadyFound || isDuplicateGuess) {
 		return {
-			duplicate: true,
+			kind: "already_found" as const,
 			displayWord:
 				matchedSlot != null
 					? await decryptWordFromGuess(matchedSlot, normalizedGuess)
 					: null,
 			guessHash,
+			normalizedGuess,
 			matchedSlotId: matchedSlot?.id ?? null,
 			unlockToken: matchedSlot
 				? await createUnlockToken(matchedSlot.slotSalt, normalizedGuess)
@@ -39,15 +50,14 @@ export async function resolveGuess(options: {
 		};
 	}
 
-	const matchedSlot = await findMatchingWordSlot(
-		options.puzzle,
-		normalizedGuess,
-	);
 	if (!matchedSlot) {
 		return {
-			duplicate: false,
+			kind: options.puzzle.validNormalizedGuesses.includes(normalizedGuess)
+				? ("valid_but_not_in_puzzle" as const)
+				: ("not_in_dictionary" as const),
 			displayWord: null,
 			guessHash,
+			normalizedGuess,
 			matchedSlotId: null,
 			unlockToken: null,
 		};
@@ -58,12 +68,13 @@ export async function resolveGuess(options: {
 		normalizedGuess,
 	);
 	return {
-		duplicate: false,
+		kind: "new_word" as const,
 		displayWord: await openAnswerCapsule(
 			matchedSlot.answerCapsule,
 			unlockToken,
 		),
 		guessHash,
+		normalizedGuess,
 		matchedSlotId: matchedSlot.id,
 		unlockToken,
 	};

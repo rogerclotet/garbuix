@@ -228,6 +228,7 @@ describe("puzzle-snapshot", () => {
 				],
 				letters: ["c", "o", "l", "a", "b", "r"],
 				initialShuffledLetters: ["c", "o", "l", "a", "b", "r"],
+				validNormalizedGuesses: [],
 				wordSlots: [
 					{
 						id: 0,

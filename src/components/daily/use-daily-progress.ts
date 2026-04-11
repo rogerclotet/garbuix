@@ -81,15 +81,17 @@ export function useDailyProgress({
 	const fetchUserProgress = useServerFn(getUserPuzzleProgress);
 	const importProgress = useServerFn(importAnonymousProgress);
 	const { captureEvent, captureException } = useObservability();
+	const emptyProgress = useMemo(
+		() => createEmptyProgressState(puzzle),
+		[puzzle],
+	);
 
-	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(() => {
-		const empty = createEmptyProgressState(puzzle);
-		return (
-			getCompatibleProgress(initialData.progress, puzzle) ??
-			getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
-			empty
-		);
-	});
+	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(
+		() => getCompatibleProgress(initialData.progress, puzzle) ?? emptyProgress,
+	);
+	const [isProgressReady, setIsProgressReady] = useState(
+		() => activeUser != null || initialData.progress != null,
+	);
 	const [queuedEvents, setQueuedEvents] = useState<PuzzleClientEvent[]>([]);
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
@@ -118,14 +120,13 @@ export function useDailyProgress({
 			return null;
 		}
 
-		const empty = createEmptyProgressState(puzzle);
 		try {
 			return (
 				(await fetchUserProgress({
 					data: { puzzleId: puzzle.id },
 				})) ??
 				getCompatibleProgress(initialData.progress, puzzle) ??
-				empty
+				emptyProgress
 			);
 		} catch (error) {
 			if (!isLikelyOfflineOrNetworkError(error)) {
@@ -135,11 +136,14 @@ export function useDailyProgress({
 					scope: "puzzle_progress_fetch",
 				});
 			}
-			return getCompatibleProgress(initialData.progress, puzzle) ?? empty;
+			return (
+				getCompatibleProgress(initialData.progress, puzzle) ?? emptyProgress
+			);
 		}
 	}, [
 		activeUser,
 		captureException,
+		emptyProgress,
 		fetchUserProgress,
 		initialData.progress,
 		puzzle,
@@ -159,9 +163,11 @@ export function useDailyProgress({
 		let cancelled = false;
 
 		const loadProgress = async () => {
-			const empty = createEmptyProgressState(puzzle);
-
 			if (activeUser) {
+				if (!cancelled) {
+					setIsProgressReady(true);
+				}
+
 				const cached = getAccountPuzzleCache(activeUser.id, puzzle.dateKey);
 				if (cached?.puzzleId === puzzle.id) {
 					const cachedQueuedEvents = cached.queuedEvents ?? [];
@@ -174,8 +180,8 @@ export function useDailyProgress({
 							? (pickPreferredProgressState(
 									serverBaseProgress,
 									cachedBaseProgress,
-								) ?? empty)
-							: (serverBaseProgress ?? cachedBaseProgress ?? empty);
+								) ?? emptyProgress)
+							: (serverBaseProgress ?? cachedBaseProgress ?? emptyProgress);
 
 					if (!cancelled) {
 						setBaseProgress(preferredCachedBase);
@@ -183,7 +189,8 @@ export function useDailyProgress({
 					}
 				} else if (!cancelled) {
 					setBaseProgress(
-						getCompatibleProgress(initialData.progress, puzzle) ?? empty,
+						getCompatibleProgress(initialData.progress, puzzle) ??
+							emptyProgress,
 					);
 					setQueuedEvents([]);
 				}
@@ -239,11 +246,17 @@ export function useDailyProgress({
 			}
 
 			if (!cancelled) {
+				setIsProgressReady(false);
+			}
+
+			if (!cancelled) {
 				setQueuedEvents([]);
 				setBaseProgress(
 					getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
-						empty,
+						getCompatibleProgress(initialData.progress, puzzle) ??
+						emptyProgress,
 				);
+				setIsProgressReady(true);
 			}
 		};
 
@@ -257,6 +270,7 @@ export function useDailyProgress({
 		captureEvent,
 		captureException,
 		deviceId,
+		emptyProgress,
 		importProgress,
 		initialData.progress,
 		puzzle,
@@ -533,5 +547,6 @@ export function useDailyProgress({
 	return {
 		applyLocalEvent,
 		derivedProgress,
+		isProgressReady,
 	};
 }

@@ -1,4 +1,4 @@
-import { Share2 } from "lucide-react";
+import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,31 @@ import {
 	getGuessKeyboardAction,
 	getNextHintCellKey,
 } from "./daily-helpers";
-import type { DailyData } from "./daily-types";
+import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
 
 const POINTER_CLICK_DEDUP_MS = 350;
+const SUBMIT_FEEDBACK_DURATION_MS = 520;
+const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
+const HAPTIC_TAP_MS = 14;
+const HAPTIC_SUBMIT_MS = 18;
+const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
+const HAPTIC_ERROR_PATTERN = [24, 32, 16];
+
+function getSubmitFeedbackDuration() {
+	if (
+		typeof window === "undefined" ||
+		typeof window.matchMedia !== "function"
+	) {
+		return SUBMIT_FEEDBACK_DURATION_MS;
+	}
+
+	return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+		? REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS
+		: SUBMIT_FEEDBACK_DURATION_MS;
+}
 
 function isEditableTarget(target: EventTarget | null) {
 	if (!(target instanceof HTMLElement)) {
@@ -63,15 +82,23 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);
+	const [submitFeedback, setSubmitFeedback] =
+		useState<DailySubmitFeedback | null>(null);
+	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
+		() => initialData.historyEntries ?? [],
+	);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
+	const submitFeedbackIdRef = useRef(0);
+	const submitFeedbackResetTimerRef = useRef<number | null>(null);
 	const completionTrackedRef = useRef(false);
 	const { captureEvent, captureException } = useObservability();
-	const { applyLocalEvent, derivedProgress } = useDailyProgress({
-		activeUser,
-		deviceId,
-		initialData,
-	});
+	const { applyLocalEvent, derivedProgress, isProgressReady } =
+		useDailyProgress({
+			activeUser,
+			deviceId,
+			initialData,
+		});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -106,8 +133,20 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (highlightResetTimerRef.current != null) {
 				window.clearTimeout(highlightResetTimerRef.current);
 			}
+			if (submitFeedbackResetTimerRef.current != null) {
+				window.clearTimeout(submitFeedbackResetTimerRef.current);
+			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (activeUser) {
+			setAnonymousHistoryEntries(initialData.historyEntries ?? []);
+			return;
+		}
+
+		setAnonymousHistoryEntries(getSortedAnonymousHistoryEntries());
+	}, [activeUser, initialData.historyEntries]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
@@ -192,7 +231,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])
-			: getSortedAnonymousHistoryEntries();
+			: anonymousHistoryEntries;
 		const streakEntries = upsertHistoryEntry(
 			baseEntries,
 			buildHistoryEntry(puzzle, derivedProgress),
@@ -201,24 +240,28 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return calculateHistoryStreaks(streakEntries, {
 			referenceDateKey: puzzle.dateKey,
 		});
-	}, [activeUser, derivedProgress, initialData.historyEntries, puzzle]);
+	}, [
+		activeUser,
+		anonymousHistoryEntries,
+		derivedProgress,
+		initialData.historyEntries,
+		puzzle,
+	]);
 
-	const triggerHaptic = useCallback((duration = 8) => {
-		if (typeof window === "undefined" || typeof navigator === "undefined") {
-			return;
-		}
+	const triggerHaptic = useCallback(
+		(pattern: number | number[] = HAPTIC_TAP_MS) => {
+			if (typeof navigator === "undefined") {
+				return;
+			}
 
-		const nav = navigator as Navigator & { standalone?: boolean };
-		const isStandalone =
-			window.matchMedia("(display-mode: standalone)").matches ||
-			nav.standalone === true;
+			if (typeof navigator.vibrate !== "function") {
+				return;
+			}
 
-		if (!isStandalone || typeof navigator.vibrate !== "function") {
-			return;
-		}
-
-		navigator.vibrate(duration);
-	}, []);
+			navigator.vibrate(pattern);
+		},
+		[],
+	);
 
 	const runPressAction = useCallback(
 		(
@@ -249,64 +292,86 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[],
 	);
 
+	const showSubmitFeedback = useCallback(
+		(word: string, kind: DailySubmitFeedback["kind"]) => {
+			const nextFeedbackId = submitFeedbackIdRef.current + 1;
+			submitFeedbackIdRef.current = nextFeedbackId;
+			setSubmitFeedback({
+				id: nextFeedbackId,
+				word,
+				kind,
+			});
+
+			if (submitFeedbackResetTimerRef.current != null) {
+				window.clearTimeout(submitFeedbackResetTimerRef.current);
+			}
+
+			submitFeedbackResetTimerRef.current = window.setTimeout(() => {
+				setSubmitFeedback((current) =>
+					current?.id === nextFeedbackId ? null : current,
+				);
+				submitFeedbackResetTimerRef.current = null;
+			}, getSubmitFeedbackDuration());
+		},
+		[],
+	);
+
+	const clearSubmitFeedback = useCallback(() => {
+		if (submitFeedbackResetTimerRef.current != null) {
+			window.clearTimeout(submitFeedbackResetTimerRef.current);
+			submitFeedbackResetTimerRef.current = null;
+		}
+		setSubmitFeedback(null);
+	}, []);
+
 	const handleGuess = useCallback(async () => {
-		triggerHaptic(10);
+		triggerHaptic(HAPTIC_SUBMIT_MS);
 
 		if (!currentGuess.trim()) return;
-		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(currentGuess.trim())) {
-			toast.error("La paraula no és vàlida");
+		const guess = currentGuess.trim();
+		const prettyGuess = formatGuess(guess);
+
+		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(guess)) {
+			triggerHaptic(HAPTIC_ERROR_PATTERN);
+			showSubmitFeedback(prettyGuess, "invalid_input");
+			captureEvent("puzzle_guess_result", {
+				date_key: puzzle.dateKey,
+				guess_length: guess.length,
+				matched: false,
+				puzzle_id: puzzle.id,
+				result_kind: "invalid_input",
+			});
 			setCurrentGuess("");
 			return;
 		}
 
-		const guess = currentGuess.trim();
-		const prettyGuess = formatGuess(guess);
 		const result = await resolveGuess({
 			puzzle,
 			progress: derivedProgress,
 			guess,
 		});
 
-		if (
-			result.matchedSlotId != null &&
-			derivedProgress.guessedWordIds.includes(result.matchedSlotId)
-		) {
-			toast.info(
-				<span>
-					Ja has encertat <b>{result.displayWord}</b>
-				</span>,
+		showSubmitFeedback(prettyGuess, result.kind);
+		captureEvent("puzzle_guess_result", {
+			date_key: puzzle.dateKey,
+			guess_length: guess.length,
+			matched: result.matchedSlotId != null,
+			puzzle_id: puzzle.id,
+			result_kind: result.kind,
+		});
+
+		if (result.kind !== "already_found") {
+			applyLocalEvent(
+				createPuzzleEvent("guess_added", {
+					guessHash: result.guessHash,
+					matchedWordId: result.matchedSlotId,
+					unlockToken: result.unlockToken,
+				}),
 			);
-			setCurrentGuess("");
-			return;
 		}
 
-		if (result.duplicate) {
-			if (result.displayWord) {
-				toast.info(
-					<span>
-						Ja has encertat <b>{result.displayWord}</b>
-					</span>,
-				);
-			} else {
-				toast.info(
-					<span>
-						Ja has provat <b>{prettyGuess}</b>
-					</span>,
-				);
-			}
-			setCurrentGuess("");
-			return;
-		}
-
-		applyLocalEvent(
-			createPuzzleEvent("guess_added", {
-				guessHash: result.guessHash,
-				matchedWordId: result.matchedSlotId,
-				unlockToken: result.unlockToken,
-			}),
-		);
-
-		if (result.displayWord) {
+		if (result.kind === "new_word") {
+			triggerHaptic(HAPTIC_SUCCESS_PATTERN);
 			if (result.matchedSlotId != null) {
 				setHighlightedWordId(result.matchedSlotId);
 				if (highlightResetTimerRef.current != null) {
@@ -319,35 +384,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					highlightResetTimerRef.current = null;
 				}, 1400);
 			}
-			captureEvent("puzzle_guess_result", {
-				date_key: puzzle.dateKey,
-				guess_length: guess.length,
-				matched: true,
-				puzzle_id: puzzle.id,
-			});
-			toast.success(
-				<span>
-					Correcte! Has trobat <b>{result.displayWord}</b>
-				</span>,
-			);
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
 				window.setTimeout(() => {
 					toast.success("Has completat el joc!");
 				}, 500);
 			}
-		} else {
-			captureEvent("puzzle_guess_result", {
-				date_key: puzzle.dateKey,
-				guess_length: guess.length,
-				matched: false,
-				puzzle_id: puzzle.id,
-			});
-			toast.error(
-				<span>
-					<b>{prettyGuess}</b> no hi és
-				</span>,
-			);
+		} else if (result.kind === "not_in_dictionary") {
+			triggerHaptic(HAPTIC_ERROR_PATTERN);
 		}
 
 		setCurrentGuess("");
@@ -357,25 +401,28 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		currentGuess,
 		derivedProgress,
 		puzzle,
+		showSubmitFeedback,
 		totalWords,
 		triggerHaptic,
 	]);
 
 	const handleLetterClick = useCallback(
 		(letter: string) => {
-			triggerHaptic(8);
+			triggerHaptic(HAPTIC_TAP_MS);
+			clearSubmitFeedback();
 			setCurrentGuess((previous) => previous + letter);
 		},
-		[triggerHaptic],
+		[clearSubmitFeedback, triggerHaptic],
 	);
 
 	const handleBackspace = useCallback(() => {
-		triggerHaptic(8);
+		triggerHaptic(HAPTIC_TAP_MS);
+		clearSubmitFeedback();
 		setCurrentGuess((previous) => previous.slice(0, -1));
-	}, [triggerHaptic]);
+	}, [clearSubmitFeedback, triggerHaptic]);
 
 	const handleShuffle = useCallback(() => {
-		triggerHaptic(8);
+		triggerHaptic(HAPTIC_TAP_MS);
 		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
 		captureEvent("puzzle_letters_shuffled", {
 			date_key: puzzle.dateKey,
@@ -396,7 +443,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	]);
 
 	const handleHint = useCallback(() => {
-		triggerHaptic(8);
+		triggerHaptic(HAPTIC_TAP_MS);
 		if (derivedProgress.hintsUsed >= 3) return;
 		if (!nextHintCellKey) return;
 		captureEvent("puzzle_hint_used", {
@@ -505,6 +552,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		isComplete,
 	]);
 
+	if (!isProgressReady) {
+		return <DailyProgressLoadingState />;
+	}
+
 	return (
 		<div
 			className={`min-h-full px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 ${
@@ -605,6 +656,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							onSubmitGuess={() => {
 								void handleGuess();
 							}}
+							submitFeedback={submitFeedback}
 							runClickAction={runClickAction}
 							runPressAction={runPressAction}
 						/>
@@ -619,6 +671,34 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								revealedAnswers={revealedAnswers}
 								cellLetters={cellLetters}
 							/>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function DailyProgressLoadingState() {
+	return (
+		<div className="min-h-full px-3 pt-4 pb-[calc(21rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-6 sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:px-8 lg:pt-8 lg:pb-24">
+			<div className="mx-auto max-w-5xl">
+				<div className="flex min-h-[calc(100svh-14rem)] items-center justify-center">
+					<div className="flex max-w-sm flex-col items-center gap-4 rounded-3xl border border-border/70 bg-background/90 px-6 py-8 text-center shadow-sm backdrop-blur-sm">
+						<div className="rounded-full border border-primary/20 bg-primary/10 p-3 text-primary">
+							<Loader2Icon className="size-6 animate-spin" />
+						</div>
+						<div className="space-y-1.5">
+							<p className="text-sm font-semibold tracking-[0.16em] text-primary/70 uppercase font-ui">
+								Carregant
+							</p>
+							<h2 className="text-lg font-semibold tracking-tight">
+								Recuperant el teu progrés
+							</h2>
+							<p className="text-sm text-muted-foreground">
+								Estem restaurant les paraules trobades i les pistes
+								d&apos;aquesta partida.
+							</p>
 						</div>
 					</div>
 				</div>

@@ -62,6 +62,7 @@ describe("getNextHintCellKey", () => {
 					gridMask: [[{ wordIds: [0] }, { wordIds: [0] }, { wordIds: [0] }]],
 					letters: ["a", "b", "c"],
 					initialShuffledLetters: ["a", "b", "c"],
+					validNormalizedGuesses: [],
 					wordSlots: [],
 					hintCapsules: [
 						{ cellKey: "0,0", hintSalt: "salt-0", hintCapsule: "capsule-0" },
@@ -86,6 +87,7 @@ describe("getNextHintCellKey", () => {
 					gridMask: [[{ wordIds: [0] }, { wordIds: [0] }]],
 					letters: ["a", "b"],
 					initialShuffledLetters: ["a", "b"],
+					validNormalizedGuesses: [],
 					wordSlots: [],
 					hintCapsules: [
 						{ cellKey: "0,0", hintSalt: "salt-0", hintCapsule: "capsule-0" },

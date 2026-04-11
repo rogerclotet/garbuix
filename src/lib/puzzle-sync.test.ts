@@ -19,6 +19,7 @@ describe("puzzle-sync", () => {
 			gridMask: [[{ wordIds: [0] }, { wordIds: [0] }, { wordIds: [0] }]],
 			letters: ["c", "a", "s"],
 			initialShuffledLetters: ["a", "c", "s"],
+			validNormalizedGuesses: ["cas"],
 			wordSlots: [
 				{
 					id: 0,

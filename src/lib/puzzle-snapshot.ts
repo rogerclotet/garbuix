@@ -168,6 +168,7 @@ export async function buildPuzzleSnapshots(options: {
 		gridMask: toGridMask(crossword.grid),
 		letters,
 		initialShuffledLetters,
+		validNormalizedGuesses: [],
 		wordSlots: wordSlotsPublic,
 		hintCapsules,
 	};
@@ -241,11 +242,15 @@ export function hydratePublicSnapshotWordMetadata(options: {
 	});
 
 	if (!changed) {
-		return publicSnapshot;
+		return {
+			...publicSnapshot,
+			validNormalizedGuesses: publicSnapshot.validNormalizedGuesses ?? [],
+		};
 	}
 
 	return {
 		...publicSnapshot,
+		validNormalizedGuesses: publicSnapshot.validNormalizedGuesses ?? [],
 		wordSlots,
 	};
 }

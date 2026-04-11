@@ -20,6 +20,10 @@ import {
 	getYesterdayDateKey,
 } from "@/lib/puzzle-dates";
 import {
+	buildNormalizedDictionary,
+	getValidNormalizedGuessesForLetters,
+} from "@/lib/puzzle-dictionary";
+import {
 	buildSyncedProgressState,
 	createEmptyProgressState,
 	getCompatibleProgress,
@@ -47,8 +51,10 @@ import type {
 export const PUZZLE_ALGORITHM_VERSION = "3";
 
 const serverWords = allWords as Word[];
+const normalizedServerWords = buildNormalizedDictionary(serverWords);
 
 let cachedDictionaryVersion: Promise<string> | null = null;
+const validNormalizedGuessesCache = new Map<string, string[]>();
 
 function toSessionUser(
 	sessionData: Awaited<ReturnType<typeof getAuthSession>>,
@@ -127,6 +133,22 @@ async function getDictionaryVersion() {
 	}
 
 	return cachedDictionaryVersion;
+}
+
+function getDailyValidNormalizedGuesses(letters: string[]) {
+	const cacheKey = [...letters].sort().join("");
+	const cachedGuesses = validNormalizedGuessesCache.get(cacheKey);
+
+	if (cachedGuesses) {
+		return cachedGuesses;
+	}
+
+	const validGuesses = getValidNormalizedGuessesForLetters(
+		normalizedServerWords,
+		letters,
+	);
+	validNormalizedGuessesCache.set(cacheKey, validGuesses);
+	return validGuesses;
 }
 
 export async function getAuthSession() {
@@ -226,6 +248,9 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 		puzzle: {
 			...publicSnapshot,
 			hintCapsules,
+			validNormalizedGuesses: getDailyValidNormalizedGuesses(
+				publicSnapshot.letters,
+			),
 		},
 		rolloverAt: getNextRolloverAt().toISOString(),
 		sessionUser: toSessionUser(sessionData),

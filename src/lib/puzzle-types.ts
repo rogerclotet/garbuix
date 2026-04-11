@@ -39,6 +39,7 @@ export type DailyPuzzlePublic = {
 	gridMask: (PuzzleGridMaskCell | null)[][];
 	letters: string[];
 	initialShuffledLetters: string[];
+	validNormalizedGuesses: string[];
 	wordSlots: DailyPuzzleWordSlot[];
 	hintCapsules: DailyPuzzleHintCapsule[];
 };
