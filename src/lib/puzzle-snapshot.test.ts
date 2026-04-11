@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildPuzzleSnapshots,
 	ensureHintCapsulesCoverGrid,
+	hydratePublicSnapshotWordMetadata,
 } from "@/lib/puzzle-snapshot";
 
 describe("puzzle-snapshot", () => {
@@ -167,5 +168,104 @@ describe("puzzle-snapshot", () => {
 				},
 			}),
 		).rejects.toThrow(/Duplicate normalized answer "consol"/);
+	});
+
+	it("stores middot metadata without counting the dot as a playable letter", async () => {
+		const { privateSnapshot, publicSnapshot } = await buildPuzzleSnapshots({
+			puzzleId: "puzzle-5",
+			dateKey: "2026-04-02",
+			seed: 260402,
+			algorithmVersion: "1",
+			letters: ["c", "o", "l", "a", "b", "r"],
+			initialShuffledLetters: ["r", "b", "a", "l", "o", "c"],
+			crossword: {
+				rows: 1,
+				cols: 10,
+				grid: [
+					Array.from("collaborar").map((letter) => ({
+						letter,
+						wordIds: [0],
+					})),
+				],
+				words: [
+					{
+						id: 0,
+						startRow: 0,
+						startCol: 0,
+						direction: "horizontal",
+						revealed: false,
+						word: {
+							name: "col·laborar",
+							areatematica: "Verb",
+							frequency: 1,
+						},
+					},
+				],
+			},
+		});
+
+		expect(publicSnapshot.wordSlots[0]).toMatchObject({
+			length: 10,
+			middleDotAfterIndices: [2],
+		});
+		expect(privateSnapshot.wordSlots[0]?.displayWord).toBe("col·laborar");
+		expect(privateSnapshot.gridLetters[0]).toEqual(Array.from("collaborar"));
+	});
+
+	it("backfills middot metadata for older public snapshots from the private snapshot", () => {
+		const upgradedSnapshot = hydratePublicSnapshotWordMetadata({
+			publicSnapshot: {
+				id: "puzzle-6",
+				dateKey: "2026-04-03",
+				seed: 260403,
+				algorithmVersion: "2",
+				rows: 1,
+				cols: 10,
+				gridMask: [
+					Array.from({ length: 10 }, () => ({
+						wordIds: [0],
+					})),
+				],
+				letters: ["c", "o", "l", "a", "b", "r"],
+				initialShuffledLetters: ["c", "o", "l", "a", "b", "r"],
+				wordSlots: [
+					{
+						id: 0,
+						startRow: 0,
+						startCol: 0,
+						direction: "horizontal",
+						length: 11,
+						slotSalt: "slot-0",
+						answerHash: "hash-0",
+						answerCapsule: "capsule-0",
+					},
+				],
+				hintCapsules: [],
+			},
+			privateSnapshot: {
+				id: "puzzle-6",
+				dateKey: "2026-04-03",
+				seed: 260403,
+				rows: 1,
+				cols: 10,
+				gridLetters: [Array.from("collaborar")],
+				letters: ["c", "o", "l", "a", "b", "r"],
+				wordSlots: [
+					{
+						id: 0,
+						displayWord: "col·laborar",
+						normalizedWord: "collaborar",
+						startRow: 0,
+						startCol: 0,
+						direction: "horizontal",
+					},
+				],
+			},
+		});
+
+		expect(upgradedSnapshot.wordSlots[0]).toMatchObject({
+			length: 10,
+			middleDotAfterIndices: [2],
+		});
 	});
 });

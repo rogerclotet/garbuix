@@ -28,6 +28,7 @@ import {
 import {
 	buildPuzzleSnapshots,
 	ensureHintCapsulesCoverGrid,
+	hydratePublicSnapshotWordMetadata,
 	toPuzzlePreview,
 } from "@/lib/puzzle-snapshot";
 import {
@@ -43,7 +44,7 @@ import type {
 	SessionUser,
 } from "@/lib/puzzle-types";
 
-export const PUZZLE_ALGORITHM_VERSION = "2";
+export const PUZZLE_ALGORITHM_VERSION = "3";
 
 const serverWords = allWords as Word[];
 
@@ -209,17 +210,21 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	const historyEntries = sessionData
 		? await getHistoryEntriesForUser(sessionData.user.id)
 		: null;
+	const publicSnapshot = hydratePublicSnapshotWordMetadata({
+		publicSnapshot: puzzle.publicSnapshotJson,
+		privateSnapshot: puzzle.privateSnapshotJson,
+	});
 	const hintCapsules = await ensureHintCapsulesCoverGrid({
-		puzzleId: puzzle.publicSnapshotJson.id,
-		seed: puzzle.publicSnapshotJson.seed,
+		puzzleId: publicSnapshot.id,
+		seed: publicSnapshot.seed,
 		gridLetters: puzzle.privateSnapshotJson.gridLetters,
-		existingHintCapsules: puzzle.publicSnapshotJson.hintCapsules,
+		existingHintCapsules: publicSnapshot.hintCapsules,
 	});
 
 	return {
 		historyEntries,
 		puzzle: {
-			...puzzle.publicSnapshotJson,
+			...publicSnapshot,
 			hintCapsules,
 		},
 		rolloverAt: getNextRolloverAt().toISOString(),

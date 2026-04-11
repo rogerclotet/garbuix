@@ -5,7 +5,7 @@ import {
 	sealAnswerCapsule,
 	sealHintCapsule,
 } from "@/lib/puzzle-crypto";
-import { normalizeWord } from "@/lib/puzzle-text";
+import { getWordLayout, normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzleHintCapsule,
 	DailyPuzzlePreview,
@@ -46,6 +46,14 @@ function toHintCandidates(
 
 function createHintSalt(puzzleId: string, cellKey: string) {
 	return `${puzzleId}:hint:${cellKey}`;
+}
+
+function toPublicWordSlotMetadata(displayWord: string) {
+	const { length, middleDotAfterIndices } = getWordLayout(displayWord);
+	return {
+		length,
+		middleDotAfterIndices,
+	};
 }
 
 export async function ensureHintCapsulesCoverGrid(options: {
@@ -118,13 +126,17 @@ export async function buildPuzzleSnapshots(options: {
 			wordPlacement.word.name,
 			unlockToken,
 		);
+		const { length, middleDotAfterIndices } = toPublicWordSlotMetadata(
+			wordPlacement.word.name,
+		);
 
 		wordSlotsPublic.push({
 			id: wordPlacement.id,
 			startRow: wordPlacement.startRow,
 			startCol: wordPlacement.startCol,
 			direction: wordPlacement.direction,
-			length: wordPlacement.word.name.length,
+			length,
+			middleDotAfterIndices,
 			slotSalt,
 			answerHash,
 			answerCapsule,
@@ -172,6 +184,70 @@ export async function buildPuzzleSnapshots(options: {
 	};
 
 	return { publicSnapshot, privateSnapshot };
+}
+
+export function hydratePublicSnapshotWordMetadata(options: {
+	publicSnapshot: DailyPuzzlePublic;
+	privateSnapshot: DailyPuzzlePrivate;
+}) {
+	const { privateSnapshot, publicSnapshot } = options;
+	const hasLegacyMiddleDotCells = privateSnapshot.gridLetters.some((row) =>
+		row.some((letter) => letter === "·"),
+	);
+
+	if (hasLegacyMiddleDotCells) {
+		return publicSnapshot;
+	}
+
+	const privateWordsById = new Map(
+		privateSnapshot.wordSlots.map((wordSlot) => [wordSlot.id, wordSlot]),
+	);
+	let changed = false;
+
+	const wordSlots = publicSnapshot.wordSlots.map((slot) => {
+		const privateWord = privateWordsById.get(slot.id);
+		if (!privateWord) {
+			if (slot.middleDotAfterIndices != null) {
+				return slot;
+			}
+
+			changed = true;
+			return {
+				...slot,
+				middleDotAfterIndices: [],
+			};
+		}
+
+		const { length, middleDotAfterIndices } = toPublicWordSlotMetadata(
+			privateWord.displayWord,
+		);
+		const existingMiddleDotAfterIndices = slot.middleDotAfterIndices ?? [];
+		const middleDotsMatch =
+			existingMiddleDotAfterIndices.length === middleDotAfterIndices.length &&
+			existingMiddleDotAfterIndices.every(
+				(index, position) => index === middleDotAfterIndices[position],
+			);
+
+		if (slot.length === length && middleDotsMatch) {
+			return slot;
+		}
+
+		changed = true;
+		return {
+			...slot,
+			length,
+			middleDotAfterIndices,
+		};
+	});
+
+	if (!changed) {
+		return publicSnapshot;
+	}
+
+	return {
+		...publicSnapshot,
+		wordSlots,
+	};
 }
 
 export function toPuzzlePreview(

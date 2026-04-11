@@ -30,6 +30,29 @@ export function DailyGrid({
 			]),
 		);
 	}, [highlightedWordId, puzzle.wordSlots]);
+	const middleDotMarkers = useMemo(() => {
+		const markers = new Map<string, { bottom: boolean; right: boolean }>();
+
+		for (const slot of puzzle.wordSlots) {
+			for (const index of slot.middleDotAfterIndices ?? []) {
+				const cellKey = getSlotCellKey(slot, index);
+				const existing = markers.get(cellKey) ?? {
+					bottom: false,
+					right: false,
+				};
+
+				if (slot.direction === "horizontal") {
+					existing.right = true;
+				} else {
+					existing.bottom = true;
+				}
+
+				markers.set(cellKey, existing);
+			}
+		}
+
+		return markers;
+	}, [puzzle.wordSlots]);
 
 	return (
 		<div
@@ -48,6 +71,7 @@ export function DailyGrid({
 						const isRevealed = revealedCells.has(key);
 						const highlightedLetterIndex = highlightedCellOrder.get(key);
 						const isJustGuessed = highlightedLetterIndex != null;
+						const middleDotMarker = middleDotMarkers.get(key);
 
 						if (!cell) {
 							return <div key={key} className="aspect-square bg-transparent" />;
@@ -63,7 +87,7 @@ export function DailyGrid({
 											} as CSSProperties)
 										: undefined
 								}
-								className={`aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-colors duration-300 ${
+								className={`relative aspect-square border rounded-[0.4rem] sm:rounded-[0.6rem] flex items-center justify-center font-bold leading-none text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] transition-colors duration-300 ${
 									isRevealed
 										? "bg-primary/12 border-primary/40 text-foreground"
 										: "bg-muted border-border/50"
@@ -80,6 +104,22 @@ export function DailyGrid({
 								) : (
 									""
 								)}
+								{middleDotMarker?.right ? (
+									<span
+										aria-hidden
+										className="pointer-events-none absolute top-1/2 right-[-0.2em] z-10 -translate-y-1/2 text-[0.9em] leading-none text-primary/70"
+									>
+										·
+									</span>
+								) : null}
+								{middleDotMarker?.bottom ? (
+									<span
+										aria-hidden
+										className="pointer-events-none absolute bottom-[-0.28em] left-1/2 z-10 -translate-x-1/2 text-[0.9em] leading-none text-primary/70"
+									>
+										·
+									</span>
+								) : null}
 							</div>
 						);
 					}),

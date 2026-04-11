@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildCellLetters,
+	getDisplayedSlotWord,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
 	getSortedWordSlots,
@@ -157,5 +159,34 @@ describe("getSortedWordSlots", () => {
 
 		expect(notFoundSlots.map((slot) => slot.id)).toEqual([2, 0]);
 		expect(foundSlots.map((slot) => slot.id)).toEqual([3, 1]);
+	});
+
+	it("shows middots as free hints without adding extra playable cells", () => {
+		const slot = {
+			id: 0,
+			startRow: 0,
+			startCol: 0,
+			direction: "horizontal" as const,
+			length: 10,
+			middleDotAfterIndices: [2],
+			slotSalt: "slot-0",
+			answerHash: "hash-0",
+			answerCapsule: "capsule-0",
+		};
+
+		const cellLetters = buildCellLetters(
+			[slot],
+			{
+				0: "col·laborar",
+			},
+			{},
+		);
+
+		expect(getDisplayedSlotWord(slot, new Map())).toBe("___·_______");
+		expect(getDisplayedSlotWord(slot, cellLetters)).toBe("COL·LABORAR");
+		expect(cellLetters.size).toBe(10);
+		expect(cellLetters.get("0,2")).toBe("l");
+		expect(cellLetters.get("0,3")).toBe("l");
+		expect(cellLetters.has("0,10")).toBe(false);
 	});
 });

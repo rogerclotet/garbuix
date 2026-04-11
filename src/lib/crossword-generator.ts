@@ -2,6 +2,7 @@
 
 import type { Word } from "@/data/types";
 import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
+import { getWordLayout, normalizeWord } from "@/lib/puzzle-text";
 
 const DEFAULT_MIN_WORDS = 10;
 const DEFAULT_MAX_WORDS = 15;
@@ -375,18 +376,15 @@ function createRankBiasedIndex(length: number, random: SeededRandom): number {
 	);
 }
 
-/**
- * Normalize a word by removing accents and converting to lowercase
- */
-export function normalizeWord(word: string): string {
-	return word
-		.toLowerCase()
-		.normalize("NFD")
-		.replace(/c\u0327/g, "ç") // Keep ç as a distinct letter
-		.replace(/[\u0300-\u036f]/g, "") // Remove other diacritics
-		.normalize("NFC")
-		.replace(/[·]/g, ""); // Remove middle dot
+function getWordCells(word: WordLike): string[] {
+	return getWordLayout(word.name).letters;
 }
+
+function getWordCellCount(word: WordLike): number {
+	return getWordLayout(word.name).length;
+}
+
+export { normalizeWord };
 
 /**
  * Check if two words match when normalized (without accents)
@@ -412,7 +410,10 @@ export function generateCrossword(
 	// Filter words: 4-12 letters, only letters
 	const candidateWords = prioritizeWords(
 		uniqueWords
-			.filter((w) => w.name.length >= 4 && w.name.length <= 12)
+			.filter((w) => {
+				const length = getWordCellCount(w);
+				return length >= 4 && length <= 12;
+			})
 			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
 		random,
 		wordPenalties,
@@ -464,9 +465,10 @@ function tryGenerateCrossword(
 	// Place first word horizontally in the middle
 	const MAX_GRID_SIZE = 15;
 	const firstWord = words[0];
+	const firstWordLetters = getWordCells(firstWord);
 	// Place the first word around the center of the potential 15x15 grid
-	const startRow = Math.floor((MAX_GRID_SIZE - firstWord.name.length) / 2);
-	const startCol = Math.floor((MAX_GRID_SIZE - firstWord.name.length) / 2);
+	const startRow = Math.floor((MAX_GRID_SIZE - firstWordLetters.length) / 2);
+	const startCol = Math.floor((MAX_GRID_SIZE - firstWordLetters.length) / 2);
 
 	placements.push({
 		id: 0,
@@ -477,10 +479,10 @@ function tryGenerateCrossword(
 		revealed: false,
 	});
 
-	for (let i = 0; i < firstWord.name.length; i++) {
+	for (let i = 0; i < firstWordLetters.length; i++) {
 		const key = `${startRow},${startCol + i}`;
 		grid.set(key, {
-			letter: firstWord.name[i],
+			letter: firstWordLetters[i] ?? "",
 			wordIds: [0],
 		});
 	}
@@ -489,12 +491,13 @@ function tryGenerateCrossword(
 	let wordId = 1;
 	for (let i = 1; i < words.length && placements.length < maxWords; i++) {
 		const word = words[i];
+		const wordLetters = getWordCells(word);
 		const placement = findBestPlacement(word, placements, grid, wordId);
 
 		if (placement) {
 			placements.push(placement);
 			// Add to grid
-			for (let j = 0; j < word.name.length; j++) {
+			for (let j = 0; j < wordLetters.length; j++) {
 				const row =
 					placement.direction === "horizontal"
 						? placement.startRow
@@ -510,7 +513,7 @@ function tryGenerateCrossword(
 					existing.wordIds.push(wordId);
 				} else {
 					grid.set(key, {
-						letter: word.name[j],
+						letter: wordLetters[j] ?? "",
 						wordIds: [wordId],
 					});
 				}
@@ -536,8 +539,10 @@ function findBestPlacement(
 	const candidates: Candidate[] = [];
 
 	// Try to find intersections with existing words
+	const wordLetters = getWordCells(word);
 	for (const placement of placements) {
 		const existingWord = placement.word;
+		const existingWordLetters = getWordCells(existingWord);
 
 		// Try both directions
 		for (const direction of ["horizontal", "vertical"] as const) {
@@ -545,12 +550,12 @@ function findBestPlacement(
 			if (direction === placement.direction) continue;
 
 			// Check each letter of the existing word
-			for (let i = 0; i < existingWord.name.length; i++) {
-				const existingLetter = existingWord.name[i];
+			for (let i = 0; i < existingWordLetters.length; i++) {
+				const existingLetter = existingWordLetters[i];
 
 				// Check each letter of the new word
-				for (let j = 0; j < word.name.length; j++) {
-					if (word.name[j] === existingLetter) {
+				for (let j = 0; j < wordLetters.length; j++) {
+					if (wordLetters[j] === existingLetter) {
 						// Found potential intersection
 						let row: number, col: number;
 
@@ -613,14 +618,15 @@ function isValidPlacement(
 	grid: Map<string, GridCell>,
 ): boolean {
 	const MAX_GRID_SIZE = 15;
+	const wordLetters = getWordCells(word);
 
 	// Check bounds
 	if (
 		startRow < 0 ||
 		startCol < 0 ||
 		(direction === "horizontal" &&
-			startCol + word.name.length > MAX_GRID_SIZE) ||
-		(direction === "vertical" && startRow + word.name.length > MAX_GRID_SIZE)
+			startCol + wordLetters.length > MAX_GRID_SIZE) ||
+		(direction === "vertical" && startRow + wordLetters.length > MAX_GRID_SIZE)
 	) {
 		return false;
 	}
@@ -631,7 +637,7 @@ function isValidPlacement(
 	const overlapsByWordId = new Map<number, number>();
 
 	// Check each cell
-	for (let i = 0; i < word.name.length; i++) {
+	for (let i = 0; i < wordLetters.length; i++) {
 		const row = isHorizontal ? startRow : startRow + i;
 		const col = isHorizontal ? startCol + i : startCol;
 		const key = `${row},${col}`;
@@ -639,7 +645,7 @@ function isValidPlacement(
 
 		if (cell) {
 			// Cell is occupied
-			if (cell.letter !== word.name[i]) {
+			if (cell.letter !== wordLetters[i]) {
 				return false; // Letter mismatch
 			}
 			hasIntersection = true;
@@ -675,8 +681,8 @@ function isValidPlacement(
 	// Check before and after the word
 	const beforeRow = isHorizontal ? startRow : startRow - 1;
 	const beforeCol = isHorizontal ? startCol - 1 : startCol;
-	const afterRow = isHorizontal ? startRow : startRow + word.name.length;
-	const afterCol = isHorizontal ? startCol + word.name.length : startCol;
+	const afterRow = isHorizontal ? startRow : startRow + wordLetters.length;
+	const afterCol = isHorizontal ? startCol + wordLetters.length : startCol;
 
 	if (
 		grid.has(`${beforeRow},${beforeCol}`) ||
@@ -697,8 +703,9 @@ function countIntersections(
 ): number {
 	let count = 0;
 	const isHorizontal = direction === "horizontal";
+	const wordLetters = getWordCells(word);
 
-	for (let i = 0; i < word.name.length; i++) {
+	for (let i = 0; i < wordLetters.length; i++) {
 		const row = isHorizontal ? startRow : startRow + i;
 		const col = isHorizontal ? startCol + i : startCol;
 		const key = `${row},${col}`;
@@ -818,6 +825,7 @@ function createFallbackCrossword(words: Word[]): CrosswordGrid {
 	for (let i = 0; i < words.length; i++) {
 		const word = words[i];
 		const direction = i % 2 === 0 ? "horizontal" : "vertical";
+		const wordLetters = getWordCells(word);
 
 		placements.push({
 			id: wordId,
@@ -829,7 +837,7 @@ function createFallbackCrossword(words: Word[]): CrosswordGrid {
 		});
 
 		// Add to grid
-		for (let j = 0; j < word.name.length; j++) {
+		for (let j = 0; j < wordLetters.length; j++) {
 			const row = direction === "horizontal" ? currentRow : currentRow + j;
 			const col = direction === "horizontal" ? currentCol + j : currentCol;
 			const key = `${row},${col}`;
@@ -839,7 +847,7 @@ function createFallbackCrossword(words: Word[]): CrosswordGrid {
 				existing.wordIds.push(wordId);
 			} else {
 				grid.set(key, {
-					letter: word.name[j],
+					letter: wordLetters[j] ?? "",
 					wordIds: [wordId],
 				});
 			}

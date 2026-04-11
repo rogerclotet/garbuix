@@ -57,9 +57,10 @@ export function buildCellLetters(
 	for (const slot of wordSlots) {
 		const answer = revealedAnswers[slot.id];
 		if (!answer) continue;
+		const normalizedAnswer = normalizeWord(answer);
 
-		for (let index = 0; index < answer.length; index += 1) {
-			letters.set(getSlotCellKey(slot, index), answer[index] ?? "");
+		for (let index = 0; index < normalizedAnswer.length; index += 1) {
+			letters.set(getSlotCellKey(slot, index), normalizedAnswer[index] ?? "");
 		}
 	}
 
@@ -128,13 +129,33 @@ export function getGuessKeyboardAction(
 	};
 }
 
+function injectMiddleDots(word: string, middleDotAfterIndices: number[] = []) {
+	if (middleDotAfterIndices.length === 0) {
+		return word;
+	}
+
+	const indices = new Set(middleDotAfterIndices);
+	let decoratedWord = "";
+
+	for (let index = 0; index < word.length; index += 1) {
+		decoratedWord += word[index] ?? "";
+		if (indices.has(index)) {
+			decoratedWord += "·";
+		}
+	}
+
+	return decoratedWord;
+}
+
 export function getDisplayedSlotWord(
 	slot: DailyPuzzleWordSlot,
 	cellLetters: Map<string, string>,
 ) {
-	return Array.from({ length: slot.length }, (_, index) => {
+	const letters = Array.from({ length: slot.length }, (_, index) => {
 		return cellLetters.get(getSlotCellKey(slot, index))?.toUpperCase() ?? "_";
 	}).join("");
+
+	return injectMiddleDots(letters, slot.middleDotAfterIndices);
 }
 
 function countDisplayedSlotLetters(

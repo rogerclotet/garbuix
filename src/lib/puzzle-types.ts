@@ -17,6 +17,7 @@ export type DailyPuzzleWordSlot = {
 	startCol: number;
 	direction: PuzzleDirection;
 	length: number;
+	middleDotAfterIndices?: number[];
 	slotSalt: string;
 	answerHash: string;
 	answerCapsule: string;
