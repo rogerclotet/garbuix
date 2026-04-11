@@ -268,7 +268,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			event: React.PointerEvent<HTMLButtonElement>,
 			action: () => void,
 		): void => {
-			if (event.pointerType === "mouse" && event.button !== 0) {
+			if (event.pointerType === "mouse") {
+				if (event.type !== "pointerdown" || event.button !== 0) {
+					return;
+				}
+			} else if (event.type !== "pointerup") {
 				return;
 			}
 

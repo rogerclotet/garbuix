@@ -107,6 +107,15 @@ function installMatchMediaMock(matches = false) {
 	});
 }
 
+function installVibrateMock() {
+	Object.defineProperty(window.navigator, "vibrate", {
+		configurable: true,
+		value: vi.fn(),
+	});
+
+	return window.navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
+}
+
 function renderDaily() {
 	return render(
 		<Daily
@@ -158,9 +167,17 @@ async function submitCurrentGuess() {
 			button: 0,
 			pointerType: "touch",
 		});
+		fireEvent.pointerUp(screen.getByRole("button", { name: letter }), {
+			button: 0,
+			pointerType: "touch",
+		});
 	}
 
 	fireEvent.pointerDown(screen.getByRole("button", { name: "Comprovar" }), {
+		button: 0,
+		pointerType: "touch",
+	});
+	fireEvent.pointerUp(screen.getByRole("button", { name: "Comprovar" }), {
 		button: 0,
 		pointerType: "touch",
 	});
@@ -242,5 +259,28 @@ describe("Daily submit feedback", () => {
 		expect(feedback.className).toContain(
 			"daily-submit-feedback-reduced-motion",
 		);
+	});
+
+	it("triggers haptics on the first touch release", async () => {
+		const vibrateMock = installVibrateMock();
+
+		renderDaily();
+
+		const letterButton = screen.getByRole("button", { name: "C" });
+		fireEvent.pointerDown(letterButton, {
+			button: 0,
+			pointerType: "touch",
+		});
+		expect(vibrateMock).not.toHaveBeenCalled();
+
+		fireEvent.pointerUp(letterButton, {
+			button: 0,
+			pointerType: "touch",
+		});
+
+		expect(vibrateMock).toHaveBeenCalledWith(14);
+		expect(
+			document.querySelector('[data-slot="current-guess"]')?.textContent,
+		).toBe("c");
 	});
 });

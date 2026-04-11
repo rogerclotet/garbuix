@@ -164,6 +164,9 @@ export function DailyControls({
 										onPointerDown={(event) =>
 											runPressAction(event, () => onLetterClick(letter))
 										}
+										onPointerUp={(event) =>
+											runPressAction(event, () => onLetterClick(letter))
+										}
 										onClick={(event) =>
 											runClickAction(event, () => onLetterClick(letter))
 										}
@@ -175,6 +178,7 @@ export function DailyControls({
 
 							<Button
 								onPointerDown={(event) => runPressAction(event, onSubmitGuess)}
+								onPointerUp={(event) => runPressAction(event, onSubmitGuess)}
 								onClick={(event) => runClickAction(event, onSubmitGuess)}
 								size="icon"
 								className="daily-pressable daily-pressable-submit w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl touch-manipulation"
@@ -189,6 +193,7 @@ export function DailyControls({
 							<Button
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onBackspace)}
+								onPointerUp={(event) => runPressAction(event, onBackspace)}
 								onClick={(event) => runClickAction(event, onBackspace)}
 								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
 								disabled={currentGuess.length === 0}
@@ -220,6 +225,7 @@ export function DailyControls({
 							<Button
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onShuffle)}
+								onPointerUp={(event) => runPressAction(event, onShuffle)}
 								onClick={(event) => runClickAction(event, onShuffle)}
 								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
 							>
