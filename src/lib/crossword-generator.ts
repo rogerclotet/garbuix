@@ -7,10 +7,11 @@ const DEFAULT_MIN_WORDS = 10;
 const DEFAULT_MAX_WORDS = 15;
 const MIN_GRID_COLS = 8;
 const LETTER_CANDIDATE_POOL_SIZE = 256;
-const LETTER_CANDIDATE_RANK_BIAS = 1.4;
-const LETTER_NOVELTY_WEIGHT = 0.5;
-const LETTER_NOVELTY_WINDOW_DAYS = 14;
-const MAX_LETTER_OVERLAP_HARD = 4;
+const LETTER_CANDIDATE_RANK_BIAS = 1.6;
+const LETTER_NOVELTY_WEIGHT = 1.0;
+const LETTER_HEAT_DECAY = 0.4;
+const LETTER_NOVELTY_WINDOW_DAYS = 21;
+const MAX_LETTER_OVERLAP_HARD = 3;
 const LETTER_SET_HISTORY_WINDOW_DAYS = 28;
 const WORD_HISTORY_WINDOW_DAYS = 45;
 const HISTORY_LOOKBACK_DAYS = Math.max(
@@ -21,6 +22,9 @@ const EXACT_LETTER_SET_REPEAT_PENALTY = 14;
 const LETTER_OVERLAP_PENALTY = 1.15;
 const WORD_REPEAT_PENALTY = 1.85;
 const HIGH_WORD_REPEAT_PENALTY = 0.45;
+const MIN_VIABLE_ELIGIBLE_WORDS = 25;
+const WORD_FRESHNESS_PENALTY = 1.5;
+const WORD_PRIORITY_RANDOM_RANGE = 1.5;
 
 /**
  * Seeded random number generator for reproducible crosswords
@@ -192,11 +196,18 @@ function dedupeWordsByNormalizedForm(words: Word[]): Word[] {
 	return [...bestWordByNormalizedForm.values()];
 }
 
-function prioritizeWords(words: Word[], random: SeededRandom): Word[] {
+function prioritizeWords(
+	words: Word[],
+	random: SeededRandom,
+	wordPenalties?: Map<string, number>,
+): Word[] {
 	return words
 		.map((word) => ({
 			word,
-			score: getWordPriority(word) + random.next() * 1.0,
+			score:
+				getWordPriority(word) +
+				random.next() * WORD_PRIORITY_RANDOM_RANGE +
+				(wordPenalties?.get(normalizeWord(word.name)) ?? 0),
 		}))
 		.sort((a, b) => b.score - a.score)
 		.map(({ word }) => word);
@@ -392,6 +403,7 @@ export function generateCrossword(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	random: SeededRandom = new SeededRandom(Date.now()),
+	wordPenalties?: Map<string, number>,
 ): CrosswordGrid {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
@@ -403,6 +415,7 @@ export function generateCrossword(
 			.filter((w) => w.name.length >= 4 && w.name.length <= 12)
 			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
 		random,
+		wordPenalties,
 	);
 	const validWords = candidateWords.slice(
 		0,
@@ -929,7 +942,7 @@ export function computeViableLetterSets(words: Word[]): ViableLetterSet[] {
 			if (valid) eligibleCount++;
 		}
 
-		if (eligibleCount >= DEFAULT_MIN_WORDS) {
+		if (eligibleCount >= MIN_VIABLE_ELIGIBLE_WORDS) {
 			result.push({
 				key,
 				letters: group.letters,
@@ -996,7 +1009,8 @@ export function getRandomLetterSet(
 
 		// Novelty: prefer letters that haven't been used recently
 		const novelty = ls.letters.reduce(
-			(sum, l) => sum + Math.max(0, 1 - (letterHeat.get(l) ?? 0) * 0.3),
+			(sum, l) =>
+				sum + Math.max(0, 1 - (letterHeat.get(l) ?? 0) * LETTER_HEAT_DECAY),
 			0,
 		);
 
@@ -1097,6 +1111,29 @@ function generateDailyCrosswordForSeedInternal(
 	return cache.get(seed) ?? null;
 }
 
+/**
+ * Compute per-word penalties based on recent puzzle history.
+ * Words that appeared in recent puzzles receive a negative score
+ * adjustment so the crossword generator prefers fresh words.
+ */
+function computeWordFreshnessPenalties(
+	recentHistory: DailyPuzzleHistoryEntry[],
+): Map<string, number> {
+	const penalties = new Map<string, number>();
+
+	for (const entry of recentHistory) {
+		const weight = getRecencyWeight(entry.daysAgo, WORD_HISTORY_WINDOW_DAYS);
+		if (weight <= 0) continue;
+
+		for (const wordKey of entry.selectedWordKeys) {
+			const current = penalties.get(wordKey) ?? 0;
+			penalties.set(wordKey, current - weight * WORD_FRESHNESS_PENALTY);
+		}
+	}
+
+	return penalties;
+}
+
 function selectBestDailyCrosswordForSeed(
 	words: Word[],
 	seed: number,
@@ -1108,6 +1145,11 @@ function selectBestDailyCrosswordForSeed(
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
 	const viableLetterSets = computeViableLetterSets(words);
+
+	// Build word freshness penalties from recent history so the crossword
+	// generator deprioritizes words that appeared in recent puzzles.
+	const wordPenalties = computeWordFreshnessPenalties(recentHistory);
+
 	let bestLetters: string[] = [];
 	let bestCrossword: CrosswordGrid | null = null;
 	let bestScore = Number.NEGATIVE_INFINITY;
@@ -1130,6 +1172,7 @@ function selectBestDailyCrosswordForSeed(
 				requiredMinWords,
 				safeMaxWords,
 				random,
+				wordPenalties,
 			);
 			if (
 				result.words.length < requiredMinWords ||
