@@ -91,6 +91,10 @@ vi.mock("./share-progress", () => ({
 	shareProgress: vi.fn(),
 }));
 
+vi.mock("./daily-confetti", () => ({
+	DailyConfetti: vi.fn(() => null),
+}));
+
 function installMatchMediaMock(matches = false) {
 	Object.defineProperty(window, "matchMedia", {
 		writable: true,
@@ -208,6 +212,7 @@ describe("Daily submit feedback", () => {
 	] as const)("shows %s feedback with the correct tone and clears the input", async (kind, expectedClassName) => {
 		resolveGuessMock.mockResolvedValue({
 			kind,
+			isRepeatGuess: false,
 			displayWord: kind === "new_word" ? "cosa" : null,
 			guessHash: `guess-${kind}`,
 			normalizedGuess: "cosa",
@@ -233,10 +238,41 @@ describe("Daily submit feedback", () => {
 		).toBe("");
 	});
 
+	it.each([
+		["valid_but_not_in_puzzle", "opacity-65"],
+		["not_in_dictionary", "text-destructive"],
+	] as const)("shows %s feedback on repeated submit and does not apply a duplicate event", async (kind, expectedClassName) => {
+		resolveGuessMock.mockResolvedValue({
+			kind,
+			isRepeatGuess: true,
+			displayWord: null,
+			guessHash: `guess-${kind}`,
+			normalizedGuess: "cosa",
+			matchedSlotId: null,
+			unlockToken: null,
+		});
+
+		renderDaily();
+		await submitCurrentGuess();
+
+		const feedback = await waitFor(() => {
+			const nextFeedback = document.querySelector(
+				'[data-slot="submit-feedback"]',
+			);
+			expect(nextFeedback).not.toBeNull();
+			return nextFeedback as HTMLElement;
+		});
+
+		expect(feedback.getAttribute("data-feedback-kind")).toBe(kind);
+		expect(feedback.className).toContain(expectedClassName);
+		expect(applyLocalEventMock).not.toHaveBeenCalled();
+	});
+
 	it("disables the feedback animation path when reduced motion is preferred", async () => {
 		installMatchMediaMock(true);
 		resolveGuessMock.mockResolvedValue({
 			kind: "new_word",
+			isRepeatGuess: false,
 			displayWord: "cosa",
 			guessHash: "guess-new-word",
 			normalizedGuess: "cosa",

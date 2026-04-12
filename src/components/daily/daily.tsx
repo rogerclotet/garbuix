@@ -21,6 +21,7 @@ import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
+import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
 import { DailyGrid } from "./daily-grid";
 import {
@@ -92,6 +93,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const submitFeedbackIdRef = useRef(0);
 	const submitFeedbackResetTimerRef = useRef<number | null>(null);
 	const completionTrackedRef = useRef(false);
+	const justCompletedRef = useRef(false);
+	const completionScheduledRef = useRef(false);
+	const completionTransitionTimerRef = useRef<number | null>(null);
+	const [displayComplete, setDisplayComplete] = useState(false);
+	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
 	const { captureEvent, captureException } = useObservability();
 	const { applyLocalEvent, derivedProgress, isProgressReady } =
 		useDailyProgress({
@@ -135,6 +141,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 			if (submitFeedbackResetTimerRef.current != null) {
 				window.clearTimeout(submitFeedbackResetTimerRef.current);
+			}
+			if (completionTransitionTimerRef.current != null) {
+				window.clearTimeout(completionTransitionTimerRef.current);
 			}
 		};
 	}, []);
@@ -364,7 +373,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			result_kind: result.kind,
 		});
 
-		if (result.kind !== "already_found") {
+		if (!result.isRepeatGuess) {
 			applyLocalEvent(
 				createPuzzleEvent("guess_added", {
 					guessHash: result.guessHash,
@@ -390,9 +399,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
-				window.setTimeout(() => {
-					toast.success("Has completat el joc!");
-				}, 500);
+				justCompletedRef.current = true;
 			}
 		} else if (result.kind === "not_in_dictionary") {
 			triggerHaptic(HAPTIC_ERROR_PATTERN);
@@ -471,6 +478,25 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	]);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
+
+	// Delay the visual completion state so the submit feedback animation plays first
+	useEffect(() => {
+		if (!isComplete || completionScheduledRef.current) return;
+		completionScheduledRef.current = true;
+
+		if (justCompletedRef.current) {
+			// User just guessed the last word — wait for the feedback animation
+			justCompletedRef.current = false;
+			completionTransitionTimerRef.current = window.setTimeout(() => {
+				setDisplayComplete(true);
+				setShouldFireConfetti(true);
+				completionTransitionTimerRef.current = null;
+			}, getSubmitFeedbackDuration());
+		} else {
+			// Puzzle was already complete on load — show immediately, no confetti
+			setDisplayComplete(true);
+		}
+	}, [isComplete]);
 
 	const handleShare = useCallback(async () => {
 		try {
@@ -561,125 +587,131 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	}
 
 	return (
-		<div
-			className={`min-h-full px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 ${
-				isComplete
-					? "pb-6 sm:pb-8 lg:pb-24"
-					: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
-			}`}
-		>
-			<div className="max-w-5xl mx-auto">
-				<div className={`mb-4 sm:mb-6 ${isComplete ? "pt-2 sm:pt-0" : ""}`}>
-					{isComplete ? (
-						<div className="space-y-1">
-							<p className="text-sm font-medium text-muted-foreground font-ui">
-								Felicitats!
-							</p>
-							<h2 className="text-xl font-semibold tracking-tight">
-								Has completat el joc
-							</h2>
-							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
-								<span>
-									{derivedProgress.guessCount} intent
-									{derivedProgress.guessCount === 1 ? "" : "s"}
-								</span>
-								<span>
-									{derivedProgress.hintsUsed === 1
-										? `${derivedProgress.hintsUsed} pista`
-										: `${derivedProgress.hintsUsed} pistes`}
-								</span>
-								{streakStats.currentStreak >= 3 ? (
-									<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
-								) : null}
-								<Button
-									variant="ghost"
-									size="sm"
-									className="gap-1.5 h-7 px-2 ml-auto"
-									onClick={() => void handleShare()}
-								>
-									<Share2 className="w-3.5 h-3.5" />
-									Compartir
-								</Button>
-							</div>
-						</div>
-					) : (
-						<>
-							<div className="mb-2 flex items-center justify-between text-sm font-medium text-muted-foreground font-ui">
-								<span>
-									{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
-									paraules trobades
-								</span>
-								<div className="flex items-center gap-3">
+		<>
+			<DailyConfetti fire={shouldFireConfetti} />
+			<div
+				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 ${
+					displayComplete
+						? "pb-6 sm:pb-8 lg:pb-24"
+						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
+				}`}
+			>
+				<div className="max-w-5xl mx-auto">
+					<div
+						className={`mb-4 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+					>
+						{displayComplete ? (
+							<div className="space-y-1">
+								<p className="text-sm font-medium text-muted-foreground font-ui">
+									Felicitats!
+								</p>
+								<h2 className="text-xl font-semibold tracking-tight">
+									Has completat el joc
+								</h2>
+								<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
 									<span>
 										{derivedProgress.guessCount} intent
 										{derivedProgress.guessCount === 1 ? "" : "s"}
 									</span>
+									<span>
+										{derivedProgress.hintsUsed === 1
+											? `${derivedProgress.hintsUsed} pista`
+											: `${derivedProgress.hintsUsed} pistes`}
+									</span>
+									{streakStats.currentStreak >= 3 ? (
+										<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
+									) : null}
 									<Button
 										variant="ghost"
 										size="sm"
-										className="gap-1.5 h-7 px-2 -mr-2"
+										className="gap-1.5 h-7 px-2 ml-auto"
 										onClick={() => void handleShare()}
 									>
 										<Share2 className="w-3.5 h-3.5" />
+										Compartir
 									</Button>
 								</div>
 							</div>
+						) : (
+							<>
+								<div className="mb-2 flex items-center justify-between text-sm font-medium text-muted-foreground font-ui">
+									<span>
+										{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
+										paraules trobades
+									</span>
+									<div className="flex items-center gap-3">
+										<span>
+											{derivedProgress.guessCount} intent
+											{derivedProgress.guessCount === 1 ? "" : "s"}
+										</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											className="gap-1.5 h-7 px-2 -mr-2"
+											onClick={() => void handleShare()}
+										>
+											<Share2 className="w-3.5 h-3.5" />
+										</Button>
+									</div>
+								</div>
 
-							<Progress
-								value={derivedProgress.guessedWordIds.length}
-								max={totalWords}
-								className="h-2"
-							/>
-						</>
-					)}
-				</div>
-
-				<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-					<div>
-						<DailyGrid
-							puzzle={puzzle}
-							revealedCells={revealedCells}
-							cellLetters={cellLetters}
-							highlightedWordId={highlightedWordId}
-						/>
+								<Progress
+									value={derivedProgress.guessedWordIds.length}
+									max={totalWords}
+									className="h-2"
+								/>
+							</>
+						)}
 					</div>
 
-					<div className="mt-6 lg:mt-0 lg:space-y-6">
-						<DailyControls
-							canUseHint={
-								derivedProgress.hintsUsed < 3 && nextHintCellKey != null
-							}
-							currentGuess={currentGuess}
-							hintsUsed={derivedProgress.hintsUsed}
-							isComplete={isComplete}
-							shuffledLetters={derivedProgress.shuffledLetters}
-							onBackspace={handleBackspace}
-							onHint={handleHint}
-							onLetterClick={handleLetterClick}
-							onShuffle={handleShuffle}
-							onSubmitGuess={() => {
-								void handleGuess();
-							}}
-							submitFeedback={submitFeedback}
-							runClickAction={runClickAction}
-							runPressAction={runPressAction}
-						/>
-
+					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
 						<div>
-							<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
-								Paraules ({derivedProgress.guessedWordIds.length}/{totalWords})
-							</h3>
-							<DailyWordList
+							<DailyGrid
 								puzzle={puzzle}
-								guessedWordIds={derivedProgress.guessedWordIds}
-								revealedAnswers={revealedAnswers}
+								revealedCells={revealedCells}
 								cellLetters={cellLetters}
+								highlightedWordId={highlightedWordId}
 							/>
+						</div>
+
+						<div className="mt-6 lg:mt-0 lg:space-y-6">
+							<DailyControls
+								canUseHint={
+									derivedProgress.hintsUsed < 3 && nextHintCellKey != null
+								}
+								currentGuess={currentGuess}
+								hintsUsed={derivedProgress.hintsUsed}
+								isComplete={displayComplete}
+								shuffledLetters={derivedProgress.shuffledLetters}
+								onBackspace={handleBackspace}
+								onHint={handleHint}
+								onLetterClick={handleLetterClick}
+								onShuffle={handleShuffle}
+								onSubmitGuess={() => {
+									void handleGuess();
+								}}
+								submitFeedback={submitFeedback}
+								runClickAction={runClickAction}
+								runPressAction={runPressAction}
+							/>
+
+							<div>
+								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
+									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
+									)
+								</h3>
+								<DailyWordList
+									puzzle={puzzle}
+									guessedWordIds={derivedProgress.guessedWordIds}
+									revealedAnswers={revealedAnswers}
+									cellLetters={cellLetters}
+								/>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
+		</>
 	);
 }
 

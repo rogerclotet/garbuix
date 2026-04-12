@@ -144,7 +144,10 @@ export function renderProgressCanvas(
 	canvas.style.width = `${canvasW}px`;
 	canvas.style.height = `${canvasH}px`;
 
-	const ctx = canvas.getContext("2d")!;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) {
+		throw new Error("Canvas 2D context is unavailable.");
+	}
 	ctx.scale(dpr, dpr);
 
 	// Background

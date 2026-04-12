@@ -34,9 +34,11 @@ export async function resolveGuess(options: {
 		options.progress.guessedWordIds.includes(matchedSlot.id);
 	const isDuplicateGuess = options.progress.guessHashes.includes(guessHash);
 
-	if (isAlreadyFound || isDuplicateGuess) {
+	// Word was already correctly found in the puzzle (or hash matches a puzzle word)
+	if (isAlreadyFound || (isDuplicateGuess && matchedSlot != null)) {
 		return {
 			kind: "already_found" as const,
+			isRepeatGuess: true,
 			displayWord:
 				matchedSlot != null
 					? await decryptWordFromGuess(matchedSlot, normalizedGuess)
@@ -50,11 +52,27 @@ export async function resolveGuess(options: {
 		};
 	}
 
+	// Word was tried before but isn't in the puzzle — repeat the original feedback
+	if (isDuplicateGuess) {
+		return {
+			kind: options.puzzle.validNormalizedGuesses.includes(normalizedGuess)
+				? ("valid_but_not_in_puzzle" as const)
+				: ("not_in_dictionary" as const),
+			isRepeatGuess: true,
+			displayWord: null,
+			guessHash,
+			normalizedGuess,
+			matchedSlotId: null,
+			unlockToken: null,
+		};
+	}
+
 	if (!matchedSlot) {
 		return {
 			kind: options.puzzle.validNormalizedGuesses.includes(normalizedGuess)
 				? ("valid_but_not_in_puzzle" as const)
 				: ("not_in_dictionary" as const),
+			isRepeatGuess: false,
 			displayWord: null,
 			guessHash,
 			normalizedGuess,
@@ -69,6 +87,7 @@ export async function resolveGuess(options: {
 	);
 	return {
 		kind: "new_word" as const,
+		isRepeatGuess: false,
 		displayWord: await openAnswerCapsule(
 			matchedSlot.answerCapsule,
 			unlockToken,

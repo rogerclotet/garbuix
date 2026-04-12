@@ -21,23 +21,27 @@ function readBuildVersion() {
 	}
 }
 
-const config = defineConfig(() => {
+const config = defineConfig(({ mode }) => {
 	const port = Number(process.env.PORT ?? 3000);
 	const isDockerDev = process.env.DOCKER_DEV === "true";
 	const buildVersion = readBuildVersion();
+	const isTest = mode === "test";
+	const plugins = isTest
+		? [viteReact()]
+		: [
+				devtools(),
+				nitro(),
+				tailwindcss(),
+				tanstackStart(),
+				viteReact(),
+				babel({ presets: [reactCompilerPreset()] }),
+			];
 
 	return {
 		define: {
 			__APP_VERSION__: JSON.stringify(buildVersion),
 		},
-		plugins: [
-			devtools(),
-			nitro(),
-			tailwindcss(),
-			tanstackStart(),
-			viteReact(),
-			babel({ presets: [reactCompilerPreset()] }),
-		],
+		plugins,
 		resolve: {
 			tsconfigPaths: true,
 		},
@@ -64,8 +68,15 @@ const config = defineConfig(() => {
 			environmentMatchGlobs: [["src/components/**/*.test.tsx", "jsdom"]],
 			server: {
 				deps: {
+					external: [
+						"react",
+						"react-dom",
+						"react/jsx-runtime",
+						"react/jsx-dev-runtime",
+						/^react(?:\/.*)?$/,
+						/^react-dom(?:\/.*)?$/,
+					],
 					fallbackCJS: true,
-					inline: ["react", "react-dom", "@testing-library/react"],
 				},
 			},
 		},

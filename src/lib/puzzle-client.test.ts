@@ -54,6 +54,7 @@ describe("resolveGuess", () => {
 		});
 
 		expect(result.kind).toBe("new_word");
+		expect(result.isRepeatGuess).toBe(false);
 		expect(result.normalizedGuess).toBe("cosa");
 		expect(result.displayWord).toBe("cosa");
 		expect(result.matchedSlotId).toBe(0);
@@ -81,11 +82,12 @@ describe("resolveGuess", () => {
 		});
 
 		expect(result.kind).toBe("already_found");
+		expect(result.isRepeatGuess).toBe(true);
 		expect(result.displayWord).toBe("cosa");
 		expect(result.matchedSlotId).toBe(0);
 	});
 
-	it("classifies a duplicate exact guess hash as already found", async () => {
+	it("re-emits valid_but_not_in_puzzle when the same valid non-puzzle word is guessed again", async () => {
 		const puzzle = await buildTestPuzzle();
 		const guessHash = await createGuessHash(puzzle.id, "saco");
 		const progress = {
@@ -100,7 +102,29 @@ describe("resolveGuess", () => {
 			guess: "saco",
 		});
 
-		expect(result.kind).toBe("already_found");
+		expect(result.kind).toBe("valid_but_not_in_puzzle");
+		expect(result.isRepeatGuess).toBe(true);
+		expect(result.displayWord).toBeNull();
+		expect(result.matchedSlotId).toBeNull();
+	});
+
+	it("re-emits not_in_dictionary when the same unknown word is guessed again", async () => {
+		const puzzle = await buildTestPuzzle();
+		const guessHash = await createGuessHash(puzzle.id, "xoca");
+		const progress = {
+			...createEmptyProgressState(puzzle),
+			guessHashes: [guessHash],
+			guessCount: 1,
+		};
+
+		const result = await resolveGuess({
+			puzzle,
+			progress,
+			guess: "xoca",
+		});
+
+		expect(result.kind).toBe("not_in_dictionary");
+		expect(result.isRepeatGuess).toBe(true);
 		expect(result.displayWord).toBeNull();
 		expect(result.matchedSlotId).toBeNull();
 	});
@@ -114,6 +138,7 @@ describe("resolveGuess", () => {
 		});
 
 		expect(result.kind).toBe("valid_but_not_in_puzzle");
+		expect(result.isRepeatGuess).toBe(false);
 		expect(result.displayWord).toBeNull();
 		expect(result.matchedSlotId).toBeNull();
 	});
@@ -127,6 +152,7 @@ describe("resolveGuess", () => {
 		});
 
 		expect(result.kind).toBe("not_in_dictionary");
+		expect(result.isRepeatGuess).toBe(false);
 		expect(result.displayWord).toBeNull();
 		expect(result.matchedSlotId).toBeNull();
 	});
