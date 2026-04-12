@@ -1,4 +1,5 @@
 const MADRID_TIME_ZONE = "Europe/Madrid";
+const ONE_HOUR_IN_MS = 60 * 60 * 1000;
 
 function getDateParts(date: Date, timeZone = MADRID_TIME_ZONE) {
 	const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -28,13 +29,18 @@ export function getTodayDateKey(timeZone = MADRID_TIME_ZONE) {
 	return getDateKeyForDate(new Date(), timeZone);
 }
 
+export function addDaysToDateKey(dateKey: string, days: number) {
+	const date = new Date(`${dateKey}T12:00:00.000Z`);
+	date.setUTCDate(date.getUTCDate() + days);
+	return getDateKeyForDate(date, "UTC");
+}
+
+export function getTomorrowDateKey(timeZone = MADRID_TIME_ZONE) {
+	return addDaysToDateKey(getTodayDateKey(timeZone), 1);
+}
+
 export function getYesterdayDateKey(timeZone = MADRID_TIME_ZONE) {
-	const now = new Date();
-	const todayInUtc = new Date(
-		`${getDateKeyForDate(now, timeZone)}T12:00:00.000Z`,
-	);
-	todayInUtc.setUTCDate(todayInUtc.getUTCDate() - 1);
-	return getDateKeyForDate(todayInUtc, "UTC");
+	return addDaysToDateKey(getTodayDateKey(timeZone), -1);
 }
 
 export function dateKeyToSeed(dateKey: string) {
@@ -49,8 +55,11 @@ export function seedToDateKey(seed: number) {
 	return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export function getNextRolloverAt(timeZone = MADRID_TIME_ZONE) {
-	const now = new Date();
+export function getNextRolloverAt(
+	timeZone = MADRID_TIME_ZONE,
+	referenceDate = new Date(),
+) {
+	const now = referenceDate;
 	const currentDateKey = getDateKeyForDate(now, timeZone);
 	let low = now.getTime();
 	let high = low + 48 * 60 * 60 * 1000;
@@ -67,6 +76,34 @@ export function getNextRolloverAt(timeZone = MADRID_TIME_ZONE) {
 	}
 
 	return new Date(high);
+}
+
+export function getNextPregenerationAt(
+	timeZone = MADRID_TIME_ZONE,
+	referenceDate = new Date(),
+	leadTimeMs = ONE_HOUR_IN_MS,
+) {
+	const nextRollover = getNextRolloverAt(timeZone, referenceDate);
+	const pregenerationAt = new Date(nextRollover.getTime() - leadTimeMs);
+
+	if (pregenerationAt.getTime() > referenceDate.getTime()) {
+		return pregenerationAt;
+	}
+
+	const followingRollover = getNextRolloverAt(
+		timeZone,
+		new Date(nextRollover.getTime() + 1_000),
+	);
+	return new Date(followingRollover.getTime() - leadTimeMs);
+}
+
+export function isWithinPregenerationWindow(
+	timeZone = MADRID_TIME_ZONE,
+	referenceDate = new Date(),
+	leadTimeMs = ONE_HOUR_IN_MS,
+) {
+	const nextRollover = getNextRolloverAt(timeZone, referenceDate);
+	return nextRollover.getTime() - referenceDate.getTime() <= leadTimeMs;
 }
 
 export function getMadridTimeZone() {

@@ -1,4 +1,9 @@
-import { getNextRolloverAt, getTodayDateKey } from "@/lib/puzzle-dates";
+import {
+	getNextPregenerationAt,
+	getTodayDateKey,
+	getTomorrowDateKey,
+	isWithinPregenerationWindow,
+} from "@/lib/puzzle-dates";
 import {
 	ensureDailyPuzzleSnapshot,
 	triggerDailyPuzzleGeneration,
@@ -11,30 +16,36 @@ export default function puzzleSchedulerPlugin() {
 	// in-progress cache so a concurrent first-client request won't double-generate.
 	triggerDailyPuzzleGeneration(today);
 
-	// Schedule puzzle generation just after each Madrid midnight so the puzzle
-	// is ready before the first user of the new day arrives.
-	function scheduleNextMidnight() {
-		const nextRollover = getNextRolloverAt();
-		// Add a small buffer so the rollover has definitely occurred before we generate.
-		const delay = nextRollover.getTime() - Date.now() + 2_000;
+	// If the server starts during the final hour before Madrid midnight,
+	// pre-generate tomorrow immediately so the rollover can serve it cold-start free.
+	if (isWithinPregenerationWindow()) {
+		triggerDailyPuzzleGeneration(getTomorrowDateKey());
+	}
+
+	// Pre-generate tomorrow's puzzle one hour before the Madrid rollover.
+	function scheduleNextPregeneration() {
+		const nextPregenerationAt = getNextPregenerationAt();
+		const delay = Math.max(0, nextPregenerationAt.getTime() - Date.now());
 
 		setTimeout(() => {
-			const dateKey = getTodayDateKey();
+			const dateKey = getTomorrowDateKey();
 
 			ensureDailyPuzzleSnapshot(dateKey)
 				.then(() => {
-					console.log(`[puzzle-scheduler] Generated puzzle for ${dateKey}`);
+					console.log(
+						`[puzzle-scheduler] Pre-generated puzzle for ${dateKey}`,
+					);
 				})
 				.catch((err: unknown) => {
 					console.error(
-						`[puzzle-scheduler] Midnight generation failed for ${dateKey}:`,
+						`[puzzle-scheduler] Pre-generation failed for ${dateKey}:`,
 						err,
 					);
 				});
 
-			scheduleNextMidnight();
+			scheduleNextPregeneration();
 		}, delay);
 	}
 
-	scheduleNextMidnight();
+	scheduleNextPregeneration();
 }
