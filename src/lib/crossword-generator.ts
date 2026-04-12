@@ -2,11 +2,7 @@
 
 import type { Word } from "@/data/types";
 import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
-import {
-	getPlayableWordLetters,
-	getWordLayout,
-	normalizeWord,
-} from "@/lib/puzzle-text";
+import { getPlayableWordLetters, normalizeWord } from "@/lib/puzzle-text";
 
 const DEFAULT_MIN_WORDS = 10;
 const DEFAULT_MAX_WORDS = 15;
@@ -117,6 +113,24 @@ type WordLike = {
 	name: string;
 };
 
+type WordRuntimeMetadata = {
+	word: WordLike;
+	normalizedName: string;
+	playableLetters: string[];
+	cellCount: number;
+	uniqueLetters: string[];
+	uniqueLetterKey: string;
+	isCrosswordCandidate: boolean;
+	wordPriority: number;
+};
+
+type CachedWordDataset = {
+	words: Word[];
+	entries: WordRuntimeMetadata[];
+	eligibleWordsByLetterSet: Map<string, Word[]>;
+	viableLetterSets: ViableLetterSet[] | null;
+};
+
 type WordLengthProfile = {
 	total: number;
 	fourLetter: number;
@@ -138,6 +152,13 @@ type WordLengthProfile = {
 const IDEAL_FOUR_LETTER_RATIO = 0.35;
 const IDEAL_SHORT_WORD_RATIO = 0.55;
 const STRONG_DIVERSITY_SCORE = 46;
+const WORD_NAME_PATTERN = /^[a-záàéèíïóòúüç·]+$/i;
+const wordRuntimeCache = new WeakMap<WordLike, WordRuntimeMetadata>();
+let cachedWordDataset: CachedWordDataset | null = null;
+
+function isDictionaryWord(word: WordLike): word is Word {
+	return "frequency" in word && "areatematica" in word;
+}
 
 function getLengthPriority(normalizedLength: number): number {
 	if (normalizedLength === 4) {
@@ -159,23 +180,63 @@ function getLengthPriority(normalizedLength: number): number {
 	return 0.3;
 }
 
-function getWordPriority(word: Word): number {
-	const normalizedLength = normalizeWord(word.name).length;
-	const frequencyScore = Math.log10((word.frequency ?? 0) + 10);
-	const lengthBonus = getLengthPriority(normalizedLength);
-	const partOfSpeechBonus = word.areatematica.includes("Nom")
-		? 0.2
-		: word.areatematica.includes("Adjectiu")
-			? 0.15
-			: word.areatematica.includes("Verb")
-				? 0.1
-				: 0.05;
+function getWordRuntimeMetadata(word: WordLike): WordRuntimeMetadata {
+	const cached = wordRuntimeCache.get(word);
+	if (cached) {
+		return cached;
+	}
 
-	return frequencyScore + lengthBonus + partOfSpeechBonus;
+	const normalizedName = normalizeWord(word.name);
+	const playableLetters = getPlayableWordLetters(word.name);
+	const uniqueLetters = [...new Set(normalizedName)].sort();
+	const wordPriority = isDictionaryWord(word)
+		? Math.log10((word.frequency ?? 0) + 10) +
+			getLengthPriority(normalizedName.length) +
+			(word.areatematica.includes("Nom")
+				? 0.2
+				: word.areatematica.includes("Adjectiu")
+					? 0.15
+					: word.areatematica.includes("Verb")
+						? 0.1
+						: 0.05)
+		: 0;
+	const metadata: WordRuntimeMetadata = {
+		word,
+		normalizedName,
+		playableLetters,
+		cellCount: playableLetters.length,
+		uniqueLetters,
+		uniqueLetterKey: uniqueLetters.join(""),
+		isCrosswordCandidate:
+			playableLetters.length >= 4 &&
+			playableLetters.length <= 12 &&
+			WORD_NAME_PATTERN.test(word.name),
+		wordPriority,
+	};
+
+	wordRuntimeCache.set(word, metadata);
+	return metadata;
+}
+
+function getCachedWordDataset(words: Word[]): CachedWordDataset {
+	if (cachedWordDataset?.words === words) {
+		return cachedWordDataset;
+	}
+
+	cachedWordDataset = {
+		words,
+		entries: words.map((word) => getWordRuntimeMetadata(word)),
+		eligibleWordsByLetterSet: new Map(),
+		viableLetterSets: null,
+	};
+
+	return cachedWordDataset;
 }
 
 function compareWordsForSelection(left: Word, right: Word): number {
-	const priorityDelta = getWordPriority(right) - getWordPriority(left);
+	const priorityDelta =
+		getWordRuntimeMetadata(right).wordPriority -
+		getWordRuntimeMetadata(left).wordPriority;
 	if (priorityDelta !== 0) {
 		return priorityDelta;
 	}
@@ -191,7 +252,7 @@ function dedupeWordsByNormalizedForm(words: Word[]): Word[] {
 	const bestWordByNormalizedForm = new Map<string, Word>();
 
 	for (const word of words) {
-		const normalized = normalizeWord(word.name);
+		const normalized = getWordRuntimeMetadata(word).normalizedName;
 		const existing = bestWordByNormalizedForm.get(normalized);
 		if (!existing || compareWordsForSelection(word, existing) < 0) {
 			bestWordByNormalizedForm.set(normalized, word);
@@ -210,16 +271,18 @@ function prioritizeWords(
 		.map((word) => ({
 			word,
 			score:
-				getWordPriority(word) +
+				getWordRuntimeMetadata(word).wordPriority +
 				random.next() * WORD_PRIORITY_RANDOM_RANGE +
-				(wordPenalties?.get(normalizeWord(word.name)) ?? 0),
+				(wordPenalties?.get(getWordRuntimeMetadata(word).normalizedName) ?? 0),
 		}))
 		.sort((a, b) => b.score - a.score)
 		.map(({ word }) => word);
 }
 
 function getWordLengthProfile(words: WordLike[]): WordLengthProfile {
-	const lengths = words.map((word) => normalizeWord(word.name).length);
+	const lengths = words.map(
+		(word) => getWordRuntimeMetadata(word).normalizedName.length,
+	);
 	const total = lengths.length;
 	const fourLetter = lengths.filter((length) => length === 4).length;
 	const fiveLetter = lengths.filter((length) => length === 5).length;
@@ -381,11 +444,7 @@ function createRankBiasedIndex(length: number, random: SeededRandom): number {
 }
 
 function getWordCells(word: WordLike): string[] {
-	return getPlayableWordLetters(word.name);
-}
-
-function getWordCellCount(word: WordLike): number {
-	return getWordLayout(word.name).length;
+	return getWordRuntimeMetadata(word).playableLetters;
 }
 
 export { normalizeWord };
@@ -413,12 +472,9 @@ export function generateCrossword(
 
 	// Filter words: 4-12 letters, only letters
 	const candidateWords = prioritizeWords(
-		uniqueWords
-			.filter((w) => {
-				const length = getWordCellCount(w);
-				return length >= 4 && length <= 12;
-			})
-			.filter((w) => /^[a-záàéèíïóòúüç·]+$/i.test(w.name)),
+		uniqueWords.filter(
+			(word) => getWordRuntimeMetadata(word).isCrosswordCandidate,
+		),
 		random,
 		wordPenalties,
 	);
@@ -431,18 +487,15 @@ export function generateCrossword(
 		throw new Error("Not enough valid words available");
 	}
 
-	// Try to generate a crossword multiple times
-	for (let attempt = 0; attempt < 50; attempt++) {
-		const result = tryGenerateCrossword(
-			validWords,
-			requiredMinWords,
-			safeMaxWords,
-		);
-		if (result && result.words.length >= requiredMinWords) {
-			const normalizedResult = ensureMinimumGridWidth(result, MIN_GRID_COLS);
-			if (allWordsHaveIntersections(normalizedResult)) {
-				return normalizedResult;
-			}
+	const result = tryGenerateCrossword(
+		validWords,
+		requiredMinWords,
+		safeMaxWords,
+	);
+	if (result && result.words.length >= requiredMinWords) {
+		const normalizedResult = ensureMinimumGridWidth(result, MIN_GRID_COLS);
+		if (allWordsHaveIntersections(normalizedResult)) {
+			return normalizedResult;
 		}
 	}
 
@@ -878,29 +931,35 @@ export function filterWordsByLetters(
 	words: Word[],
 	allowedLetters: string[],
 ): Word[] {
-	const normalizedAllowed = new Set(
-		allowedLetters.map((l) => normalizeWord(l)),
-	);
+	const dataset = getCachedWordDataset(words);
+	const normalizedAllowed = [
+		...new Set(allowedLetters.map((l) => normalizeWord(l))),
+	];
+	const letterSetKey = [...normalizedAllowed].sort().join("");
+	const cachedEligibleWords =
+		dataset.eligibleWordsByLetterSet.get(letterSetKey);
+	if (cachedEligibleWords) {
+		return cachedEligibleWords;
+	}
 
-	return words.filter((word) => {
-		const normalized = normalizeWord(word.name);
-		if (normalized.length < 4) {
-			return false;
-		}
+	const allowedSet = new Set(normalizedAllowed);
 
-		for (const char of normalized) {
-			if (!normalizedAllowed.has(char)) {
+	return dataset.entries
+		.filter((entry) => {
+			if (entry.cellCount < 4) {
 				return false;
 			}
-		}
-		return true;
-	});
-}
 
-let viableLetterSetsCache: {
-	words: Word[];
-	result: ViableLetterSet[];
-} | null = null;
+			for (const char of entry.uniqueLetters) {
+				if (!allowedSet.has(char)) {
+					return false;
+				}
+			}
+
+			return true;
+		})
+		.map((entry) => entry.word as Word);
+}
 
 /**
  * Precompute all viable 6-letter sets from the dictionary.
@@ -909,31 +968,34 @@ let viableLetterSetsCache: {
  * reference equality on the words array.
  */
 export function computeViableLetterSets(words: Word[]): ViableLetterSet[] {
-	if (viableLetterSetsCache?.words === words) {
-		return viableLetterSetsCache.result;
+	const dataset = getCachedWordDataset(words);
+	if (dataset.viableLetterSets) {
+		return dataset.viableLetterSets;
 	}
-
-	// Precompute normalized forms for efficiency
-	const normalizedForms = words.map((w) => normalizeWord(w.name));
 
 	// Find all words with exactly 6 unique letters (length 6-10) and group by letter set
 	const groups = new Map<string, { letters: string[]; maxFrequency: number }>();
-	for (let i = 0; i < words.length; i++) {
-		const norm = normalizedForms[i];
-		const uniqueChars = new Set(norm.split(""));
-		if (uniqueChars.size !== 6 || norm.length < 6 || norm.length > 10) {
+	for (let index = 0; index < dataset.entries.length; index++) {
+		const entry = dataset.entries[index];
+		if (
+			entry.uniqueLetters.length !== 6 ||
+			entry.normalizedName.length < 6 ||
+			entry.normalizedName.length > 10
+		) {
 			continue;
 		}
-		const letters = [...uniqueChars].sort();
-		const key = letters.join("");
+		const key = entry.uniqueLetterKey;
 		const existing = groups.get(key);
 		if (existing) {
 			existing.maxFrequency = Math.max(
 				existing.maxFrequency,
-				words[i].frequency,
+				words[index].frequency,
 			);
 		} else {
-			groups.set(key, { letters, maxFrequency: words[i].frequency });
+			groups.set(key, {
+				letters: entry.uniqueLetters,
+				maxFrequency: words[index].frequency,
+			});
 		}
 	}
 
@@ -941,30 +1003,37 @@ export function computeViableLetterSets(words: Word[]): ViableLetterSet[] {
 	const result: ViableLetterSet[] = [];
 	for (const [key, group] of groups) {
 		const normalizedAllowed = new Set(group.letters);
-		let eligibleCount = 0;
-		for (const norm of normalizedForms) {
-			if (norm.length < 4) continue;
+		const eligibleWords: Word[] = [];
+		for (let index = 0; index < dataset.entries.length; index++) {
+			const entry = dataset.entries[index];
+			if (entry.cellCount < 4) {
+				continue;
+			}
+
 			let valid = true;
-			for (const char of norm) {
+			for (const char of entry.uniqueLetters) {
 				if (!normalizedAllowed.has(char)) {
 					valid = false;
 					break;
 				}
 			}
-			if (valid) eligibleCount++;
+			if (valid) {
+				eligibleWords.push(words[index]);
+			}
 		}
 
-		if (eligibleCount >= MIN_VIABLE_ELIGIBLE_WORDS) {
+		if (eligibleWords.length >= MIN_VIABLE_ELIGIBLE_WORDS) {
+			dataset.eligibleWordsByLetterSet.set(key, eligibleWords);
 			result.push({
 				key,
 				letters: group.letters,
-				eligibleCount,
+				eligibleCount: eligibleWords.length,
 				maxFrequency: group.maxFrequency,
 			});
 		}
 	}
 
-	viableLetterSetsCache = { words, result };
+	dataset.viableLetterSets = result;
 	return result;
 }
 
