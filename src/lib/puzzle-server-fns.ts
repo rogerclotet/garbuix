@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { observeServerAction } from "@/lib/observability-server";
+import { getTodayDateKey } from "@/lib/puzzle-dates";
 import {
+	checkDailyPuzzleExists,
 	getAuthSession,
 	getDailyPuzzlePublicData,
 	getHistoryPageDataForUser,
@@ -9,6 +11,7 @@ import {
 	getUserPuzzleProgressData,
 	importAnonymousProgressForUser,
 	syncPuzzleEventsForUser,
+	triggerDailyPuzzleGeneration,
 } from "@/lib/puzzle-service.server";
 import type {
 	AnonymousImportPayload,
@@ -47,6 +50,14 @@ export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 		return observeServerAction(
 			"getDailyPuzzlePageData",
 			async () => {
+				const dateKey = data?.dateKey ?? getTodayDateKey();
+				const puzzleExists = await checkDailyPuzzleExists(dateKey);
+
+				if (!puzzleExists) {
+					triggerDailyPuzzleGeneration(dateKey);
+					return { status: "generating" as const };
+				}
+
 				const dailyData = await getDailyPuzzlePublicData(data?.dateKey);
 				const progress = dailyData.sessionUser
 					? await getUserPuzzleProgressData(
@@ -56,6 +67,7 @@ export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 					: null;
 
 				return {
+					status: "ready" as const,
 					...dailyData,
 					progress,
 				};
@@ -67,6 +79,30 @@ export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 			},
 		);
 	});
+
+export const pollDailyPuzzleReady = createServerFn({ method: "GET" }).handler(
+	async () => {
+		return observeServerAction("pollDailyPuzzleReady", async () => {
+			const dateKey = getTodayDateKey();
+			const puzzleExists = await checkDailyPuzzleExists(dateKey);
+
+			if (!puzzleExists) {
+				triggerDailyPuzzleGeneration(dateKey);
+				return null;
+			}
+
+			const dailyData = await getDailyPuzzlePublicData(dateKey);
+			const progress = dailyData.sessionUser
+				? await getUserPuzzleProgressData(
+						dailyData.puzzle.id,
+						dailyData.sessionUser.id,
+					)
+				: null;
+
+			return { ...dailyData, progress };
+		});
+	},
+);
 
 export const getSessionUser = createServerFn({ method: "POST" }).handler(
 	async () => observeServerAction("getSessionUser", () => getSessionUserData()),

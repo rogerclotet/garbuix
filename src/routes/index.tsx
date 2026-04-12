@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2Icon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Daily } from "@/components/daily/daily";
-import { getDailyPuzzlePageData } from "@/lib/puzzle-server-fns";
+import type { DailyData } from "@/components/daily/daily-types";
+import {
+	getDailyPuzzlePageData,
+	pollDailyPuzzleReady,
+} from "@/lib/puzzle-server-fns";
 
 export const Route = createFileRoute("/")({
 	loader: async () => getDailyPuzzlePageData(),
@@ -10,10 +15,54 @@ export const Route = createFileRoute("/")({
 });
 
 function IndexPage() {
-	return <Daily initialData={Route.useLoaderData()} />;
+	const data = Route.useLoaderData();
+
+	if (data.status === "generating") {
+		return <PuzzleGeneratingPage />;
+	}
+
+	return <Daily initialData={data} />;
 }
 
-function DailyLoadingPage() {
+function PuzzleGeneratingPage() {
+	const [initialData, setInitialData] = useState<DailyData | null>(null);
+	const cancelledRef = useRef(false);
+
+	useEffect(() => {
+		cancelledRef.current = false;
+
+		async function poll() {
+			if (cancelledRef.current) return;
+
+			try {
+				const result = await pollDailyPuzzleReady();
+				if (result) {
+					if (!cancelledRef.current) {
+						setInitialData(result as unknown as DailyData);
+					}
+					return;
+				}
+			} catch {
+				// Ignore errors, keep polling
+			}
+
+			if (!cancelledRef.current) {
+				setTimeout(poll, 2_000);
+			}
+		}
+
+		poll();
+
+		return () => {
+			cancelledRef.current = true;
+		};
+	}, []);
+
+	if (initialData) return <Daily initialData={initialData} />;
+	return <DailyLoadingPage />;
+}
+
+export function DailyLoadingPage() {
 	return (
 		<div className="relative overflow-hidden">
 			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />

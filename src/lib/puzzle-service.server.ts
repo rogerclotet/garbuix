@@ -55,6 +55,7 @@ const normalizedServerWords = buildNormalizedDictionary(serverWords);
 
 let cachedDictionaryVersion: Promise<string> | null = null;
 const validNormalizedGuessesCache = new Map<string, string[]>();
+const inProgressGenerations = new Map<string, Promise<void>>();
 
 function toSessionUser(
 	sessionData: Awaited<ReturnType<typeof getAuthSession>>,
@@ -156,6 +157,36 @@ export async function getAuthSession() {
 	return auth.api.getSession({
 		headers,
 	});
+}
+
+export async function checkDailyPuzzleExists(
+	dateKey = getTodayDateKey(),
+): Promise<boolean> {
+	const existing = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.dateKey, dateKey),
+		columns: { id: true },
+	});
+	return existing != null;
+}
+
+export function triggerDailyPuzzleGeneration(
+	dateKey = getTodayDateKey(),
+): void {
+	if (inProgressGenerations.has(dateKey)) return;
+
+	const promise = ensureDailyPuzzleSnapshot(dateKey)
+		.then(() => {})
+		.catch((err: unknown) => {
+			console.error(
+				`[puzzle-scheduler] Puzzle generation failed for ${dateKey}:`,
+				err,
+			);
+		})
+		.finally(() => {
+			inProgressGenerations.delete(dateKey);
+		});
+
+	inProgressGenerations.set(dateKey, promise);
 }
 
 export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
