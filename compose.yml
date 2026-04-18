@@ -43,6 +43,28 @@ services:
       - "${APP_PORT:-3000}:3000"
     restart: unless-stopped
 
+  pre-generator:
+    build:
+      context: .
+      target: scheduler
+    image: paraules-scheduler:prod
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      TZ: Europe/Madrid
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      POSTHOG_KEY: "${POSTHOG_KEY:-}"
+      POSTHOG_HOST: "${POSTHOG_HOST:-}"
+      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+    init: true
+    restart: unless-stopped
+
   backfill:
     build:
       context: .

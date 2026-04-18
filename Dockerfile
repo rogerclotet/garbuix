@@ -32,3 +32,15 @@ COPY --from=builder /app/.output ./.output
 EXPOSE 3000
 
 CMD ["sh", "-lc", "pnpm db:migrate && node .output/server/index.mjs"]
+
+FROM alpine AS supercronic-download
+ARG SUPERCRONIC_VERSION=0.2.33
+ARG TARGETARCH
+RUN wget -O /supercronic \
+    "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH}" \
+    && chmod +x /supercronic
+
+FROM production AS scheduler
+COPY --from=supercronic-download /supercronic /usr/local/bin/supercronic
+COPY crontab ./crontab
+CMD ["supercronic", "crontab"]
