@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Await, createFileRoute } from "@tanstack/react-router";
 import { Loader2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Daily } from "@/components/daily/daily";
@@ -9,19 +9,26 @@ import {
 } from "@/lib/puzzle-server-fns";
 
 export const Route = createFileRoute("/")({
-	loader: async () => getDailyPuzzlePageData(),
+	// Return the promise without awaiting so TanStack Router treats it as
+	// deferred data. During SSR the server streams the loading shell
+	// immediately instead of blocking until the data resolves.
+	loader: () => ({ data: getDailyPuzzlePageData() }),
 	component: IndexPage,
-	pendingComponent: DailyLoadingPage,
 });
 
 function IndexPage() {
-	const data = Route.useLoaderData();
+	const { data } = Route.useLoaderData();
 
-	if (data.status === "generating") {
-		return <PuzzleGeneratingPage />;
-	}
-
-	return <Daily initialData={data} />;
+	return (
+		<Await promise={data} fallback={<DailyLoadingPage />}>
+			{(resolvedData) => {
+				if (resolvedData.status === "generating") {
+					return <PuzzleGeneratingPage />;
+				}
+				return <Daily initialData={resolvedData} />;
+			}}
+		</Await>
+	);
 }
 
 function PuzzleGeneratingPage() {
