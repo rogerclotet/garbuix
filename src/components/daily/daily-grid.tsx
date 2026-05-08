@@ -107,7 +107,10 @@ export function DailyGrid({
 								{middleDotMarker?.right ? (
 									<span
 										aria-hidden
-										className="pointer-events-none absolute top-1/2 right-[-0.2em] z-10 -translate-y-1/2 text-[0.9em] leading-none text-primary/70"
+										style={{
+											transform: "translate(calc(50% + 1.5px), -50%)",
+										}}
+										className="pointer-events-none absolute top-1/2 right-0 z-10 text-[1.6em] font-black leading-none text-foreground"
 									>
 										·
 									</span>
@@ -115,7 +118,10 @@ export function DailyGrid({
 								{middleDotMarker?.bottom ? (
 									<span
 										aria-hidden
-										className="pointer-events-none absolute bottom-[-0.28em] left-1/2 z-10 -translate-x-1/2 text-[0.9em] leading-none text-primary/70"
+										style={{
+											transform: "translate(-50%, calc(50% + 1.5px))",
+										}}
+										className="pointer-events-none absolute bottom-0 left-1/2 z-10 text-[1.6em] font-black leading-none text-foreground"
 									>
 										·
 									</span>
