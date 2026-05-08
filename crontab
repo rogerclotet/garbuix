@@ -1,4 +1,3 @@
-# Pre-generate puzzles every 2 hours as a safety net, and at 23:00 Madrid time
-# (the primary pre-generation window before midnight rollover).
-# The script is idempotent — already-generated puzzles are skipped.
-0 */2 * * *  /app/scripts/pre-generate.sh
+# Pre-generate today's and tomorrow's puzzles at 23:00 Madrid time,
+# one hour before midnight rollover. The script is idempotent.
+0 23 * * *  /app/scripts/pre-generate.sh

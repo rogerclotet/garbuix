@@ -28,6 +28,7 @@ COPY scripts ./scripts
 COPY src ./src
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.output ./.output
+COPY --from=builder /app/src/data/catalan-words.json ./src/data/catalan-words.json
 
 EXPOSE 3000
 
@@ -43,4 +44,4 @@ RUN wget -O /supercronic \
 FROM production AS scheduler
 COPY --from=supercronic-download /supercronic /usr/local/bin/supercronic
 COPY crontab ./crontab
-CMD ["supercronic", "crontab"]
+CMD ["sh", "-lc", "/app/scripts/pre-generate.sh || true; exec supercronic crontab"]
