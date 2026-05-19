@@ -2,6 +2,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+	getLeaderboardOptOut,
+	getOrCreateAnonIdentity,
+} from "@/lib/anon-identity";
+import {
 	buildAnonymousImportPayload,
 	getAccountPuzzleCache,
 	getAnonymousProgress,
@@ -399,6 +403,7 @@ export function useDailyProgress({
 				puzzleId: puzzle.id,
 				deviceId,
 				events: pendingEvents,
+				leaderboardOptOut: getLeaderboardOptOut(),
 			},
 		})
 			.then((result) => {
@@ -511,6 +516,7 @@ export function useDailyProgress({
 					puzzleId: cache.puzzleId,
 					deviceId,
 					events: cache.queuedEvents ?? [],
+					leaderboardOptOut: getLeaderboardOptOut(),
 				},
 			})
 				.then((result) => {
@@ -532,6 +538,54 @@ export function useDailyProgress({
 				});
 		}
 	}, [activeUser, deviceId, isOnline, puzzle.dateKey, syncEvents]);
+
+	const lastReportedAnonRef = useRef<{
+		wordsFound: number;
+		completedAt: string | null;
+	}>({ wordsFound: 0, completedAt: null });
+
+	useEffect(() => {
+		if (activeUser) {
+			lastReportedAnonRef.current = { wordsFound: 0, completedAt: null };
+			return;
+		}
+		if (typeof window === "undefined") return;
+		if (getLeaderboardOptOut()) return;
+
+		const wordsFound = derivedProgress.guessedWordIds.length;
+		const completedAt = derivedProgress.completedAt ?? null;
+		const prev = lastReportedAnonRef.current;
+		if (wordsFound <= prev.wordsFound && completedAt === prev.completedAt) {
+			return;
+		}
+
+		const identity = getOrCreateAnonIdentity();
+		const previousWordsFound = prev.wordsFound;
+		const previousCompletedAt = prev.completedAt;
+		lastReportedAnonRef.current = { wordsFound, completedAt };
+
+		void fetch(`/api/leaderboard/${puzzle.dateKey}/anon`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				deviceId: identity.deviceId,
+				name: identity.name,
+				wordsFound,
+				totalWords,
+				completedAt,
+				previousWordsFound,
+				previousCompletedAt,
+			}),
+		}).catch(() => {
+			// non-fatal: leaderboard reporting can quietly fail
+		});
+	}, [
+		activeUser,
+		derivedProgress.guessedWordIds.length,
+		derivedProgress.completedAt,
+		puzzle.dateKey,
+		totalWords,
+	]);
 
 	const applyLocalEvent = (event: PuzzleClientEvent) => {
 		if (activeUser) {

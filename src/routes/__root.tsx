@@ -9,6 +9,8 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/header";
+import { LeaderboardRoot } from "@/components/leaderboard/leaderboard-root";
+import { LeaderboardToasts } from "@/components/leaderboard/leaderboard-toast";
 import { links } from "@/components/meta";
 import { ObservabilityProvider } from "@/components/observability";
 import { OrientationLock } from "@/components/orientation-lock";
@@ -94,13 +96,16 @@ function RootDocument() {
 						<ThemeMeta />
 						<OrientationLock />
 						<ServiceWorkerRegister />
-						<div className="flex min-h-svh flex-col">
-							<Header />
-							<main className="flex-1">
-								<Outlet />
-							</main>
-						</div>
-						<Toaster position="top-center" />
+						<LeaderboardRoot>
+							<div className="flex min-h-svh flex-col">
+								<Header />
+								<main className="flex-1">
+									<Outlet />
+								</main>
+							</div>
+							<Toaster position="top-center" />
+							<LeaderboardToasts />
+						</LeaderboardRoot>
 						{showDevtools ? (
 							<TanStackDevtools
 								config={{

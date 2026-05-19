@@ -10,13 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
+import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
+import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
   id: '/dies-anteriors',
   path: '/dies-anteriors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClassificacioRoute = ClassificacioRouteImport.update({
+  id: '/classificacio',
+  path: '/classificacio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +36,11 @@ const PhSplatRoute = PhSplatRouteImport.update({
   path: '/ph/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
+  id: '/api/leaderboard/$',
+  path: '/api/leaderboard/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -37,36 +49,63 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dies-anteriors' | '/ph/$' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/classificacio'
+    | '/dies-anteriors'
+    | '/ph/$'
+    | '/api/auth/$'
+    | '/api/leaderboard/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dies-anteriors' | '/ph/$' | '/api/auth/$'
-  id: '__root__' | '/' | '/dies-anteriors' | '/ph/$' | '/api/auth/$'
+  to:
+    | '/'
+    | '/classificacio'
+    | '/dies-anteriors'
+    | '/ph/$'
+    | '/api/auth/$'
+    | '/api/leaderboard/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/classificacio'
+    | '/dies-anteriors'
+    | '/ph/$'
+    | '/api/auth/$'
+    | '/api/leaderboard/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PhSplatRoute: typeof PhSplatRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/dies-anteriors'
       fullPath: '/dies-anteriors'
       preLoaderRoute: typeof DiesAnteriorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/classificacio': {
+      id: '/classificacio'
+      path: '/classificacio'
+      fullPath: '/classificacio'
+      preLoaderRoute: typeof ClassificacioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -92,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PhSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/leaderboard/$': {
+      id: '/api/leaderboard/$'
+      path: '/api/leaderboard/$'
+      fullPath: '/api/leaderboard/$'
+      preLoaderRoute: typeof ApiLeaderboardSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -104,9 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PhSplatRoute: PhSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

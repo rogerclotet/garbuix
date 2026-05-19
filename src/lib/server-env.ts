@@ -21,6 +21,7 @@ const serverEnvSchema = z.object({
 	POSTHOG_HOST: z.string().url().optional(),
 	POSTHOG_KEY: optionalEnvString,
 	POSTHOG_UI_HOST: z.string().url().optional(),
+	REDIS_URL: optionalEnvString,
 });
 
 let cachedServerEnv: z.infer<typeof serverEnvSchema> | null = null;

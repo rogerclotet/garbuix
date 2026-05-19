@@ -19,6 +19,19 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
   app:
     build:
       context: .
@@ -27,10 +40,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
@@ -51,10 +67,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       TZ: Europe/Madrid
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"

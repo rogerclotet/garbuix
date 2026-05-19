@@ -2,6 +2,7 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
+import { user } from "@/db/auth-schema";
 import {
 	dailyPuzzles,
 	legacyImportedResults,
@@ -11,6 +12,11 @@ import {
 import { auth } from "@/lib/auth";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
+import {
+	getLeaderboard,
+	recordProgress as recordLeaderboardProgress,
+	userParticipantId,
+} from "@/lib/leaderboard.server";
 import { captureServerEvent } from "@/lib/observability-server";
 import { hashText, openAnswerCapsule } from "@/lib/puzzle-crypto";
 import {
@@ -157,6 +163,41 @@ export async function getAuthSession() {
 	return auth.api.getSession({
 		headers,
 	});
+}
+
+async function publishLeaderboardForUser(input: {
+	dateKey: string;
+	userId: string;
+	wordsFound: number;
+	totalWords: number;
+	completedAt: string | null;
+	previousWordsFound: number;
+	previousCompletedAt: string | null;
+}) {
+	try {
+		const profiles = await db
+			.select({ name: user.name, image: user.image })
+			.from(user)
+			.where(eq(user.id, input.userId))
+			.limit(1);
+		const profile = profiles[0];
+		if (!profile) return;
+
+		await recordLeaderboardProgress({
+			dateKey: input.dateKey,
+			participantId: userParticipantId(input.userId),
+			kind: "user",
+			name: profile.name,
+			image: profile.image ?? null,
+			wordsFound: input.wordsFound,
+			totalWords: input.totalWords,
+			completedAt: input.completedAt,
+			previousWordsFound: input.previousWordsFound,
+			previousCompletedAt: input.previousCompletedAt,
+		});
+	} catch (error) {
+		console.warn("[leaderboard] publish for user failed", error);
+	}
 }
 
 export async function checkDailyPuzzleExists(
@@ -311,8 +352,10 @@ export async function syncPuzzleEventsForUser(options: {
 	userId: string;
 	deviceId: string;
 	events: PuzzleClientEvent[];
+	leaderboardOptOut?: boolean;
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
+	const leaderboardOptOut = options.leaderboardOptOut ?? false;
 	const puzzleRow = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.id, puzzleId),
 	});
@@ -433,6 +476,25 @@ export async function syncPuzzleEventsForUser(options: {
 		filteredEvents,
 	});
 
+	const previousWordsFound = existingProgress?.guessedWordIds.length ?? 0;
+	const previousCompletedAt = existingProgress?.completedAt ?? null;
+	const nextCompletedAt = nextProgress.completedAt ?? null;
+	const hasProgressDelta =
+		nextProgress.guessedWordIds.length > previousWordsFound ||
+		(Boolean(nextCompletedAt) && !previousCompletedAt);
+
+	if (hasProgressDelta && !leaderboardOptOut) {
+		void publishLeaderboardForUser({
+			dateKey: puzzleRow.dateKey,
+			userId,
+			wordsFound: nextProgress.guessedWordIds.length,
+			totalWords: privateSnapshot.wordSlots.length,
+			completedAt: nextCompletedAt,
+			previousWordsFound,
+			previousCompletedAt,
+		});
+	}
+
 	captureServerEvent({
 		distinctId: userId,
 		event: "puzzle_progress_synced_server",
@@ -526,6 +588,7 @@ export async function getHistoryPageDataForUser(
 ) {
 	const yesterdayPuzzleRow = await ensureDailyPuzzleSnapshot(dateKey);
 	const accountHistory = userId ? await getHistoryEntriesForUser(userId) : null;
+	const yesterdayLeaderboard = await getLeaderboard(yesterdayPuzzleRow.dateKey);
 
 	captureServerEvent({
 		distinctId: userId,
@@ -534,6 +597,7 @@ export async function getHistoryPageDataForUser(
 			date_key: dateKey,
 			has_account_history: Boolean(accountHistory),
 			history_entry_count: accountHistory?.length ?? 0,
+			yesterday_leaderboard_entry_count: yesterdayLeaderboard.entries.length,
 		},
 	});
 
@@ -543,6 +607,7 @@ export async function getHistoryPageDataForUser(
 			dateKey: yesterdayPuzzleRow.dateKey,
 			preview: toPuzzlePreview(yesterdayPuzzleRow.privateSnapshotJson),
 		},
+		yesterdayLeaderboard,
 	};
 }
 

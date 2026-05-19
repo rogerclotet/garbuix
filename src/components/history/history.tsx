@@ -9,9 +9,11 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import {
 	buildAnonymousImportPayload,
 	getDeviceId,
@@ -45,6 +47,7 @@ type HistoryData = {
 		dateKey: string;
 		preview: DailyPuzzlePreview;
 	};
+	yesterdayLeaderboard?: LeaderboardSnapshot;
 };
 
 export function History({ initialData }: { initialData: HistoryData }) {
@@ -348,6 +351,18 @@ export function History({ initialData }: { initialData: HistoryData }) {
 									)}
 								</div>
 							</div>
+
+							{initialData.yesterdayLeaderboard ? (
+								<div className="space-y-3 border-t border-border/50 pt-4">
+									<h4 className="text-base font-semibold">
+										Classificació d'ahir
+									</h4>
+									<LeaderboardList
+										entries={initialData.yesterdayLeaderboard.entries}
+										emptyMessage="Ningú no va aparèixer ahir al rànquing."
+									/>
+								</div>
+							) : null}
 						</div>
 					</div>
 				</div>
