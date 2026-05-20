@@ -1,6 +1,5 @@
-import { getRouteApi, Link } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft } from "lucide-react";
 import {
 	type CSSProperties,
 	useEffect,
@@ -11,7 +10,6 @@ import {
 import { toast } from "sonner";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import {
@@ -198,20 +196,9 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	return (
 		<div className="min-h-screen px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-16">
 			<div className="max-w-5xl mx-auto space-y-6">
-				<div className="flex items-center justify-between">
-					<div>
-						<h2 className="text-2xl font-bold">Dies anteriors</h2>
-						<p className="text-sm text-muted-foreground font-ui">
-							Consulta els resultats dels dies passats i el teu progrés.
-						</p>
-					</div>
-					<Button variant="ghost" size="sm" asChild>
-						<Link to="/" className="gap-2">
-							<ArrowLeft className="h-4 w-4" />
-							Tornar
-						</Link>
-					</Button>
-				</div>
+				<p className="text-sm text-muted-foreground font-ui">
+					Consulta els resultats dels dies passats i el teu progrés.
+				</p>
 
 				<div className="grid gap-6 lg:grid-cols-2">
 					<div className="order-2 lg:order-1 space-y-6">

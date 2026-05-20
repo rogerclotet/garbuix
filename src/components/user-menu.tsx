@@ -1,22 +1,25 @@
 import { getRouteApi, Link, useRouter } from "@tanstack/react-router";
-import { History, LogIn, LogOut, Menu, Moon, Trophy } from "lucide-react";
+import {
+	History,
+	LogIn,
+	LogOut,
+	Menu,
+	Moon,
+	Settings,
+	Trophy,
+} from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	getLeaderboardOptOut,
-	setLeaderboardOptOut,
-} from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
@@ -31,17 +34,6 @@ export function UserMenu() {
 	const { captureEvent, resetUser } = useObservability();
 	const isDark = (resolvedTheme ?? theme) === "dark";
 	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
-	const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
-
-	useEffect(() => {
-		setShowOnLeaderboard(!getLeaderboardOptOut());
-	}, []);
-
-	const handleToggleLeaderboard = (next: boolean) => {
-		setShowOnLeaderboard(next);
-		setLeaderboardOptOut(!next);
-		captureEvent("leaderboard_opt_out_toggled", { opt_out: !next });
-	};
 
 	const triggerLabel = activeUser
 		? `Obrir el menú de ${activeUser.name}`
@@ -123,15 +115,12 @@ export function UserMenu() {
 						<span>Historial</span>
 					</Link>
 				</DropdownMenuItem>
-				<DropdownMenuCheckboxItem
-					checked={showOnLeaderboard}
-					onCheckedChange={(checked) =>
-						handleToggleLeaderboard(checked === true)
-					}
-					onSelect={(event) => event.preventDefault()}
-				>
-					Mostra'm a la classificació
-				</DropdownMenuCheckboxItem>
+				<DropdownMenuItem asChild>
+					<Link to="/preferencies">
+						<Settings className="size-4" />
+						<span>Preferències</span>
+					</Link>
+				</DropdownMenuItem>
 				<DropdownMenuItem
 					onSelect={() => {
 						setTheme(isDark ? "light" : "dark");

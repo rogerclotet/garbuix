@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as IndexRouteImport } from './routes/index'
@@ -16,6 +17,11 @@ import { Route as PhSplatRouteImport } from './routes/ph/$'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
+const PreferenciesRoute = PreferenciesRouteImport.update({
+  id: '/preferencies',
+  path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
   id: '/dies-anteriors',
   path: '/dies-anteriors',
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
+  '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
+  '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
+  '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
+    | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
+    | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
+    | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
+  PreferenciesRoute: typeof PreferenciesRoute
   PhSplatRoute: typeof PhSplatRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
@@ -110,6 +123,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/preferencies': {
+      id: '/preferencies'
+      path: '/preferencies'
+      fullPath: '/preferencies'
+      preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dies-anteriors': {
       id: '/dies-anteriors'
       path: '/dies-anteriors'
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
+  PreferenciesRoute: PreferenciesRoute,
   PhSplatRoute: PhSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,
