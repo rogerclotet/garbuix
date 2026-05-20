@@ -1,7 +1,8 @@
 import anonNameWords from "@/data/anon-name-words.json";
 import { getDeviceId } from "@/lib/puzzle-local";
 
-const ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
+const ANON_IDENTITY_KEY = "paraules-anon-identity-v2";
+const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
 const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 
 export type AnonIdentity = {
@@ -12,15 +13,18 @@ export type AnonIdentity = {
 type StoredIdentity = {
 	deviceId: string;
 	name: string;
-	version: 1;
+	version: 2;
 };
 
 function pickName(): string {
-	const adjectives = anonNameWords.adjectives;
-	const animals = anonNameWords.animals;
-	const adjectiveIndex = Math.floor(Math.random() * adjectives.length);
-	const animalIndex = Math.floor(Math.random() * animals.length);
-	return `${adjectives[adjectiveIndex]} ${animals[animalIndex]}`;
+	const { adjectives, animals } = anonNameWords;
+	const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+	const animal = animals[Math.floor(Math.random() * animals.length)];
+	if (!adjective || !animal) {
+		return "Convidat";
+	}
+	const inflected = animal.gender === "f" ? adjective.fem : adjective.masc;
+	return `${animal.name} ${inflected.toLowerCase()}`;
 }
 
 export function getOrCreateAnonIdentity(): AnonIdentity {
@@ -39,8 +43,12 @@ export function getOrCreateAnonIdentity(): AnonIdentity {
 			// fall through to regeneration
 		}
 	}
+	// Drop any legacy (adjective+animal, ungendered) identity so the
+	// holder regenerates with a grammatically-correct name.
+	window.localStorage.removeItem(LEGACY_ANON_IDENTITY_KEY);
+
 	const identity: StoredIdentity = {
-		version: 1,
+		version: 2,
 		deviceId,
 		name: pickName(),
 	};
