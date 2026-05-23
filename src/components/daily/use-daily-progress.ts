@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import {
 	getLeaderboardOptOut,
 	getOrCreateAnonIdentity,
+	getReportedAnonProgress,
+	setReportedAnonProgress,
 } from "@/lib/anon-identity";
 import {
 	buildAnonymousImportPayload,
@@ -540,17 +542,31 @@ export function useDailyProgress({
 	}, [activeUser, deviceId, isOnline, puzzle.dateKey, syncEvents]);
 
 	const lastReportedAnonRef = useRef<{
+		dateKey: string | null;
 		wordsFound: number;
 		completedAt: string | null;
-	}>({ wordsFound: 0, completedAt: null });
+	}>({ dateKey: null, wordsFound: 0, completedAt: null });
 
 	useEffect(() => {
 		if (activeUser) {
-			lastReportedAnonRef.current = { wordsFound: 0, completedAt: null };
+			lastReportedAnonRef.current = {
+				dateKey: null,
+				wordsFound: 0,
+				completedAt: null,
+			};
 			return;
 		}
 		if (typeof window === "undefined") return;
 		if (getLeaderboardOptOut()) return;
+
+		if (lastReportedAnonRef.current.dateKey !== puzzle.dateKey) {
+			const stored = getReportedAnonProgress(puzzle.dateKey);
+			lastReportedAnonRef.current = {
+				dateKey: puzzle.dateKey,
+				wordsFound: stored.wordsFound,
+				completedAt: stored.completedAt,
+			};
+		}
 
 		const wordsFound = derivedProgress.guessedWordIds.length;
 		const completedAt = derivedProgress.completedAt ?? null;
@@ -562,7 +578,12 @@ export function useDailyProgress({
 		const identity = getOrCreateAnonIdentity();
 		const previousWordsFound = prev.wordsFound;
 		const previousCompletedAt = prev.completedAt;
-		lastReportedAnonRef.current = { wordsFound, completedAt };
+		lastReportedAnonRef.current = {
+			dateKey: puzzle.dateKey,
+			wordsFound,
+			completedAt,
+		};
+		setReportedAnonProgress(puzzle.dateKey, { wordsFound, completedAt });
 
 		void fetch(`/api/leaderboard/${puzzle.dateKey}/anon`, {
 			method: "POST",

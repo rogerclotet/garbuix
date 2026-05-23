@@ -4,6 +4,18 @@ import { getDeviceId } from "@/lib/puzzle-local";
 const ANON_IDENTITY_KEY = "paraules-anon-identity-v2";
 const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
 const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
+const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
+
+export type AnonReportedProgress = {
+	wordsFound: number;
+	completedAt: string | null;
+};
+
+type StoredReportedProgress = {
+	dateKey: string;
+	wordsFound: number;
+	completedAt: string | null;
+};
 
 export type AnonIdentity = {
 	deviceId: string;
@@ -68,4 +80,36 @@ export function setLeaderboardOptOut(optOut: boolean): void {
 	} else {
 		window.localStorage.removeItem(ANON_OPT_OUT_KEY);
 	}
+}
+
+export function getReportedAnonProgress(dateKey: string): AnonReportedProgress {
+	const empty: AnonReportedProgress = { wordsFound: 0, completedAt: null };
+	if (typeof window === "undefined") return empty;
+	const raw = window.localStorage.getItem(ANON_LB_REPORTED_KEY);
+	if (!raw) return empty;
+	try {
+		const parsed = JSON.parse(raw) as StoredReportedProgress;
+		if (parsed.dateKey !== dateKey) return empty;
+		const wordsFound = Number.isFinite(parsed.wordsFound)
+			? Math.max(0, Math.trunc(parsed.wordsFound))
+			: 0;
+		const completedAt =
+			typeof parsed.completedAt === "string" ? parsed.completedAt : null;
+		return { wordsFound, completedAt };
+	} catch {
+		return empty;
+	}
+}
+
+export function setReportedAnonProgress(
+	dateKey: string,
+	progress: AnonReportedProgress,
+): void {
+	if (typeof window === "undefined") return;
+	const payload: StoredReportedProgress = {
+		dateKey,
+		wordsFound: progress.wordsFound,
+		completedAt: progress.completedAt,
+	};
+	window.localStorage.setItem(ANON_LB_REPORTED_KEY, JSON.stringify(payload));
 }
