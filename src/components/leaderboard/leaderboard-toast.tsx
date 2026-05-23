@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { LeaderboardEvent } from "@/lib/leaderboard-types";
@@ -12,14 +11,15 @@ type PendingBatch = {
 	name: string;
 	kind: LeaderboardEvent["entry"]["kind"];
 	wordsAdded: number;
+	wordsFound: number;
+	totalWords: number;
 	completedAt: string | null;
 	scheduledFor: number;
 	timer: ReturnType<typeof setTimeout> | null;
 };
 
 export function LeaderboardToasts() {
-	const { subscribe, localParticipantId, dateKey } = useLeaderboard();
-	const navigate = useNavigate();
+	const { subscribe, localParticipantId } = useLeaderboard();
 	const pendingRef = useRef<Map<string, PendingBatch>>(new Map());
 	const nextEmitAtRef = useRef<number>(0);
 
@@ -34,26 +34,22 @@ export function LeaderboardToasts() {
 			nextEmitAtRef.current = now + wait + GLOBAL_TOAST_GAP_MS;
 
 			window.setTimeout(() => {
+				const progress =
+					batch.totalWords > 0
+						? ` (${batch.wordsFound}/${batch.totalWords})`
+						: "";
 				let message: string;
 				if (batch.completedAt) {
-					message = `${batch.name} ha completat el puzle!`;
+					message = `${batch.name} ha trobat totes les paraules!`;
 				} else if (batch.wordsAdded === 1) {
-					message = `${batch.name} ha trobat una paraula nova`;
+					message = `${batch.name} ha trobat una paraula nova${progress}`;
 				} else {
-					message = `${batch.name} ha trobat ${batch.wordsAdded} paraules`;
+					message = `${batch.name} ha trobat ${batch.wordsAdded} paraules${progress}`;
 				}
 
 				toast(message, {
-					duration: 4_000,
+					duration: 8_000,
 					onAutoClose: () => {},
-					action: dateKey
-						? {
-								label: "Veure",
-								onClick: () => {
-									navigate({ to: "/classificacio" }).catch(() => {});
-								},
-							}
-						: undefined,
 				});
 			}, wait);
 		};
@@ -70,6 +66,8 @@ export function LeaderboardToasts() {
 			const now = Date.now();
 			if (existing) {
 				existing.wordsAdded += event.delta.wordsAdded;
+				existing.wordsFound = event.entry.wordsFound;
+				existing.totalWords = event.entry.totalWords;
 				existing.completedAt = event.entry.completedAt ?? existing.completedAt;
 				if (event.delta.justCompleted && existing.timer) {
 					clearTimeout(existing.timer);
@@ -84,6 +82,8 @@ export function LeaderboardToasts() {
 				name: event.entry.name,
 				kind: event.entry.kind,
 				wordsAdded: event.delta.wordsAdded,
+				wordsFound: event.entry.wordsFound,
+				totalWords: event.entry.totalWords,
 				completedAt: event.entry.completedAt,
 				scheduledFor: now + COALESCE_WINDOW_MS,
 				timer: null,
@@ -108,7 +108,7 @@ export function LeaderboardToasts() {
 			}
 			pendingRef.current.clear();
 		};
-	}, [subscribe, localParticipantId, dateKey, navigate]);
+	}, [subscribe, localParticipantId]);
 
 	return null;
 }
