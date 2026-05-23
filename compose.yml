@@ -22,7 +22,16 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--save",
+        "300 1",
+      ]
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
@@ -31,6 +40,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+    volumes:
+      - redis_data:/data
 
   app:
     build:
@@ -109,3 +120,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
