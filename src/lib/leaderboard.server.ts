@@ -228,7 +228,7 @@ export async function renameAnonToUser(options: {
 	const fromId = anonParticipantId(options.deviceId);
 	const toId = userParticipantId(options.userId);
 	const fromMeta = metaKey(options.dateKey, fromId);
-	const toMeta = metaKey(options.dateKey, options.userId);
+	const toMeta = metaKey(options.dateKey, toId);
 
 	try {
 		const hash = await redis.hgetall(fromMeta);
