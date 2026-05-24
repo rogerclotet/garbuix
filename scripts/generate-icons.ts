@@ -31,9 +31,9 @@ function maskableLogoSvg(
 
 	const positions = [
 		[0, 0], [24, 0], [48, 0],
-		[48, 24], [48, 48],
-		[24, 48], [0, 48],
-		[0, 72],
+		[0, 24],
+		[0, 48], [48, 48],
+		[0, 72], [24, 72], [48, 72],
 	];
 
 	const paths = positions
@@ -49,7 +49,7 @@ function maskableLogoSvg(
 }
 
 function faviconSvg(size: number): string {
-	// Rounded square background with the "P" logo centered
+	// Rounded square background with the "G" logo centered
 	const logoW = 68;
 	const logoH = 92;
 	const padding = size * 0.18;
@@ -66,9 +66,9 @@ function faviconSvg(size: number): string {
 
 	const positions = [
 		[0, 0], [24, 0], [48, 0],
-		[48, 24], [48, 48],
-		[24, 48], [0, 48],
-		[0, 72],
+		[0, 24],
+		[0, 48], [48, 48],
+		[0, 72], [24, 72], [48, 72],
 	];
 
 	const paths = positions

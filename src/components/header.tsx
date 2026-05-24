@@ -47,7 +47,7 @@ export default function Header() {
 						>
 							<Logo className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
 							<h1 className="text-xl sm:text-2xl font-bold text-primary">
-								Paraules
+								Garbuix
 							</h1>
 						</Link>
 					)}

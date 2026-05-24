@@ -16,7 +16,8 @@
 			"!**/dist",
 			"!**/node_modules",
 			"!**/src/routeTree.gen.ts",
-			"!**/src/data/catalan-words.json"
+			"!**/src/data/catalan-words.json",
+			"!**/public/offline.html"
 		]
 	},
 	"formatter": {

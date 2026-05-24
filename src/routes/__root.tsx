@@ -45,7 +45,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1, viewport-fit=cover",
 			},
 			{
-				title: "Paraules - Joc de Mots Encreuats en Català",
+				title: "Garbuix - Joc de Mots Encreuats en Català",
 			},
 			{
 				name: "mobile-web-app-capable",

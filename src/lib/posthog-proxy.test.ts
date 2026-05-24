@@ -7,7 +7,7 @@ import {
 describe("posthog-proxy", () => {
 	it("routes analytics requests to the configured PostHog host", () => {
 		const targetUrl = getPostHogProxyTarget(
-			"https://paraules.cat/ph/e/?ip=1&_=123",
+			"https://garbuix.cat/ph/e/?ip=1&_=123",
 			"https://eu.i.posthog.com",
 		);
 
@@ -16,7 +16,7 @@ describe("posthog-proxy", () => {
 
 	it("routes static assets to the PostHog assets host", () => {
 		const targetUrl = getPostHogProxyTarget(
-			"https://paraules.cat/ph/static/array.js",
+			"https://garbuix.cat/ph/static/array.js",
 			"https://eu.i.posthog.com",
 		);
 
@@ -27,7 +27,7 @@ describe("posthog-proxy", () => {
 
 	it("preserves a custom base path for self-hosted PostHog", () => {
 		const targetUrl = getPostHogProxyTarget(
-			"https://paraules.cat/ph/e/",
+			"https://garbuix.cat/ph/e/",
 			"https://analytics.example.com/ingest",
 		);
 
@@ -41,8 +41,8 @@ describe("posthog-proxy", () => {
 			new Headers({
 				connection: "keep-alive",
 				"content-length": "42",
-				host: "paraules.cat",
-				origin: "https://paraules.cat",
+				host: "garbuix.cat",
+				origin: "https://garbuix.cat",
 			}),
 			new URL("https://eu.i.posthog.com/e/"),
 		);
@@ -50,6 +50,6 @@ describe("posthog-proxy", () => {
 		expect(headers.get("connection")).toBeNull();
 		expect(headers.get("content-length")).toBeNull();
 		expect(headers.get("host")).toBe("eu.i.posthog.com");
-		expect(headers.get("origin")).toBe("https://paraules.cat");
+		expect(headers.get("origin")).toBe("https://garbuix.cat");
 	});
 });

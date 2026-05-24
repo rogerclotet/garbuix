@@ -1,13 +1,14 @@
 import type { SVGProps } from "react";
 
 /**
- * Logo component representing a capital 'P' formed by 8 squircles.
+ * Logo component representing a capital 'G' formed by 9 squircles
+ * arranged like cells in a crossword.
  *
- * Shape description:
- * - A horizontal line on top with 3 squircles.
- * - 2 down on the right.
- * - 2 left from there (forming the loop).
- * - 1 down from there (forming the stem).
+ * Shape (3 columns × 4 rows):
+ *   ■ ■ ■
+ *   ■ . .
+ *   ■ . ■
+ *   ■ ■ ■
  *
  * Color: Uses currentColor for fill, no background.
  */
@@ -22,24 +23,25 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
 			fill="currentColor"
 			xmlns="http://www.w3.org/2000/svg"
 			role="img"
-			aria-label="Logo Paraules"
+			aria-label="Logo Garbuix"
 			{...props}
 		>
-			{/* Horizontal line on top: 3 squircles */}
+			{/* Top bar: 3 squircles */}
 			<path d={squirclePath} transform="translate(0, 0)" />
 			<path d={squirclePath} transform="translate(24, 0)" />
 			<path d={squirclePath} transform="translate(48, 0)" />
 
-			{/* 2 down on the right */}
-			<path d={squirclePath} transform="translate(48, 24)" />
+			{/* Left stem */}
+			<path d={squirclePath} transform="translate(0, 24)" />
+
+			{/* Left stem + right hook */}
+			<path d={squirclePath} transform="translate(0, 48)" />
 			<path d={squirclePath} transform="translate(48, 48)" />
 
-			{/* 2 left from there */}
-			<path d={squirclePath} transform="translate(24, 48)" />
-			<path d={squirclePath} transform="translate(0, 48)" />
-
-			{/* 1 down from there (stem) */}
+			{/* Bottom bar: 3 squircles */}
 			<path d={squirclePath} transform="translate(0, 72)" />
+			<path d={squirclePath} transform="translate(24, 72)" />
+			<path d={squirclePath} transform="translate(48, 72)" />
 		</svg>
 	);
 }

@@ -1,4 +1,4 @@
-# Paraules
+# Garbuix
 
 A responsive web application for a Catalan crossword-style word game.
 

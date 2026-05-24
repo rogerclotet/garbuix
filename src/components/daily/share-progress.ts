@@ -78,16 +78,17 @@ function drawLogo(
 	ctx.scale(scale, scale);
 	ctx.fillStyle = color;
 
-	// 8 squircles at specific positions forming a 'P'
+	// 9 squircles at specific positions forming a 'G'
 	const positions = [
 		[0, 0],
 		[24, 0],
-		[48, 0], // top row
-		[48, 24],
-		[48, 48], // right column
-		[24, 48],
-		[0, 48], // middle row back
-		[0, 72], // stem
+		[48, 0], // top bar
+		[0, 24], // left stem
+		[0, 48],
+		[48, 48], // stem + hook
+		[0, 72],
+		[24, 72],
+		[48, 72], // bottom bar
 	];
 
 	for (const [sx, sy] of positions) {
@@ -238,7 +239,7 @@ export function renderProgressCanvas(
 	ctx.font = "12px system-ui, -apple-system, sans-serif";
 	ctx.textAlign = "center";
 	ctx.fillText(
-		"paraules.clotet.dev",
+		"garbuix.clotet.dev",
 		canvasW / 2,
 		gridOffsetY + gridH + FOOTER_HEIGHT / 2 + 10,
 	);
@@ -269,14 +270,14 @@ export async function shareProgress(
 		}, "image/png");
 	});
 
-	const text = `${guessedCount}/${totalWords} https://paraules.clotet.dev`;
+	const text = `${guessedCount}/${totalWords} https://garbuix.clotet.dev`;
 
 	if (
 		typeof navigator !== "undefined" &&
 		typeof navigator.share === "function" &&
 		typeof navigator.canShare === "function"
 	) {
-		const file = new File([blob], `paraules-${puzzle.dateKey}.png`, {
+		const file = new File([blob], `garbuix-${puzzle.dateKey}.png`, {
 			type: "image/png",
 		});
 		const shareData: ShareData = { text, files: [file] };
@@ -302,7 +303,7 @@ export async function shareProgress(
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `paraules-${puzzle.dateKey}.png`;
+		a.download = `garbuix-${puzzle.dateKey}.png`;
 		a.click();
 		URL.revokeObjectURL(url);
 		return "downloaded";
