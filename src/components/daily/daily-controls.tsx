@@ -46,7 +46,6 @@ export function DailyControls({
 }: DailyControlsProps) {
 	const [hintHoldProgress, setHintHoldProgress] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-	const [hasUsedHint, setHasUsedHint] = useState(hintsUsed > 0);
 	const hintHoldFrameRef = useRef<number | null>(null);
 
 	useEffect(() => {
@@ -95,7 +94,6 @@ export function DailyControls({
 			} else {
 				hintHoldFrameRef.current = null;
 				setHintHoldProgress(0);
-				setHasUsedHint(true);
 				onHint();
 			}
 		};
@@ -120,18 +118,13 @@ export function DailyControls({
 	return (
 		<div className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:touch-auto lg:overscroll-auto">
 			<div className="rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto">
-				<div className="px-4 pt-3 pb-1 text-center lg:px-0 lg:pt-0 lg:pb-0 lg:text-left">
-					<h2 className="hidden lg:block font-semibold leading-none tracking-tight">
+				<div className="hidden lg:block lg:text-left">
+					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
-					<p className="text-sm text-muted-foreground font-ui lg:mt-2">
-						<span className="lg:hidden">
-							Forma paraules de 4 lletres o més.
-						</span>
-						<span className="hidden lg:inline">
-							Escriu amb el teclat, esborra amb retrocés i envia amb Enter o
-							espai.
-						</span>
+					<p className="text-sm text-muted-foreground font-ui mt-2">
+						Escriu amb el teclat, esborra amb retrocés i envia amb Enter o
+						espai.
 					</p>
 				</div>
 				<div className="p-6 lg:px-0 lg:pt-4">
@@ -208,35 +201,28 @@ export function DailyControls({
 								<Delete className="w-4 h-4" />
 								Esborrar
 							</Button>
-							<div className="flex flex-col items-stretch gap-0.5">
-								<Button
-									variant="ghost"
-									onPointerDown={handleHintPointerDown}
-									onPointerUp={cancelHintHold}
-									onPointerLeave={cancelHintHold}
-									onPointerCancel={cancelHintHold}
-									onContextMenu={(e) => e.preventDefault()}
-									className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
-									disabled={!canUseHint || isComplete}
-									size="lg"
-									aria-description="Mantén premut per revelar una lletra"
-								>
-									<span
-										className="absolute inset-0 bg-amber-400/25 origin-left"
-										style={{ transform: `scaleX(${hintHoldProgress})` }}
-										aria-hidden
-									/>
-									<Lightbulb
-										className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-									/>
-									<span className="relative">Pista ({3 - hintsUsed})</span>
-								</Button>
-								{!hasUsedHint && canUseHint ? (
-									<span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 text-center font-ui lg:hidden">
-										Mantén premut
-									</span>
-								) : null}
-							</div>
+							<Button
+								variant="ghost"
+								onPointerDown={handleHintPointerDown}
+								onPointerUp={cancelHintHold}
+								onPointerLeave={cancelHintHold}
+								onPointerCancel={cancelHintHold}
+								onContextMenu={(e) => e.preventDefault()}
+								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
+								disabled={!canUseHint || isComplete}
+								size="lg"
+								aria-description="Mantén premut per revelar una lletra"
+							>
+								<span
+									className="absolute inset-0 bg-amber-400/25 origin-left"
+									style={{ transform: `scaleX(${hintHoldProgress})` }}
+									aria-hidden
+								/>
+								<Lightbulb
+									className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+								/>
+								<span className="relative">Pista ({3 - hintsUsed})</span>
+							</Button>
 							<Button
 								variant="ghost"
 								onPointerDown={(event) => runPressAction(event, onShuffle)}
