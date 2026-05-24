@@ -1,14 +1,15 @@
 import type { SVGProps } from "react";
 
 /**
- * Logo component representing a capital 'G' formed by 9 squircles
- * arranged like cells in a crossword.
+ * Logo component representing a capital 'G' with a descender,
+ * formed by 10 squircles arranged like cells in a crossword.
  *
- * Shape (3 columns × 4 rows):
+ * Shape (3 columns × 5 rows):
  *   ■ ■ ■
  *   ■ . .
  *   ■ . ■
  *   ■ ■ ■
+ *   . . ■
  *
  * Color: Uses currentColor for fill, no background.
  */
@@ -19,29 +20,32 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
 
 	return (
 		<svg
-			viewBox="0 0 68 92"
+			viewBox="0 0 64 108"
 			fill="currentColor"
 			xmlns="http://www.w3.org/2000/svg"
 			role="img"
 			aria-label="Logo Garbuix"
 			{...props}
 		>
-			{/* Top bar: 3 squircles */}
+			{/* Top bar */}
 			<path d={squirclePath} transform="translate(0, 0)" />
-			<path d={squirclePath} transform="translate(24, 0)" />
-			<path d={squirclePath} transform="translate(48, 0)" />
+			<path d={squirclePath} transform="translate(22, 0)" />
+			<path d={squirclePath} transform="translate(44, 0)" />
 
 			{/* Left stem */}
-			<path d={squirclePath} transform="translate(0, 24)" />
+			<path d={squirclePath} transform="translate(0, 22)" />
 
-			{/* Left stem + right hook */}
-			<path d={squirclePath} transform="translate(0, 48)" />
-			<path d={squirclePath} transform="translate(48, 48)" />
+			{/* Stem + inner hook */}
+			<path d={squirclePath} transform="translate(0, 44)" />
+			<path d={squirclePath} transform="translate(44, 44)" />
 
-			{/* Bottom bar: 3 squircles */}
-			<path d={squirclePath} transform="translate(0, 72)" />
-			<path d={squirclePath} transform="translate(24, 72)" />
-			<path d={squirclePath} transform="translate(48, 72)" />
+			{/* Bottom bar */}
+			<path d={squirclePath} transform="translate(0, 66)" />
+			<path d={squirclePath} transform="translate(22, 66)" />
+			<path d={squirclePath} transform="translate(44, 66)" />
+
+			{/* Descender */}
+			<path d={squirclePath} transform="translate(44, 88)" />
 		</svg>
 	);
 }

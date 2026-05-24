@@ -71,24 +71,25 @@ function drawLogo(
 	height: number,
 	color: string,
 ) {
-	// The logo SVG viewBox is 68x92. Scale to fit the given height.
-	const scale = height / 92;
+	// The logo SVG viewBox is 64x108. Scale to fit the given height.
+	const scale = height / 108;
 	ctx.save();
 	ctx.translate(x, y);
 	ctx.scale(scale, scale);
 	ctx.fillStyle = color;
 
-	// 9 squircles at specific positions forming a 'G'
+	// 10 squircles at specific positions forming a 'G' with a descender
 	const positions = [
 		[0, 0],
-		[24, 0],
-		[48, 0], // top bar
-		[0, 24], // left stem
-		[0, 48],
-		[48, 48], // stem + hook
-		[0, 72],
-		[24, 72],
-		[48, 72], // bottom bar
+		[22, 0],
+		[44, 0], // top bar
+		[0, 22], // left stem
+		[0, 44],
+		[44, 44], // stem + hook
+		[0, 66],
+		[22, 66],
+		[44, 66], // bottom bar
+		[44, 88], // descender
 	];
 
 	for (const [sx, sy] of positions) {
