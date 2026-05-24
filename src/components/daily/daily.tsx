@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import {
 	createPuzzleEvent,
@@ -14,7 +15,9 @@ import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
+	hasSeenWelcome,
 	markHowToPlaySeen,
+	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import {
 	calculateHistoryStreaks,
@@ -40,6 +43,7 @@ import { openHowToPlay } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
+import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
 
 const POINTER_CLICK_DEDUP_MS = 350;
@@ -105,6 +109,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [displayComplete, setDisplayComplete] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
+	const [welcomeOpen, setWelcomeOpen] = useState(false);
+	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
 	const winDialogTimerRef = useRef<number | null>(null);
 	const { captureEvent, captureException } = useObservability();
@@ -169,11 +175,39 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		setAnonymousHistoryEntries(getSortedAnonymousHistoryEntries());
 	}, [activeUser, initialData.historyEntries]);
 
-	useEffect(() => {
+	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
 		markHowToPlaySeen();
 		openHowToPlay();
 		captureEvent("how_to_play_shown", { trigger: "first_visit" });
+	}, [captureEvent]);
+
+	useEffect(() => {
+		if (firstVisitChecked.current) return;
+		firstVisitChecked.current = true;
+
+		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
+		if (shouldShowWelcome) {
+			setWelcomeOpen(true);
+			captureEvent("welcome_shown", { trigger: "first_visit" });
+			return;
+		}
+
+		openHowToPlayIfFirstVisit();
+	}, [activeUser, captureEvent, openHowToPlayIfFirstVisit]);
+
+	const handleWelcomeOpenChange = useCallback(
+		(next: boolean) => {
+			setWelcomeOpen(next);
+			if (next) return;
+			markWelcomeSeen();
+			openHowToPlayIfFirstVisit();
+		},
+		[openHowToPlayIfFirstVisit],
+	);
+
+	const handleWelcomeContinueAnonymous = useCallback(() => {
+		captureEvent("welcome_dismissed", { choice: "anonymous" });
 	}, [captureEvent]);
 
 	useEffect(() => {
@@ -522,21 +556,31 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		}
 	}, [isComplete]);
 
-	const handleSignInWithGoogle = useCallback(async () => {
-		captureEvent("auth_sign_in_started", {
-			provider: "google",
-			source: "win_dialog",
-		});
-		try {
-			await authClient.signIn.social({
+	const signInWithGoogle = useCallback(
+		async (source: string) => {
+			captureEvent("auth_sign_in_started", {
 				provider: "google",
-				callbackURL: window.location.href,
+				source,
 			});
-		} catch (error) {
-			captureException(error, { scope: "win_dialog_sign_in" });
-			toast.error("No s'ha pogut iniciar la sessió");
-		}
-	}, [captureEvent, captureException]);
+			try {
+				await authClient.signIn.social({
+					provider: "google",
+					callbackURL: window.location.href,
+				});
+			} catch (error) {
+				captureException(error, { scope: `${source}_sign_in` });
+				toast.error("No s'ha pogut iniciar la sessió");
+			}
+		},
+		[captureEvent, captureException],
+	);
+
+	const handleWelcomeSignIn = useCallback(() => {
+		captureEvent("welcome_dismissed", { choice: "google" });
+		markWelcomeSeen();
+		setWelcomeOpen(false);
+		void signInWithGoogle("welcome_dialog");
+	}, [captureEvent, signInWithGoogle]);
 
 	const handleShare = useCallback(async () => {
 		try {
@@ -688,7 +732,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 											variant="outline"
 											size="sm"
 											className="gap-1.5 h-7 px-2 -mr-2 border-border/60"
-											onClick={() => setSharePreviewOpen(true)}
+											onClick={() => {
+												if (getSkipSharePreview()) {
+													void handleShare();
+												} else {
+													setSharePreviewOpen(true);
+												}
+											}}
 											aria-label="Compartir progrés"
 										>
 											<Share2 className="w-3.5 h-3.5" />
@@ -755,6 +805,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					</div>
 				</div>
 			</div>
+			<WelcomeDialog
+				open={welcomeOpen}
+				onOpenChange={handleWelcomeOpenChange}
+				onSignIn={handleWelcomeSignIn}
+				onContinueAnonymous={handleWelcomeContinueAnonymous}
+			/>
 			<SharePreviewDialog
 				open={sharePreviewOpen}
 				onOpenChange={setSharePreviewOpen}
@@ -780,7 +836,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					void handleShare();
 				}}
 				onSignIn={() => {
-					void handleSignInWithGoogle();
+					void signInWithGoogle("win_dialog");
 				}}
 			/>
 		</>

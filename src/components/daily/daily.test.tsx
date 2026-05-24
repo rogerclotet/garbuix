@@ -17,6 +17,8 @@ const {
 	captureExceptionMock,
 	hasSeenHowToPlayMock,
 	markHowToPlaySeenMock,
+	hasSeenWelcomeMock,
+	markWelcomeSeenMock,
 	openHowToPlayMock,
 } = vi.hoisted(() => ({
 	resolveGuessMock: vi.fn(),
@@ -25,6 +27,8 @@ const {
 	captureExceptionMock: vi.fn(),
 	hasSeenHowToPlayMock: vi.fn(() => true),
 	markHowToPlaySeenMock: vi.fn(),
+	hasSeenWelcomeMock: vi.fn(() => true),
+	markWelcomeSeenMock: vi.fn(),
 	openHowToPlayMock: vi.fn(),
 }));
 
@@ -46,6 +50,8 @@ vi.mock("@/lib/puzzle-local", () => ({
 	getSortedAnonymousHistoryEntries: vi.fn(() => []),
 	hasSeenHowToPlay: hasSeenHowToPlayMock,
 	markHowToPlaySeen: markHowToPlaySeenMock,
+	hasSeenWelcome: hasSeenWelcomeMock,
+	markWelcomeSeen: markWelcomeSeenMock,
 }));
 
 vi.mock("./how-to-play-store", () => ({
@@ -212,6 +218,9 @@ describe("Daily submit feedback", () => {
 		hasSeenHowToPlayMock.mockReset();
 		hasSeenHowToPlayMock.mockReturnValue(true);
 		markHowToPlaySeenMock.mockReset();
+		hasSeenWelcomeMock.mockReset();
+		hasSeenWelcomeMock.mockReturnValue(true);
+		markWelcomeSeenMock.mockReset();
 		openHowToPlayMock.mockReset();
 		installMatchMediaMock(false);
 	});

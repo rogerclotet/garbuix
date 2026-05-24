@@ -11,6 +11,7 @@ const ACCOUNT_CACHE_PREFIX = "paraules-account-cache-v1:";
 const IMPORT_MARKER_PREFIX = "paraules-account-import-v1:";
 const DEVICE_ID_KEY = "paraules-device-id-v1";
 const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
+const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
 
 function readJson<T>(key: string): T | null {
 	if (typeof window === "undefined") return null;
@@ -142,6 +143,16 @@ export function hasSeenHowToPlay(): boolean {
 export function markHowToPlaySeen() {
 	if (typeof window === "undefined") return;
 	window.localStorage.setItem(HOW_TO_PLAY_SEEN_KEY, "1");
+}
+
+export function hasSeenWelcome(): boolean {
+	if (typeof window === "undefined") return true;
+	return window.localStorage.getItem(WELCOME_SEEN_KEY) === "1";
+}
+
+export function markWelcomeSeen() {
+	if (typeof window === "undefined") return;
+	window.localStorage.setItem(WELCOME_SEEN_KEY, "1");
 }
 
 export function getDeviceId() {
