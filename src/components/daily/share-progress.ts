@@ -240,7 +240,7 @@ export function renderProgressCanvas(
 	ctx.font = "12px system-ui, -apple-system, sans-serif";
 	ctx.textAlign = "center";
 	ctx.fillText(
-		"garbuix.clotet.dev",
+		"garbuix.app",
 		canvasW / 2,
 		gridOffsetY + gridH + FOOTER_HEIGHT / 2 + 10,
 	);
@@ -271,7 +271,7 @@ export async function shareProgress(
 		}, "image/png");
 	});
 
-	const text = `${guessedCount}/${totalWords} https://garbuix.clotet.dev`;
+	const text = `${guessedCount}/${totalWords} https://garbuix.app`;
 
 	if (
 		typeof navigator !== "undefined" &&
