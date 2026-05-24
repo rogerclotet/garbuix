@@ -727,7 +727,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								return (
 									<div className="flex items-center gap-1.5">
 										<div
-											className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/50 bg-muted/40"
+											className="relative h-8 flex-1 overflow-hidden rounded-full bg-muted/40"
 											role="progressbar"
 											aria-valuenow={derivedProgress.guessedWordIds.length}
 											aria-valuemin={0}
@@ -735,15 +735,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 											aria-label="Paraules trobades"
 										>
 											<div
-												className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
+												className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
 												style={{ width: `${percent}%` }}
 											/>
-											{percent > 0 && percent < 100 ? (
-												<div
-													className="absolute top-1.5 bottom-1.5 w-px bg-primary/80 transition-[left] duration-500 ease-out"
-													style={{ left: `calc(${percent}% - 0.5px)` }}
-												/>
-											) : null}
 											<div className="relative flex h-full items-center justify-between gap-3 px-3 text-xs font-semibold font-ui">
 												<span className="flex items-baseline gap-1">
 													<span className="text-foreground tabular-nums text-sm">
