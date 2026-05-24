@@ -91,7 +91,12 @@ function RootDocument() {
 				<style>{materialThemeCss}</style>
 			</head>
 			<body className="min-h-svh bg-background text-foreground">
-				<ThemeProvider storageKey="paraules-theme" attribute="class">
+				<ThemeProvider
+					storageKey="paraules-theme-v2"
+					attribute="class"
+					defaultTheme="system"
+					enableSystem
+				>
 					<ObservabilityProvider>
 						<ThemeMeta />
 						<OrientationLock />

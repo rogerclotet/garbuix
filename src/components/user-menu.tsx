@@ -5,11 +5,9 @@ import {
 	LogIn,
 	LogOut,
 	Menu,
-	Moon,
 	Settings,
 	Trophy,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -31,10 +29,8 @@ const rootRoute = getRouteApi("__root__");
 export function UserMenu() {
 	const rootData = rootRoute.useLoaderData();
 	const router = useRouter();
-	const { theme, resolvedTheme, setTheme } = useTheme();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const { captureEvent, resetUser } = useObservability();
-	const isDark = (resolvedTheme ?? theme) === "dark";
 	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
 	const triggerLabel = activeUser
@@ -130,14 +126,6 @@ export function UserMenu() {
 						<Settings className="size-4" />
 						<span>Preferències</span>
 					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem
-					onSelect={() => {
-						setTheme(isDark ? "light" : "dark");
-					}}
-				>
-					<Moon className="size-4" />
-					<span>{isDark ? "Mode clar" : "Mode fosc"}</span>
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				{session.isPending ? (
