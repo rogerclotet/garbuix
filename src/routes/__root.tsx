@@ -65,7 +65,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			},
 			{
 				name: "theme-color",
+				media: "(prefers-color-scheme: light)",
 				content: materialThemeMetaColors.light,
+			},
+			{
+				name: "theme-color",
+				media: "(prefers-color-scheme: dark)",
+				content: materialThemeMetaColors.dark,
 			},
 		],
 		links: [

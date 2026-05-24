@@ -88,6 +88,6 @@ ${toCssVariables(appScheme.dark)}
 `.trim();
 
 export const materialThemeMetaColors = {
-	light: appScheme.light.primary,
+	light: appScheme.light.background,
 	dark: appScheme.dark.background,
 } as const;
