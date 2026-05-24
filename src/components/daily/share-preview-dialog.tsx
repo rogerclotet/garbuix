@@ -1,5 +1,5 @@
 import { Loader2Icon, Share2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -10,6 +10,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { setSkipSharePreview } from "@/lib/anon-identity";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import { renderProgressCanvas } from "./share-progress";
 
@@ -33,10 +35,13 @@ export function SharePreviewDialog({
 	onConfirm,
 }: SharePreviewDialogProps) {
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const [dontShowAgain, setDontShowAgain] = useState(false);
+	const dontShowAgainId = useId();
 
 	useEffect(() => {
 		if (!open) {
 			setPreviewUrl(null);
+			setDontShowAgain(false);
 			return;
 		}
 
@@ -92,6 +97,21 @@ export function SharePreviewDialog({
 						</div>
 					)}
 				</div>
+
+				<label
+					htmlFor={dontShowAgainId}
+					className="flex items-center justify-between gap-3 cursor-pointer text-sm text-muted-foreground font-ui"
+				>
+					<span>No ho tornis a mostrar</span>
+					<Switch
+						id={dontShowAgainId}
+						checked={dontShowAgain}
+						onCheckedChange={(next) => {
+							setDontShowAgain(next);
+							setSkipSharePreview(next);
+						}}
+					/>
+				</label>
 
 				<AlertDialogFooter>
 					<AlertDialogCancel>Cancel·lar</AlertDialogCancel>

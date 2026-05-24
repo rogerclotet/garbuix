@@ -5,6 +5,7 @@ const ANON_IDENTITY_KEY = "paraules-anon-identity-v2";
 const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
 const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
+const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
 
 export type AnonReportedProgress = {
 	wordsFound: number;
@@ -79,6 +80,20 @@ export function setLeaderboardOptOut(optOut: boolean): void {
 		window.localStorage.setItem(ANON_OPT_OUT_KEY, "1");
 	} else {
 		window.localStorage.removeItem(ANON_OPT_OUT_KEY);
+	}
+}
+
+export function getSkipSharePreview(): boolean {
+	if (typeof window === "undefined") return false;
+	return window.localStorage.getItem(SKIP_SHARE_PREVIEW_KEY) === "1";
+}
+
+export function setSkipSharePreview(skip: boolean): void {
+	if (typeof window === "undefined") return;
+	if (skip) {
+		window.localStorage.setItem(SKIP_SHARE_PREVIEW_KEY, "1");
+	} else {
+		window.localStorage.removeItem(SKIP_SHARE_PREVIEW_KEY);
 	}
 }
 
