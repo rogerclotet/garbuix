@@ -48,7 +48,6 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
-      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
@@ -67,16 +66,11 @@ services:
       target: dev
     image: paraules-app:dev
     command:
-      [
-        "sh",
-        "-lc",
-        "pnpm install --frozen-lockfile && pnpm backfill:puzzles",
-      ]
+      ["sh", "-lc", "pnpm install --frozen-lockfile && pnpm backfill:puzzles"]
     environment:
       NODE_ENV: development
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
-      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:3000}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"

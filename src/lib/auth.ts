@@ -19,7 +19,11 @@ const socialProviders =
 
 export const auth = betterAuth({
 	basePath: "/api/auth",
-	baseURL: serverEnv.BETTER_AUTH_URL,
+	baseURL: {
+		allowedHosts: ["garbuix.app", "garbuix.clotet.dev"],
+		protocol: "https",
+		fallback: "https://garbuix.app",
+	},
 	secret: serverEnv.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, {
 		provider: "pg",

@@ -11,7 +11,6 @@ const serverEnvSchema = z.object({
 		.string()
 		.min(1)
 		.default("dev-secret-change-me-please-replace-1234"),
-	BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
 	DATABASE_URL: z
 		.string()
 		.min(1)
