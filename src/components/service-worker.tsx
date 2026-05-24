@@ -114,6 +114,7 @@ export function ServiceWorkerRegister() {
 		let isCheckingForUpdates = false;
 		let latestVersion = APP_VERSION;
 		let updateToastVisible = false;
+		let autoActivatedInitialWaiting = false;
 
 		const resetUpdateToast = () => {
 			updateToastVisible = false;
@@ -220,7 +221,11 @@ export function ServiceWorkerRegister() {
 			nextRegistration.addEventListener("updatefound", onUpdateFound);
 			onUpdateFound();
 
-			if (nextRegistration.waiting && navigator.serviceWorker.controller) {
+			if (
+				nextRegistration.waiting &&
+				navigator.serviceWorker.controller &&
+				!autoActivatedInitialWaiting
+			) {
 				showUpdateToast();
 			}
 
@@ -308,6 +313,24 @@ export function ServiceWorkerRegister() {
 			}
 		};
 
+		const autoActivateExistingWaitingWorker = async () => {
+			try {
+				const existing = await navigator.serviceWorker.getRegistration();
+				const waiting = existing?.waiting;
+				if (!waiting || !navigator.serviceWorker.controller) {
+					return false;
+				}
+
+				autoActivatedInitialWaiting = true;
+				shouldReloadOnControllerChange = true;
+				waiting.postMessage({ type: "SKIP_WAITING" });
+				return true;
+			} catch (error) {
+				console.warn("Failed to inspect existing service worker", error);
+				return false;
+			}
+		};
+
 		const onVisibilityChange = () => {
 			if (document.visibilityState === "visible") {
 				void checkForUpdates();
@@ -326,7 +349,13 @@ export function ServiceWorkerRegister() {
 			"controllerchange",
 			onControllerChange,
 		);
-		void checkForUpdates();
+		void (async () => {
+			const autoActivated = await autoActivateExistingWaitingWorker();
+			if (autoActivated) {
+				return;
+			}
+			await checkForUpdates();
+		})();
 
 		window.addEventListener("focus", onWindowFocus);
 		window.addEventListener("pageshow", onPageShow);
