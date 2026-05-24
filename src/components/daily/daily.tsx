@@ -2,7 +2,6 @@ import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -674,7 +673,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		<>
 			<DailyConfetti fire={shouldFireConfetti} />
 			<div
-				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 ${
+				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
 						? "pb-6 sm:pb-8 lg:pb-24"
 						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
@@ -717,21 +716,59 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								</div>
 							</div>
 						) : (
-							<>
-								<div className="mb-2 flex items-center justify-between text-sm font-medium text-muted-foreground font-ui">
-									<span>
-										{derivedProgress.guessedWordIds.length} / {totalWords}{" "}
-										paraules trobades
-									</span>
-									<div className="flex items-center gap-3">
-										<span>
-											{derivedProgress.guessCount} intent
-											{derivedProgress.guessCount === 1 ? "" : "s"}
-										</span>
+							(() => {
+								const percent = Math.min(
+									100,
+									Math.max(
+										0,
+										(derivedProgress.guessedWordIds.length / totalWords) * 100,
+									),
+								);
+								return (
+									<div className="flex items-center gap-1.5">
+										<div
+											className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/50 bg-muted/40"
+											role="progressbar"
+											aria-valuenow={derivedProgress.guessedWordIds.length}
+											aria-valuemin={0}
+											aria-valuemax={totalWords}
+											aria-label="Paraules trobades"
+										>
+											<div
+												className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
+												style={{ width: `${percent}%` }}
+											/>
+											{percent > 0 && percent < 100 ? (
+												<div
+													className="absolute top-1.5 bottom-1.5 w-px bg-primary/80 transition-[left] duration-500 ease-out"
+													style={{ left: `calc(${percent}% - 0.5px)` }}
+												/>
+											) : null}
+											<div className="relative flex h-full items-center justify-between gap-3 px-3 text-xs font-semibold font-ui">
+												<span className="flex items-baseline gap-1">
+													<span className="text-foreground tabular-nums text-sm">
+														{derivedProgress.guessedWordIds.length}
+													</span>
+													<span className="text-muted-foreground/50">/</span>
+													<span className="text-muted-foreground tabular-nums">
+														{totalWords}
+													</span>
+													<span className="ml-1 hidden text-muted-foreground sm:inline">
+														paraules
+													</span>
+												</span>
+												<span className="text-muted-foreground tabular-nums">
+													{derivedProgress.guessCount}{" "}
+													{derivedProgress.guessCount === 1
+														? "intent"
+														: "intents"}
+												</span>
+											</div>
+										</div>
 										<Button
-											variant="outline"
-											size="sm"
-											className="gap-1.5 h-7 px-2 -mr-2 border-border/60"
+											variant="ghost"
+											size="icon"
+											className="size-8 shrink-0 rounded-full border border-border/50 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
 											onClick={() => {
 												if (getSkipSharePreview()) {
 													void handleShare();
@@ -741,20 +778,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 											}}
 											aria-label="Compartir progrés"
 										>
-											<Share2 className="w-3.5 h-3.5" />
-											<span className="hidden sm:inline">
-												Compartir progrés
-											</span>
+											<Share2 className="size-3.5" />
 										</Button>
 									</div>
-								</div>
-
-								<Progress
-									value={derivedProgress.guessedWordIds.length}
-									max={totalWords}
-									className="h-2"
-								/>
-							</>
+								);
+							})()
 						)}
 					</div>
 

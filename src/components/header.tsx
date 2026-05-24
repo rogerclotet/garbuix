@@ -21,8 +21,8 @@ export default function Header() {
 	const howToPlayOpen = useHowToPlayOpen();
 
 	return (
-		<header className="bg-background/80 backdrop-blur-md border-b border-border/50 transition-colors duration-300">
-			<div className="max-w-7xl mx-auto px-3 sm:px-4 pb-3 sm:pb-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-[calc(env(safe-area-inset-top)+1rem)]">
+		<header className="bg-background/80 backdrop-blur-md transition-colors duration-300">
+			<div className="max-w-7xl mx-auto px-3 sm:px-4 pb-1 sm:pb-1.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-[calc(env(safe-area-inset-top)+1rem)]">
 				<div className="flex items-center justify-between gap-2">
 					{innerTitle ? (
 						<div className="flex min-w-0 items-center gap-1 sm:gap-2">
