@@ -13,7 +13,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { setSkipSharePreview } from "@/lib/anon-identity";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
-import { renderProgressCanvas } from "./share-progress";
+import {
+	renderProgressCanvas,
+	type ShareCompletionStats,
+} from "./share-progress";
 
 type SharePreviewDialogProps = {
 	open: boolean;
@@ -22,6 +25,7 @@ type SharePreviewDialogProps = {
 	revealedCells: Set<string>;
 	guessedCount: number;
 	totalWords: number;
+	completionStats?: ShareCompletionStats;
 	onConfirm: () => void;
 };
 
@@ -32,6 +36,7 @@ export function SharePreviewDialog({
 	revealedCells,
 	guessedCount,
 	totalWords,
+	completionStats,
 	onConfirm,
 }: SharePreviewDialogProps) {
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -54,6 +59,7 @@ export function SharePreviewDialog({
 				revealedCells,
 				guessedCount,
 				totalWords,
+				completionStats,
 			);
 			canvas.toBlob((blob) => {
 				if (cancelled || !blob) return;
@@ -68,7 +74,7 @@ export function SharePreviewDialog({
 			cancelled = true;
 			if (objectUrl) URL.revokeObjectURL(objectUrl);
 		};
-	}, [open, puzzle, revealedCells, guessedCount, totalWords]);
+	}, [open, puzzle, revealedCells, guessedCount, totalWords, completionStats]);
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>

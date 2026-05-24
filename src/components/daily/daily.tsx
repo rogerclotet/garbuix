@@ -581,6 +581,23 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		void signInWithGoogle("welcome_dialog");
 	}, [captureEvent, signInWithGoogle]);
 
+	const completionStats = useMemo(() => {
+		if (derivedProgress.guessedWordIds.length !== totalWords) return undefined;
+		return {
+			guessCount: derivedProgress.guessCount,
+			hintsUsed: derivedProgress.hintsUsed,
+			completedAt: derivedProgress.completedAt,
+			currentStreak: streakStats.currentStreak,
+		};
+	}, [
+		derivedProgress.completedAt,
+		derivedProgress.guessCount,
+		derivedProgress.guessedWordIds.length,
+		derivedProgress.hintsUsed,
+		streakStats.currentStreak,
+		totalWords,
+	]);
+
 	const handleShare = useCallback(async () => {
 		try {
 			const result = await shareProgress(
@@ -588,6 +605,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				revealedCells,
 				derivedProgress.guessedWordIds.length,
 				totalWords,
+				completionStats,
 			);
 			if (result === "copied") {
 				toast.success("Imatge copiada!");
@@ -596,6 +614,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			toast.error("No s'ha pogut compartir");
 		}
 	}, [
+		completionStats,
 		puzzle,
 		revealedCells,
 		derivedProgress.guessedWordIds.length,
@@ -840,6 +859,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				revealedCells={revealedCells}
 				guessedCount={derivedProgress.guessedWordIds.length}
 				totalWords={totalWords}
+				completionStats={completionStats}
 				onConfirm={() => {
 					setSharePreviewOpen(false);
 					void handleShare();

@@ -7,6 +7,23 @@ const PADDING = 24;
 const HEADER_HEIGHT = 48;
 const FOOTER_HEIGHT = 32;
 const DOT_RADIUS = 6;
+const STATS_TOP_GAP = 18;
+const STATS_HEIGHT = 64;
+const STATS_GAP = 8;
+const STATS_RADIUS = 10;
+const STREAK_THRESHOLD = 3;
+
+export type ShareCompletionStats = {
+	guessCount: number;
+	hintsUsed: number;
+	completedAt: string | null;
+	currentStreak: number;
+};
+
+const timeFormatter =
+	typeof Intl !== "undefined"
+		? new Intl.DateTimeFormat("ca-ES", { hour: "2-digit", minute: "2-digit" })
+		: null;
 
 function formatShareDate(dateKey: string): string {
 	const [year, month, day] = dateKey.split("-");
@@ -16,6 +33,40 @@ function formatShareDate(dateKey: string): string {
 	}
 
 	return `${day}/${month}/${year}`;
+}
+
+type StatItem = { value: string; label: string };
+
+function buildStatItems(stats: ShareCompletionStats): StatItem[] {
+	const items: StatItem[] = [
+		{
+			value: String(stats.guessCount),
+			label: stats.guessCount === 1 ? "Intent" : "Intents",
+		},
+		{
+			value: String(stats.hintsUsed),
+			label: stats.hintsUsed === 1 ? "Pista" : "Pistes",
+		},
+	];
+
+	if (stats.completedAt && timeFormatter) {
+		const completedDate = new Date(stats.completedAt);
+		if (!Number.isNaN(completedDate.getTime())) {
+			items.push({
+				value: timeFormatter.format(completedDate),
+				label: "Acabat",
+			});
+		}
+	}
+
+	if (stats.currentStreak >= STREAK_THRESHOLD) {
+		items.push({
+			value: `${stats.currentStreak} 🔥`,
+			label: stats.currentStreak === 1 ? "Ratxa (dia)" : "Ratxa (dies)",
+		});
+	}
+
+	return items;
 }
 
 function getCSSColor(varName: string, fallback: string): string {
@@ -132,12 +183,16 @@ export function renderProgressCanvas(
 	revealedCells: Set<string>,
 	guessedCount: number,
 	totalWords: number,
+	completionStats?: ShareCompletionStats,
 ): HTMLCanvasElement {
 	const colors = getThemeColors();
+	const statItems = completionStats ? buildStatItems(completionStats) : [];
+	const statsBlockH = statItems.length > 0 ? STATS_TOP_GAP + STATS_HEIGHT : 0;
 	const gridW = puzzle.cols * (CELL_SIZE + CELL_GAP) - CELL_GAP;
 	const gridH = puzzle.rows * (CELL_SIZE + CELL_GAP) - CELL_GAP;
 	const canvasW = gridW + PADDING * 2;
-	const canvasH = gridH + PADDING * 2 + HEADER_HEIGHT + FOOTER_HEIGHT;
+	const canvasH =
+		gridH + PADDING * 2 + HEADER_HEIGHT + FOOTER_HEIGHT + statsBlockH;
 
 	const dpr = Math.min(window.devicePixelRatio || 1, 3);
 	const canvas = document.createElement("canvas");
@@ -235,15 +290,52 @@ export function renderProgressCanvas(
 		}
 	}
 
+	// Stats (only when completed)
+	if (statItems.length > 0) {
+		const statsTop = gridOffsetY + gridH + STATS_TOP_GAP;
+		const cardCount = statItems.length;
+		const cardWidth = (gridW - STATS_GAP * (cardCount - 1)) / cardCount;
+
+		for (let i = 0; i < cardCount; i++) {
+			const item = statItems[i];
+			if (!item) continue;
+			const x = PADDING + i * (cardWidth + STATS_GAP);
+
+			ctx.fillStyle = colors.muted;
+			roundRect(ctx, x, statsTop, cardWidth, STATS_HEIGHT, STATS_RADIUS);
+			ctx.fill();
+
+			ctx.globalAlpha = 0.6;
+			ctx.strokeStyle = colors.border;
+			ctx.lineWidth = 1;
+			roundRect(ctx, x, statsTop, cardWidth, STATS_HEIGHT, STATS_RADIUS);
+			ctx.stroke();
+			ctx.globalAlpha = 1;
+
+			const centerX = x + cardWidth / 2;
+			ctx.textAlign = "center";
+
+			ctx.fillStyle = colors.foreground;
+			ctx.font =
+				"600 18px system-ui, -apple-system, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
+			ctx.textBaseline = "alphabetic";
+			ctx.fillText(item.value, centerX, statsTop + 30);
+
+			ctx.fillStyle = colors.mutedFg;
+			ctx.font = "11px system-ui, -apple-system, sans-serif";
+			ctx.fillText(item.label.toUpperCase(), centerX, statsTop + 50);
+		}
+
+		ctx.textAlign = "left";
+		ctx.textBaseline = "middle";
+	}
+
 	// Footer
+	const footerY = gridOffsetY + gridH + statsBlockH + FOOTER_HEIGHT / 2 + 10;
 	ctx.fillStyle = colors.mutedFg;
 	ctx.font = "12px system-ui, -apple-system, sans-serif";
 	ctx.textAlign = "center";
-	ctx.fillText(
-		"garbuix.app",
-		canvasW / 2,
-		gridOffsetY + gridH + FOOTER_HEIGHT / 2 + 10,
-	);
+	ctx.fillText("garbuix.app", canvasW / 2, footerY);
 	ctx.textAlign = "left";
 
 	return canvas;
@@ -256,12 +348,14 @@ export async function shareProgress(
 	revealedCells: Set<string>,
 	guessedCount: number,
 	totalWords: number,
+	completionStats?: ShareCompletionStats,
 ): Promise<ShareResult> {
 	const canvas = renderProgressCanvas(
 		puzzle,
 		revealedCells,
 		guessedCount,
 		totalWords,
+		completionStats,
 	);
 
 	const blob = await new Promise<Blob>((resolve, reject) => {
