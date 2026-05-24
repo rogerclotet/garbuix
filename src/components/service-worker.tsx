@@ -88,7 +88,23 @@ function waitForWaitingWorker(registration: ServiceWorkerRegistration) {
 
 export function ServiceWorkerRegister() {
 	useEffect(() => {
-		if (import.meta.env.DEV || !("serviceWorker" in navigator)) {
+		if (!("serviceWorker" in navigator)) {
+			return;
+		}
+
+		if (import.meta.env.DEV) {
+			void (async () => {
+				const registrations = await navigator.serviceWorker.getRegistrations();
+				if (registrations.length === 0) {
+					return;
+				}
+				await Promise.all(registrations.map((r) => r.unregister()));
+				if ("caches" in window) {
+					const keys = await caches.keys();
+					await Promise.all(keys.map((key) => caches.delete(key)));
+				}
+				window.location.reload();
+			})();
 			return;
 		}
 
