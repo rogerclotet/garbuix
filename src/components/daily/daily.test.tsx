@@ -15,11 +15,17 @@ const {
 	applyLocalEventMock,
 	captureEventMock,
 	captureExceptionMock,
+	hasSeenHowToPlayMock,
+	markHowToPlaySeenMock,
+	openHowToPlayMock,
 } = vi.hoisted(() => ({
 	resolveGuessMock: vi.fn(),
 	applyLocalEventMock: vi.fn(),
 	captureEventMock: vi.fn(),
 	captureExceptionMock: vi.fn(),
+	hasSeenHowToPlayMock: vi.fn(() => true),
+	markHowToPlaySeenMock: vi.fn(),
+	openHowToPlayMock: vi.fn(),
 }));
 
 vi.mock("@/lib/puzzle-client", async () => {
@@ -38,6 +44,12 @@ vi.mock("@/lib/puzzle-client", async () => {
 vi.mock("@/lib/puzzle-local", () => ({
 	getDeviceId: vi.fn(() => "device-1"),
 	getSortedAnonymousHistoryEntries: vi.fn(() => []),
+	hasSeenHowToPlay: hasSeenHowToPlayMock,
+	markHowToPlaySeen: markHowToPlaySeenMock,
+}));
+
+vi.mock("./how-to-play-store", () => ({
+	openHowToPlay: openHowToPlayMock,
 }));
 
 vi.mock("@/lib/puzzle-streaks", () => ({
@@ -197,6 +209,10 @@ describe("Daily submit feedback", () => {
 		applyLocalEventMock.mockReset();
 		captureEventMock.mockReset();
 		captureExceptionMock.mockReset();
+		hasSeenHowToPlayMock.mockReset();
+		hasSeenHowToPlayMock.mockReturnValue(true);
+		markHowToPlaySeenMock.mockReset();
+		openHowToPlayMock.mockReset();
 		installMatchMediaMock(false);
 	});
 
@@ -295,6 +311,35 @@ describe("Daily submit feedback", () => {
 		expect(feedback.className).toContain(
 			"daily-submit-feedback-reduced-motion",
 		);
+	});
+
+	it("opens the how-to-play dialog on first visit and marks it seen", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(false);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(markHowToPlaySeenMock).toHaveBeenCalledTimes(1);
+		});
+		expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
+		expect(captureEventMock).toHaveBeenCalledWith("how_to_play_shown", {
+			trigger: "first_visit",
+		});
+	});
+
+	it("does not auto-open the how-to-play dialog on subsequent visits", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(true);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(captureEventMock).toHaveBeenCalledWith(
+				"puzzle_loaded",
+				expect.any(Object),
+			);
+		});
+		expect(openHowToPlayMock).not.toHaveBeenCalled();
+		expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
 	});
 
 	it("triggers haptics on the first touch release", async () => {

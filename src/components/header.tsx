@@ -1,5 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
+import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
+import {
+	setHowToPlayOpen,
+	useHowToPlayOpen,
+} from "@/components/daily/how-to-play-store";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -13,6 +18,7 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 export default function Header() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const innerTitle = INNER_PAGE_TITLES[pathname];
+	const howToPlayOpen = useHowToPlayOpen();
 
 	return (
 		<header className="bg-background/80 backdrop-blur-md border-b border-border/50 transition-colors duration-300">
@@ -50,6 +56,7 @@ export default function Header() {
 					</div>
 				</div>
 			</div>
+			<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
 		</header>
 	);
 }

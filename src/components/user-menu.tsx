@@ -1,5 +1,6 @@
 import { getRouteApi, Link, useRouter } from "@tanstack/react-router";
 import {
+	HelpCircle,
 	History,
 	LogIn,
 	LogOut,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { openHowToPlay } from "@/components/daily/how-to-play-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,6 +116,14 @@ export function UserMenu() {
 						<History className="size-4" />
 						<span>Historial</span>
 					</Link>
+				</DropdownMenuItem>
+				<DropdownMenuItem
+					onSelect={() => {
+						openHowToPlay();
+					}}
+				>
+					<HelpCircle className="size-4" />
+					<span>Com es juga</span>
 				</DropdownMenuItem>
 				<DropdownMenuItem asChild>
 					<Link to="/preferencies">

@@ -10,6 +10,7 @@ const ANON_HISTORY_KEY = "paraules-anon-history-v2";
 const ACCOUNT_CACHE_PREFIX = "paraules-account-cache-v1:";
 const IMPORT_MARKER_PREFIX = "paraules-account-import-v1:";
 const DEVICE_ID_KEY = "paraules-device-id-v1";
+const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
 
 function readJson<T>(key: string): T | null {
 	if (typeof window === "undefined") return null;
@@ -131,6 +132,16 @@ export function buildAnonymousImportPayload(): AnonymousImportPayload {
 		historyEntries: getSortedAnonymousHistoryEntries(),
 		activeProgressByDate,
 	};
+}
+
+export function hasSeenHowToPlay(): boolean {
+	if (typeof window === "undefined") return true;
+	return window.localStorage.getItem(HOW_TO_PLAY_SEEN_KEY) === "1";
+}
+
+export function markHowToPlaySeen() {
+	if (typeof window === "undefined") return;
+	window.localStorage.setItem(HOW_TO_PLAY_SEEN_KEY, "1");
 }
 
 export function getDeviceId() {

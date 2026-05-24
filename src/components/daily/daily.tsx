@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { authClient } from "@/lib/auth-client";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -12,6 +13,8 @@ import {
 import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
+	hasSeenHowToPlay,
+	markHowToPlaySeen,
 } from "@/lib/puzzle-local";
 import {
 	calculateHistoryStreaks,
@@ -33,8 +36,11 @@ import {
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
+import { openHowToPlay } from "./how-to-play-store";
+import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
+import { WinDialog } from "./win-dialog";
 
 const POINTER_CLICK_DEDUP_MS = 350;
 const SUBMIT_FEEDBACK_DURATION_MS = 520;
@@ -98,6 +104,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const completionTransitionTimerRef = useRef<number | null>(null);
 	const [displayComplete, setDisplayComplete] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
+	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
+	const [winDialogOpen, setWinDialogOpen] = useState(false);
+	const winDialogTimerRef = useRef<number | null>(null);
 	const { captureEvent, captureException } = useObservability();
 	const { applyLocalEvent, derivedProgress, isProgressReady } =
 		useDailyProgress({
@@ -145,6 +154,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (completionTransitionTimerRef.current != null) {
 				window.clearTimeout(completionTransitionTimerRef.current);
 			}
+			if (winDialogTimerRef.current != null) {
+				window.clearTimeout(winDialogTimerRef.current);
+			}
 		};
 	}, []);
 
@@ -156,6 +168,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		setAnonymousHistoryEntries(getSortedAnonymousHistoryEntries());
 	}, [activeUser, initialData.historyEntries]);
+
+	useEffect(() => {
+		if (hasSeenHowToPlay()) return;
+		markHowToPlaySeen();
+		openHowToPlay();
+		captureEvent("how_to_play_shown", { trigger: "first_visit" });
+	}, [captureEvent]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
@@ -491,12 +510,33 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				setDisplayComplete(true);
 				setShouldFireConfetti(true);
 				completionTransitionTimerRef.current = null;
+				// Let confetti land before the modal pops up.
+				winDialogTimerRef.current = window.setTimeout(() => {
+					setWinDialogOpen(true);
+					winDialogTimerRef.current = null;
+				}, 900);
 			}, getSubmitFeedbackDuration());
 		} else {
 			// Puzzle was already complete on load — show immediately, no confetti
 			setDisplayComplete(true);
 		}
 	}, [isComplete]);
+
+	const handleSignInWithGoogle = useCallback(async () => {
+		captureEvent("auth_sign_in_started", {
+			provider: "google",
+			source: "win_dialog",
+		});
+		try {
+			await authClient.signIn.social({
+				provider: "google",
+				callbackURL: window.location.href,
+			});
+		} catch (error) {
+			captureException(error, { scope: "win_dialog_sign_in" });
+			toast.error("No s'ha pogut iniciar la sessió");
+		}
+	}, [captureEvent, captureException]);
 
 	const handleShare = useCallback(async () => {
 		try {
@@ -645,12 +685,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 											{derivedProgress.guessCount === 1 ? "" : "s"}
 										</span>
 										<Button
-											variant="ghost"
+											variant="outline"
 											size="sm"
-											className="gap-1.5 h-7 px-2 -mr-2"
-											onClick={() => void handleShare()}
+											className="gap-1.5 h-7 px-2 -mr-2 border-border/60"
+											onClick={() => setSharePreviewOpen(true)}
+											aria-label="Compartir progrés"
 										>
 											<Share2 className="w-3.5 h-3.5" />
+											<span className="hidden sm:inline">
+												Compartir progrés
+											</span>
 										</Button>
 									</div>
 								</div>
@@ -711,6 +755,34 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					</div>
 				</div>
 			</div>
+			<SharePreviewDialog
+				open={sharePreviewOpen}
+				onOpenChange={setSharePreviewOpen}
+				puzzle={puzzle}
+				revealedCells={revealedCells}
+				guessedCount={derivedProgress.guessedWordIds.length}
+				totalWords={totalWords}
+				onConfirm={() => {
+					setSharePreviewOpen(false);
+					void handleShare();
+				}}
+			/>
+			<WinDialog
+				open={winDialogOpen}
+				onOpenChange={setWinDialogOpen}
+				guessCount={derivedProgress.guessCount}
+				hintsUsed={derivedProgress.hintsUsed}
+				completedAt={derivedProgress.completedAt}
+				currentStreak={streakStats.currentStreak}
+				isAnonymous={!activeUser}
+				onShare={() => {
+					setWinDialogOpen(false);
+					void handleShare();
+				}}
+				onSignIn={() => {
+					void handleSignInWithGoogle();
+				}}
+			/>
 		</>
 	);
 }
