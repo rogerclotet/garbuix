@@ -218,15 +218,13 @@ export function History({ initialData }: { initialData: HistoryData }) {
 									{statCards.map((stat) => (
 										<div
 											key={stat.label}
-											className="rounded-xl bg-muted/50 px-3 py-3 sm:min-h-28 sm:px-4 sm:py-4"
+											className="flex min-h-24 flex-col rounded-xl bg-muted/50 px-3 py-3 sm:min-h-28 sm:px-4 sm:py-4"
 										>
-											<div className="flex items-center justify-between gap-3 sm:h-full sm:flex-col sm:items-start">
-												<span className="text-sm text-muted-foreground font-medium leading-tight font-ui">
-													{stat.label}
-												</span>
-												<div className="shrink-0 text-2xl leading-none font-bold sm:mt-auto sm:text-3xl">
-													{stat.value}
-												</div>
+											<span className="text-xs text-muted-foreground font-medium leading-tight font-ui sm:text-sm">
+												{stat.label}
+											</span>
+											<div className="mt-auto pt-2 text-2xl leading-none font-bold tabular-nums sm:text-3xl">
+												{stat.value}
 											</div>
 										</div>
 									))}
