@@ -60,7 +60,7 @@ export function WelcomeDialog({
 			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-base">
-						Benvingut/da a Garbuix
+						Benvingut/da a Garbuix!
 					</AlertDialogTitle>
 					<AlertDialogDescription>
 						Cada dia, un nou trencaclosques: troba totes les paraules amagades
@@ -102,7 +102,7 @@ export function WelcomeDialog({
 								</strong>{" "}
 								{platform === "ios" ? (
 									<>
-										pots instal·lar Garbuix com una app. Al Safari, toca{" "}
+										pots instal·lar Garbuix! com una app. Al Safari, toca{" "}
 										<Share className="inline size-3.5 -mt-0.5" /> i tria{" "}
 										<strong className="font-medium text-foreground">
 											Afegir a la pantalla d'inici
@@ -111,7 +111,7 @@ export function WelcomeDialog({
 									</>
 								) : (
 									<>
-										pots instal·lar Garbuix com una app. Al Chrome, toca{" "}
+										pots instal·lar Garbuix! com una app. Al Chrome, toca{" "}
 										<MoreVertical className="inline size-3.5 -mt-0.5" /> i tria{" "}
 										<strong className="font-medium text-foreground">
 											Instal·lar l'aplicació

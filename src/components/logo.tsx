@@ -24,7 +24,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
 			fill="currentColor"
 			xmlns="http://www.w3.org/2000/svg"
 			role="img"
-			aria-label="Logo Garbuix"
+			aria-label="Logo Garbuix!"
 			{...props}
 		>
 			{/* Top bar */}
