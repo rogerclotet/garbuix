@@ -14,6 +14,7 @@
 		"backfill:puzzles": "tsx scripts/backfill-daily-puzzles.ts",
 		"backfill:leaderboard": "tsx scripts/backfill-leaderboard.ts",
 		"delete:puzzle-day": "tsx scripts/delete-puzzle-day.ts",
+		"reset:user-progress": "tsx scripts/reset-user-progress.ts",
 		"analyze:randomness": "tsx scripts/analyze-daily-randomness.ts",
 		"test:generation-stats": "tsx scripts/test-generation-stats.ts",
 		"test": "vitest run",
