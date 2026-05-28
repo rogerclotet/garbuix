@@ -13,6 +13,7 @@ export function createEmptyProgressState(
 		guessedWordIds: [],
 		revealedWordTokens: {},
 		hintedCells: [],
+		clueWordIds: [],
 		hintsUsed: 0,
 		guessCount: 0,
 		shuffledLetters: [...puzzle.initialShuffledLetters],
@@ -101,6 +102,7 @@ export function isSameProgressState(
 		JSON.stringify(left.revealedWordTokens) ===
 			JSON.stringify(right.revealedWordTokens) &&
 		JSON.stringify(left.hintedCells) === JSON.stringify(right.hintedCells) &&
+		JSON.stringify(left.clueWordIds) === JSON.stringify(right.clueWordIds) &&
 		JSON.stringify(left.shuffledLetters) ===
 			JSON.stringify(right.shuffledLetters)
 	);
@@ -127,6 +129,12 @@ export function mergeProgressStates(
 		},
 		hintedCells: Array.from(
 			new Set([...(existing?.hintedCells ?? []), ...incoming.hintedCells]),
+		),
+		clueWordIds: Array.from(
+			new Set([
+				...(existing?.clueWordIds ?? []),
+				...(incoming.clueWordIds ?? []),
+			]),
 		),
 		hintsUsed: Math.max(existing?.hintsUsed ?? 0, incoming.hintsUsed),
 		guessCount: guessHashes.length,
@@ -193,6 +201,20 @@ export function applyPuzzleEvent(
 				hintsUsed: state.hintsUsed + 1,
 			};
 		}
+		case "text_hint_requested": {
+			if (
+				state.hintsUsed >= 3 ||
+				state.clueWordIds.includes(event.payload.wordId)
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				clueWordIds: [...state.clueWordIds, event.payload.wordId],
+				hintsUsed: state.hintsUsed + 1,
+			};
+		}
 		case "letters_shuffled": {
 			return {
 				...state,
@@ -206,6 +228,7 @@ export function applyPuzzleEvent(
 				guessedWordIds: [],
 				revealedWordTokens: {},
 				hintedCells: [],
+				clueWordIds: [],
 				hintsUsed: 0,
 				guessCount: 0,
 				completedAt: null,

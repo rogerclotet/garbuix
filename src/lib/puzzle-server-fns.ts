@@ -5,11 +5,16 @@ import { getTodayDateKey } from "@/lib/puzzle-dates";
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
+	getCluesForReviewData,
 	getDailyPuzzlePublicData,
 	getHistoryPageDataForUser,
+	getModelRatingSummaryData,
 	getSessionUserData,
 	getUserPuzzleProgressData,
+	getWordCluesData,
 	importAnonymousProgressForUser,
+	isAdminEmail,
+	submitClueRatingData,
 	syncPuzzleEventsForUser,
 	triggerDailyPuzzleGeneration,
 } from "@/lib/puzzle-service.server";
@@ -164,6 +169,118 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 					device_id: data.deviceId,
 					event_count: data.events.length,
 					puzzle_id: data.puzzleId,
+				},
+			},
+		);
+	});
+
+export const getWordClues = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			puzzleId: z.string(),
+			wordIds: z.array(z.number()),
+		}),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"getWordClues",
+			async () => {
+				const session = await getAuthSession();
+				if (!session) {
+					return {} as Record<number, string>;
+				}
+
+				return getWordCluesData(data.puzzleId, data.wordIds);
+			},
+			{
+				properties: {
+					puzzle_id: data.puzzleId,
+					word_count: data.wordIds.length,
+				},
+			},
+		);
+	});
+
+async function requireAdminSession() {
+	const session = await getAuthSession();
+	if (!session) {
+		throw new Error("Unauthorized");
+	}
+	if (!isAdminEmail(session.user.email)) {
+		throw new Error("Forbidden");
+	}
+	return session;
+}
+
+export const getCluesForReview = createServerFn({ method: "POST" })
+	.inputValidator(
+		z
+			.object({
+				dateKey: z.string().optional(),
+			})
+			.optional(),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"getCluesForReview",
+			async () => {
+				const session = await requireAdminSession();
+				return getCluesForReviewData(session.user.email, data?.dateKey);
+			},
+			{
+				properties: {
+					date_key: data?.dateKey,
+				},
+			},
+		);
+	});
+
+export const submitClueRating = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			clueId: z.string(),
+			winner: z.enum(["a", "b", "tie"]),
+		}),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"submitClueRating",
+			async () => {
+				const session = await requireAdminSession();
+				await submitClueRatingData({
+					clueId: data.clueId,
+					winner: data.winner,
+					reviewerEmail: session.user.email,
+				});
+				return { ok: true as const };
+			},
+			{
+				properties: {
+					clue_id: data.clueId,
+					winner: data.winner,
+				},
+			},
+		);
+	});
+
+export const getModelRatingSummary = createServerFn({ method: "POST" })
+	.inputValidator(
+		z
+			.object({
+				dateKey: z.string().optional(),
+			})
+			.optional(),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"getModelRatingSummary",
+			async () => {
+				await requireAdminSession();
+				return getModelRatingSummaryData(data?.dateKey);
+			},
+			{
+				properties: {
+					date_key: data?.dateKey,
 				},
 			},
 		);

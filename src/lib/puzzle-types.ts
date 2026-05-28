@@ -76,6 +76,7 @@ export type PuzzleProgressState = {
 	guessedWordIds: number[];
 	revealedWordTokens: Record<string, string>;
 	hintedCells: string[];
+	clueWordIds: number[];
 	hintsUsed: number;
 	guessCount: number;
 	shuffledLetters: string[];
@@ -103,6 +104,15 @@ export type HintUsedEvent = {
 	};
 };
 
+export type TextHintRequestedEvent = {
+	id: string;
+	at: string;
+	type: "text_hint_requested";
+	payload: {
+		wordId: number;
+	};
+};
+
 export type LettersShuffledEvent = {
 	id: string;
 	at: string;
@@ -122,6 +132,7 @@ export type ProgressResetEvent = {
 export type PuzzleClientEvent =
 	| GuessAddedEvent
 	| HintUsedEvent
+	| TextHintRequestedEvent
 	| LettersShuffledEvent
 	| ProgressResetEvent;
 

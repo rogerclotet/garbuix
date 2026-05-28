@@ -1,9 +1,11 @@
+import { useFeatureFlagEnabled } from "@posthog/react";
 import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
+import { AI_WORD_CLUES_FLAG } from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -18,6 +20,7 @@ import {
 	markHowToPlaySeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
+import { getWordClues } from "@/lib/puzzle-server-fns";
 import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
@@ -35,6 +38,7 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
+	getSortedWordSlots,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -92,6 +96,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);
+	const [clueTextsByWordId, setClueTextsByWordId] = useState<
+		Record<number, string>
+	>({});
+	const [highlightedClueWordId, setHighlightedClueWordId] = useState<
+		number | null
+	>(null);
+	const aiCluesEnabled = useFeatureFlagEnabled(AI_WORD_CLUES_FLAG);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
@@ -289,6 +300,68 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		() => getNextHintCellKey(puzzle, revealedCells),
 		[puzzle, revealedCells],
 	);
+
+	// Logged-in players with the flag on get AI text clues; everyone else keeps
+	// the single-letter reveal.
+	const useTextClue = Boolean(activeUser && aiCluesEnabled);
+
+	const nextClueWordId = useMemo(() => {
+		if (!useTextClue) return null;
+		const { notFoundSlots } = getSortedWordSlots(
+			puzzle.wordSlots,
+			derivedProgress.guessedWordIds,
+			cellLetters,
+		);
+		const requested = new Set(derivedProgress.clueWordIds);
+		return notFoundSlots.find((slot) => !requested.has(slot.id))?.id ?? null;
+	}, [
+		useTextClue,
+		puzzle.wordSlots,
+		derivedProgress.guessedWordIds,
+		derivedProgress.clueWordIds,
+		cellLetters,
+	]);
+
+	// Stable primitive key derived from the requested clue word ids, so the fetch
+	// effect refires only when the set actually changes (not on every render that
+	// produces a fresh array reference).
+	const clueWordIdsKey = derivedProgress.clueWordIds.join(",");
+
+	useEffect(() => {
+		if (!useTextClue || clueWordIdsKey === "") {
+			setClueTextsByWordId({});
+			return;
+		}
+
+		const wordIds = clueWordIdsKey.split(",").map(Number);
+		let cancelled = false;
+		void (async () => {
+			try {
+				const clues = await getWordClues({
+					data: { puzzleId: puzzle.id, wordIds },
+				});
+				if (!cancelled) {
+					setClueTextsByWordId(clues);
+				}
+			} catch (error) {
+				console.error("Failed to load word clues", error);
+				captureException(error, {
+					puzzle_date: puzzle.dateKey,
+					scope: "load_word_clues",
+				});
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		useTextClue,
+		puzzle.id,
+		puzzle.dateKey,
+		clueWordIdsKey,
+		captureException,
+	]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])
@@ -508,6 +581,24 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleHint = useCallback(() => {
 		triggerHaptic(HAPTIC_TAP_MS);
 		if (derivedProgress.hintsUsed >= 3) return;
+
+		if (useTextClue) {
+			if (nextClueWordId == null) return;
+			captureEvent("puzzle_text_hint_requested", {
+				date_key: puzzle.dateKey,
+				hints_used_after: derivedProgress.hintsUsed + 1,
+				puzzle_id: puzzle.id,
+				word_id: nextClueWordId,
+			});
+			applyLocalEvent(
+				createPuzzleEvent("text_hint_requested", {
+					wordId: nextClueWordId,
+				}),
+			);
+			setHighlightedClueWordId(nextClueWordId);
+			return;
+		}
+
 		if (!nextHintCellKey) return;
 		captureEvent("puzzle_hint_used", {
 			date_key: puzzle.dateKey,
@@ -523,10 +614,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		applyLocalEvent,
 		captureEvent,
 		derivedProgress.hintsUsed,
+		nextClueWordId,
 		nextHintCellKey,
 		puzzle.dateKey,
 		puzzle.id,
 		triggerHaptic,
+		useTextClue,
 	]);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
@@ -812,7 +905,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						<div className="mt-6 lg:mt-0 lg:space-y-6">
 							<DailyControls
 								canUseHint={
-									derivedProgress.hintsUsed < 3 && nextHintCellKey != null
+									derivedProgress.hintsUsed < 3 &&
+									(useTextClue
+										? nextClueWordId != null
+										: nextHintCellKey != null)
 								}
 								currentGuess={currentGuess}
 								hintsUsed={derivedProgress.hintsUsed}
@@ -840,6 +936,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									guessedWordIds={derivedProgress.guessedWordIds}
 									revealedAnswers={revealedAnswers}
 									cellLetters={cellLetters}
+									clueTextsByWordId={clueTextsByWordId}
+									highlightedClueWordId={highlightedClueWordId}
 								/>
 							</div>
 						</div>
