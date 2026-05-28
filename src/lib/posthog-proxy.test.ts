@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	getPostHogProxyHeaders,
+	getPostHogProxyResponseHeaders,
 	getPostHogProxyTarget,
 } from "@/lib/posthog-proxy";
 
@@ -51,5 +52,21 @@ describe("posthog-proxy", () => {
 		expect(headers.get("content-length")).toBeNull();
 		expect(headers.get("host")).toBe("eu.i.posthog.com");
 		expect(headers.get("origin")).toBe("https://garbuix.cat");
+	});
+
+	it("strips stale encoding headers from the proxied response", () => {
+		const headers = getPostHogProxyResponseHeaders(
+			new Headers({
+				connection: "keep-alive",
+				"content-encoding": "gzip",
+				"content-length": "1234",
+				"content-type": "application/json",
+			}),
+		);
+
+		expect(headers.get("connection")).toBeNull();
+		expect(headers.get("content-encoding")).toBeNull();
+		expect(headers.get("content-length")).toBeNull();
+		expect(headers.get("content-type")).toBe("application/json");
 	});
 });
