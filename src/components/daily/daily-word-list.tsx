@@ -7,6 +7,8 @@ type DailyWordListProps = {
 	guessedWordIds: number[];
 	revealedAnswers: Record<number, string>;
 	cellLetters: Map<string, string>;
+	clueTextsByWordId?: Record<number, string>;
+	highlightedClueWordId?: number | null;
 };
 
 export function DailyWordList({
@@ -14,6 +16,8 @@ export function DailyWordList({
 	guessedWordIds,
 	revealedAnswers,
 	cellLetters,
+	clueTextsByWordId = {},
+	highlightedClueWordId = null,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
 		puzzle.wordSlots,
@@ -23,20 +27,36 @@ export function DailyWordList({
 
 	return (
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
-			{notFoundSlots.map((slot) => (
-				<div
-					key={slot.id}
-					className="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-muted/40"
-				>
-					<div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
-					<span className="font-mono text-muted-foreground tracking-widest">
-						{getDisplayedSlotWord(slot, cellLetters)}
-					</span>
-					<span className="text-xs text-muted-foreground ml-auto font-ui">
-						{slot.length} lletres
-					</span>
-				</div>
-			))}
+			{notFoundSlots.map((slot) => {
+				const clueText = clueTextsByWordId[slot.id];
+				const isHighlighted = slot.id === highlightedClueWordId;
+
+				return (
+					<div
+						key={slot.id}
+						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg ${
+							isHighlighted
+								? "bg-amber-400/15 ring-2 ring-amber-400/50"
+								: "bg-muted/40"
+						}`}
+					>
+						<div className="flex items-center gap-2">
+							<div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+							<span className="font-mono text-muted-foreground tracking-widest">
+								{getDisplayedSlotWord(slot, cellLetters)}
+							</span>
+							<span className="text-xs text-muted-foreground ml-auto font-ui">
+								{slot.length} lletres
+							</span>
+						</div>
+						{clueText ? (
+							<p className="text-sm italic text-muted-foreground pl-7 font-ui">
+								{clueText}
+							</p>
+						) : null}
+					</div>
+				);
+			})}
 
 			{foundSlots.map((slot) => (
 				<div

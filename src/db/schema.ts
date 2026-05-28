@@ -71,6 +71,10 @@ export const userPuzzleProgress = pgTable(
 			.$type<string[]>()
 			.notNull()
 			.default(sql`'[]'::jsonb`),
+		clueWordIds: jsonb("clue_word_ids")
+			.$type<number[]>()
+			.notNull()
+			.default(sql`'[]'::jsonb`),
 		hintsUsed: integer("hints_used").notNull().default(0),
 		guessCount: integer("guess_count").notNull().default(0),
 		shuffledLetters: jsonb("shuffled_letters")
@@ -149,10 +153,82 @@ export const legacyImportedResults = pgTable(
 	],
 );
 
+export const puzzleWordClues = pgTable(
+	"puzzle_word_clues",
+	{
+		id: text("id").primaryKey(),
+		puzzleId: text("puzzle_id")
+			.notNull()
+			.references(() => dailyPuzzles.id, { onDelete: "cascade" }),
+		wordId: integer("word_id").notNull(),
+		normalizedWord: text("normalized_word").notNull(),
+		sonnetModel: text("sonnet_model").notNull(),
+		sonnetClue: text("sonnet_clue").notNull(),
+		haikuModel: text("haiku_model").notNull(),
+		haikuClue: text("haiku_clue").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		uniqueIndex("puzzle_word_clues_puzzle_word_idx").on(
+			table.puzzleId,
+			table.wordId,
+		),
+		index("puzzle_word_clues_puzzle_idx").on(table.puzzleId),
+	],
+);
+
+export const puzzleWordClueRatings = pgTable(
+	"puzzle_word_clue_ratings",
+	{
+		id: text("id").primaryKey(),
+		clueId: text("clue_id")
+			.notNull()
+			.references(() => puzzleWordClues.id, { onDelete: "cascade" }),
+		model: text("model").notNull(),
+		rating: text("rating").notNull(),
+		ratedByEmail: text("rated_by_email").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		uniqueIndex("puzzle_word_clue_ratings_unique_idx").on(
+			table.clueId,
+			table.model,
+			table.ratedByEmail,
+		),
+		index("puzzle_word_clue_ratings_clue_idx").on(table.clueId),
+	],
+);
+
 export const dailyPuzzleRelations = relations(dailyPuzzles, ({ many }) => ({
 	progress: many(userPuzzleProgress),
 	events: many(userPuzzleEvents),
+	wordClues: many(puzzleWordClues),
 }));
+
+export const puzzleWordCluesRelations = relations(
+	puzzleWordClues,
+	({ one, many }) => ({
+		puzzle: one(dailyPuzzles, {
+			fields: [puzzleWordClues.puzzleId],
+			references: [dailyPuzzles.id],
+		}),
+		ratings: many(puzzleWordClueRatings),
+	}),
+);
+
+export const puzzleWordClueRatingsRelations = relations(
+	puzzleWordClueRatings,
+	({ one }) => ({
+		clue: one(puzzleWordClues, {
+			fields: [puzzleWordClueRatings.clueId],
+			references: [puzzleWordClues.id],
+		}),
+	}),
+);
 
 export const userPuzzleProgressRelations = relations(
 	userPuzzleProgress,
@@ -204,6 +280,8 @@ export const puzzleSchema = {
 	legacyImportedResults,
 	userPuzzleEvents,
 	userPuzzleProgress,
+	puzzleWordClues,
+	puzzleWordClueRatings,
 };
 
 export type DbPuzzleProgressRow = typeof userPuzzleProgress.$inferSelect;
