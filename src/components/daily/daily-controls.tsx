@@ -1,4 +1,10 @@
-import { CornerDownLeft, Delete, Lightbulb, Shuffle } from "lucide-react";
+import {
+	CornerDownLeft,
+	Delete,
+	Lightbulb,
+	Shuffle,
+	Sparkles,
+} from "lucide-react";
 import type { MouseEvent, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +14,7 @@ import type { DailySubmitFeedback } from "./daily-types";
 const HINT_HOLD_MS = 600;
 
 type DailyControlsProps = {
+	aiClueMode: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
 	hintsUsed: number;
@@ -30,6 +37,7 @@ type DailyControlsProps = {
 };
 
 export function DailyControls({
+	aiClueMode,
 	canUseHint,
 	currentGuess,
 	hintsUsed,
@@ -211,16 +219,26 @@ export function DailyControls({
 								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
 								disabled={!canUseHint || isComplete}
 								size="lg"
-								aria-description="Mantén premut per revelar una lletra"
+								aria-description={
+									aiClueMode
+										? "Mantén premut per rebre una pista de la IA"
+										: "Mantén premut per revelar una lletra"
+								}
 							>
 								<span
 									className="absolute inset-0 bg-amber-400/25 origin-left"
 									style={{ transform: `scaleX(${hintHoldProgress})` }}
 									aria-hidden
 								/>
-								<Lightbulb
-									className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-								/>
+								{aiClueMode ? (
+									<Sparkles
+										className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+									/>
+								) : (
+									<Lightbulb
+										className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+									/>
+								)}
 								<span className="relative">Pista ({3 - hintsUsed})</span>
 							</Button>
 							<Button
