@@ -904,6 +904,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 						<div className="mt-6 lg:mt-0 lg:space-y-6">
 							<DailyControls
+								aiClueMode={useTextClue}
 								canUseHint={
 									derivedProgress.hintsUsed < 3 &&
 									(useTextClue
