@@ -49,6 +49,14 @@ export function getPostHogProxyResponseHeaders(responseHeaders: Headers) {
 		headers.delete(header);
 	}
 
+	// `fetch` already decoded the upstream body, so the original encoding and
+	// length no longer describe what we forward. Leaving them in makes the
+	// browser try to decompress plain text (NS_ERROR_INVALID_CONTENT_ENCODING),
+	// which breaks reading the /flags response and silently disables feature
+	// flags. Drop them and let the runtime set correct values.
+	headers.delete("content-encoding");
+	headers.delete("content-length");
+
 	return headers;
 }
 
