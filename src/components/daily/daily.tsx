@@ -39,6 +39,7 @@ import {
 	getGuessKeyboardAction,
 	getNextHintCellKey,
 	getNextHintCellKeyForSlot,
+	getSlotCellKey,
 	getSortedWordSlots,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
@@ -362,6 +363,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 				const slot = currentPuzzle.wordSlots.find((item) => item.id === wordId);
 				if (!slot) continue;
+
+				// At most one fallback letter per word, ever. If any of the word's
+				// cells is already revealed (a fallback letter from a previous visit),
+				// skip it so reloads don't keep uncovering more letters.
+				const alreadyRevealed = Array.from(
+					{ length: slot.length },
+					(_, index) => getSlotCellKey(slot, index),
+				).some((key) => revealed.has(key));
+				if (alreadyRevealed) continue;
 
 				const cellKey = getNextHintCellKeyForSlot(
 					currentPuzzle,
