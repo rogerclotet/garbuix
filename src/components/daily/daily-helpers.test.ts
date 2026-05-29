@@ -4,6 +4,7 @@ import {
 	getDisplayedSlotWord,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
+	getSlotHintCellKey,
 	getSortedWordSlots,
 } from "./daily-helpers";
 
@@ -97,6 +98,85 @@ describe("getNextHintCellKey", () => {
 				new Set(["0,0", "0,1"]),
 			),
 		).toBeNull();
+	});
+});
+
+describe("getSlotHintCellKey", () => {
+	const horizontalSlot = {
+		id: 0,
+		startRow: 0,
+		startCol: 0,
+		direction: "horizontal" as const,
+		length: 4,
+		slotSalt: "salt-0",
+		answerHash: "hash-0",
+		answerCapsule: "capsule-0",
+	};
+	const verticalSlot = {
+		id: 1,
+		startRow: 0,
+		startCol: 0,
+		direction: "vertical" as const,
+		length: 3,
+		slotSalt: "salt-1",
+		answerHash: "hash-1",
+		answerCapsule: "capsule-1",
+	};
+
+	function buildPuzzle(
+		wordSlots: Array<typeof horizontalSlot | typeof verticalSlot>,
+		hintCellKeys: string[],
+	) {
+		return {
+			id: "puzzle-1",
+			dateKey: "2026-03-10",
+			seed: 123,
+			algorithmVersion: "1",
+			rows: 3,
+			cols: 4,
+			gridMask: [],
+			letters: [],
+			initialShuffledLetters: [],
+			validNormalizedGuesses: [],
+			wordSlots,
+			hintCapsules: hintCellKeys.map((cellKey, index) => ({
+				cellKey,
+				hintSalt: `salt-${index}`,
+				hintCapsule: `capsule-${index}`,
+			})),
+		};
+	}
+
+	it("prefers a cell that no crossing word covers", () => {
+		// (0,0) is shared with the vertical word and listed first, but the fallback
+		// must skip it so the revealed letter isn't hidden behind a crossing reveal.
+		const puzzle = buildPuzzle(
+			[horizontalSlot, verticalSlot],
+			["0,0", "0,1", "0,2", "0,3", "1,0", "2,0"],
+		);
+
+		expect(getSlotHintCellKey(puzzle, horizontalSlot)).toBe("0,1");
+	});
+
+	it("falls back to any slot capsule cell when every cell crosses", () => {
+		// A two-cell word whose cells are both intersections has no owned cell.
+		const shortHorizontal = { ...horizontalSlot, length: 2 };
+		const crossingVertical = {
+			...verticalSlot,
+			startCol: 1,
+		};
+		const puzzle = buildPuzzle(
+			[shortHorizontal, verticalSlot, crossingVertical],
+			["0,0", "0,1"],
+		);
+
+		expect(getSlotHintCellKey(puzzle, shortHorizontal)).toBe("0,0");
+	});
+
+	it("returns null when the slot has no capsule cell", () => {
+		const puzzle = buildPuzzle([horizontalSlot], ["2,3"]);
+
+		expect(getSlotHintCellKey(puzzle, horizontalSlot)).toBeNull();
 	});
 });
 
