@@ -364,6 +364,36 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// produces a fresh array reference).
 	const clueWordIdsKey = derivedProgress.clueWordIds.join(",");
 
+	// Light a clue word's grid ring for a few seconds, then fade it back to the
+	// regular cell colors so it reads as a transient cue, not a permanent mark.
+	// Only used for words that resolved to a real AI clue — letter fallbacks add
+	// the letter without highlighting the word.
+	const lightClueWordRing = useCallback(
+		(wordId: number) => {
+			const clueSlot = puzzle.wordSlots.find((slot) => slot.id === wordId);
+			if (!clueSlot) return;
+
+			if (clueGridFadeTimerRef.current != null) {
+				window.clearTimeout(clueGridFadeTimerRef.current);
+			}
+			if (clueGridClearTimerRef.current != null) {
+				window.clearTimeout(clueGridClearTimerRef.current);
+			}
+			setClueGridFading(false);
+			setClueGridCells(getWordCellKeys(clueSlot));
+			clueGridFadeTimerRef.current = window.setTimeout(() => {
+				setClueGridFading(true);
+				clueGridFadeTimerRef.current = null;
+			}, CLUE_GRID_HIGHLIGHT_MS);
+			clueGridClearTimerRef.current = window.setTimeout(() => {
+				setClueGridCells(new Set());
+				setClueGridFading(false);
+				clueGridClearTimerRef.current = null;
+			}, CLUE_GRID_HIGHLIGHT_MS + CLUE_GRID_FADE_MS);
+		},
+		[puzzle.wordSlots],
+	);
+
 	useEffect(() => {
 		if (!useTextClue || clueWordIdsKey === "") {
 			setClueTextsByWordId({});
@@ -434,6 +464,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					const clue = result[wordId];
 					if (!clue) continue;
 					toast("Pista", { description: clue, duration: 10000 });
+					lightClueWordRing(wordId);
 					pendingToasts.delete(wordId);
 				}
 
@@ -461,6 +492,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		puzzle.dateKey,
 		clueWordIdsKey,
 		captureException,
+		lightClueWordRing,
 	]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
@@ -696,31 +728,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}),
 			);
 			pendingClueToastWordIdsRef.current.add(nextClueWordId);
-
-			// Light the clue word's grid ring for 5s, then fade it back to the
-			// regular cell colors so it reads as a transient cue, not a permanent mark.
-			const clueSlot = puzzle.wordSlots.find(
-				(slot) => slot.id === nextClueWordId,
-			);
-			if (clueSlot) {
-				if (clueGridFadeTimerRef.current != null) {
-					window.clearTimeout(clueGridFadeTimerRef.current);
-				}
-				if (clueGridClearTimerRef.current != null) {
-					window.clearTimeout(clueGridClearTimerRef.current);
-				}
-				setClueGridFading(false);
-				setClueGridCells(getWordCellKeys(clueSlot));
-				clueGridFadeTimerRef.current = window.setTimeout(() => {
-					setClueGridFading(true);
-					clueGridFadeTimerRef.current = null;
-				}, CLUE_GRID_HIGHLIGHT_MS);
-				clueGridClearTimerRef.current = window.setTimeout(() => {
-					setClueGridCells(new Set());
-					setClueGridFading(false);
-					clueGridClearTimerRef.current = null;
-				}, CLUE_GRID_HIGHLIGHT_MS + CLUE_GRID_FADE_MS);
-			}
+			// The grid ring is lit only once the clue text resolves (see the
+			// clue-fetch effect); a letter fallback adds the letter without it.
 			return;
 		}
 
@@ -743,7 +752,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		nextHintCellKey,
 		puzzle.dateKey,
 		puzzle.id,
-		puzzle.wordSlots,
 		triggerHaptic,
 		useTextClue,
 	]);
