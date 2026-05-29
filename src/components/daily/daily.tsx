@@ -1,4 +1,3 @@
-import { useFeatureFlagEnabled } from "@posthog/react";
 import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -28,6 +27,7 @@ import {
 import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
@@ -104,7 +104,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
-	const aiCluesEnabled = useFeatureFlagEnabled(AI_WORD_CLUES_FLAG);
+	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
