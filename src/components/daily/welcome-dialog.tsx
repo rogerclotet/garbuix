@@ -1,4 +1,4 @@
-import { Lightbulb, LogIn, MoreVertical, Share } from "lucide-react";
+import { Lightbulb, LogIn, MoreVertical, Share, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import {
 	AlertDialog,
@@ -78,6 +78,16 @@ export function WelcomeDialog({
 						</strong>
 						, mantens la ratxa entre dispositius i apareixes a la classificació
 						amb el teu nom.
+					</p>
+					<p className="flex items-start gap-2">
+						<Sparkles className="size-4 shrink-0 text-primary" />
+						<span>
+							A més, desbloqueges{" "}
+							<strong className="font-medium text-foreground">
+								pistes descriptives amb IA
+							</strong>{" "}
+							que t'expliquen cada paraula en comptes de revelar-te una lletra.
+						</span>
 					</p>
 					<p>
 						<strong className="font-medium text-foreground">
