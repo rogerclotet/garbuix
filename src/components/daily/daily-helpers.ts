@@ -83,14 +83,15 @@ export function getNextHintCellKey(
 	);
 }
 
-// Next revealable hint cell that belongs to a specific word slot, used as the
-// silent fallback when a word's AI clue is unavailable. Only hint-capsule cells
-// decode into letters, so we restrict to capsules within the slot; returns null
-// when the word has no revealable cell left (caller then reveals nothing).
-export function getNextHintCellKeyForSlot(
+// Deterministic hint cell for a word slot, used as the silent fallback when a
+// word's AI clue is unavailable. Only hint-capsule cells decode into letters, so
+// we return the slot's first capsule cell (stable per word, regardless of what
+// is already revealed) and null when the word has no capsule cell. Picking a
+// fixed cell keeps the fallback idempotent across reloads and gives each word
+// its own letter instead of latching onto a cell revealed for a crossing word.
+export function getSlotHintCellKey(
 	puzzle: DailyPuzzlePublic,
 	slot: DailyPuzzleWordSlot,
-	revealedCells: Set<string>,
 ) {
 	const slotCellKeys = new Set<string>();
 	for (let index = 0; index < slot.length; index += 1) {
@@ -98,10 +99,8 @@ export function getNextHintCellKeyForSlot(
 	}
 
 	return (
-		puzzle.hintCapsules.find(
-			(item) =>
-				slotCellKeys.has(item.cellKey) && !revealedCells.has(item.cellKey),
-		)?.cellKey ?? null
+		puzzle.hintCapsules.find((item) => slotCellKeys.has(item.cellKey))
+			?.cellKey ?? null
 	);
 }
 

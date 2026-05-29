@@ -38,8 +38,8 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
-	getNextHintCellKeyForSlot,
 	getSlotCellKey,
+	getSlotHintCellKey,
 	getSortedWordSlots,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
@@ -104,6 +104,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
+	// Word ids the player just asked a clue for; drained into a toast once the
+	// clue text resolves. Reloads refetch every clue but add nothing here, so
+	// they stay quiet.
+	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
 	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
@@ -330,6 +334,29 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		cellLetters,
 	]);
 
+	// Grid cells belonging to words with an active (requested, not-yet-solved)
+	// clue, so the player can see which word the clue is for on the grid too.
+	const clueCellKeys = useMemo(() => {
+		const keys = new Set<string>();
+		if (!useTextClue) return keys;
+
+		const guessed = new Set(derivedProgress.guessedWordIds);
+		const clued = new Set(derivedProgress.clueWordIds);
+		for (const slot of puzzle.wordSlots) {
+			if (!clued.has(slot.id) || guessed.has(slot.id)) continue;
+			for (let index = 0; index < slot.length; index += 1) {
+				keys.add(getSlotCellKey(slot, index));
+			}
+		}
+
+		return keys;
+	}, [
+		useTextClue,
+		puzzle.wordSlots,
+		derivedProgress.clueWordIds,
+		derivedProgress.guessedWordIds,
+	]);
+
 	// Stable primitive key derived from the requested clue word ids, so the fetch
 	// effect refires only when the set actually changes (not on every render that
 	// produces a fresh array reference).
@@ -364,21 +391,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				const slot = currentPuzzle.wordSlots.find((item) => item.id === wordId);
 				if (!slot) continue;
 
-				// At most one fallback letter per word, ever. If any of the word's
-				// cells is already revealed (a fallback letter from a previous visit),
-				// skip it so reloads don't keep uncovering more letters.
-				const alreadyRevealed = Array.from(
-					{ length: slot.length },
-					(_, index) => getSlotCellKey(slot, index),
-				).some((key) => revealed.has(key));
-				if (alreadyRevealed) continue;
-
-				const cellKey = getNextHintCellKeyForSlot(
-					currentPuzzle,
-					slot,
-					revealed,
-				);
-				if (!cellKey) continue;
+				// One deterministic letter per word. Skip only when that exact cell is
+				// already revealed, so reloads stay idempotent (no extra letters, no
+				// duplicate events) without latching onto a crossing word's letter.
+				const cellKey = getSlotHintCellKey(currentPuzzle, slot);
+				if (!cellKey || revealed.has(cellKey)) continue;
 
 				revealed.add(cellKey);
 				apply(createPuzzleEvent("text_hint_fallback", { wordId, cellKey }));
@@ -406,6 +423,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}
 
 				setClueTextsByWordId(result);
+
+				// Toast freshly requested clues so the player notices them even if
+				// they miss the word list update; reloads add nothing to the pending
+				// set, so they don't re-toast old clues.
+				const pendingToasts = pendingClueToastWordIdsRef.current;
+				for (const wordId of Array.from(pendingToasts)) {
+					const clue = result[wordId];
+					if (!clue) continue;
+					toast("Pista", { description: clue, duration: 10000 });
+					pendingToasts.delete(wordId);
+				}
+
 				revealFallbackLetters(result);
 			} catch (error) {
 				if (cancelled) return;
@@ -664,6 +693,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					wordId: nextClueWordId,
 				}),
 			);
+			pendingClueToastWordIdsRef.current.add(nextClueWordId);
 			return;
 		}
 
@@ -967,6 +997,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								revealedCells={revealedCells}
 								cellLetters={cellLetters}
 								highlightedWordId={highlightedWordId}
+								clueCells={clueCellKeys}
 							/>
 						</div>
 
