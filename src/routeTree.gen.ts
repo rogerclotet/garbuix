@@ -14,7 +14,6 @@ import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
-import { Route as AdminPistesRouteImport } from './routes/admin/pistes'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -43,11 +42,6 @@ const PhSplatRoute = PhSplatRouteImport.update({
   path: '/ph/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminPistesRoute = AdminPistesRouteImport.update({
-  id: '/admin/pistes',
-  path: '/admin/pistes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
   id: '/api/leaderboard/$',
   path: '/api/leaderboard/$',
@@ -64,7 +58,6 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
-  '/admin/pistes': typeof AdminPistesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -74,7 +67,6 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
-  '/admin/pistes': typeof AdminPistesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -85,7 +77,6 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
-  '/admin/pistes': typeof AdminPistesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -97,7 +88,6 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
-    | '/admin/pistes'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -107,7 +97,6 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
-    | '/admin/pistes'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -117,7 +106,6 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
-    | '/admin/pistes'
     | '/ph/$'
     | '/api/auth/$'
     | '/api/leaderboard/$'
@@ -128,7 +116,6 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
-  AdminPistesRoute: typeof AdminPistesRoute
   PhSplatRoute: typeof PhSplatRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
@@ -171,13 +158,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PhSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/pistes': {
-      id: '/admin/pistes'
-      path: '/admin/pistes'
-      fullPath: '/admin/pistes'
-      preLoaderRoute: typeof AdminPistesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/leaderboard/$': {
       id: '/api/leaderboard/$'
       path: '/api/leaderboard/$'
@@ -200,7 +180,6 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
-  AdminPistesRoute: AdminPistesRoute,
   PhSplatRoute: PhSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,

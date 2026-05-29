@@ -22,8 +22,6 @@ const serverEnvSchema = z.object({
 	POSTHOG_UI_HOST: z.string().url().optional(),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
-	ADMIN_EMAILS: optionalEnvString,
-	ACTIVE_HINT_MODEL: z.enum(["sonnet", "haiku"]).default("sonnet"),
 });
 
 let cachedServerEnv: z.infer<typeof serverEnvSchema> | null = null;

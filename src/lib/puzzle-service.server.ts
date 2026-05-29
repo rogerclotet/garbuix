@@ -6,24 +6,12 @@ import { user } from "@/db/auth-schema";
 import {
 	dailyPuzzles,
 	legacyImportedResults,
-	puzzleWordClueRatings,
 	puzzleWordClues,
 	userPuzzleEvents,
 	userPuzzleProgress,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import {
-	generateAndStoreCluesForPuzzle,
-	getWordCategory,
-	type HintModel,
-} from "@/lib/clue-generator.server";
-import type {
-	ClueReviewChoice,
-	ClueReviewItem,
-	CluesForReview,
-	ModelRatingCounts,
-	ModelRatingSummary,
-} from "@/lib/clue-types";
+import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import {
@@ -71,7 +59,6 @@ import type {
 	PuzzleProgressState,
 	SessionUser,
 } from "@/lib/puzzle-types";
-import { getServerEnv } from "@/lib/server-env";
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
 
@@ -85,7 +72,7 @@ const cluesGenerationStarted = new Set<string>();
 
 // Fire-and-forget AI clue generation for a freshly created puzzle. Never blocks
 // or fails puzzle creation: a missing API key or API error only means clues are
-// absent (players fall back to letter hints, admin review skips the word).
+// absent (players fall back to letter hints).
 function triggerCluesGeneration(
 	puzzleId: string,
 	wordSlots: DailyPuzzlePrivateWord[],
@@ -395,17 +382,9 @@ export async function getUserPuzzleProgressData(
 	return row ? serializeProgressRow(row) : null;
 }
 
-type PuzzleWordClueRow = typeof puzzleWordClues.$inferSelect;
-
-function activeHintClue(row: PuzzleWordClueRow): string {
-	return getServerEnv().ACTIVE_HINT_MODEL === "haiku"
-		? row.haikuClue
-		: row.sonnetClue;
-}
-
-// Returns the active model's clue text for the requested word ids, keyed by
-// wordId. The caller passes the words it has unlocked (its local clueWordIds),
-// which avoids racing the asynchronous progress sync.
+// Returns the clue text for the requested word ids, keyed by wordId. The caller
+// passes the words it has unlocked (its local clueWordIds), which avoids racing
+// the asynchronous progress sync.
 export async function getWordCluesData(
 	puzzleId: string,
 	wordIds: number[],
@@ -423,185 +402,9 @@ export async function getWordCluesData(
 
 	const cluesByWordId: Record<number, string> = {};
 	for (const row of rows) {
-		cluesByWordId[row.wordId] = activeHintClue(row);
+		cluesByWordId[row.wordId] = row.sonnetClue;
 	}
 	return cluesByWordId;
-}
-
-export function isAdminEmail(email: string | null | undefined): boolean {
-	if (!email) return false;
-	const adminEmails = getServerEnv().ADMIN_EMAILS;
-	if (!adminEmails) return false;
-
-	const normalized = email.trim().toLowerCase();
-	return adminEmails
-		.split(",")
-		.map((entry) => entry.trim().toLowerCase())
-		.filter(Boolean)
-		.includes(normalized);
-}
-
-// Deterministically maps a clue to anonymized A/B slots from its id, so the
-// blind review stays stable across reloads and submitClueRating can translate a
-// choice back to the underlying model without persisting the mapping.
-function clueModelAssignment(clueId: string): { a: HintModel; b: HintModel } {
-	let parity = 0;
-	for (let index = 0; index < clueId.length; index += 1) {
-		parity = (parity + clueId.charCodeAt(index)) % 2;
-	}
-	return parity === 0
-		? { a: "sonnet", b: "haiku" }
-		: { a: "haiku", b: "sonnet" };
-}
-
-function clueTextForModel(row: PuzzleWordClueRow, model: HintModel): string {
-	return model === "haiku" ? row.haikuClue : row.sonnetClue;
-}
-
-function deriveReviewerChoice(
-	ratings: { model: string; rating: string }[],
-	assignment: { a: HintModel; b: HintModel },
-): ClueReviewChoice | null {
-	if (ratings.length === 0) return null;
-	if (ratings.every((entry) => entry.rating === "tie")) return "tie";
-	const winner = ratings.find((entry) => entry.rating === "win");
-	if (!winner) return null;
-	return winner.model === assignment.a ? "a" : "b";
-}
-
-export async function getCluesForReviewData(
-	reviewerEmail: string,
-	dateKey: string = getYesterdayDateKey(),
-): Promise<CluesForReview> {
-	const puzzle = await db.query.dailyPuzzles.findFirst({
-		where: eq(dailyPuzzles.dateKey, dateKey),
-	});
-
-	if (!puzzle) {
-		return { dateKey, hasPuzzle: false, items: [] };
-	}
-
-	const displayWordByWordId = new Map<number, string>(
-		puzzle.privateSnapshotJson.wordSlots.map((slot) => [
-			slot.id,
-			slot.displayWord,
-		]),
-	);
-
-	const clueRows = await db.query.puzzleWordClues.findMany({
-		where: eq(puzzleWordClues.puzzleId, puzzle.id),
-	});
-
-	const clueIds = clueRows.map((row) => row.id);
-	const reviewerRatings = clueIds.length
-		? await db.query.puzzleWordClueRatings.findMany({
-				where: and(
-					inArray(puzzleWordClueRatings.clueId, clueIds),
-					eq(puzzleWordClueRatings.ratedByEmail, reviewerEmail),
-				),
-			})
-		: [];
-
-	const ratingsByClueId = new Map<
-		string,
-		{ model: string; rating: string }[]
-	>();
-	for (const rating of reviewerRatings) {
-		const list = ratingsByClueId.get(rating.clueId) ?? [];
-		list.push({ model: rating.model, rating: rating.rating });
-		ratingsByClueId.set(rating.clueId, list);
-	}
-
-	const items: ClueReviewItem[] = clueRows.map((row) => {
-		const assignment = clueModelAssignment(row.id);
-		const displayWord = displayWordByWordId.get(row.wordId) ?? "";
-		return {
-			clueId: row.id,
-			displayWord,
-			areatematica: getWordCategory(displayWord),
-			clueA: clueTextForModel(row, assignment.a),
-			clueB: clueTextForModel(row, assignment.b),
-			modelA: assignment.a,
-			modelB: assignment.b,
-			currentChoice: deriveReviewerChoice(
-				ratingsByClueId.get(row.id) ?? [],
-				assignment,
-			),
-		};
-	});
-
-	items.sort((a, b) => a.displayWord.localeCompare(b.displayWord, "ca"));
-
-	return { dateKey, hasPuzzle: true, items };
-}
-
-export async function submitClueRatingData(options: {
-	clueId: string;
-	winner: ClueReviewChoice;
-	reviewerEmail: string;
-}): Promise<void> {
-	const assignment = clueModelAssignment(options.clueId);
-	const ratingForModel = (model: HintModel): string => {
-		if (options.winner === "tie") return "tie";
-		const winningModel = options.winner === "a" ? assignment.a : assignment.b;
-		return model === winningModel ? "win" : "loss";
-	};
-
-	for (const model of ["sonnet", "haiku"] as const) {
-		await db
-			.insert(puzzleWordClueRatings)
-			.values({
-				id: crypto.randomUUID(),
-				clueId: options.clueId,
-				model,
-				rating: ratingForModel(model),
-				ratedByEmail: options.reviewerEmail,
-			})
-			.onConflictDoUpdate({
-				target: [
-					puzzleWordClueRatings.clueId,
-					puzzleWordClueRatings.model,
-					puzzleWordClueRatings.ratedByEmail,
-				],
-				set: { rating: ratingForModel(model) },
-			});
-	}
-}
-
-export async function getModelRatingSummaryData(
-	dateKey: string = getYesterdayDateKey(),
-): Promise<ModelRatingSummary> {
-	const perModel: Record<HintModel, ModelRatingCounts> = {
-		sonnet: { win: 0, loss: 0, tie: 0 },
-		haiku: { win: 0, loss: 0, tie: 0 },
-	};
-
-	const puzzle = await db.query.dailyPuzzles.findFirst({
-		where: eq(dailyPuzzles.dateKey, dateKey),
-		columns: { id: true },
-	});
-	if (!puzzle) return { dateKey, perModel };
-
-	const clueRows = await db.query.puzzleWordClues.findMany({
-		where: eq(puzzleWordClues.puzzleId, puzzle.id),
-		columns: { id: true },
-	});
-	const clueIds = clueRows.map((row) => row.id);
-	if (clueIds.length === 0) return { dateKey, perModel };
-
-	const ratings = await db.query.puzzleWordClueRatings.findMany({
-		where: inArray(puzzleWordClueRatings.clueId, clueIds),
-	});
-
-	for (const rating of ratings) {
-		const model = rating.model as HintModel;
-		if (model !== "sonnet" && model !== "haiku") continue;
-		if (rating.rating === "win") perModel[model].win += 1;
-		else if (rating.rating === "loss") perModel[model].loss += 1;
-		else if (rating.rating === "tie") perModel[model].tie += 1;
-	}
-
-	return { dateKey, perModel };
 }
 
 export async function syncPuzzleEventsForUser(options: {

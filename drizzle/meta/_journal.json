@@ -15,6 +15,13 @@
       "when": 1779996498942,
       "tag": "0001_lovely_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780096700142,
+      "tag": "0002_sweet_talkback",
+      "breakpoints": true
     }
   ]
 }
