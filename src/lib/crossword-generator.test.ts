@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import allWords from "@/data/catalan-words.json";
 import {
 	calculateCandidateFreshnessPenalty,
+	countSameRootPairs,
 	type DailyPuzzleHistoryEntry,
 	generateDailyCrosswordForSeed,
 	normalizeWord,
+	wordsShareRoot,
 } from "@/lib/crossword-generator";
 import { getPlayableWordLetters } from "@/lib/puzzle-text";
 
@@ -39,6 +41,43 @@ function hasConflictingDisplayIntersections(
 
 	return false;
 }
+
+describe("wordsShareRoot", () => {
+	it("flags morphological siblings", () => {
+		const samples: [string, string][] = [
+			["instància", "instanciar"],
+			["quedar", "quedada"],
+			["casa", "casar"],
+		];
+
+		for (const [left, right] of samples) {
+			expect(wordsShareRoot({ name: left }, { name: right })).toBe(true);
+		}
+	});
+
+	it("treats distinct roots as unrelated", () => {
+		const samples: [string, string][] = [
+			["mare", "marca"],
+			["casa", "cosa"],
+			["taula", "tauró"],
+		];
+
+		for (const [left, right] of samples) {
+			expect(wordsShareRoot({ name: left }, { name: right })).toBe(false);
+		}
+	});
+
+	it("counts unordered same-root pairs", () => {
+		expect(
+			countSameRootPairs([
+				{ name: "quedar" },
+				{ name: "quedada" },
+				{ name: "taula" },
+			]),
+		).toBe(1);
+		expect(countSameRootPairs([{ name: "mare" }, { name: "casa" }])).toBe(0);
+	});
+});
 
 describe("crossword-generator freshness scoring", () => {
 	it("returns no penalty when there is no recent history", () => {
@@ -139,6 +178,30 @@ describe("crossword-generator freshness scoring", () => {
 		expect(crossword.words.map((placement) => placement.word.name)).not.toEqual(
 			expect.arrayContaining(["consol", "cònsol"]),
 		);
+	});
+
+	it("does not place multiple words sharing a root in the same puzzle", {
+		timeout: 120_000,
+	}, () => {
+		const cache = new Map();
+		for (const seed of [260401, 260405, 260411]) {
+			const result = generateDailyCrosswordForSeed(allWords, seed, 10, 15, {
+				cache,
+			});
+
+			expect(result).not.toBeNull();
+			if (!result) {
+				throw new Error(`Expected crossword for seed ${seed}`);
+			}
+
+			const placedWords = result.crossword.words.map(
+				(placement) => placement.word,
+			);
+
+			expect(countSameRootPairs(placedWords)).toBe(0);
+			expect(placedWords.length).toBeGreaterThanOrEqual(10);
+			expect(placedWords.length).toBeLessThanOrEqual(15);
+		}
 	});
 
 	it("avoids crossings that disagree on the displayed accent for a shared cell", {

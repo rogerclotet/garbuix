@@ -26,6 +26,15 @@ const HIGH_WORD_REPEAT_PENALTY = 0.45;
 const MIN_VIABLE_ELIGIBLE_WORDS = 25;
 const WORD_FRESHNESS_PENALTY = 1.5;
 const WORD_PRIORITY_RANDOM_RANGE = 1.5;
+// Two words are treated as sharing a root when their normalized common prefix
+// covers at least this fraction of the shorter word (Catalan inflection is
+// suffix-based: quedar/quedada, instància/instanciar).
+const ROOT_PREFIX_RATIO = 0.8;
+// Hard floor on the shared prefix so short coincidences (mare/marca) don't match.
+const MIN_ROOT_PREFIX_LENGTH = 4;
+// Score penalty per residual same-root pair, so the chooser prefers letter sets
+// that reach the target word count without morphological siblings.
+const SAME_ROOT_PAIR_PENALTY = 3;
 
 /**
  * Seeded random number generator for reproducible crosswords
@@ -216,6 +225,48 @@ function getWordRuntimeMetadata(word: WordLike): WordRuntimeMetadata {
 
 	wordRuntimeCache.set(word, metadata);
 	return metadata;
+}
+
+function commonPrefixLength(left: string, right: string): number {
+	const limit = Math.min(left.length, right.length);
+	let length = 0;
+	while (length < limit && left[length] === right[length]) {
+		length++;
+	}
+	return length;
+}
+
+/**
+ * Whether two words likely share a morphological root, judged by the length of
+ * their normalized common prefix relative to the shorter word. Used to avoid
+ * placing siblings such as `quedar`/`quedada` in the same puzzle.
+ */
+export function wordsShareRoot(left: WordLike, right: WordLike): boolean {
+	const normalizedLeft = getWordRuntimeMetadata(left).normalizedName;
+	const normalizedRight = getWordRuntimeMetadata(right).normalizedName;
+	const shorter = Math.min(normalizedLeft.length, normalizedRight.length);
+	const prefix = commonPrefixLength(normalizedLeft, normalizedRight);
+
+	return (
+		prefix >= MIN_ROOT_PREFIX_LENGTH &&
+		prefix >= Math.ceil(ROOT_PREFIX_RATIO * shorter)
+	);
+}
+
+/**
+ * Count unordered pairs of words in a puzzle that share a root. Used both for
+ * scoring candidate puzzles and in tests.
+ */
+export function countSameRootPairs(words: WordLike[]): number {
+	let pairs = 0;
+	for (let i = 0; i < words.length; i++) {
+		for (let j = i + 1; j < words.length; j++) {
+			if (wordsShareRoot(words[i], words[j])) {
+				pairs++;
+			}
+		}
+	}
+	return pairs;
 }
 
 function getCachedWordDataset(words: Word[]): CachedWordDataset {
@@ -546,37 +597,63 @@ function tryGenerateCrossword(
 
 	// Try to place remaining words
 	let wordId = 1;
+
+	const tryPlace = (word: Word): boolean => {
+		if (placements.length >= maxWords) {
+			return false;
+		}
+
+		const placement = findBestPlacement(word, placements, grid, wordId);
+		if (!placement) {
+			return false;
+		}
+
+		placements.push(placement);
+		const wordLetters = getWordCells(word);
+		for (let j = 0; j < wordLetters.length; j++) {
+			const row =
+				placement.direction === "horizontal"
+					? placement.startRow
+					: placement.startRow + j;
+			const col =
+				placement.direction === "horizontal"
+					? placement.startCol + j
+					: placement.startCol;
+			const key = `${row},${col}`;
+
+			const existing = grid.get(key);
+			if (existing) {
+				existing.wordIds.push(wordId);
+			} else {
+				grid.set(key, {
+					letter: wordLetters[j] ?? "",
+					wordIds: [wordId],
+				});
+			}
+		}
+		wordId++;
+		return true;
+	};
+
+	// Pass 1: place words whose root is not already represented in the puzzle,
+	// deferring morphological siblings so distinct roots are preferred.
+	const deferred: Word[] = [];
 	for (let i = 1; i < words.length && placements.length < maxWords; i++) {
 		const word = words[i];
-		const wordLetters = getWordCells(word);
-		const placement = findBestPlacement(word, placements, grid, wordId);
-
-		if (placement) {
-			placements.push(placement);
-			// Add to grid
-			for (let j = 0; j < wordLetters.length; j++) {
-				const row =
-					placement.direction === "horizontal"
-						? placement.startRow
-						: placement.startRow + j;
-				const col =
-					placement.direction === "horizontal"
-						? placement.startCol + j
-						: placement.startCol;
-				const key = `${row},${col}`;
-
-				const existing = grid.get(key);
-				if (existing) {
-					existing.wordIds.push(wordId);
-				} else {
-					grid.set(key, {
-						letter: wordLetters[j] ?? "",
-						wordIds: [wordId],
-					});
-				}
-			}
-			wordId++;
+		if (placements.some((placement) => wordsShareRoot(placement.word, word))) {
+			deferred.push(word);
+			continue;
 		}
+		tryPlace(word);
+	}
+
+	// Pass 2: only if distinct-root words couldn't fill the puzzle, top it up
+	// with the deferred siblings to reach the target count.
+	for (const word of deferred) {
+		if (placements.length >= maxWords) {
+			break;
+		}
+		tryPlace(word);
 	}
 
 	if (placements.length < minWords) {
@@ -1285,7 +1362,10 @@ function selectBestDailyCrosswordForSeed(
 				selectedWords,
 				recentHistory,
 			);
-			const score = baseScore - freshnessPenalty;
+			const rootCollisionPenalty =
+				countSameRootPairs(result.words.map((placement) => placement.word)) *
+				SAME_ROOT_PAIR_PENALTY;
+			const score = baseScore - freshnessPenalty - rootCollisionPenalty;
 
 			if (score > bestScore) {
 				bestScore = score;
@@ -1293,7 +1373,11 @@ function selectBestDailyCrosswordForSeed(
 				bestLetters = letters;
 			}
 
-			if (baseScore >= STRONG_DIVERSITY_SCORE && freshnessPenalty <= 2) {
+			if (
+				baseScore >= STRONG_DIVERSITY_SCORE &&
+				freshnessPenalty <= 2 &&
+				rootCollisionPenalty === 0
+			) {
 				break;
 			}
 		} catch (_e) {
