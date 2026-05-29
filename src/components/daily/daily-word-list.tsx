@@ -9,6 +9,7 @@ type DailyWordListProps = {
 	cellLetters: Map<string, string>;
 	clueTextsByWordId?: Record<number, string>;
 	clueWordIds?: number[];
+	onWordTap?: (wordId: number) => void;
 };
 
 export function DailyWordList({
@@ -18,6 +19,7 @@ export function DailyWordList({
 	cellLetters,
 	clueTextsByWordId = {},
 	clueWordIds = [],
+	onWordTap,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
 		puzzle.wordSlots,
@@ -33,9 +35,11 @@ export function DailyWordList({
 				const isHighlighted = cluedWordIds.has(slot.id);
 
 				return (
-					<div
+					<button
 						key={slot.id}
-						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg ${
+						type="button"
+						onClick={() => onWordTap?.(slot.id)}
+						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full text-left cursor-pointer ${
 							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
 						}`}
 					>
@@ -49,11 +53,11 @@ export function DailyWordList({
 							</span>
 						</div>
 						{clueText ? (
-							<p className="text-sm italic text-muted-foreground pl-7 font-ui">
+							<span className="block text-sm italic text-muted-foreground pl-7 font-ui">
 								{clueText}
-							</p>
+							</span>
 						) : null}
-					</div>
+					</button>
 				);
 			})}
 

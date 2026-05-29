@@ -293,7 +293,7 @@ code {
 }
 
 .clue-gradient-border {
-	border: 1.5px solid transparent;
+	border: 1px solid transparent;
 	border-radius: var(--radius-lg);
 	/* Inner fill matches the other word rows (bg-muted/40), just slightly
 	   lighter so the highlighted row reads as a touch more prominent. */
@@ -319,7 +319,7 @@ code {
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
-	padding: 2px;
+	padding: 1px;
 	background: var(--clue-gradient);
 	-webkit-mask:
 		linear-gradient(#000 0 0) content-box,
@@ -327,6 +327,37 @@ code {
 	-webkit-mask-composite: xor;
 	mask-composite: exclude;
 	pointer-events: none;
+	opacity: 1;
+	transition: opacity 600ms ease;
+}
+
+/* When the requested-clue ring has been lit for its 5s window, fade it back to
+   the regular cell colors instead of removing it instantly. */
+.clue-gradient-cell-hidden::before {
+	opacity: 0;
+}
+
+/* Tap-to-locate: flash a word's grid cells in an off-white teal that fades back
+   to the cell's normal colors, so the player can find the word on the grid. */
+@keyframes grid-locate-flash {
+	0% {
+		background-color: color-mix(
+			in srgb,
+			var(--color-teal-200) 75%,
+			var(--color-background)
+		);
+		box-shadow: inset 0 0 0 1px
+			color-mix(in srgb, var(--color-teal-400) 60%, transparent);
+	}
+
+	100% {
+		background-color: transparent;
+		box-shadow: none;
+	}
+}
+
+.grid-locate-cell {
+	animation: grid-locate-flash 1300ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -339,6 +370,10 @@ code {
 	}
 
 	.grid-word-just-guessed-letter {
+		animation: none;
+	}
+
+	.grid-locate-cell {
 		animation: none;
 	}
 

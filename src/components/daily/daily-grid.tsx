@@ -8,6 +8,8 @@ type DailyGridProps = {
 	cellLetters: Map<string, string>;
 	highlightedWordId: number | null;
 	clueCells?: Set<string>;
+	clueCellsFading?: boolean;
+	locateCells?: Set<string>;
 };
 
 export function DailyGrid({
@@ -16,6 +18,8 @@ export function DailyGrid({
 	cellLetters,
 	highlightedWordId,
 	clueCells,
+	clueCellsFading = false,
+	locateCells,
 }: DailyGridProps) {
 	const highlightedCellOrder = useMemo(() => {
 		const slot = puzzle.wordSlots.find(
@@ -74,6 +78,7 @@ export function DailyGrid({
 						const highlightedLetterIndex = highlightedCellOrder.get(key);
 						const isJustGuessed = highlightedLetterIndex != null;
 						const isClueCell = clueCells?.has(key) ?? false;
+						const isLocateCell = locateCells?.has(key) ?? false;
 						const middleDotMarker = middleDotMarkers.get(key);
 
 						if (!cell) {
@@ -94,7 +99,7 @@ export function DailyGrid({
 									isRevealed
 										? "bg-primary/12 border-primary/40 text-foreground"
 										: "bg-muted border-border/50"
-								} ${isClueCell ? "clue-gradient-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
+								} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 							>
 								{isRevealed ? (
 									<span
