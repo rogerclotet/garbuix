@@ -30,6 +30,17 @@ export function getSlotCellKey(slot: DailyPuzzleWordSlot, index: number) {
 	return `${row},${col}`;
 }
 
+// All grid cell keys covered by a word slot, used to highlight a word on the
+// grid (AI-clue ring and tap-to-locate flash).
+export function getWordCellKeys(slot: DailyPuzzleWordSlot): Set<string> {
+	const keys = new Set<string>();
+	for (let index = 0; index < slot.length; index += 1) {
+		keys.add(getSlotCellKey(slot, index));
+	}
+
+	return keys;
+}
+
 export function buildRevealedCells(
 	puzzle: DailyPuzzlePublic,
 	progress: PuzzleProgressState,

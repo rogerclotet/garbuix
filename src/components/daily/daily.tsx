@@ -38,9 +38,9 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
-	getSlotCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
+	getWordCellKeys,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -61,6 +61,12 @@ const HAPTIC_ERROR_PATTERN = [24, 32, 16];
 // If an AI clue can't be loaded within this window, degrade to a silent
 // single-letter reveal so the hint button never feels broken.
 const CLUE_FETCH_TIMEOUT_MS = 8000;
+// How long a freshly requested clue's grid ring stays lit before fading out, and
+// the fade duration itself (kept in sync with the CSS opacity transition).
+const CLUE_GRID_HIGHLIGHT_MS = 5000;
+const CLUE_GRID_FADE_MS = 600;
+// Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
+const LOCATE_FLASH_MS = 1300;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -114,6 +120,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
 		() => initialData.historyEntries ?? [],
 	);
+	// Transient grid highlight for a freshly requested AI clue: the gradient ring
+	// shows for 5s, then fades back to the regular cell colors.
+	const [clueGridCells, setClueGridCells] = useState<Set<string>>(new Set());
+	const [clueGridFading, setClueGridFading] = useState(false);
+	const clueGridFadeTimerRef = useRef<number | null>(null);
+	const clueGridClearTimerRef = useRef<number | null>(null);
+	// Transient teal flash on a word's grid cells when its list row is tapped.
+	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
+	const locateClearTimerRef = useRef<number | null>(null);
+	const gridRef = useRef<HTMLDivElement>(null);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -178,6 +194,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 			if (winDialogTimerRef.current != null) {
 				window.clearTimeout(winDialogTimerRef.current);
+			}
+			if (clueGridFadeTimerRef.current != null) {
+				window.clearTimeout(clueGridFadeTimerRef.current);
+			}
+			if (clueGridClearTimerRef.current != null) {
+				window.clearTimeout(clueGridClearTimerRef.current);
+			}
+			if (locateClearTimerRef.current != null) {
+				window.clearTimeout(locateClearTimerRef.current);
 			}
 		};
 	}, []);
@@ -332,29 +357,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.guessedWordIds,
 		derivedProgress.clueWordIds,
 		cellLetters,
-	]);
-
-	// Grid cells belonging to words with an active (requested, not-yet-solved)
-	// clue, so the player can see which word the clue is for on the grid too.
-	const clueCellKeys = useMemo(() => {
-		const keys = new Set<string>();
-		if (!useTextClue) return keys;
-
-		const guessed = new Set(derivedProgress.guessedWordIds);
-		const clued = new Set(derivedProgress.clueWordIds);
-		for (const slot of puzzle.wordSlots) {
-			if (!clued.has(slot.id) || guessed.has(slot.id)) continue;
-			for (let index = 0; index < slot.length; index += 1) {
-				keys.add(getSlotCellKey(slot, index));
-			}
-		}
-
-		return keys;
-	}, [
-		useTextClue,
-		puzzle.wordSlots,
-		derivedProgress.clueWordIds,
-		derivedProgress.guessedWordIds,
 	]);
 
 	// Stable primitive key derived from the requested clue word ids, so the fetch
@@ -694,6 +696,31 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}),
 			);
 			pendingClueToastWordIdsRef.current.add(nextClueWordId);
+
+			// Light the clue word's grid ring for 5s, then fade it back to the
+			// regular cell colors so it reads as a transient cue, not a permanent mark.
+			const clueSlot = puzzle.wordSlots.find(
+				(slot) => slot.id === nextClueWordId,
+			);
+			if (clueSlot) {
+				if (clueGridFadeTimerRef.current != null) {
+					window.clearTimeout(clueGridFadeTimerRef.current);
+				}
+				if (clueGridClearTimerRef.current != null) {
+					window.clearTimeout(clueGridClearTimerRef.current);
+				}
+				setClueGridFading(false);
+				setClueGridCells(getWordCellKeys(clueSlot));
+				clueGridFadeTimerRef.current = window.setTimeout(() => {
+					setClueGridFading(true);
+					clueGridFadeTimerRef.current = null;
+				}, CLUE_GRID_HIGHLIGHT_MS);
+				clueGridClearTimerRef.current = window.setTimeout(() => {
+					setClueGridCells(new Set());
+					setClueGridFading(false);
+					clueGridClearTimerRef.current = null;
+				}, CLUE_GRID_HIGHLIGHT_MS + CLUE_GRID_FADE_MS);
+			}
 			return;
 		}
 
@@ -716,9 +743,44 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		nextHintCellKey,
 		puzzle.dateKey,
 		puzzle.id,
+		puzzle.wordSlots,
 		triggerHaptic,
 		useTextClue,
 	]);
+
+	// Tapping an incomplete word flashes its grid cells in off-white teal so the
+	// player can locate it, scrolling the grid into view on mobile when needed.
+	const handleLocateWord = useCallback(
+		(wordId: number) => {
+			const slot = puzzle.wordSlots.find((item) => item.id === wordId);
+			if (!slot) return;
+
+			const cellKeys = getWordCellKeys(slot);
+			// Clear first, then set on the next frame so the animation restarts even
+			// when the same word is tapped repeatedly.
+			if (locateClearTimerRef.current != null) {
+				window.clearTimeout(locateClearTimerRef.current);
+			}
+			setLocateCells(new Set());
+			window.requestAnimationFrame(() => {
+				setLocateCells(cellKeys);
+				locateClearTimerRef.current = window.setTimeout(() => {
+					setLocateCells(new Set());
+					locateClearTimerRef.current = null;
+				}, LOCATE_FLASH_MS);
+			});
+
+			const grid = gridRef.current;
+			if (grid && window.matchMedia("(max-width: 1023px)").matches) {
+				const rect = grid.getBoundingClientRect();
+				const offScreen = rect.top < 0 || rect.bottom > window.innerHeight;
+				if (offScreen) {
+					grid.scrollIntoView({ behavior: "smooth", block: "center" });
+				}
+			}
+		},
+		[puzzle.wordSlots],
+	);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
@@ -991,13 +1053,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					</div>
 
 					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div>
+						<div ref={gridRef}>
 							<DailyGrid
 								puzzle={puzzle}
 								revealedCells={revealedCells}
 								cellLetters={cellLetters}
 								highlightedWordId={highlightedWordId}
-								clueCells={clueCellKeys}
+								clueCells={clueGridCells}
+								clueCellsFading={clueGridFading}
+								locateCells={locateCells}
 							/>
 						</div>
 
@@ -1038,6 +1102,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									cellLetters={cellLetters}
 									clueTextsByWordId={clueTextsByWordId}
 									clueWordIds={derivedProgress.clueWordIds}
+									onWordTap={handleLocateWord}
 								/>
 							</div>
 						</div>
