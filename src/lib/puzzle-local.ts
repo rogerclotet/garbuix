@@ -12,6 +12,10 @@ const IMPORT_MARKER_PREFIX = "paraules-account-import-v1:";
 const DEVICE_ID_KEY = "paraules-device-id-v1";
 const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
+// Re-show the welcome dialog to anonymous users periodically so they keep
+// getting nudged to sign in. We store the last-shown timestamp and only
+// suppress the dialog within this cooldown window.
+const WELCOME_RESHOW_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 function readJson<T>(key: string): T | null {
 	if (typeof window === "undefined") return null;
@@ -147,12 +151,18 @@ export function markHowToPlaySeen() {
 
 export function hasSeenWelcome(): boolean {
 	if (typeof window === "undefined") return true;
-	return window.localStorage.getItem(WELCOME_SEEN_KEY) === "1";
+	const raw = window.localStorage.getItem(WELCOME_SEEN_KEY);
+	if (!raw) return false;
+	// Legacy installs stored "1"; Number("1") is far enough in the past to fall
+	// outside the cooldown, so those users see the refreshed dialog once more.
+	const lastSeen = Number(raw);
+	if (!Number.isFinite(lastSeen)) return false;
+	return Date.now() - lastSeen < WELCOME_RESHOW_COOLDOWN_MS;
 }
 
 export function markWelcomeSeen() {
 	if (typeof window === "undefined") return;
-	window.localStorage.setItem(WELCOME_SEEN_KEY, "1");
+	window.localStorage.setItem(WELCOME_SEEN_KEY, String(Date.now()));
 }
 
 export function getDeviceId() {
