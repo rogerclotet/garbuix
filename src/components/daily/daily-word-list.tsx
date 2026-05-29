@@ -36,9 +36,7 @@ export function DailyWordList({
 					<div
 						key={slot.id}
 						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg ${
-							isHighlighted
-								? "bg-amber-400/15 ring-2 ring-inset ring-amber-400/50"
-								: "bg-muted/40"
+							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
 						}`}
 					>
 						<div className="flex items-center gap-2">

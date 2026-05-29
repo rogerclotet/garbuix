@@ -7,6 +7,14 @@ import { getServerEnv } from "@/lib/server-env";
 
 const serverEnv = getServerEnv();
 
+const isProduction = process.env.NODE_ENV === "production";
+
+// In development the app is served over plain HTTP on localhost, which the
+// production allowedHosts/HTTPS base URL rejects as an invalid origin. Trust the
+// local dev origin (override with BETTER_AUTH_URL when not on :3000) so login
+// works locally; production keeps the strict host allowlist.
+const devBaseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+
 const socialProviders =
 	serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET
 		? {
@@ -19,11 +27,14 @@ const socialProviders =
 
 export const auth = betterAuth({
 	basePath: "/api/auth",
-	baseURL: {
-		allowedHosts: ["garbuix.app", "garbuix.clotet.dev"],
-		protocol: "https",
-		fallback: "https://garbuix.app",
-	},
+	baseURL: isProduction
+		? {
+				allowedHosts: ["garbuix.app", "garbuix.clotet.dev"],
+				protocol: "https",
+				fallback: "https://garbuix.app",
+			}
+		: devBaseURL,
+	trustedOrigins: isProduction ? [] : [devBaseURL],
 	secret: serverEnv.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, {
 		provider: "pg",

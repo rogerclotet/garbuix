@@ -259,7 +259,81 @@ code {
 		color-mix(in srgb, var(--color-primary) 42%, transparent);
 }
 
+/* AI clue highlight: a flowing green -> blue gradient that signals the
+   AI-generated "pista". Defined once here and reused by the word-list row border
+   and the grid-cell ring so both stay consistent. */
+:root {
+	--clue-gradient: linear-gradient(
+		120deg,
+		var(--color-green-500),
+		var(--color-blue-500),
+		var(--color-green-500)
+	);
+}
+
+/* The border is the second background painted on the border box, while the fill
+   is painted on the padding box, so it works with rounded corners and
+   box-sizing: border-box without shifting layout. */
+@keyframes clue-gradient-pan {
+	0% {
+		background-position:
+			0 0,
+			0% 50%;
+	}
+	50% {
+		background-position:
+			0 0,
+			100% 50%;
+	}
+	100% {
+		background-position:
+			0 0,
+			0% 50%;
+	}
+}
+
+.clue-gradient-border {
+	border: 1.5px solid transparent;
+	border-radius: var(--radius-lg);
+	/* Inner fill matches the other word rows (bg-muted/40), just slightly
+	   lighter so the highlighted row reads as a touch more prominent. */
+	background:
+		linear-gradient(
+			color-mix(in srgb, var(--color-muted) 50%, var(--color-background)),
+			color-mix(in srgb, var(--color-muted) 50%, var(--color-background))
+		)
+		padding-box,
+		var(--clue-gradient) border-box;
+	background-size:
+		100% 100%,
+		200% 200%;
+	animation: clue-gradient-pan 6s ease infinite;
+	will-change: background-position;
+}
+
+/* Grid-cell version of the clue highlight: a gradient ring drawn with a masked
+   pseudo-element so it overlays the cell's own background, keeps the rounded
+   corners, and uses the same palette as the word-list row. */
+.clue-gradient-cell::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	padding: 2px;
+	background: var(--clue-gradient);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
+	.clue-gradient-border {
+		animation: none;
+	}
+
 	.grid-word-just-guessed-cell {
 		animation: none;
 	}
