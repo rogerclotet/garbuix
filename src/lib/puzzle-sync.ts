@@ -23,6 +23,7 @@ function createEmptyEventTypeCounts(): EventTypeCounts {
 		guess_added: 0,
 		hint_used: 0,
 		text_hint_requested: 0,
+		text_hint_fallback: 0,
 		letters_shuffled: 0,
 		progress_reset: 0,
 	};
