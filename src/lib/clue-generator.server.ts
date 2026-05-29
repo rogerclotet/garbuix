@@ -8,18 +8,11 @@ import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
 
-export type HintModel = "sonnet" | "haiku";
+export const CLUE_MODEL_ID = "claude-sonnet-4-6";
 
-export const HINT_MODEL_IDS: Record<HintModel, string> = {
-	sonnet: "claude-sonnet-4-6",
-	haiku: "claude-haiku-4-5",
-};
-
-export type GeneratedWordClues = {
-	sonnetModel: string;
-	sonnetClue: string;
-	haikuModel: string;
-	haikuClue: string;
+export type GeneratedWordClue = {
+	model: string;
+	clue: string;
 };
 
 const CLUE_MAX_TOKENS = 150;
@@ -192,31 +185,26 @@ async function generateClueForModel(options: {
 	return leaks.length > 0 ? maskLeaks(clue, leaks) : clue;
 }
 
-export async function generateWordClues(options: {
+export async function generateWordClue(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
-}): Promise<GeneratedWordClues> {
-	const [sonnetClue, haikuClue] = await Promise.all([
-		generateClueForModel({ ...options, modelId: HINT_MODEL_IDS.sonnet }),
-		generateClueForModel({ ...options, modelId: HINT_MODEL_IDS.haiku }),
-	]);
+}): Promise<GeneratedWordClue> {
+	const clue = await generateClueForModel({
+		...options,
+		modelId: CLUE_MODEL_ID,
+	});
 
-	return {
-		sonnetModel: HINT_MODEL_IDS.sonnet,
-		sonnetClue,
-		haikuModel: HINT_MODEL_IDS.haiku,
-		haikuClue,
-	};
+	return { model: CLUE_MODEL_ID, clue };
 }
 
 // Bound concurrency so a large puzzle doesn't fire dozens of parallel Anthropic
 // requests at once and hit rate limits.
 const CLUE_GENERATION_BATCH_SIZE = 4;
 
-// Generates both models' clues for every word slot and stores them. Idempotent:
-// the unique (puzzleId, wordId) index means re-runs skip already-stored clues.
-// Per-word failures are logged and skipped so one bad word can't abort the rest.
+// Generates a clue for every word slot and stores it. Idempotent: the unique
+// (puzzleId, wordId) index means re-runs skip already-stored clues. Per-word
+// failures are logged and skipped so one bad word can't abort the rest.
 export async function generateAndStoreCluesForPuzzle(options: {
 	puzzleId: string;
 	wordSlots: DailyPuzzlePrivateWord[];
@@ -253,7 +241,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 		await Promise.all(
 			batch.map(async (slot) => {
 				try {
-					const clues = await generateWordClues({
+					const generated = await generateWordClue({
 						displayWord: slot.displayWord,
 						normalizedWord: slot.normalizedWord,
 						areatematica: getWordCategory(slot.displayWord),
@@ -266,10 +254,8 @@ export async function generateAndStoreCluesForPuzzle(options: {
 							puzzleId: options.puzzleId,
 							wordId: slot.id,
 							normalizedWord: slot.normalizedWord,
-							sonnetModel: clues.sonnetModel,
-							sonnetClue: clues.sonnetClue,
-							haikuModel: clues.haikuModel,
-							haikuClue: clues.haikuClue,
+							sonnetModel: generated.model,
+							sonnetClue: generated.clue,
 						})
 						.onConflictDoNothing({
 							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],

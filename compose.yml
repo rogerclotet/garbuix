@@ -63,8 +63,6 @@ services:
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-      ACTIVE_HINT_MODEL: "${ACTIVE_HINT_MODEL:-sonnet}"
-      ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
     init: true
     ports:
       - "${APP_PORT:-3000}:3000"
