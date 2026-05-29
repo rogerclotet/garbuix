@@ -62,6 +62,9 @@ services:
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ACTIVE_HINT_MODEL: "${ACTIVE_HINT_MODEL:-sonnet}"
+      ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
     init: true
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -88,6 +91,7 @@ services:
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     restart: unless-stopped
 
@@ -109,6 +113,7 @@ services:
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     profiles: ["ops"]
     restart: "no"
