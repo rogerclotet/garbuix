@@ -217,16 +217,12 @@ function ClueReviewCard({
 	return (
 		<li className="rounded-lg border border-border bg-background p-4 space-y-3">
 			<div className="flex items-center justify-between gap-2 font-ui">
+				<span className="text-sm font-semibold text-foreground">
+					{item.displayWord.toUpperCase()}
+				</span>
 				<span className="text-xs uppercase tracking-wider text-muted-foreground">
 					{item.areatematica || "Sense categoria"}
 				</span>
-				{revealed ? (
-					<span className="text-sm font-semibold text-foreground">
-						{item.displayWord.toUpperCase()}
-					</span>
-				) : (
-					<span className="text-xs text-muted-foreground">paraula oculta</span>
-				)}
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2">
