@@ -24,6 +24,12 @@ export type GeneratedWordClues = {
 
 const CLUE_MAX_TOKENS = 150;
 
+// Cap how long a single Anthropic request can stall before we abort and let the
+// SDK retry. The default is 10 minutes, which lets one stuck request wedge a
+// whole backfill run (batches are awaited sequentially).
+const ANTHROPIC_REQUEST_TIMEOUT_MS = 60_000;
+const ANTHROPIC_MAX_RETRIES = 2;
+
 const SYSTEM_PROMPT = `Ets l'autor de pistes d'un joc de paraules en català (estil mots encreuats). Et donaré una paraula amagada i la seva categoria temàtica. Has d'escriure UNA pista en català que ajudi a endevinar-la.
 
 Regles estrictes:
@@ -53,7 +59,11 @@ function getAnthropicClient(): Anthropic {
 		throw new Error("ANTHROPIC_API_KEY_MISSING");
 	}
 	if (!cachedClient) {
-		cachedClient = new Anthropic({ apiKey });
+		cachedClient = new Anthropic({
+			apiKey,
+			timeout: ANTHROPIC_REQUEST_TIMEOUT_MS,
+			maxRetries: ANTHROPIC_MAX_RETRIES,
+		});
 	}
 	return cachedClient;
 }
@@ -222,14 +232,22 @@ export async function generateAndStoreCluesForPuzzle(options: {
 		return;
 	}
 
+	const totalWords = options.wordSlots.length;
+	let completedWords = 0;
+
 	for (
 		let offset = 0;
-		offset < options.wordSlots.length;
+		offset < totalWords;
 		offset += CLUE_GENERATION_BATCH_SIZE
 	) {
 		const batch = options.wordSlots.slice(
 			offset,
 			offset + CLUE_GENERATION_BATCH_SIZE,
+		);
+		console.log(
+			`[clue-generator] puzzle ${options.puzzleId}: batch ${
+				offset / CLUE_GENERATION_BATCH_SIZE + 1
+			} (words ${offset + 1}-${Math.min(offset + batch.length, totalWords)} of ${totalWords})`,
 		);
 
 		await Promise.all(
@@ -256,6 +274,11 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						.onConflictDoNothing({
 							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
 						});
+
+					completedWords += 1;
+					console.log(
+						`[clue-generator] puzzle ${options.puzzleId}: stored clue for "${slot.displayWord}" (${completedWords}/${totalWords})`,
+					);
 				} catch (error) {
 					console.error(
 						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,

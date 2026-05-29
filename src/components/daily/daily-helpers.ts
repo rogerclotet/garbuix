@@ -95,11 +95,12 @@ export function getNextHintCellKey(
 }
 
 // Deterministic hint cell for a word slot, used as the silent fallback when a
-// word's AI clue is unavailable. Only hint-capsule cells decode into letters, so
-// we return the slot's first capsule cell (stable per word, regardless of what
-// is already revealed) and null when the word has no capsule cell. Picking a
-// fixed cell keeps the fallback idempotent across reloads and gives each word
-// its own letter instead of latching onto a cell revealed for a crossing word.
+// word's AI clue is unavailable. Only hint-capsule cells decode into letters.
+// Prefer a cell owned solely by this slot: a cell shared with a crossing word may
+// already be filled in by that word's reveal, which would make the fallback
+// reveal no visible letter at all. We fall back to any slot capsule cell (and
+// null when the word has none). The choice is independent of what's currently
+// revealed, so it stays the same across reloads and never reveals extra letters.
 export function getSlotHintCellKey(
 	puzzle: DailyPuzzlePublic,
 	slot: DailyPuzzleWordSlot,
@@ -107,6 +108,25 @@ export function getSlotHintCellKey(
 	const slotCellKeys = new Set<string>();
 	for (let index = 0; index < slot.length; index += 1) {
 		slotCellKeys.add(getSlotCellKey(slot, index));
+	}
+
+	const crossingCellKeys = new Set<string>();
+	for (const other of puzzle.wordSlots) {
+		if (other.id === slot.id) continue;
+		for (let index = 0; index < other.length; index += 1) {
+			const cellKey = getSlotCellKey(other, index);
+			if (slotCellKeys.has(cellKey)) {
+				crossingCellKeys.add(cellKey);
+			}
+		}
+	}
+
+	const ownCell = puzzle.hintCapsules.find(
+		(item) =>
+			slotCellKeys.has(item.cellKey) && !crossingCellKeys.has(item.cellKey),
+	);
+	if (ownCell) {
+		return ownCell.cellKey;
 	}
 
 	return (
