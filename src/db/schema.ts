@@ -164,8 +164,6 @@ export const puzzleWordClues = pgTable(
 		normalizedWord: text("normalized_word").notNull(),
 		sonnetModel: text("sonnet_model").notNull(),
 		sonnetClue: text("sonnet_clue").notNull(),
-		haikuModel: text("haiku_model").notNull(),
-		haikuClue: text("haiku_clue").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -179,30 +177,6 @@ export const puzzleWordClues = pgTable(
 	],
 );
 
-export const puzzleWordClueRatings = pgTable(
-	"puzzle_word_clue_ratings",
-	{
-		id: text("id").primaryKey(),
-		clueId: text("clue_id")
-			.notNull()
-			.references(() => puzzleWordClues.id, { onDelete: "cascade" }),
-		model: text("model").notNull(),
-		rating: text("rating").notNull(),
-		ratedByEmail: text("rated_by_email").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.defaultNow()
-			.notNull(),
-	},
-	(table) => [
-		uniqueIndex("puzzle_word_clue_ratings_unique_idx").on(
-			table.clueId,
-			table.model,
-			table.ratedByEmail,
-		),
-		index("puzzle_word_clue_ratings_clue_idx").on(table.clueId),
-	],
-);
-
 export const dailyPuzzleRelations = relations(dailyPuzzles, ({ many }) => ({
 	progress: many(userPuzzleProgress),
 	events: many(userPuzzleEvents),
@@ -211,21 +185,10 @@ export const dailyPuzzleRelations = relations(dailyPuzzles, ({ many }) => ({
 
 export const puzzleWordCluesRelations = relations(
 	puzzleWordClues,
-	({ one, many }) => ({
+	({ one }) => ({
 		puzzle: one(dailyPuzzles, {
 			fields: [puzzleWordClues.puzzleId],
 			references: [dailyPuzzles.id],
-		}),
-		ratings: many(puzzleWordClueRatings),
-	}),
-);
-
-export const puzzleWordClueRatingsRelations = relations(
-	puzzleWordClueRatings,
-	({ one }) => ({
-		clue: one(puzzleWordClues, {
-			fields: [puzzleWordClueRatings.clueId],
-			references: [puzzleWordClues.id],
 		}),
 	}),
 );
@@ -281,7 +244,6 @@ export const puzzleSchema = {
 	userPuzzleEvents,
 	userPuzzleProgress,
 	puzzleWordClues,
-	puzzleWordClueRatings,
 };
 
 export type DbPuzzleProgressRow = typeof userPuzzleProgress.$inferSelect;
