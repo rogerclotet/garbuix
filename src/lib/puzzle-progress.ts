@@ -215,6 +215,21 @@ export function applyPuzzleEvent(
 				hintsUsed: state.hintsUsed + 1,
 			};
 		}
+		case "text_hint_fallback": {
+			// Silent letter reveal when no AI clue is available. The hint was already
+			// counted by the preceding text_hint_requested, so we only reveal the
+			// letter here without touching hintsUsed. Idempotent on cellKey so a
+			// reload (which refetches and finds the clue still missing) won't reveal
+			// extra letters.
+			if (state.hintedCells.includes(event.payload.cellKey)) {
+				return state;
+			}
+
+			return {
+				...state,
+				hintedCells: [...state.hintedCells, event.payload.cellKey],
+			};
+		}
 		case "letters_shuffled": {
 			return {
 				...state,

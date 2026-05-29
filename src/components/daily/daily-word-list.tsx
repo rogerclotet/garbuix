@@ -8,7 +8,7 @@ type DailyWordListProps = {
 	revealedAnswers: Record<number, string>;
 	cellLetters: Map<string, string>;
 	clueTextsByWordId?: Record<number, string>;
-	highlightedClueWordId?: number | null;
+	clueWordIds?: number[];
 };
 
 export function DailyWordList({
@@ -17,26 +17,27 @@ export function DailyWordList({
 	revealedAnswers,
 	cellLetters,
 	clueTextsByWordId = {},
-	highlightedClueWordId = null,
+	clueWordIds = [],
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
 		puzzle.wordSlots,
 		guessedWordIds,
 		cellLetters,
 	);
+	const cluedWordIds = new Set(clueWordIds);
 
 	return (
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
-				const isHighlighted = slot.id === highlightedClueWordId;
+				const isHighlighted = cluedWordIds.has(slot.id);
 
 				return (
 					<div
 						key={slot.id}
 						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg ${
 							isHighlighted
-								? "bg-amber-400/15 ring-2 ring-amber-400/50"
+								? "bg-amber-400/15 ring-2 ring-inset ring-amber-400/50"
 								: "bg-muted/40"
 						}`}
 					>

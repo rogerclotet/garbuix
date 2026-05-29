@@ -31,7 +31,10 @@ import {
 	recordProgress as recordLeaderboardProgress,
 	userParticipantId,
 } from "@/lib/leaderboard.server";
-import { captureServerEvent } from "@/lib/observability-server";
+import {
+	captureServerEvent,
+	captureServerException,
+} from "@/lib/observability-server";
 import { hashText, openAnswerCapsule } from "@/lib/puzzle-crypto";
 import {
 	dateKeyToSeed,
@@ -96,6 +99,9 @@ function triggerCluesGeneration(
 				`[puzzle-service] Clue generation failed for puzzle ${puzzleId}:`,
 				error,
 			);
+			captureServerException(error, {
+				properties: { puzzle_id: puzzleId, scope: "clue_generation" },
+			});
 		})
 		.finally(() => {
 			cluesGenerationStarted.delete(puzzleId);

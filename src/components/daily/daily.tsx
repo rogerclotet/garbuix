@@ -38,6 +38,7 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
+	getNextHintCellKeyForSlot,
 	getSortedWordSlots,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
@@ -56,6 +57,9 @@ const HAPTIC_TAP_MS = 14;
 const HAPTIC_SUBMIT_MS = 18;
 const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
 const HAPTIC_ERROR_PATTERN = [24, 32, 16];
+// If an AI clue can't be loaded within this window, degrade to a silent
+// single-letter reveal so the hint button never feels broken.
+const CLUE_FETCH_TIMEOUT_MS = 8000;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -99,9 +103,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
-	const [highlightedClueWordId, setHighlightedClueWordId] = useState<
-		number | null
-	>(null);
 	const aiCluesEnabled = useFeatureFlagEnabled(AI_WORD_CLUES_FLAG);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
@@ -291,6 +292,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle, derivedProgress],
 	);
 
+	// The clue-fetch effect reveals fallback letters off the latest progress
+	// without re-firing on every reveal; keep the moving parts in a ref so the
+	// effect can stay keyed on the requested clue words alone.
+	const fallbackContextRef = useRef({ revealedCells, applyLocalEvent, puzzle });
+	fallbackContextRef.current = { revealedCells, applyLocalEvent, puzzle };
+
 	const cellLetters = useMemo(
 		() => buildCellLetters(puzzle.wordSlots, revealedAnswers, hintLetters),
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
@@ -335,25 +342,77 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		const wordIds = clueWordIdsKey.split(",").map(Number);
 		let cancelled = false;
+		let timeoutId: number | null = null;
+
+		// For every requested word that has no clue text, silently reveal one of
+		// its letters instead. Idempotent: words that already have a revealed cell
+		// (e.g. a fallback letter from a previous visit) are skipped, so a reload
+		// that refetches and still finds the clue missing won't reveal extra
+		// letters.
+		const revealFallbackLetters = (cluesByWordId: Record<number, string>) => {
+			const {
+				revealedCells: currentRevealed,
+				applyLocalEvent: apply,
+				puzzle: currentPuzzle,
+			} = fallbackContextRef.current;
+			const revealed = new Set(currentRevealed);
+
+			for (const wordId of wordIds) {
+				if (cluesByWordId[wordId]) continue;
+
+				const slot = currentPuzzle.wordSlots.find((item) => item.id === wordId);
+				if (!slot) continue;
+
+				const cellKey = getNextHintCellKeyForSlot(
+					currentPuzzle,
+					slot,
+					revealed,
+				);
+				if (!cellKey) continue;
+
+				revealed.add(cellKey);
+				apply(createPuzzleEvent("text_hint_fallback", { wordId, cellKey }));
+			}
+		};
+
+		const timeoutPromise = new Promise<"timeout">((resolve) => {
+			timeoutId = window.setTimeout(
+				() => resolve("timeout"),
+				CLUE_FETCH_TIMEOUT_MS,
+			);
+		});
+
 		void (async () => {
 			try {
-				const clues = await getWordClues({
-					data: { puzzleId: puzzle.id, wordIds },
-				});
-				if (!cancelled) {
-					setClueTextsByWordId(clues);
+				const result = await Promise.race([
+					getWordClues({ data: { puzzleId: puzzle.id, wordIds } }),
+					timeoutPromise,
+				]);
+				if (cancelled) return;
+
+				if (result === "timeout") {
+					revealFallbackLetters({});
+					return;
 				}
+
+				setClueTextsByWordId(result);
+				revealFallbackLetters(result);
 			} catch (error) {
+				if (cancelled) return;
 				console.error("Failed to load word clues", error);
 				captureException(error, {
 					puzzle_date: puzzle.dateKey,
 					scope: "load_word_clues",
 				});
+				revealFallbackLetters({});
+			} finally {
+				if (timeoutId != null) window.clearTimeout(timeoutId);
 			}
 		})();
 
 		return () => {
 			cancelled = true;
+			if (timeoutId != null) window.clearTimeout(timeoutId);
 		};
 	}, [
 		useTextClue,
@@ -595,7 +654,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					wordId: nextClueWordId,
 				}),
 			);
-			setHighlightedClueWordId(nextClueWordId);
 			return;
 		}
 
@@ -938,7 +996,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									revealedAnswers={revealedAnswers}
 									cellLetters={cellLetters}
 									clueTextsByWordId={clueTextsByWordId}
-									highlightedClueWordId={highlightedClueWordId}
+									clueWordIds={derivedProgress.clueWordIds}
 								/>
 							</div>
 						</div>

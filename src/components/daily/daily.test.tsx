@@ -87,6 +87,7 @@ vi.mock("./use-daily-progress", () => ({
 			guessedWordIds: [],
 			revealedWordTokens: {},
 			hintedCells: [],
+			clueWordIds: [],
 			hintsUsed: 0,
 			guessCount: 0,
 			shuffledLetters: ["c", "o", "s", "a"],

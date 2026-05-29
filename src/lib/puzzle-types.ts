@@ -113,6 +113,16 @@ export type TextHintRequestedEvent = {
 	};
 };
 
+export type TextHintFallbackEvent = {
+	id: string;
+	at: string;
+	type: "text_hint_fallback";
+	payload: {
+		wordId: number;
+		cellKey: string;
+	};
+};
+
 export type LettersShuffledEvent = {
 	id: string;
 	at: string;
@@ -133,6 +143,7 @@ export type PuzzleClientEvent =
 	| GuessAddedEvent
 	| HintUsedEvent
 	| TextHintRequestedEvent
+	| TextHintFallbackEvent
 	| LettersShuffledEvent
 	| ProgressResetEvent;
 
