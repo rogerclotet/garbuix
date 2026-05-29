@@ -53,6 +53,9 @@ services:
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ACTIVE_HINT_MODEL: "${ACTIVE_HINT_MODEL:-sonnet}"
+      ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
     stdin_open: true
     tty: true
     volumes:
@@ -76,6 +79,7 @@ services:
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
       POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules
