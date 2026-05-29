@@ -110,6 +110,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
+	// Clues for words the player has already found, surfaced in the list out of
+	// curiosity or to help a friend. Kept separate from the requested-hint clues
+	// above so the hint fetch effect can freely reset its own map.
+	const [foundClueTextsByWordId, setFoundClueTextsByWordId] = useState<
+		Record<number, string>
+	>({});
 	// Word ids the player just asked a clue for; drained into a toast once the
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
@@ -493,6 +499,50 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		clueWordIdsKey,
 		captureException,
 		lightClueWordRing,
+	]);
+
+	// Stable primitive key so the found-clue fetch refires only when the set of
+	// found words actually changes, not on every render.
+	const guessedWordIdsKey = derivedProgress.guessedWordIds.join(",");
+
+	// Fetch clues for words the player has already found so they can be shown in
+	// the list. No toast, no letter fallback, no grid highlight — these are just
+	// for reading after the fact. Same availability as requested clues.
+	useEffect(() => {
+		if (!useTextClue || guessedWordIdsKey === "") {
+			setFoundClueTextsByWordId({});
+			return;
+		}
+
+		const wordIds = guessedWordIdsKey.split(",").map(Number);
+		let cancelled = false;
+
+		void (async () => {
+			try {
+				const result = await getWordClues({
+					data: { puzzleId: puzzle.id, wordIds },
+				});
+				if (cancelled) return;
+				setFoundClueTextsByWordId(result);
+			} catch (error) {
+				if (cancelled) return;
+				console.error("Failed to load found word clues", error);
+				captureException(error, {
+					puzzle_date: puzzle.dateKey,
+					scope: "load_found_word_clues",
+				});
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		useTextClue,
+		puzzle.id,
+		puzzle.dateKey,
+		guessedWordIdsKey,
+		captureException,
 	]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
@@ -1110,6 +1160,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									cellLetters={cellLetters}
 									clueTextsByWordId={clueTextsByWordId}
 									clueWordIds={derivedProgress.clueWordIds}
+									foundClueTextsByWordId={foundClueTextsByWordId}
 									onWordTap={handleLocateWord}
 								/>
 							</div>

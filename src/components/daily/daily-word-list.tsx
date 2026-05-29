@@ -9,6 +9,7 @@ type DailyWordListProps = {
 	cellLetters: Map<string, string>;
 	clueTextsByWordId?: Record<number, string>;
 	clueWordIds?: number[];
+	foundClueTextsByWordId?: Record<number, string>;
 	onWordTap?: (wordId: number) => void;
 };
 
@@ -19,6 +20,7 @@ export function DailyWordList({
 	cellLetters,
 	clueTextsByWordId = {},
 	clueWordIds = [],
+	foundClueTextsByWordId = {},
 	onWordTap,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
@@ -61,27 +63,36 @@ export function DailyWordList({
 				);
 			})}
 
-			{foundSlots.map((slot) => (
-				<div
-					key={slot.id}
-					className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3"
-				>
-					<div className="flex items-center gap-2">
-						<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
-						<a
-							href={`https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(revealedAnswers[slot.id] ?? "")}&tipusCerca=cerca.queSignifica`}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="font-medium text-foreground tracking-widest hover:underline"
-						>
-							{revealedAnswers[slot.id]?.toUpperCase()}
-						</a>
-						<span className="text-xs text-muted-foreground ml-auto font-ui">
-							{slot.length} lletres
-						</span>
+			{foundSlots.map((slot) => {
+				const foundClueText = foundClueTextsByWordId[slot.id];
+
+				return (
+					<div
+						key={slot.id}
+						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3"
+					>
+						<div className="flex items-center gap-2">
+							<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
+							<a
+								href={`https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(revealedAnswers[slot.id] ?? "")}&tipusCerca=cerca.queSignifica`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="font-medium text-foreground tracking-widest hover:underline"
+							>
+								{revealedAnswers[slot.id]?.toUpperCase()}
+							</a>
+							<span className="text-xs text-muted-foreground ml-auto font-ui">
+								{slot.length} lletres
+							</span>
+						</div>
+						{foundClueText ? (
+							<span className="block text-sm italic text-muted-foreground pl-7 font-ui">
+								{foundClueText}
+							</span>
+						) : null}
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</div>
 	);
 }
