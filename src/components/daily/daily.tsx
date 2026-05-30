@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
-import { AI_WORD_CLUES_FLAG } from "@/lib/feature-flags";
+import { AI_WORD_CLUES_FLAG, CIRCLE_LETTERS_FLAG } from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -121,6 +121,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
 	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
+	const circleLetters = useFeatureFlag(CIRCLE_LETTERS_FLAG);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
@@ -1126,6 +1127,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						<div className="mt-6 lg:mt-0 lg:space-y-6">
 							<DailyControls
 								aiClueMode={useTextClue}
+								circleLetters={circleLetters}
 								canUseHint={
 									derivedProgress.hintsUsed < 3 &&
 									(useTextClue

@@ -13,8 +13,13 @@ import type { DailySubmitFeedback } from "./daily-types";
 
 const HINT_HOLD_MS = 600;
 
+// Distance in rem from the circle's center to each letter button. Sized so the
+// six letters clear each other and the container stays compact on mobile.
+const CIRCLE_RADIUS_REM = 4.25;
+
 type DailyControlsProps = {
 	aiClueMode: boolean;
+	circleLetters: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
 	hintsUsed: number;
@@ -38,6 +43,7 @@ type DailyControlsProps = {
 
 export function DailyControls({
 	aiClueMode,
+	circleLetters,
 	canUseHint,
 	currentGuess,
 	hintsUsed,
@@ -113,6 +119,133 @@ export function DailyControls({
 		return null;
 	}
 
+	const renderLetterButton = (letter: string) => (
+		<Button
+			key={`letter-${letter}`}
+			variant="outline"
+			size="lg"
+			className={cn(
+				"daily-pressable daily-pressable-key w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
+				circleLetters ? "rounded-full" : "rounded-lg sm:rounded-xl",
+			)}
+			onPointerDown={(event) =>
+				runPressAction(event, () => onLetterClick(letter))
+			}
+			onPointerUp={(event) =>
+				runPressAction(event, () => onLetterClick(letter))
+			}
+			onClick={(event) => runClickAction(event, () => onLetterClick(letter))}
+		>
+			{letter.toUpperCase()}
+		</Button>
+	);
+
+	const submitButton = (
+		<Button
+			onPointerDown={(event) => runPressAction(event, onSubmitGuess)}
+			onPointerUp={(event) => runPressAction(event, onSubmitGuess)}
+			onClick={(event) => runClickAction(event, onSubmitGuess)}
+			size="icon"
+			className={cn(
+				"daily-pressable daily-pressable-submit w-14 h-14 sm:w-16 sm:h-16 touch-manipulation",
+				circleLetters ? "rounded-full" : "rounded-lg sm:rounded-xl",
+			)}
+			disabled={currentGuess.length < 4}
+			aria-label="Comprovar"
+		>
+			<CornerDownLeft className="h-5 w-5" />
+		</Button>
+	);
+
+	const lettersLayout = circleLetters ? (
+		<div className="relative w-[12rem] h-[12rem] sm:w-[13rem] sm:h-[13rem] shrink-0">
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+				{submitButton}
+			</div>
+			{shuffledLetters.map((letter, index) => {
+				const angle =
+					(index / shuffledLetters.length) * 2 * Math.PI - Math.PI / 2;
+				const x = Math.cos(angle) * CIRCLE_RADIUS_REM;
+				const y = Math.sin(angle) * CIRCLE_RADIUS_REM;
+				return (
+					<div
+						key={`letter-${letter}`}
+						className="absolute"
+						style={{
+							left: "50%",
+							top: "50%",
+							transform: `translate(calc(-50% + ${x}rem), calc(-50% + ${y}rem))`,
+						}}
+					>
+						{renderLetterButton(letter)}
+					</div>
+				);
+			})}
+		</div>
+	) : (
+		<div className="grid grid-cols-3 gap-2 sm:gap-3">
+			{shuffledLetters.map((letter) => renderLetterButton(letter))}
+		</div>
+	);
+
+	const actionButtons = (
+		<>
+			<Button
+				variant="ghost"
+				onPointerDown={(event) => runPressAction(event, onBackspace)}
+				onPointerUp={(event) => runPressAction(event, onBackspace)}
+				onClick={(event) => runClickAction(event, onBackspace)}
+				className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
+				disabled={currentGuess.length === 0}
+			>
+				<Delete className="w-4 h-4" />
+				Esborrar
+			</Button>
+			<Button
+				variant="ghost"
+				onPointerDown={handleHintPointerDown}
+				onPointerUp={cancelHintHold}
+				onPointerLeave={cancelHintHold}
+				onPointerCancel={cancelHintHold}
+				onContextMenu={(e) => e.preventDefault()}
+				className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
+				disabled={!canUseHint || isComplete}
+				size="lg"
+				aria-description={
+					aiClueMode
+						? "Mantén premut per rebre una pista de la IA"
+						: "Mantén premut per revelar una lletra"
+				}
+			>
+				<span
+					className="absolute inset-0 bg-amber-400/25 origin-left"
+					style={{ transform: `scaleX(${hintHoldProgress})` }}
+					aria-hidden
+				/>
+				{aiClueMode ? (
+					<Sparkles
+						className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+					/>
+				) : (
+					<Lightbulb
+						className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
+					/>
+				)}
+				<span className="relative">Pista ({3 - hintsUsed})</span>
+			</Button>
+			<Button
+				variant="ghost"
+				onPointerDown={(event) => runPressAction(event, onShuffle)}
+				onPointerUp={(event) => runPressAction(event, onShuffle)}
+				onClick={(event) => runClickAction(event, onShuffle)}
+				className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
+			>
+				<Shuffle className="w-4 h-4" />
+				Barrejar
+			</Button>
+		</>
+	);
+
 	const submitFeedbackToneClass =
 		submitFeedback?.kind === "new_word"
 			? "text-primary"
@@ -161,97 +294,25 @@ export function DailyControls({
 							</div>
 						</div>
 
-						<div className="flex items-center justify-evenly w-full gap-4 sm:gap-6">
-							<div className="grid grid-cols-3 gap-2 sm:gap-3">
-								{shuffledLetters.map((letter) => (
-									<Button
-										key={`letter-${letter}`}
-										variant="outline"
-										size="lg"
-										className="daily-pressable daily-pressable-key w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold rounded-lg sm:rounded-xl border border-border bg-background transition-all duration-100 touch-manipulation"
-										onPointerDown={(event) =>
-											runPressAction(event, () => onLetterClick(letter))
-										}
-										onPointerUp={(event) =>
-											runPressAction(event, () => onLetterClick(letter))
-										}
-										onClick={(event) =>
-											runClickAction(event, () => onLetterClick(letter))
-										}
-									>
-										{letter.toUpperCase()}
-									</Button>
-								))}
+						{circleLetters ? (
+							<div className="flex w-full items-center justify-center gap-4 sm:gap-6">
+								<div className="flex flex-col-reverse gap-2 font-ui">
+									{actionButtons}
+								</div>
+								{lettersLayout}
 							</div>
+						) : (
+							<>
+								<div className="flex items-center w-full gap-4 sm:gap-6 justify-evenly">
+									{lettersLayout}
+									{submitButton}
+								</div>
 
-							<Button
-								onPointerDown={(event) => runPressAction(event, onSubmitGuess)}
-								onPointerUp={(event) => runPressAction(event, onSubmitGuess)}
-								onClick={(event) => runClickAction(event, onSubmitGuess)}
-								size="icon"
-								className="daily-pressable daily-pressable-submit w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl touch-manipulation"
-								disabled={currentGuess.length < 4}
-								aria-label="Comprovar"
-							>
-								<CornerDownLeft className="h-5 w-5" />
-							</Button>
-						</div>
-
-						<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full font-ui">
-							<Button
-								variant="ghost"
-								onPointerDown={(event) => runPressAction(event, onBackspace)}
-								onPointerUp={(event) => runPressAction(event, onBackspace)}
-								onClick={(event) => runClickAction(event, onBackspace)}
-								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
-								disabled={currentGuess.length === 0}
-							>
-								<Delete className="w-4 h-4" />
-								Esborrar
-							</Button>
-							<Button
-								variant="ghost"
-								onPointerDown={handleHintPointerDown}
-								onPointerUp={cancelHintHold}
-								onPointerLeave={cancelHintHold}
-								onPointerCancel={cancelHintHold}
-								onContextMenu={(e) => e.preventDefault()}
-								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
-								disabled={!canUseHint || isComplete}
-								size="lg"
-								aria-description={
-									aiClueMode
-										? "Mantén premut per rebre una pista de la IA"
-										: "Mantén premut per revelar una lletra"
-								}
-							>
-								<span
-									className="absolute inset-0 bg-amber-400/25 origin-left"
-									style={{ transform: `scaleX(${hintHoldProgress})` }}
-									aria-hidden
-								/>
-								{aiClueMode ? (
-									<Sparkles
-										className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-									/>
-								) : (
-									<Lightbulb
-										className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-									/>
-								)}
-								<span className="relative">Pista ({3 - hintsUsed})</span>
-							</Button>
-							<Button
-								variant="ghost"
-								onPointerDown={(event) => runPressAction(event, onShuffle)}
-								onPointerUp={(event) => runPressAction(event, onShuffle)}
-								onClick={(event) => runClickAction(event, onShuffle)}
-								className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation"
-							>
-								<Shuffle className="w-4 h-4" />
-								Barrejar
-							</Button>
-						</div>
+								<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full font-ui">
+									{actionButtons}
+								</div>
+							</>
+						)}
 					</div>
 				</div>
 			</div>
