@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
-import { AI_WORD_CLUES_FLAG, CIRCLE_LETTERS_FLAG } from "@/lib/feature-flags";
+import {
+	AI_WORD_CLUES_FLAG,
+	CIRCLE_LETTERS_FLAG,
+	PEER_CLUES_FLAG,
+} from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -27,6 +31,7 @@ import {
 import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { useClueRequests } from "@/lib/use-clue-requests";
 import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
@@ -122,6 +127,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
 	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
 	const circleLetters = useFeatureFlag(CIRCLE_LETTERS_FLAG);
+	const peerCluesEnabled = useFeatureFlag(PEER_CLUES_FLAG);
+	const { subscribe: subscribeClueRequests, requestClue } = useClueRequests();
+	// Word ids the player has asked other players for help with (awaiting a reply).
+	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
+		[],
+	);
+	// Clue texts delivered by other players, keyed by word id.
+	const [peerClueTextsByWordId, setPeerClueTextsByWordId] = useState<
+		Record<number, string>
+	>({});
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
@@ -807,6 +822,53 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		useTextClue,
 	]);
 
+	// Peer clue requests: a logged-in player who is out of hints can ask other
+	// connected players for a clue about a specific unfound word.
+	const canRequestHelp =
+		Boolean(activeUser) &&
+		peerCluesEnabled &&
+		derivedProgress.hintsUsed >= 3 &&
+		derivedProgress.guessedWordIds.length < totalWords;
+
+	const handleRequestHelp = useCallback(
+		(wordId: number) => {
+			triggerHaptic(HAPTIC_TAP_MS);
+			setRequestedHelpWordIds((current) =>
+				current.includes(wordId) ? current : [...current, wordId],
+			);
+			captureEvent("peer_clue_requested", {
+				date_key: puzzle.dateKey,
+				puzzle_id: puzzle.id,
+				word_id: wordId,
+			});
+			void requestClue(wordId).then((created) => {
+				if (!created) {
+					// Couldn't register the request (e.g. no other players / offline);
+					// drop the pending state so the button is actionable again.
+					setRequestedHelpWordIds((current) =>
+						current.filter((id) => id !== wordId),
+					);
+					toast.error("No s'ha pogut demanar ajuda");
+				}
+			});
+		},
+		[captureEvent, puzzle.dateKey, puzzle.id, requestClue, triggerHaptic],
+	);
+
+	// Receive clues sent by other players and surface them under the word.
+	useEffect(() => {
+		const unsubscribe = subscribeClueRequests((event) => {
+			if (event.type !== "response") return;
+			const { wordId, text, responderName } = event.response;
+			setPeerClueTextsByWordId((current) => ({ ...current, [wordId]: text }));
+			toast(`Pista de ${responderName}`, {
+				description: text,
+				duration: 12000,
+			});
+		});
+		return unsubscribe;
+	}, [subscribeClueRequests]);
+
 	// Tapping an incomplete word flashes its grid cells in off-white teal so the
 	// player can locate it, scrolling the grid into view on mobile when needed.
 	const handleLocateWord = useCallback(
@@ -1164,6 +1226,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									clueWordIds={derivedProgress.clueWordIds}
 									foundClueTextsByWordId={foundClueTextsByWordId}
 									onWordTap={handleLocateWord}
+									canRequestHelp={canRequestHelp}
+									requestedHelpWordIds={requestedHelpWordIds}
+									peerClueTextsByWordId={peerClueTextsByWordId}
+									onRequestHelp={handleRequestHelp}
 								/>
 							</div>
 						</div>

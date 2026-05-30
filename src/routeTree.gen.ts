@@ -15,6 +15,7 @@ import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
+import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const PreferenciesRoute = PreferenciesRouteImport.update({
@@ -47,6 +48,11 @@ const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
   path: '/api/leaderboard/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClueRequestsSplatRoute = ApiClueRequestsSplatRouteImport.update({
+  id: '/api/clue-requests/$',
+  path: '/api/clue-requests/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/preferencies': typeof PreferenciesRoute
   '/ph/$': typeof PhSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
+    | '/api/clue-requests/$'
     | '/api/leaderboard/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
+    | '/api/clue-requests/$'
     | '/api/leaderboard/$'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/ph/$'
     | '/api/auth/$'
+    | '/api/clue-requests/$'
     | '/api/leaderboard/$'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   PreferenciesRoute: typeof PreferenciesRoute
   PhSplatRoute: typeof PhSplatRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLeaderboardSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/clue-requests/$': {
+      id: '/api/clue-requests/$'
+      path: '/api/clue-requests/$'
+      fullPath: '/api/clue-requests/$'
+      preLoaderRoute: typeof ApiClueRequestsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreferenciesRoute: PreferenciesRoute,
   PhSplatRoute: PhSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,
 }
 export const routeTree = rootRouteImport
