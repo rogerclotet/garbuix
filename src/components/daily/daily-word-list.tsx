@@ -1,4 +1,5 @@
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
 
@@ -11,6 +12,12 @@ type DailyWordListProps = {
 	clueWordIds?: number[];
 	foundClueTextsByWordId?: Record<number, string>;
 	onWordTap?: (wordId: number) => void;
+	// Peer clue requests: when out of hints, let the player ask other players for
+	// help on a specific unfound word.
+	canRequestHelp?: boolean;
+	requestedHelpWordIds?: number[];
+	peerClueTextsByWordId?: Record<number, string>;
+	onRequestHelp?: (wordId: number) => void;
 };
 
 export function DailyWordList({
@@ -22,6 +29,10 @@ export function DailyWordList({
 	clueWordIds = [],
 	foundClueTextsByWordId = {},
 	onWordTap,
+	canRequestHelp = false,
+	requestedHelpWordIds = [],
+	peerClueTextsByWordId = {},
+	onRequestHelp,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
 		puzzle.wordSlots,
@@ -29,23 +40,29 @@ export function DailyWordList({
 		cellLetters,
 	);
 	const cluedWordIds = new Set(clueWordIds);
+	const requestedHelp = new Set(requestedHelpWordIds);
 
 	return (
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
-				const isHighlighted = cluedWordIds.has(slot.id);
+				const peerClueText = peerClueTextsByWordId[slot.id];
+				const isHighlighted =
+					cluedWordIds.has(slot.id) || Boolean(peerClueText);
+				const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClueText;
 
 				return (
-					<button
+					<div
 						key={slot.id}
-						type="button"
-						onClick={() => onWordTap?.(slot.id)}
-						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full text-left cursor-pointer ${
+						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full ${
 							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
 						}`}
 					>
-						<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={() => onWordTap?.(slot.id)}
+							className="flex items-center gap-2 w-full text-left cursor-pointer"
+						>
 							<div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
 							<span className="font-mono text-muted-foreground tracking-widest">
 								{getDisplayedSlotWord(slot, cellLetters)}
@@ -53,13 +70,42 @@ export function DailyWordList({
 							<span className="text-xs text-muted-foreground ml-auto font-ui">
 								{slot.length} lletres
 							</span>
-						</div>
+						</button>
 						{clueText ? (
 							<span className="block text-sm italic text-muted-foreground pl-7 font-ui">
 								{clueText}
 							</span>
 						) : null}
-					</button>
+						{peerClueText ? (
+							<span className="block text-sm italic text-foreground pl-7 font-ui">
+								{peerClueText}
+							</span>
+						) : null}
+						{canRequestHelp ? (
+							<div className="pl-7">
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-7 gap-1.5 px-2 text-xs font-ui text-muted-foreground hover:text-foreground"
+									disabled={isWaitingForHelp}
+									onClick={() => onRequestHelp?.(slot.id)}
+								>
+									{isWaitingForHelp ? (
+										<>
+											<Loader2 className="size-3.5 animate-spin" />
+											Esperant pista…
+										</>
+									) : (
+										<>
+											<Users className="size-3.5" />
+											Demana ajuda
+										</>
+									)}
+								</Button>
+							</div>
+						) : null}
+					</div>
 				);
 			})}
 

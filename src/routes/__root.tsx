@@ -8,6 +8,8 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
+import { ClueRequestToasts } from "@/components/clue/clue-request-toasts";
+import { ClueRequestsRoot } from "@/components/clue/clue-requests-root";
 import Header from "@/components/header";
 import { LeaderboardRoot } from "@/components/leaderboard/leaderboard-root";
 import { LeaderboardToasts } from "@/components/leaderboard/leaderboard-toast";
@@ -108,14 +110,17 @@ function RootDocument() {
 						<OrientationLock />
 						<ServiceWorkerRegister />
 						<LeaderboardRoot>
-							<div className="flex min-h-svh flex-col">
-								<Header />
-								<main className="flex-1">
-									<Outlet />
-								</main>
-							</div>
-							<Toaster position="top-center" />
-							<LeaderboardToasts />
+							<ClueRequestsRoot>
+								<div className="flex min-h-svh flex-col">
+									<Header />
+									<main className="flex-1">
+										<Outlet />
+									</main>
+								</div>
+								<Toaster position="top-center" />
+								<LeaderboardToasts />
+								<ClueRequestToasts />
+							</ClueRequestsRoot>
 						</LeaderboardRoot>
 						{showDevtools ? (
 							<TanStackDevtools
