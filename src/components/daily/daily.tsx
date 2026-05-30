@@ -2,7 +2,7 @@ import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getSkipSharePreview } from "@/lib/anon-identity";
+import { getSkipSharePreview, isVibrationEnabled } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import {
 	AI_WORD_CLUES_FLAG,
@@ -587,6 +587,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 
 			if (typeof navigator.vibrate !== "function") {
+				return;
+			}
+
+			if (!isVibrationEnabled()) {
 				return;
 			}
 

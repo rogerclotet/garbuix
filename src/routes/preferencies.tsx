@@ -12,8 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import {
 	getLeaderboardOptOut,
 	getSkipSharePreview,
+	isVibrationEnabled,
 	setLeaderboardOptOut,
 	setSkipSharePreview,
+	setVibrationPreference,
 } from "@/lib/anon-identity";
 import { useObservability } from "@/lib/use-observability";
 
@@ -33,15 +35,18 @@ function PreferencesPage() {
 	const { captureEvent } = useObservability();
 	const leaderboardToggleId = useId();
 	const sharePreviewToggleId = useId();
+	const vibrationToggleId = useId();
 	const themeSelectId = useId();
 	const { theme, setTheme } = useTheme();
 	const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
 	const [showSharePreview, setShowSharePreview] = useState(true);
+	const [vibrationEnabled, setVibrationEnabled] = useState(true);
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		setShowOnLeaderboard(!getLeaderboardOptOut());
 		setShowSharePreview(!getSkipSharePreview());
+		setVibrationEnabled(isVibrationEnabled());
 		setMounted(true);
 	}, []);
 
@@ -55,6 +60,12 @@ function PreferencesPage() {
 		setShowSharePreview(next);
 		setSkipSharePreview(!next);
 		captureEvent("share_preview_toggled", { skip: !next });
+	};
+
+	const handleToggleVibration = (next: boolean) => {
+		setVibrationEnabled(next);
+		setVibrationPreference(next);
+		captureEvent("vibration_toggled", { enabled: next });
 	};
 
 	const handleThemeChange = (next: string) => {
@@ -131,6 +142,24 @@ function PreferencesPage() {
 						id={sharePreviewToggleId}
 						checked={showSharePreview}
 						onCheckedChange={handleToggleSharePreview}
+					/>
+				</label>
+				<label
+					htmlFor={vibrationToggleId}
+					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
+				>
+					<div className="space-y-1">
+						<div className="font-medium">Vibració</div>
+						<p className="text-sm text-muted-foreground font-ui">
+							Fes vibrar el dispositiu en encertar paraules i altres accions. Si
+							no tries res, seguim la preferència de moviment reduït del teu
+							dispositiu.
+						</p>
+					</div>
+					<Switch
+						id={vibrationToggleId}
+						checked={vibrationEnabled}
+						onCheckedChange={handleToggleVibration}
 					/>
 				</label>
 			</section>
