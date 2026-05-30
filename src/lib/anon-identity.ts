@@ -6,6 +6,7 @@ const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
 const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
 const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
+const VIBRATION_KEY = "paraules-vibration-v1";
 
 export type AnonReportedProgress = {
 	wordsFound: number;
@@ -95,6 +96,52 @@ export function setSkipSharePreview(skip: boolean): void {
 	} else {
 		window.localStorage.removeItem(SKIP_SHARE_PREVIEW_KEY);
 	}
+}
+
+// Vibration uses a tri-state preference so we can honor the device's
+// reduced-motion setting when the user hasn't made an explicit choice:
+//   null  -> follow the device (reduced-motion implies no vibration)
+//   true  -> user explicitly enabled vibration
+//   false -> user explicitly disabled vibration
+export function getVibrationPreference(): boolean | null {
+	if (typeof window === "undefined") return null;
+	try {
+		const raw = window.localStorage.getItem(VIBRATION_KEY);
+		if (raw === "1") return true;
+		if (raw === "0") return false;
+	} catch {
+		// Storage can be unavailable (private mode, disabled cookies); fall
+		// back to following the device preference.
+	}
+	return null;
+}
+
+export function setVibrationPreference(enabled: boolean): void {
+	if (typeof window === "undefined") return;
+	try {
+		window.localStorage.setItem(VIBRATION_KEY, enabled ? "1" : "0");
+	} catch {
+		// Best-effort persistence; ignore storage failures.
+	}
+}
+
+function deviceWantsReducedMotion(): boolean {
+	if (
+		typeof window === "undefined" ||
+		typeof window.matchMedia !== "function"
+	) {
+		return false;
+	}
+	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+// Resolves the tri-state preference against the device's reduced-motion
+// setting to a concrete on/off used both by the haptics call site and the
+// preferences toggle's default value.
+export function isVibrationEnabled(): boolean {
+	const preference = getVibrationPreference();
+	if (preference !== null) return preference;
+	return !deviceWantsReducedMotion();
 }
 
 export function getReportedAnonProgress(dateKey: string): AnonReportedProgress {
