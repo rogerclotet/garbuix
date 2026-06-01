@@ -2,9 +2,13 @@ import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getSkipSharePreview, isVibrationEnabled } from "@/lib/anon-identity";
+import {
+	getLetterLayout,
+	getSkipSharePreview,
+	isVibrationEnabled,
+} from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
-import { CIRCLE_LETTERS_FLAG, PEER_CLUES_FLAG } from "@/lib/feature-flags";
+import { PEER_CLUES_FLAG } from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -121,8 +125,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
-	const circleLetters = useFeatureFlag(CIRCLE_LETTERS_FLAG);
 	const peerCluesEnabled = useFeatureFlag(PEER_CLUES_FLAG);
+	// Circle is the default; a player can opt back into the grid via
+	// /preferencies. Initialise to the default so SSR markup is deterministic,
+	// then read the stored choice after mount.
+	const [circleLetters, setCircleLetters] = useState(true);
+	useEffect(() => {
+		setCircleLetters(getLetterLayout() === "circle");
+	}, []);
 	const { subscribe: subscribeClueRequests, requestClue } = useClueRequests();
 	// Word ids the player has asked other players for help with (awaiting a reply).
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(

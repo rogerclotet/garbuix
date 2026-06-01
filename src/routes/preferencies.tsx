@@ -11,13 +11,17 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
 	getLeaderboardOptOut,
+	getLetterLayout,
 	getSkipSharePreview,
 	isVibrationEnabled,
+	type LetterLayout,
 	setLeaderboardOptOut,
+	setLetterLayout,
 	setSkipSharePreview,
 	setVibrationPreference,
 } from "@/lib/anon-identity";
 import { useObservability } from "@/lib/use-observability";
+import { cn } from "@/lib/utils";
 
 type ThemePreference = "system" | "light" | "dark";
 
@@ -26,6 +30,57 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 	{ value: "light", label: "Clar" },
 	{ value: "dark", label: "Fosc" },
 ];
+
+const LETTER_LAYOUT_OPTIONS: { value: LetterLayout; label: string }[] = [
+	{ value: "circle", label: "Cercle" },
+	{ value: "grid", label: "Graella" },
+];
+
+// Stable slot keys for the six preview dots; mirrors the six letter buttons the
+// daily controls lay out. Reused for both layouts so neither relies on an array
+// index as a React key.
+const PREVIEW_SLOTS = ["n", "ne", "se", "s", "sw", "nw"] as const;
+
+// Miniature of each layout so the choice is self-explanatory: dots in a ring for
+// "circle" (matching the radial placement in daily-controls.tsx) and a 3×2 grid
+// for "grid".
+function LetterLayoutPreview({ layout }: { layout: LetterLayout }) {
+	if (layout === "grid") {
+		return (
+			<div className="grid grid-cols-3 gap-1">
+				{PREVIEW_SLOTS.map((slot) => (
+					<div
+						key={slot}
+						className="h-3.5 w-3.5 rounded-sm border border-border bg-background"
+					/>
+				))}
+			</div>
+		);
+	}
+
+	return (
+		<div className="relative h-16 w-16">
+			<div className="absolute top-1/2 left-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
+			{PREVIEW_SLOTS.map((slot, index) => {
+				const angle =
+					(index / PREVIEW_SLOTS.length) * 2 * Math.PI - Math.PI / 2;
+				const x = Math.cos(angle) * 1.55;
+				const y = Math.sin(angle) * 1.55;
+				return (
+					<div
+						key={slot}
+						className="absolute h-3.5 w-3.5 rounded-full border border-border bg-background"
+						style={{
+							left: "50%",
+							top: "50%",
+							transform: `translate(calc(-50% + ${x}rem), calc(-50% + ${y}rem))`,
+						}}
+					/>
+				);
+			})}
+		</div>
+	);
+}
 
 export const Route = createFileRoute("/preferencies")({
 	component: PreferencesPage,
@@ -36,17 +91,20 @@ function PreferencesPage() {
 	const leaderboardToggleId = useId();
 	const sharePreviewToggleId = useId();
 	const vibrationToggleId = useId();
+	const letterLayoutGroupId = useId();
 	const themeSelectId = useId();
 	const { theme, setTheme } = useTheme();
 	const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
 	const [showSharePreview, setShowSharePreview] = useState(true);
 	const [vibrationEnabled, setVibrationEnabled] = useState(true);
+	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>("circle");
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		setShowOnLeaderboard(!getLeaderboardOptOut());
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
+		setLetterLayoutState(getLetterLayout());
 		setMounted(true);
 	}, []);
 
@@ -66,6 +124,12 @@ function PreferencesPage() {
 		setVibrationEnabled(next);
 		setVibrationPreference(next);
 		captureEvent("vibration_toggled", { enabled: next });
+	};
+
+	const handleLayoutChange = (next: LetterLayout) => {
+		setLetterLayoutState(next);
+		setLetterLayout(next);
+		captureEvent("letter_layout_changed", { layout: next });
 	};
 
 	const handleThemeChange = (next: string) => {
@@ -162,6 +226,51 @@ function PreferencesPage() {
 						onCheckedChange={handleToggleVibration}
 					/>
 				</label>
+				<div className="flex flex-col gap-3 p-4 sm:p-5">
+					<div className="space-y-1">
+						<div id={letterLayoutGroupId} className="font-medium">
+							Disposició de les lletres
+						</div>
+						<p className="text-sm text-muted-foreground font-ui">
+							Tria com es col·loquen les lletres per escriure: en cercle al
+							voltant del botó d'enviar o en una graella de tres columnes.
+						</p>
+					</div>
+					<fieldset
+						aria-labelledby={letterLayoutGroupId}
+						className="flex gap-3 border-0 p-0 m-0"
+					>
+						{LETTER_LAYOUT_OPTIONS.map((option) => {
+							const selected = letterLayout === option.value;
+							return (
+								<label
+									key={option.value}
+									className={cn(
+										"flex flex-1 flex-col items-center gap-2 rounded-lg border p-3 transition-colors cursor-pointer",
+										selected
+											? "border-primary ring-2 ring-primary bg-background"
+											: "border-border bg-background hover:border-primary/50",
+									)}
+								>
+									<input
+										type="radio"
+										name="letter-layout"
+										value={option.value}
+										checked={selected}
+										onChange={() => handleLayoutChange(option.value)}
+										className="sr-only"
+									/>
+									<div className="flex h-20 items-center justify-center">
+										<LetterLayoutPreview layout={option.value} />
+									</div>
+									<span className="text-sm font-medium font-ui">
+										{option.label}
+									</span>
+								</label>
+							);
+						})}
+					</fieldset>
+				</div>
 			</section>
 		</div>
 	);
