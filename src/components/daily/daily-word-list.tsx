@@ -1,6 +1,10 @@
-import { CheckCircle2, Loader2, Users } from "lucide-react";
+import { CheckCircle2, HelpingHand, Loader2, Users } from "lucide-react";
+import { useState } from "react";
+import { ClueResponder } from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
+import type { ClueRequest } from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
+import type { RespondResult } from "@/lib/use-clue-requests";
 import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
 
 type DailyWordListProps = {
@@ -18,6 +22,9 @@ type DailyWordListProps = {
 	requestedHelpWordIds?: number[];
 	peerClueTextsByWordId?: Record<number, string>;
 	onRequestHelp?: (wordId: number) => void;
+	// The other side: requests from other players this user can help with.
+	incomingRequests?: ClueRequest[];
+	onRespondToClue?: (requestId: string, text: string) => Promise<RespondResult>;
 };
 
 export function DailyWordList({
@@ -33,6 +40,8 @@ export function DailyWordList({
 	requestedHelpWordIds = [],
 	peerClueTextsByWordId = {},
 	onRequestHelp,
+	incomingRequests = [],
+	onRespondToClue,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
 		puzzle.wordSlots,
@@ -42,13 +51,63 @@ export function DailyWordList({
 	const cluedWordIds = new Set(clueWordIds);
 	const requestedHelp = new Set(requestedHelpWordIds);
 
+	const requestsByWordId = new Map<number, ClueRequest[]>();
+	for (const request of incomingRequests) {
+		const existing = requestsByWordId.get(request.wordId);
+		if (existing) {
+			existing.push(request);
+		} else {
+			requestsByWordId.set(request.wordId, [request]);
+		}
+	}
+
+	// Which request's composer is currently expanded. Only one at a time keeps
+	// the list compact.
+	const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+
+	const renderIncomingRequests = (wordId: number) => {
+		const requests = requestsByWordId.get(wordId);
+		if (!requests || requests.length === 0 || !onRespondToClue) {
+			return null;
+		}
+
+		return (
+			<div className="flex flex-col gap-2 pl-7">
+				{requests.map((request) =>
+					activeRequestId === request.id ? (
+						<ClueResponder
+							key={request.id}
+							request={request}
+							onRespond={onRespondToClue}
+							onDone={() => setActiveRequestId(null)}
+							intro={`Dóna una pista a ${request.requesterName}`}
+						/>
+					) : (
+						<Button
+							key={request.id}
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="h-7 w-fit gap-1.5 px-2 text-xs font-ui text-primary hover:text-primary"
+							onClick={() => setActiveRequestId(request.id)}
+						>
+							<HelpingHand className="size-3.5" />
+							Ajuda {request.requesterName}
+						</Button>
+					),
+				)}
+			</div>
+		);
+	};
+
 	return (
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
 				const peerClueText = peerClueTextsByWordId[slot.id];
+				const hasIncoming = requestsByWordId.has(slot.id);
 				const isHighlighted =
-					cluedWordIds.has(slot.id) || Boolean(peerClueText);
+					cluedWordIds.has(slot.id) || Boolean(peerClueText) || hasIncoming;
 				const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClueText;
 
 				return (
@@ -81,6 +140,7 @@ export function DailyWordList({
 								{peerClueText}
 							</span>
 						) : null}
+						{renderIncomingRequests(slot.id)}
 						{canRequestHelp ? (
 							<div className="pl-7">
 								<Button
@@ -136,6 +196,7 @@ export function DailyWordList({
 								{foundClueText}
 							</span>
 						) : null}
+						{renderIncomingRequests(slot.id)}
 					</div>
 				);
 			})}

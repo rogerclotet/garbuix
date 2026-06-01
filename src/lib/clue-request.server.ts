@@ -197,3 +197,50 @@ export async function publishClueResponse(options: {
 		console.warn("[clue-request] failed to publish response", error);
 	}
 }
+
+// Removes a request from the pending set and tells every connected responder to
+// drop it from their badge/list. Idempotent — broadcasts even if the entry was
+// already gone, so late subscribers converge.
+export async function resolveClueRequest(
+	dateKey: string,
+	request: Pick<ClueRequest, "id" | "wordId">,
+): Promise<void> {
+	if (!isRedisConfigured()) {
+		return;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return;
+	}
+
+	const event: ClueRequestStreamEvent = {
+		type: "resolved",
+		requestId: request.id,
+		wordId: request.wordId,
+	};
+
+	try {
+		await redis.hdel(pendingRequestsKey(dateKey), request.id);
+		await redis.publish(clueRequestsChannel(dateKey), JSON.stringify(event));
+	} catch (error) {
+		console.warn("[clue-request] failed to resolve request", error);
+	}
+}
+
+// Resolves any of a requester's own pending requests for a word — used when the
+// asker finds the word and no longer needs help.
+export async function resolveOwnClueRequestsForWord(options: {
+	dateKey: string;
+	requesterId: string;
+	wordId: number;
+}): Promise<void> {
+	const pending = await getPendingClueRequests(options.dateKey);
+	const matches = pending.filter(
+		(request) =>
+			request.requesterId === options.requesterId &&
+			request.wordId === options.wordId,
+	);
+	await Promise.all(
+		matches.map((request) => resolveClueRequest(options.dateKey, request)),
+	);
+}

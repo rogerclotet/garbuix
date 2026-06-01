@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getSkipSharePreview } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
+import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
 import {
 	AI_WORD_CLUES_FLAG,
 	CIRCLE_LETTERS_FLAG,
@@ -128,7 +129,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
 	const circleLetters = useFeatureFlag(CIRCLE_LETTERS_FLAG);
 	const peerCluesEnabled = useFeatureFlag(PEER_CLUES_FLAG);
-	const { subscribe: subscribeClueRequests, requestClue } = useClueRequests();
+	const {
+		subscribe: subscribeClueRequests,
+		requestClue,
+		resolveClue,
+		incomingRequests,
+		respondToClue,
+	} = useClueRequests();
 	// Word ids the player has asked other players for help with (awaiting a reply).
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
 		[],
@@ -869,6 +876,22 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return unsubscribe;
 	}, [subscribeClueRequests]);
 
+	// Once the asker finds a word they'd asked help for, the request is no longer
+	// needed: resolve it so other players' badges/buttons clear, and stop showing
+	// the local "waiting" state.
+	useEffect(() => {
+		const found = requestedHelpWordIds.filter((wordId) =>
+			derivedProgress.guessedWordIds.includes(wordId),
+		);
+		if (found.length === 0) return;
+		for (const wordId of found) {
+			void resolveClue(wordId);
+		}
+		setRequestedHelpWordIds((current) =>
+			current.filter((wordId) => !found.includes(wordId)),
+		);
+	}, [derivedProgress.guessedWordIds, requestedHelpWordIds, resolveClue]);
+
 	// Tapping an incomplete word flashes its grid cells in off-white teal so the
 	// player can locate it, scrolling the grid into view on mobile when needed.
 	const handleLocateWord = useCallback(
@@ -1212,7 +1235,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								runPressAction={runPressAction}
 							/>
 
-							<div>
+							<div id={WORD_LIST_SECTION_ID} className="scroll-mt-4">
 								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
 									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
 									)
@@ -1230,6 +1253,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									requestedHelpWordIds={requestedHelpWordIds}
 									peerClueTextsByWordId={peerClueTextsByWordId}
 									onRequestHelp={handleRequestHelp}
+									incomingRequests={incomingRequests}
+									onRespondToClue={respondToClue}
 								/>
 							</div>
 						</div>

@@ -10,6 +10,8 @@ import {
 	getPendingClueRequests,
 	hasActiveClueRequest,
 	publishClueResponse,
+	resolveClueRequest,
+	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
 import {
 	clueRequestsChannel,
@@ -32,6 +34,7 @@ type ParsedPath =
 	| { kind: "stream"; dateKey: string }
 	| { kind: "request"; dateKey: string }
 	| { kind: "respond"; dateKey: string }
+	| { kind: "resolve"; dateKey: string }
 	| { kind: "unknown" };
 
 function parsePath(pathname: string): ParsedPath {
@@ -48,6 +51,7 @@ function parsePath(pathname: string): ParsedPath {
 	if (rest[1] === "stream") return { kind: "stream", dateKey };
 	if (rest[1] === "request") return { kind: "request", dateKey };
 	if (rest[1] === "respond") return { kind: "respond", dateKey };
+	if (rest[1] === "resolve") return { kind: "resolve", dateKey };
 	return { kind: "unknown" };
 }
 
@@ -93,7 +97,9 @@ async function handlePost(request: Request) {
 	const url = new URL(request.url);
 	const parsed = parsePath(url.pathname);
 	if (
-		(parsed.kind !== "request" && parsed.kind !== "respond") ||
+		(parsed.kind !== "request" &&
+			parsed.kind !== "respond" &&
+			parsed.kind !== "resolve") ||
 		!isValidDateKey(parsed.dateKey)
 	) {
 		return new Response("Not Found", { status: 404 });
@@ -114,6 +120,11 @@ async function handlePost(request: Request) {
 	if (parsed.kind === "request") {
 		return observeServerAction("clue_request_create", () =>
 			handleCreateRequest(parsed.dateKey, user, raw),
+		);
+	}
+	if (parsed.kind === "resolve") {
+		return observeServerAction("clue_request_resolve", () =>
+			handleResolve(parsed.dateKey, user, raw),
 		);
 	}
 	return observeServerAction("clue_request_respond", () =>
@@ -214,8 +225,29 @@ async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
 		text,
 		responderName: user.name,
 	});
+	// First responder wins: clear the request so other helpers' badges/buttons
+	// update live and the asker isn't flooded with duplicate clues.
+	await resolveClueRequest(dateKey, clueRequest);
 
 	return Response.json({ delivered: true });
+}
+
+const resolveSchema = z.object({
+	wordId: z.number().int().min(0),
+});
+
+async function handleResolve(dateKey: string, user: SessionUser, raw: unknown) {
+	const result = resolveSchema.safeParse(raw);
+	if (!result.success) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	// Only the asker can resolve their own request (e.g. they found the word).
+	await resolveOwnClueRequestsForWord({
+		dateKey,
+		requesterId: user.id,
+		wordId: result.data.wordId,
+	});
+	return Response.json({ resolved: true });
 }
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
