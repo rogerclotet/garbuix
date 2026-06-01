@@ -14,8 +14,8 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 // not configured.
 
 // How long a request stays answerable. Pruned lazily on read since Redis hashes
-// have no per-field TTL.
-const REQUEST_TTL_MS = 5 * 60 * 1000;
+// have no per-field TTL. Long enough for another player to notice and reply.
+const REQUEST_TTL_MS = 15 * 60 * 1000;
 // Whole-hash expiry, refreshed on each write, so abandoned puzzles get cleaned up.
 const HASH_TTL_SECONDS = 60 * 60;
 
