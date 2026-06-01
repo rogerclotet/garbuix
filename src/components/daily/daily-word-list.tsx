@@ -1,5 +1,11 @@
-import { CheckCircle2, HelpingHand, Loader2, Users } from "lucide-react";
-import { useState } from "react";
+import {
+	CheckCircle2,
+	ClipboardCopy,
+	HelpingHand,
+	Loader2,
+	Users,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import { ClueResponder } from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
 import type { ClueRequest } from "@/lib/clue-request-types";
@@ -61,9 +67,30 @@ export function DailyWordList({
 		}
 	}
 
-	// Which request's composer is currently expanded. Only one at a time keeps
-	// the list compact.
+	// Which request's composer is currently expanded (one at a time keeps the
+	// list compact), plus the text it should open with. The nonce forces the
+	// composer to remount when text is dropped in via the copy button.
 	const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+	const [prefillText, setPrefillText] = useState("");
+	const composerNonceRef = useRef(0);
+
+	const openComposer = (requestId: string, initial: string) => {
+		composerNonceRef.current += 1;
+		setPrefillText(initial);
+		setActiveRequestId(requestId);
+	};
+
+	const closeComposer = () => {
+		setActiveRequestId(null);
+		setPrefillText("");
+	};
+
+	// Lazy route: drop a word's AI clue straight into the open composer.
+	const handleUseClue = (wordId: number, clueText: string) => {
+		const first = requestsByWordId.get(wordId)?.[0];
+		if (!first) return;
+		openComposer(first.id, clueText);
+	};
 
 	const renderIncomingRequests = (wordId: number) => {
 		const requests = requestsByWordId.get(wordId);
@@ -76,11 +103,12 @@ export function DailyWordList({
 				{requests.map((request) =>
 					activeRequestId === request.id ? (
 						<ClueResponder
-							key={request.id}
+							key={`${request.id}:${composerNonceRef.current}`}
 							request={request}
 							onRespond={onRespondToClue}
-							onDone={() => setActiveRequestId(null)}
+							onDone={closeComposer}
 							intro={`Dóna una pista a ${request.requesterName}`}
+							initialText={prefillText}
 						/>
 					) : (
 						<Button
@@ -89,7 +117,7 @@ export function DailyWordList({
 							variant="ghost"
 							size="sm"
 							className="h-7 w-fit gap-1.5 px-2 text-xs font-ui text-primary hover:text-primary"
-							onClick={() => setActiveRequestId(request.id)}
+							onClick={() => openComposer(request.id, "")}
 						>
 							<HelpingHand className="size-3.5" />
 							Ajuda {request.requesterName}
@@ -99,6 +127,37 @@ export function DailyWordList({
 			</div>
 		);
 	};
+
+	// An AI clue shown next to a word can be copied into the response composer,
+	// but only when there's actually a request to answer for that word.
+	const renderClueLine = (
+		wordId: number,
+		clueText: string,
+		tone: "muted" | "foreground",
+	) => (
+		<div className="flex items-start gap-1 pl-7">
+			<span
+				className={`block flex-1 text-sm italic font-ui ${
+					tone === "foreground" ? "text-foreground" : "text-muted-foreground"
+				}`}
+			>
+				{clueText}
+			</span>
+			{requestsByWordId.has(wordId) && onRespondToClue ? (
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+					aria-label="Fes servir aquesta pista"
+					title="Fes servir aquesta pista"
+					onClick={() => handleUseClue(wordId, clueText)}
+				>
+					<ClipboardCopy className="size-3.5" />
+				</Button>
+			) : null}
+		</div>
+	);
 
 	return (
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
@@ -130,11 +189,7 @@ export function DailyWordList({
 								{slot.length} lletres
 							</span>
 						</button>
-						{clueText ? (
-							<span className="block text-sm italic text-muted-foreground pl-7 font-ui">
-								{clueText}
-							</span>
-						) : null}
+						{clueText ? renderClueLine(slot.id, clueText, "muted") : null}
 						{peerClueText ? (
 							<span className="block text-sm italic text-foreground pl-7 font-ui">
 								{peerClueText}
@@ -191,11 +246,9 @@ export function DailyWordList({
 								{slot.length} lletres
 							</span>
 						</div>
-						{foundClueText ? (
-							<span className="block text-sm italic text-muted-foreground pl-7 font-ui">
-								{foundClueText}
-							</span>
-						) : null}
+						{foundClueText
+							? renderClueLine(slot.id, foundClueText, "muted")
+							: null}
 						{renderIncomingRequests(slot.id)}
 					</div>
 				);

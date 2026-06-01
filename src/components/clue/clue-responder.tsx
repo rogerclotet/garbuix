@@ -29,14 +29,17 @@ export function ClueResponder({
 	onDone,
 	onCapture,
 	intro,
+	initialText = "",
 }: {
 	request: ClueRequest;
 	onRespond: (requestId: string, text: string) => Promise<RespondResult>;
 	onDone: () => void;
 	onCapture?: (event: string, props?: Record<string, unknown>) => void;
 	intro?: ReactNode;
+	// Prefilled composer text — e.g. the AI clue dropped in via the copy button.
+	initialText?: string;
 }) {
-	const [text, setText] = useState("");
+	const [text, setText] = useState(initialText);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
