@@ -104,7 +104,7 @@ async function main() {
 		`Seeded clue request ${request.id}: "${requesterName}" asking for word ${slot.id} (${slot.length} letters) on ${dateKey}.`,
 	);
 	console.log(
-		"Open the app as a logged-in user with the peer-clues flag on — you should see the header badge and the word in the list.",
+		"Open the app as a logged-in user — you should see the header badge and the word in the list.",
 	);
 
 	await sql.end();
