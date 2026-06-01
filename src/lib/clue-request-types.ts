@@ -46,6 +46,13 @@ export function pendingRequestsKey(dateKey: string): string {
 	return `clreq:${dateKey}:pending`;
 }
 
+// Per-user, per-day store of clues received by the asker. Persisted so the clue
+// survives an SSE reconnect: it's replayed in the asker's snapshot rather than
+// relying solely on the live pub/sub event reaching them.
+export function clueInboxKey(userId: string, dateKey: string): string {
+	return `clreq:user:${userId}:${dateKey}:inbox`;
+}
+
 // DOM id of the word list section, so the header help badge can scroll to it.
 export const WORD_LIST_SECTION_ID = "word-list-section";
 

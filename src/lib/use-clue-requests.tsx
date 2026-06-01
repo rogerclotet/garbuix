@@ -11,6 +11,7 @@ import {
 import type {
 	ClueRequest,
 	ClueRequestStreamEvent,
+	ClueResponse,
 } from "@/lib/clue-request-types";
 
 type ClueRequestsStatus = "idle" | "connecting" | "open" | "error" | "closed";
@@ -20,6 +21,8 @@ export type RespondResult = { ok: true } | { ok: false; reason: string | null };
 type ClueRequestsContextValue = {
 	dateKey: string | null;
 	incomingRequests: ClueRequest[];
+	// Clues delivered to this user, keyed by word id (live + replayed snapshot).
+	receivedClues: Record<number, ClueResponse>;
 	status: ClueRequestsStatus;
 	enabled: boolean;
 	subscribe(listener: (event: ClueRequestStreamEvent) => void): () => void;
@@ -33,6 +36,7 @@ const noop = () => {};
 const defaultValue: ClueRequestsContextValue = {
 	dateKey: null,
 	incomingRequests: [],
+	receivedClues: {},
 	status: "idle",
 	enabled: false,
 	subscribe: () => noop,
@@ -57,6 +61,9 @@ export function ClueRequestsProvider({
 	children,
 }: ClueRequestsProviderProps) {
 	const [incomingRequests, setIncomingRequests] = useState<ClueRequest[]>([]);
+	const [receivedClues, setReceivedClues] = useState<
+		Record<number, ClueResponse>
+	>({});
 	// Requests this user has already answered, hidden from the badge/list so the
 	// count reflects only outstanding requests they could still help with.
 	const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
@@ -77,8 +84,22 @@ export function ClueRequestsProvider({
 
 		const handleSnapshot = (event: MessageEvent) => {
 			try {
-				const snapshot = JSON.parse(event.data) as { requests: ClueRequest[] };
+				const snapshot = JSON.parse(event.data) as {
+					requests?: ClueRequest[];
+					responses?: ClueResponse[];
+				};
 				setIncomingRequests(snapshot.requests ?? []);
+				// Merge replayed clues so a previously-missed live event recovers,
+				// without re-toasting (snapshot responses don't reach subscribers).
+				if (snapshot.responses && snapshot.responses.length > 0) {
+					setReceivedClues((current) => {
+						const next = { ...current };
+						for (const response of snapshot.responses ?? []) {
+							next[response.wordId] = response;
+						}
+						return next;
+					});
+				}
 				setStatus("open");
 			} catch {
 				// ignore
@@ -104,6 +125,11 @@ export function ClueRequestsProvider({
 					setIncomingRequests((current) =>
 						current.filter((r) => r.id !== payload.requestId),
 					);
+				} else if (payload.type === "response") {
+					setReceivedClues((current) => ({
+						...current,
+						[payload.response.wordId]: payload.response,
+					}));
 				}
 				for (const listener of listenersRef.current) {
 					listener(payload);
@@ -210,6 +236,7 @@ export function ClueRequestsProvider({
 		() => ({
 			dateKey,
 			incomingRequests: visibleRequests,
+			receivedClues,
 			status,
 			enabled: active,
 			subscribe,
@@ -220,6 +247,7 @@ export function ClueRequestsProvider({
 		[
 			dateKey,
 			visibleRequests,
+			receivedClues,
 			status,
 			active,
 			subscribe,

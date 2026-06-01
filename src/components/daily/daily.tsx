@@ -142,15 +142,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		resolveClue,
 		incomingRequests,
 		respondToClue,
+		receivedClues,
 	} = useClueRequests();
 	// Word ids the player has asked other players for help with (awaiting a reply).
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
 		[],
 	);
-	// Clue texts delivered by other players, keyed by word id.
-	const [peerClueTextsByWordId, setPeerClueTextsByWordId] = useState<
-		Record<number, string>
-	>({});
+	// Clue texts delivered by other players, keyed by word id. Sourced from the
+	// provider so they persist across SSE reconnects (replayed in the snapshot).
+	const peerClueTextsByWordId = useMemo(() => {
+		const map: Record<number, string> = {};
+		for (const [wordId, response] of Object.entries(receivedClues)) {
+			map[Number(wordId)] = response.text;
+		}
+		return map;
+	}, [receivedClues]);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	// Bonus clues for valid off-puzzle words (default on; off = hardcore mode).
@@ -909,12 +915,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[captureEvent, puzzle.dateKey, puzzle.id, requestClue, triggerHaptic],
 	);
 
-	// Receive clues sent by other players and surface them under the word.
+	// Toast clues as they arrive live. The clue itself is stored in the provider
+	// (and replayed in the snapshot), so display doesn't depend on this firing.
 	useEffect(() => {
 		const unsubscribe = subscribeClueRequests((event) => {
 			if (event.type !== "response") return;
-			const { wordId, text, responderName } = event.response;
-			setPeerClueTextsByWordId((current) => ({ ...current, [wordId]: text }));
+			const { text, responderName } = event.response;
 			toast(`Pista de ${responderName}`, {
 				description: text,
 				duration: 12000,
