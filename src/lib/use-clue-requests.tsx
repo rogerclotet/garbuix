@@ -152,6 +152,44 @@ export function ClueRequestsProvider({
 		};
 	}, [active, dateKey, localUserId]);
 
+	// Polling fallback for delivered clues: the live SSE event can be dropped (a
+	// proxy buffering the open stream in production), so the asker would otherwise
+	// wait forever. The inbox is tiny; merge it in every few seconds. No toast on
+	// this path — only live events toast.
+	useEffect(() => {
+		if (!active || !dateKey || typeof window === "undefined") {
+			return;
+		}
+
+		let cancelled = false;
+
+		const pollInbox = async () => {
+			try {
+				const response = await fetch(`/api/clue-requests/${dateKey}/inbox`);
+				if (!response.ok) return;
+				const data = (await response.json()) as { responses?: ClueResponse[] };
+				if (cancelled || !data.responses || data.responses.length === 0) {
+					return;
+				}
+				setReceivedClues((current) => {
+					const next = { ...current };
+					for (const clue of data.responses ?? []) {
+						next[clue.wordId] = clue;
+					}
+					return next;
+				});
+			} catch {
+				// best-effort; the SSE path or the next poll will recover
+			}
+		};
+
+		const interval = window.setInterval(pollInbox, 8000);
+		return () => {
+			cancelled = true;
+			window.clearInterval(interval);
+		};
+	}, [active, dateKey]);
+
 	const subscribe = useCallback(
 		(listener: (event: ClueRequestStreamEvent) => void) => {
 			listenersRef.current.add(listener);

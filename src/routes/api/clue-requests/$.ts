@@ -33,6 +33,7 @@ export const Route = createFileRoute("/api/clue-requests/$")({
 
 type ParsedPath =
 	| { kind: "stream"; dateKey: string }
+	| { kind: "inbox"; dateKey: string }
 	| { kind: "request"; dateKey: string }
 	| { kind: "respond"; dateKey: string }
 	| { kind: "resolve"; dateKey: string }
@@ -50,6 +51,7 @@ function parsePath(pathname: string): ParsedPath {
 		return { kind: "unknown" };
 	}
 	if (rest[1] === "stream") return { kind: "stream", dateKey };
+	if (rest[1] === "inbox") return { kind: "inbox", dateKey };
 	if (rest[1] === "request") return { kind: "request", dateKey };
 	if (rest[1] === "respond") return { kind: "respond", dateKey };
 	if (rest[1] === "resolve") return { kind: "resolve", dateKey };
@@ -75,12 +77,24 @@ async function requireUser(request: Request): Promise<SessionUser | null> {
 async function handleGet(request: Request) {
 	const url = new URL(request.url);
 	const parsed = parsePath(url.pathname);
-	if (parsed.kind !== "stream" || !isValidDateKey(parsed.dateKey)) {
+	if (
+		(parsed.kind !== "stream" && parsed.kind !== "inbox") ||
+		!isValidDateKey(parsed.dateKey)
+	) {
 		return new Response("Not Found", { status: 404 });
 	}
 	const user = await requireUser(request);
 	if (!user) {
 		return new Response("Unauthorized", { status: 401 });
+	}
+	// Polling fallback for clues delivered to the asker, in case the live SSE
+	// event is dropped (e.g. a proxy buffering the open stream in production).
+	if (parsed.kind === "inbox") {
+		const responses = await getClueInbox(user.id, parsed.dateKey);
+		return Response.json(
+			{ responses },
+			{ headers: { "Cache-Control": "no-store" } },
+		);
 	}
 	return openSseStream(parsed.dateKey, user.id);
 }
