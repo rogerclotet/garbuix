@@ -8,7 +8,7 @@ import {
 	isVibrationEnabled,
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
-import { AI_WORD_CLUES_FLAG, PEER_CLUES_FLAG } from "@/lib/feature-flags";
+import { PEER_CLUES_FLAG } from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -125,7 +125,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
-	const aiCluesEnabled = useFeatureFlag(AI_WORD_CLUES_FLAG);
 	const peerCluesEnabled = useFeatureFlag(PEER_CLUES_FLAG);
 	// Circle is the default; a player can opt back into the grid via
 	// /preferencies. Initialise to the default so SSR markup is deterministic,
@@ -366,9 +365,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle, revealedCells],
 	);
 
-	// Logged-in players with the flag on get AI text clues; everyone else keeps
-	// the single-letter reveal.
-	const useTextClue = Boolean(activeUser && aiCluesEnabled);
+	// Logged-in players get AI text clues; anonymous players keep the
+	// single-letter reveal.
+	const useTextClue = Boolean(activeUser);
 
 	const nextClueWordId = useMemo(() => {
 		if (!useTextClue) return null;
