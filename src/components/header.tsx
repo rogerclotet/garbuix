@@ -1,5 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { ChevronLeft, HelpingHand } from "lucide-react";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
 	setHowToPlayOpen,
@@ -8,6 +8,8 @@ import {
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
+import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
+import { useClueRequests } from "@/lib/use-clue-requests";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -19,6 +21,33 @@ export default function Header() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
+	const navigate = useNavigate();
+	const { incomingRequests } = useClueRequests();
+	// "How many players are requesting help" — distinct askers, not raw requests.
+	const helpRequestCount = new Set(
+		incomingRequests.map((request) => request.requesterId),
+	).size;
+
+	const goToWordList = () => {
+		// Scroll straight to the first requested word's row. scrollIntoView walks
+		// every scrollable ancestor, so it also moves the word list's own inner
+		// scroll on desktop — not just the page. Falls back to the section header.
+		const firstWordId = incomingRequests[0]?.wordId;
+		const scrollToTarget = () => {
+			const target =
+				(firstWordId != null
+					? document.getElementById(wordRowId(firstWordId))
+					: null) ?? document.getElementById(WORD_LIST_SECTION_ID);
+			target?.scrollIntoView({ behavior: "smooth", block: "center" });
+		};
+		if (pathname === "/") {
+			scrollToTarget();
+			return;
+		}
+		void navigate({ to: "/" }).then(() => {
+			window.setTimeout(scrollToTarget, 150);
+		});
+	};
 
 	return (
 		<header className="bg-background transition-colors duration-300">
@@ -52,6 +81,24 @@ export default function Header() {
 						</Link>
 					)}
 					<div className="flex items-center gap-2">
+						{helpRequestCount > 0 ? (
+							<Button
+								variant="ghost"
+								size="icon-lg"
+								onClick={goToWordList}
+								className="relative size-11 rounded-full text-foreground hover:bg-muted sm:size-9"
+								aria-label={`${helpRequestCount} ${
+									helpRequestCount === 1
+										? "jugador demana ajuda"
+										: "jugadors demanen ajuda"
+								}`}
+							>
+								<HelpingHand className="size-6 sm:size-5" />
+								<span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums">
+									{helpRequestCount > 9 ? "9+" : helpRequestCount}
+								</span>
+							</Button>
+						) : null}
 						<UserMenu />
 					</div>
 				</div>

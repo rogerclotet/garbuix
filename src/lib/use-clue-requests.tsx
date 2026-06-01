@@ -25,6 +25,7 @@ type ClueRequestsContextValue = {
 	subscribe(listener: (event: ClueRequestStreamEvent) => void): () => void;
 	requestClue(wordId: number): Promise<boolean>;
 	respondToClue(requestId: string, text: string): Promise<RespondResult>;
+	resolveClue(wordId: number): Promise<void>;
 };
 
 const noop = () => {};
@@ -37,6 +38,7 @@ const defaultValue: ClueRequestsContextValue = {
 	subscribe: () => noop,
 	requestClue: async () => false,
 	respondToClue: async () => ({ ok: false, reason: null }),
+	resolveClue: async () => {},
 };
 
 const ClueRequestsContext =
@@ -55,6 +57,9 @@ export function ClueRequestsProvider({
 	children,
 }: ClueRequestsProviderProps) {
 	const [incomingRequests, setIncomingRequests] = useState<ClueRequest[]>([]);
+	// Requests this user has already answered, hidden from the badge/list so the
+	// count reflects only outstanding requests they could still help with.
+	const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
 	const [status, setStatus] = useState<ClueRequestsStatus>("idle");
 	const listenersRef = useRef<Set<(event: ClueRequestStreamEvent) => void>>(
 		new Set(),
@@ -93,6 +98,11 @@ export function ClueRequestsProvider({
 						current.some((r) => r.id === payload.request.id)
 							? current
 							: [...current, payload.request],
+					);
+				} else if (payload.type === "resolved") {
+					// Helped by someone else or no longer needed — drop it everywhere.
+					setIncomingRequests((current) =>
+						current.filter((r) => r.id !== payload.requestId),
 					);
 				}
 				for (const listener of listenersRef.current) {
@@ -155,6 +165,9 @@ export function ClueRequestsProvider({
 					body: JSON.stringify({ requestId, text }),
 				});
 				if (response.ok) {
+					setRespondedRequestIds((current) =>
+						current.includes(requestId) ? current : [...current, requestId],
+					);
 					return { ok: true };
 				}
 				let reason: string | null = null;
@@ -172,24 +185,47 @@ export function ClueRequestsProvider({
 		[dateKey],
 	);
 
+	const resolveClue = useCallback(
+		async (wordId: number): Promise<void> => {
+			if (!dateKey) return;
+			try {
+				await fetch(`/api/clue-requests/${dateKey}/resolve`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ wordId }),
+				});
+			} catch {
+				// best-effort; the request expires on its own otherwise
+			}
+		},
+		[dateKey],
+	);
+
+	const visibleRequests = useMemo(
+		() => incomingRequests.filter((r) => !respondedRequestIds.includes(r.id)),
+		[incomingRequests, respondedRequestIds],
+	);
+
 	const value = useMemo<ClueRequestsContextValue>(
 		() => ({
 			dateKey,
-			incomingRequests,
+			incomingRequests: visibleRequests,
 			status,
 			enabled: active,
 			subscribe,
 			requestClue,
 			respondToClue,
+			resolveClue,
 		}),
 		[
 			dateKey,
-			incomingRequests,
+			visibleRequests,
 			status,
 			active,
 			subscribe,
 			requestClue,
 			respondToClue,
+			resolveClue,
 		],
 	);
 

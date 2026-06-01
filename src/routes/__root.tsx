@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
-import { ClueRequestToasts } from "@/components/clue/clue-request-toasts";
 import { ClueRequestsRoot } from "@/components/clue/clue-requests-root";
 import Header from "@/components/header";
 import { LeaderboardRoot } from "@/components/leaderboard/leaderboard-root";
@@ -119,7 +118,6 @@ function RootDocument() {
 								</div>
 								<Toaster position="top-center" />
 								<LeaderboardToasts />
-								<ClueRequestToasts />
 							</ClueRequestsRoot>
 						</LeaderboardRoot>
 						{showDevtools ? (

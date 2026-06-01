@@ -14,8 +14,8 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 // not configured.
 
 // How long a request stays answerable. Pruned lazily on read since Redis hashes
-// have no per-field TTL.
-const REQUEST_TTL_MS = 5 * 60 * 1000;
+// have no per-field TTL. Long enough for another player to notice and reply.
+const REQUEST_TTL_MS = 15 * 60 * 1000;
 // Whole-hash expiry, refreshed on each write, so abandoned puzzles get cleaned up.
 const HASH_TTL_SECONDS = 60 * 60;
 
@@ -196,4 +196,51 @@ export async function publishClueResponse(options: {
 	} catch (error) {
 		console.warn("[clue-request] failed to publish response", error);
 	}
+}
+
+// Removes a request from the pending set and tells every connected responder to
+// drop it from their badge/list. Idempotent — broadcasts even if the entry was
+// already gone, so late subscribers converge.
+export async function resolveClueRequest(
+	dateKey: string,
+	request: Pick<ClueRequest, "id" | "wordId">,
+): Promise<void> {
+	if (!isRedisConfigured()) {
+		return;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return;
+	}
+
+	const event: ClueRequestStreamEvent = {
+		type: "resolved",
+		requestId: request.id,
+		wordId: request.wordId,
+	};
+
+	try {
+		await redis.hdel(pendingRequestsKey(dateKey), request.id);
+		await redis.publish(clueRequestsChannel(dateKey), JSON.stringify(event));
+	} catch (error) {
+		console.warn("[clue-request] failed to resolve request", error);
+	}
+}
+
+// Resolves any of a requester's own pending requests for a word — used when the
+// asker finds the word and no longer needs help.
+export async function resolveOwnClueRequestsForWord(options: {
+	dateKey: string;
+	requesterId: string;
+	wordId: number;
+}): Promise<void> {
+	const pending = await getPendingClueRequests(options.dateKey);
+	const matches = pending.filter(
+		(request) =>
+			request.requesterId === options.requesterId &&
+			request.wordId === options.wordId,
+	);
+	await Promise.all(
+		matches.map((request) => resolveClueRequest(options.dateKey, request)),
+	);
 }

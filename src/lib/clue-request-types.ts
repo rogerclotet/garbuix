@@ -25,7 +25,10 @@ export type ClueResponse = {
 
 export type ClueRequestStreamEvent =
 	| { type: "request"; request: ClueRequest }
-	| { type: "response"; response: ClueResponse };
+	| { type: "response"; response: ClueResponse }
+	// A request no longer needs answering — it was helped, or the asker found the
+	// word. Responders drop it from their badge/list on receipt.
+	| { type: "resolved"; requestId: string; wordId: number };
 
 // All connected players on a given puzzle receive new requests on this channel.
 export function clueRequestsChannel(dateKey: string): string {
@@ -41,4 +44,13 @@ export function clueResponsesChannel(userId: string): string {
 // so a player who just connected still sees an open request.
 export function pendingRequestsKey(dateKey: string): string {
 	return `clreq:${dateKey}:pending`;
+}
+
+// DOM id of the word list section, so the header help badge can scroll to it.
+export const WORD_LIST_SECTION_ID = "word-list-section";
+
+// DOM id of a single word row, so the help badge can scroll straight to the
+// requested word (handling the word list's own inner scroll on desktop).
+export function wordRowId(wordId: number): string {
+	return `word-row-${wordId}`;
 }

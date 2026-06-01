@@ -1,15 +1,11 @@
 import { Loader2, Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_CLUE_LENGTH } from "@/lib/clue-fairness";
 import type { ClueRequest } from "@/lib/clue-request-types";
-import { type RespondResult, useClueRequests } from "@/lib/use-clue-requests";
-import { useObservability } from "@/lib/use-observability";
-
-const TOAST_DURATION_MS = 30_000;
-const GLOBAL_TOAST_GAP_MS = 1_000;
+import type { RespondResult } from "@/lib/use-clue-requests";
 
 function reasonMessage(reason: string | null): string {
 	switch (reason) {
@@ -24,21 +20,26 @@ function reasonMessage(reason: string | null): string {
 	}
 }
 
-// Inline composer rendered inside the request toast so a responder can reply
-// without leaving the game. Validation feedback (e.g. "too similar") surfaces
-// here rather than as a separate toast.
-function ClueResponder({
+// Inline composer for replying to a peer's clue request. Shared by the request
+// toast and the word list so a responder can help from either surface. Fairness
+// feedback (e.g. "too similar") surfaces inline rather than as a separate toast.
+export function ClueResponder({
 	request,
 	onRespond,
 	onDone,
 	onCapture,
+	intro,
+	initialText = "",
 }: {
 	request: ClueRequest;
 	onRespond: (requestId: string, text: string) => Promise<RespondResult>;
 	onDone: () => void;
-	onCapture: (event: string, props?: Record<string, unknown>) => void;
+	onCapture?: (event: string, props?: Record<string, unknown>) => void;
+	intro?: ReactNode;
+	// Prefilled composer text — e.g. the AI clue dropped in via the copy button.
+	initialText?: string;
 }) {
-	const [text, setText] = useState("");
+	const [text, setText] = useState(initialText);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +51,7 @@ function ClueResponder({
 		const result = await onRespond(request.id, trimmed);
 		setPending(false);
 		if (result.ok) {
-			onCapture("peer_clue_responded", {
+			onCapture?.("peer_clue_responded", {
 				word_id: request.wordId,
 				date_key: request.dateKey,
 			});
@@ -58,7 +59,7 @@ function ClueResponder({
 			onDone();
 			return;
 		}
-		onCapture("peer_clue_response_rejected", {
+		onCapture?.("peer_clue_response_rejected", {
 			word_id: request.wordId,
 			reason: result.reason ?? "unknown",
 		});
@@ -68,8 +69,12 @@ function ClueResponder({
 	return (
 		<div className="flex w-full flex-col gap-2">
 			<p className="text-sm font-medium">
-				{request.requesterName} demana ajuda amb una paraula de{" "}
-				{request.wordLength} lletres
+				{intro ?? (
+					<>
+						{request.requesterName} demana ajuda amb una paraula de{" "}
+						{request.wordLength} lletres
+					</>
+				)}
 			</p>
 			<Textarea
 				autoFocus
@@ -107,54 +112,4 @@ function ClueResponder({
 			</div>
 		</div>
 	);
-}
-
-export function ClueRequestToasts() {
-	const { subscribe, respondToClue, enabled } = useClueRequests();
-	const { captureEvent } = useObservability();
-	const nextEmitAtRef = useRef<number>(0);
-	const shownIdsRef = useRef<Set<string>>(new Set());
-
-	useEffect(() => {
-		if (!enabled) return;
-
-		const showRequestToast = (request: ClueRequest) => {
-			if (shownIdsRef.current.has(request.id)) return;
-			shownIdsRef.current.add(request.id);
-
-			const now = Date.now();
-			const wait = Math.max(0, nextEmitAtRef.current - now);
-			nextEmitAtRef.current = now + wait + GLOBAL_TOAST_GAP_MS;
-
-			window.setTimeout(() => {
-				captureEvent("peer_clue_request_received", {
-					word_id: request.wordId,
-					date_key: request.dateKey,
-				});
-				toast.custom(
-					(id) => (
-						<ClueResponder
-							request={request}
-							onRespond={respondToClue}
-							onDone={() => toast.dismiss(id)}
-							onCapture={captureEvent}
-						/>
-					),
-					{ duration: TOAST_DURATION_MS },
-				);
-			}, wait);
-		};
-
-		const unsubscribe = subscribe((event) => {
-			if (event.type === "request") {
-				showRequestToast(event.request);
-			}
-		});
-
-		return () => {
-			unsubscribe();
-		};
-	}, [enabled, subscribe, respondToClue, captureEvent]);
-
-	return null;
 }
