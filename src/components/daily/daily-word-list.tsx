@@ -1,4 +1,5 @@
 import {
+	Check,
 	CheckCircle2,
 	ClipboardCopy,
 	HelpingHand,
@@ -74,6 +75,27 @@ export function DailyWordList({
 	const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
 	const [prefillText, setPrefillText] = useState("");
 	const composerNonceRef = useRef(0);
+	// Names of askers this user has helped, kept per word so a confirmation stays
+	// on the row after the request itself is resolved and removed.
+	const [helpedNamesByWordId, setHelpedNamesByWordId] = useState<
+		Record<number, string>
+	>({});
+
+	const respondAndRecord = async (
+		request: ClueRequest,
+		requestId: string,
+		text: string,
+	): Promise<RespondResult> => {
+		if (!onRespondToClue) return { ok: false, reason: null };
+		const result = await onRespondToClue(requestId, text);
+		if (result.ok) {
+			setHelpedNamesByWordId((current) => ({
+				...current,
+				[request.wordId]: request.requesterName,
+			}));
+		}
+		return result;
+	};
 
 	const openComposer = (requestId: string, initial: string) => {
 		composerNonceRef.current += 1;
@@ -106,7 +128,9 @@ export function DailyWordList({
 						<ClueResponder
 							key={`${request.id}:${composerNonceRef.current}`}
 							request={request}
-							onRespond={onRespondToClue}
+							onRespond={(requestId, text) =>
+								respondAndRecord(request, requestId, text)
+							}
 							onDone={closeComposer}
 							intro={`Dóna una pista a ${request.requesterName}`}
 							initialText={prefillText}
@@ -126,6 +150,17 @@ export function DailyWordList({
 					),
 				)}
 			</div>
+		);
+	};
+
+	const renderHelpedConfirmation = (wordId: number) => {
+		const name = helpedNamesByWordId[wordId];
+		if (!name) return null;
+		return (
+			<span className="flex items-center gap-1.5 pl-7 text-sm font-ui text-primary">
+				<Check className="size-3.5 shrink-0" />
+				Has ajudat a {name}
+			</span>
 		);
 	};
 
@@ -198,6 +233,7 @@ export function DailyWordList({
 							</span>
 						) : null}
 						{renderIncomingRequests(slot.id)}
+						{renderHelpedConfirmation(slot.id)}
 						{canRequestHelp ? (
 							<div className="pl-7">
 								<Button
@@ -253,6 +289,7 @@ export function DailyWordList({
 							? renderClueLine(slot.id, foundClueText, "muted")
 							: null}
 						{renderIncomingRequests(slot.id)}
+						{renderHelpedConfirmation(slot.id)}
 					</div>
 				);
 			})}
