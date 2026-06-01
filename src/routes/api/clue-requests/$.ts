@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { validateClueText } from "@/lib/clue-fairness";
 import {
 	createClueRequest,
+	getClueInbox,
 	getClueRequest,
 	getPendingClueRequests,
 	hasActiveClueRequest,
@@ -286,16 +287,20 @@ function openSseStream(dateKey: string, userId: string): Response {
 			};
 
 			try {
-				const pending = await getPendingClueRequests(dateKey);
-				// Don't echo the viewer's own open requests back as actionable.
+				const [pending, responses] = await Promise.all([
+					getPendingClueRequests(dateKey),
+					getClueInbox(userId, dateKey),
+				]);
+				// Don't echo the viewer's own open requests back as actionable; replay
+				// any clues already delivered to them so a missed live event recovers.
 				const requests = pending.filter((r) => r.requesterId !== userId);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, responses })}\n\n`,
 				);
 			} catch (error) {
 				console.warn("[clue-request:sse] initial snapshot failed", error);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests: [] })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests: [], responses: [] })}\n\n`,
 				);
 			}
 

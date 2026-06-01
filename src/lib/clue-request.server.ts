@@ -2,6 +2,7 @@ import {
 	type ClueRequest,
 	type ClueRequestStreamEvent,
 	type ClueResponse,
+	clueInboxKey,
 	clueRequestsChannel,
 	clueResponsesChannel,
 	pendingRequestsKey,
@@ -18,6 +19,8 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 const REQUEST_TTL_MS = 15 * 60 * 1000;
 // Whole-hash expiry, refreshed on each write, so abandoned puzzles get cleaned up.
 const HASH_TTL_SECONDS = 60 * 60;
+// How long a delivered clue stays in the asker's inbox (covers a full session).
+const INBOX_TTL_SECONDS = 24 * 60 * 60;
 
 type StoredRequest = {
 	request: ClueRequest;
@@ -187,14 +190,56 @@ export async function publishClueResponse(options: {
 		at: new Date().toISOString(),
 	};
 	const event: ClueRequestStreamEvent = { type: "response", response };
+	const inboxKey = clueInboxKey(
+		options.request.requesterId,
+		options.request.dateKey,
+	);
 
 	try {
+		// Persist first so the clue survives even if the live event is missed (SSE
+		// reconnect); the asker's snapshot replays the inbox on connect.
+		const pipeline = redis.pipeline();
+		pipeline.hset(inboxKey, String(response.wordId), JSON.stringify(response));
+		pipeline.expire(inboxKey, INBOX_TTL_SECONDS);
+		await pipeline.exec();
+
 		await redis.publish(
 			clueResponsesChannel(options.request.requesterId),
 			JSON.stringify(event),
 		);
 	} catch (error) {
 		console.warn("[clue-request] failed to publish response", error);
+	}
+}
+
+// Clues already delivered to a user for a puzzle, replayed in the SSE snapshot so
+// they show under the word regardless of whether the live event was received.
+export async function getClueInbox(
+	userId: string,
+	dateKey: string,
+): Promise<ClueResponse[]> {
+	if (!isRedisConfigured()) {
+		return [];
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return [];
+	}
+
+	try {
+		const entries = await redis.hgetall(clueInboxKey(userId, dateKey));
+		return Object.values(entries)
+			.map((raw) => {
+				try {
+					return JSON.parse(raw) as ClueResponse;
+				} catch {
+					return null;
+				}
+			})
+			.filter((response): response is ClueResponse => response !== null);
+	} catch (error) {
+		console.warn("[clue-request] failed to read inbox", error);
+		return [];
 	}
 }
 
