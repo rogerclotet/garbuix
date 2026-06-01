@@ -48,3 +48,9 @@ export function pendingRequestsKey(dateKey: string): string {
 
 // DOM id of the word list section, so the header help badge can scroll to it.
 export const WORD_LIST_SECTION_ID = "word-list-section";
+
+// DOM id of a single word row, so the help badge can scroll straight to the
+// requested word (handling the word list's own inner scroll on desktop).
+export function wordRowId(wordId: number): string {
+	return `word-row-${wordId}`;
+}

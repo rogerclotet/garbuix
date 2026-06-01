@@ -8,7 +8,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
-import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
+import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
@@ -29,17 +29,23 @@ export default function Header() {
 	).size;
 
 	const goToWordList = () => {
-		const scrollToWordList = () => {
-			document
-				.getElementById(WORD_LIST_SECTION_ID)
-				?.scrollIntoView({ behavior: "smooth", block: "start" });
+		// Scroll straight to the first requested word's row. scrollIntoView walks
+		// every scrollable ancestor, so it also moves the word list's own inner
+		// scroll on desktop — not just the page. Falls back to the section header.
+		const firstWordId = incomingRequests[0]?.wordId;
+		const scrollToTarget = () => {
+			const target =
+				(firstWordId != null
+					? document.getElementById(wordRowId(firstWordId))
+					: null) ?? document.getElementById(WORD_LIST_SECTION_ID);
+			target?.scrollIntoView({ behavior: "smooth", block: "center" });
 		};
 		if (pathname === "/") {
-			scrollToWordList();
+			scrollToTarget();
 			return;
 		}
 		void navigate({ to: "/" }).then(() => {
-			window.setTimeout(scrollToWordList, 150);
+			window.setTimeout(scrollToTarget, 150);
 		});
 	};
 

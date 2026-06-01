@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { ClueResponder } from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
 import type { ClueRequest } from "@/lib/clue-request-types";
+import { wordRowId } from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
 import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
@@ -172,7 +173,8 @@ export function DailyWordList({
 				return (
 					<div
 						key={slot.id}
-						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full ${
+						id={wordRowId(slot.id)}
+						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full scroll-mt-4 ${
 							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
 						}`}
 					>
@@ -230,7 +232,8 @@ export function DailyWordList({
 				return (
 					<div
 						key={slot.id}
-						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3"
+						id={wordRowId(slot.id)}
+						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3 scroll-mt-4"
 					>
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
