@@ -10,7 +10,6 @@ import {
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
-import { PEER_CLUES_FLAG } from "@/lib/feature-flags";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
@@ -34,7 +33,6 @@ import { formatGuess } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
-import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
@@ -128,7 +126,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
-	const peerCluesEnabled = useFeatureFlag(PEER_CLUES_FLAG);
 	// Circle is the default; a player can opt back into the grid via
 	// /preferencies. Initialise to the default so SSR markup is deterministic,
 	// then read the stored choice after mount.
@@ -880,7 +877,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// connected players for a clue about a specific unfound word.
 	const canRequestHelp =
 		Boolean(activeUser) &&
-		peerCluesEnabled &&
 		derivedProgress.hintsUsed >= 3 &&
 		derivedProgress.guessedWordIds.length < totalWords;
 
