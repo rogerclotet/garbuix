@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 //      .env (Vite reads it automatically). SSR-safe and deterministic.
 //   2. localStorage "ff:<key>" — runtime toggle, no restart needed. Accepts
 //      "1"/"true" (on) or "0"/"false" (off) and takes precedence over the env
-//      list. Example: localStorage.setItem("ff:ai-word-clues", "1").
+//      list. Example: localStorage.setItem("ff:circle-letters", "1").
 //
 // Both overrides are compiled out of production builds (import.meta.env.DEV).
 
