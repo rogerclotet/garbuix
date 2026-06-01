@@ -6,6 +6,9 @@ const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
 const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
 const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
+const VIBRATION_KEY = "paraules-vibration-v1";
+const LETTER_LAYOUT_KEY = "paraules-letter-layout-v1";
+const BONUS_CLUES_KEY = "paraules-bonus-clues-v1";
 
 export type AnonReportedProgress = {
 	wordsFound: number;
@@ -94,6 +97,106 @@ export function setSkipSharePreview(skip: boolean): void {
 		window.localStorage.setItem(SKIP_SHARE_PREVIEW_KEY, "1");
 	} else {
 		window.localStorage.removeItem(SKIP_SHARE_PREVIEW_KEY);
+	}
+}
+
+// Vibration uses a tri-state preference so we can honor the device's
+// reduced-motion setting when the user hasn't made an explicit choice:
+//   null  -> follow the device (reduced-motion implies no vibration)
+//   true  -> user explicitly enabled vibration
+//   false -> user explicitly disabled vibration
+export function getVibrationPreference(): boolean | null {
+	if (typeof window === "undefined") return null;
+	try {
+		const raw = window.localStorage.getItem(VIBRATION_KEY);
+		if (raw === "1") return true;
+		if (raw === "0") return false;
+	} catch {
+		// Storage can be unavailable (private mode, disabled cookies); fall
+		// back to following the device preference.
+	}
+	return null;
+}
+
+export function setVibrationPreference(enabled: boolean): void {
+	if (typeof window === "undefined") return;
+	try {
+		window.localStorage.setItem(VIBRATION_KEY, enabled ? "1" : "0");
+	} catch {
+		// Best-effort persistence; ignore storage failures.
+	}
+}
+
+function deviceWantsReducedMotion(): boolean {
+	if (
+		typeof window === "undefined" ||
+		typeof window.matchMedia !== "function"
+	) {
+		return false;
+	}
+	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+// Resolves the tri-state preference against the device's reduced-motion
+// setting to a concrete on/off used both by the haptics call site and the
+// preferences toggle's default value.
+export function isVibrationEnabled(): boolean {
+	const preference = getVibrationPreference();
+	if (preference !== null) return preference;
+	return !deviceWantsReducedMotion();
+}
+
+export type LetterLayout = "circle" | "grid";
+
+// Circle is the default letter layout; we only persist an explicit "grid"
+// opt-out so the absence of a stored value cleanly means "use the new default".
+export function getLetterLayout(): LetterLayout {
+	if (typeof window === "undefined") return "circle";
+	try {
+		if (window.localStorage.getItem(LETTER_LAYOUT_KEY) === "grid") {
+			return "grid";
+		}
+	} catch {
+		// Storage may be unavailable (private mode); fall back to the default.
+	}
+	return "circle";
+}
+
+export function setLetterLayout(layout: LetterLayout): void {
+	if (typeof window === "undefined") return;
+	try {
+		if (layout === "grid") {
+			window.localStorage.setItem(LETTER_LAYOUT_KEY, "grid");
+		} else {
+			window.localStorage.removeItem(LETTER_LAYOUT_KEY);
+		}
+	} catch {
+		// Best-effort persistence; ignore storage failures.
+	}
+}
+
+// Bonus clues are enabled by default; turning them off is the "hardcore" mode.
+// Absence of the key means enabled, so only the disabled state is persisted.
+export function getBonusCluesEnabled(): boolean {
+	if (typeof window === "undefined") return true;
+	try {
+		return window.localStorage.getItem(BONUS_CLUES_KEY) !== "0";
+	} catch {
+		// Storage can be unavailable (private mode, disabled cookies); default on.
+		return true;
+	}
+}
+
+export function setBonusCluesEnabled(enabled: boolean): void {
+	if (typeof window === "undefined") return;
+	try {
+		if (enabled) {
+			window.localStorage.removeItem(BONUS_CLUES_KEY);
+		} else {
+			window.localStorage.setItem(BONUS_CLUES_KEY, "0");
+		}
+	} catch {
+		// Best-effort persistence; ignore storage failures.
 	}
 }
 

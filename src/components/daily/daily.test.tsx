@@ -90,6 +90,7 @@ vi.mock("./use-daily-progress", () => ({
 			clueWordIds: [],
 			hintsUsed: 0,
 			guessCount: 0,
+			bonusWordsFound: 0,
 			shuffledLetters: ["c", "o", "s", "a"],
 			completedAt: null,
 			lastSyncedAt: null,
@@ -127,6 +128,25 @@ function installMatchMediaMock(matches = false) {
 			dispatchEvent: vi.fn(),
 			onchange: null,
 		})),
+	});
+}
+
+function installLocalStorageMock(initial: Record<string, string> = {}) {
+	const store = new Map<string, string>(Object.entries(initial));
+	Object.defineProperty(window, "localStorage", {
+		configurable: true,
+		value: {
+			getItem: (key: string) => store.get(key) ?? null,
+			setItem: (key: string, value: string) => {
+				store.set(key, value);
+			},
+			removeItem: (key: string) => {
+				store.delete(key);
+			},
+			clear: () => {
+				store.clear();
+			},
+		},
 	});
 }
 
@@ -373,5 +393,52 @@ describe("Daily submit feedback", () => {
 		expect(
 			document.querySelector('[data-slot="current-guess"]')?.textContent,
 		).toBe("c");
+	});
+
+	it("does not vibrate when the user has disabled vibration", async () => {
+		installLocalStorageMock({ "paraules-vibration-v1": "0" });
+		const vibrateMock = installVibrateMock();
+
+		renderDaily();
+
+		const letterButton = screen.getByRole("button", { name: "C" });
+		fireEvent.pointerUp(letterButton, {
+			button: 0,
+			pointerType: "touch",
+		});
+
+		expect(vibrateMock).not.toHaveBeenCalled();
+	});
+
+	it("does not vibrate when the device prefers reduced motion and no preference is set", async () => {
+		installMatchMediaMock(true);
+		installLocalStorageMock();
+		const vibrateMock = installVibrateMock();
+
+		renderDaily();
+
+		const letterButton = screen.getByRole("button", { name: "C" });
+		fireEvent.pointerUp(letterButton, {
+			button: 0,
+			pointerType: "touch",
+		});
+
+		expect(vibrateMock).not.toHaveBeenCalled();
+	});
+
+	it("vibrates when the user enabled vibration despite reduced motion", async () => {
+		installMatchMediaMock(true);
+		installLocalStorageMock({ "paraules-vibration-v1": "1" });
+		const vibrateMock = installVibrateMock();
+
+		renderDaily();
+
+		const letterButton = screen.getByRole("button", { name: "C" });
+		fireEvent.pointerUp(letterButton, {
+			button: 0,
+			pointerType: "touch",
+		});
+
+		expect(vibrateMock).toHaveBeenCalledWith(14);
 	});
 });

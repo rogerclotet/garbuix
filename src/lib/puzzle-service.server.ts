@@ -120,6 +120,7 @@ function serializeProgressRow(
 		clueWordIds: row.clueWordIds,
 		hintsUsed: row.hintsUsed,
 		guessCount: row.guessCount,
+		bonusWordsFound: row.bonusWordsFound,
 		shuffledLetters: row.shuffledLetters,
 		completedAt: row.completedAt?.toISOString() ?? null,
 		lastSyncedAt: row.lastSyncedAt.toISOString(),
@@ -147,6 +148,7 @@ function toPuzzleClientEvent(
 		case "guess_added":
 		case "hint_used":
 		case "text_hint_requested":
+		case "bonus_clue_revealed":
 		case "letters_shuffled":
 		case "progress_reset":
 			return {
@@ -507,6 +509,7 @@ export async function syncPuzzleEventsForUser(options: {
 			clueWordIds: nextProgress.clueWordIds,
 			hintsUsed: nextProgress.hintsUsed,
 			guessCount: nextProgress.guessCount,
+			bonusWordsFound: nextProgress.bonusWordsFound,
 			shuffledLetters: nextProgress.shuffledLetters,
 			completedAt: nextProgress.completedAt
 				? new Date(nextProgress.completedAt)
@@ -523,6 +526,7 @@ export async function syncPuzzleEventsForUser(options: {
 				clueWordIds: nextProgress.clueWordIds,
 				hintsUsed: nextProgress.hintsUsed,
 				guessCount: nextProgress.guessCount,
+				bonusWordsFound: nextProgress.bonusWordsFound,
 				shuffledLetters: nextProgress.shuffledLetters,
 				completedAt: nextProgress.completedAt
 					? new Date(nextProgress.completedAt)
@@ -761,6 +765,7 @@ export async function importAnonymousProgressForUser(options: {
 				hintedCells: merged.hintedCells,
 				hintsUsed: merged.hintsUsed,
 				guessCount: merged.guessCount,
+				bonusWordsFound: merged.bonusWordsFound,
 				shuffledLetters: merged.shuffledLetters,
 				completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
 				lastSyncedAt: new Date(),
@@ -774,6 +779,7 @@ export async function importAnonymousProgressForUser(options: {
 					hintedCells: merged.hintedCells,
 					hintsUsed: merged.hintsUsed,
 					guessCount: merged.guessCount,
+					bonusWordsFound: merged.bonusWordsFound,
 					shuffledLetters: merged.shuffledLetters,
 					completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
 					lastSyncedAt: new Date(),

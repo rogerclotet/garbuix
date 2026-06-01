@@ -4,9 +4,31 @@ import {
 	getDisplayedSlotWord,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
+	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
 } from "./daily-helpers";
+
+function buildHintPuzzle(hintCellKeys: string[]) {
+	return {
+		id: "puzzle-1",
+		dateKey: "2026-03-10",
+		seed: 123,
+		algorithmVersion: "1",
+		rows: 1,
+		cols: hintCellKeys.length,
+		gridMask: [],
+		letters: [],
+		initialShuffledLetters: [],
+		validNormalizedGuesses: [],
+		wordSlots: [],
+		hintCapsules: hintCellKeys.map((cellKey, index) => ({
+			cellKey,
+			hintSalt: `salt-${index}`,
+			hintCapsule: `capsule-${index}`,
+		})),
+	};
+}
 
 describe("getGuessKeyboardAction", () => {
 	it("maps typed letters to the available puzzle letters", () => {
@@ -98,6 +120,25 @@ describe("getNextHintCellKey", () => {
 				new Set(["0,0", "0,1"]),
 			),
 		).toBeNull();
+	});
+});
+
+describe("getRandomHintCellKey", () => {
+	it("only ever returns an unrevealed capsule cell", () => {
+		const puzzle = buildHintPuzzle(["0,0", "0,1", "0,2", "0,3"]);
+		const revealed = new Set(["0,0", "0,2"]);
+
+		for (let attempt = 0; attempt < 50; attempt += 1) {
+			const cellKey = getRandomHintCellKey(puzzle, revealed);
+			expect(["0,1", "0,3"]).toContain(cellKey);
+		}
+	});
+
+	it("returns null when every capsule cell is already revealed", () => {
+		const puzzle = buildHintPuzzle(["0,0", "0,1"]);
+
+		expect(getRandomHintCellKey(puzzle, new Set(["0,0", "0,1"]))).toBeNull();
+		expect(getRandomHintCellKey(buildHintPuzzle([]), new Set())).toBeNull();
 	});
 });
 
