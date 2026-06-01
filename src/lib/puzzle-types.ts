@@ -79,6 +79,9 @@ export type PuzzleProgressState = {
 	clueWordIds: number[];
 	hintsUsed: number;
 	guessCount: number;
+	// Valid dictionary words the player found that aren't part of the puzzle.
+	// Every 10th such word grants a free bonus clue (see bonus_clue_revealed).
+	bonusWordsFound: number;
 	shuffledLetters: string[];
 	completedAt: string | null;
 	lastSyncedAt: string | null;
@@ -92,6 +95,10 @@ export type GuessAddedEvent = {
 		guessHash: string;
 		matchedWordId: number | null;
 		unlockToken: string | null;
+		// True when the guess is a valid dictionary word that isn't in the puzzle.
+		// Drives the bonusWordsFound counter. Optional for backward compatibility
+		// with events recorded before the bonus-clue feature existed.
+		validNotInPuzzle?: boolean;
 	};
 };
 
@@ -123,6 +130,15 @@ export type TextHintFallbackEvent = {
 	};
 };
 
+export type BonusClueRevealedEvent = {
+	id: string;
+	at: string;
+	type: "bonus_clue_revealed";
+	payload: {
+		cellKey: string;
+	};
+};
+
 export type LettersShuffledEvent = {
 	id: string;
 	at: string;
@@ -144,6 +160,7 @@ export type PuzzleClientEvent =
 	| HintUsedEvent
 	| TextHintRequestedEvent
 	| TextHintFallbackEvent
+	| BonusClueRevealedEvent
 	| LettersShuffledEvent
 	| ProgressResetEvent;
 

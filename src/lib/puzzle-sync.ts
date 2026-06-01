@@ -24,6 +24,7 @@ function createEmptyEventTypeCounts(): EventTypeCounts {
 		hint_used: 0,
 		text_hint_requested: 0,
 		text_hint_fallback: 0,
+		bonus_clue_revealed: 0,
 		letters_shuffled: 0,
 		progress_reset: 0,
 	};

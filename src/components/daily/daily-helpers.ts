@@ -94,6 +94,24 @@ export function getNextHintCellKey(
 	);
 }
 
+// Picks a uniformly random not-yet-revealed hint-capsule cell for the bonus
+// clue earned every 10 valid off-puzzle words. Only capsule cells are eligible
+// so the revealed letter can be decoded. Returns null when none remain.
+export function getRandomHintCellKey(
+	puzzle: DailyPuzzlePublic,
+	revealedCells: Set<string>,
+) {
+	const candidates = puzzle.hintCapsules.filter(
+		(capsule) => !revealedCells.has(capsule.cellKey),
+	);
+	if (candidates.length === 0) {
+		return null;
+	}
+
+	const choice = candidates[Math.floor(Math.random() * candidates.length)];
+	return choice?.cellKey ?? null;
+}
+
 // Deterministic hint cell for a word slot, used as the silent fallback when a
 // word's AI clue is unavailable. Only hint-capsule cells decode into letters.
 // Prefer a cell owned solely by this slot: a cell shared with a crossing word may

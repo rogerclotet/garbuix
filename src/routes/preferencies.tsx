@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+	getBonusCluesEnabled,
 	getLeaderboardOptOut,
 	getLetterLayout,
 	getSkipSharePreview,
 	isVibrationEnabled,
 	type LetterLayout,
+	setBonusCluesEnabled,
 	setLeaderboardOptOut,
 	setLetterLayout,
 	setSkipSharePreview,
@@ -92,12 +94,14 @@ function PreferencesPage() {
 	const sharePreviewToggleId = useId();
 	const vibrationToggleId = useId();
 	const letterLayoutGroupId = useId();
+	const bonusCluesToggleId = useId();
 	const themeSelectId = useId();
 	const { theme, setTheme } = useTheme();
 	const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
 	const [showSharePreview, setShowSharePreview] = useState(true);
 	const [vibrationEnabled, setVibrationEnabled] = useState(true);
 	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>("circle");
+	const [bonusCluesEnabled, setBonusCluesEnabledState] = useState(true);
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
@@ -105,6 +109,7 @@ function PreferencesPage() {
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
 		setLetterLayoutState(getLetterLayout());
+		setBonusCluesEnabledState(getBonusCluesEnabled());
 		setMounted(true);
 	}, []);
 
@@ -130,6 +135,12 @@ function PreferencesPage() {
 		setLetterLayoutState(next);
 		setLetterLayout(next);
 		captureEvent("letter_layout_changed", { layout: next });
+	};
+
+	const handleToggleBonusClues = (next: boolean) => {
+		setBonusCluesEnabledState(next);
+		setBonusCluesEnabled(next);
+		captureEvent("bonus_clues_toggled", { enabled: next });
 	};
 
 	const handleThemeChange = (next: string) => {
@@ -271,6 +282,24 @@ function PreferencesPage() {
 						})}
 					</fieldset>
 				</div>
+				<label
+					htmlFor={bonusCluesToggleId}
+					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
+				>
+					<div className="space-y-1">
+						<div className="font-medium">Pistes per paraules extra</div>
+						<p className="text-sm text-muted-foreground font-ui">
+							Cada 10 paraules vàlides que no siguin del trencaclosques, et
+							revelem una lletra a l'atzar. Desactiva-ho per a una experiència
+							més difícil.
+						</p>
+					</div>
+					<Switch
+						id={bonusCluesToggleId}
+						checked={bonusCluesEnabled}
+						onCheckedChange={handleToggleBonusClues}
+					/>
+				</label>
 			</section>
 		</div>
 	);

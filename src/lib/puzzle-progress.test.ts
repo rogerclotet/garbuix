@@ -282,4 +282,132 @@ describe("puzzle-progress", () => {
 		expect(next.guessHashes).toEqual(["guess-1", "guess-2"]);
 		expect(next.shuffledLetters).toEqual(["c", "a", "b"]);
 	});
+
+	it("counts only fresh valid off-puzzle words as bonus words", () => {
+		const initial = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+
+		const bonus = applyPuzzleEvent(
+			initial,
+			{
+				id: "1",
+				at: "2026-03-10T10:00:00.000Z",
+				type: "guess_added",
+				payload: {
+					guessHash: "off-1",
+					matchedWordId: null,
+					unlockToken: null,
+					validNotInPuzzle: true,
+				},
+			},
+			3,
+		);
+		expect(bonus.bonusWordsFound).toBe(1);
+
+		// Repeat of the same hash is ignored (no double count).
+		const repeated = applyPuzzleEvent(
+			bonus,
+			{
+				id: "2",
+				at: "2026-03-10T10:01:00.000Z",
+				type: "guess_added",
+				payload: {
+					guessHash: "off-1",
+					matchedWordId: null,
+					unlockToken: null,
+					validNotInPuzzle: true,
+				},
+			},
+			3,
+		);
+		expect(repeated.bonusWordsFound).toBe(1);
+
+		// A puzzle word and a flagless (legacy) guess never count as bonus words.
+		const puzzleWord = applyPuzzleEvent(
+			repeated,
+			{
+				id: "3",
+				at: "2026-03-10T10:02:00.000Z",
+				type: "guess_added",
+				payload: { guessHash: "hit", matchedWordId: 0, unlockToken: "u" },
+			},
+			3,
+		);
+		const legacyGuess = applyPuzzleEvent(
+			puzzleWord,
+			{
+				id: "4",
+				at: "2026-03-10T10:03:00.000Z",
+				type: "guess_added",
+				payload: {
+					guessHash: "legacy",
+					matchedWordId: null,
+					unlockToken: null,
+				},
+			},
+			3,
+		);
+		expect(legacyGuess.bonusWordsFound).toBe(1);
+	});
+
+	it("reveals a bonus cell without spending the hint budget", () => {
+		const initial = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+
+		const revealed = applyPuzzleEvent(
+			initial,
+			{
+				id: "bonus-1",
+				at: "2026-03-10T10:00:00.000Z",
+				type: "bonus_clue_revealed",
+				payload: { cellKey: "1,2" },
+			},
+			3,
+		);
+		expect(revealed.hintedCells).toEqual(["1,2"]);
+		expect(revealed.hintsUsed).toBe(0);
+
+		// Idempotent on cellKey so replays don't reveal extra letters.
+		const again = applyPuzzleEvent(
+			revealed,
+			{
+				id: "bonus-2",
+				at: "2026-03-10T10:01:00.000Z",
+				type: "bonus_clue_revealed",
+				payload: { cellKey: "1,2" },
+			},
+			3,
+		);
+		expect(again).toEqual(revealed);
+	});
+
+	it("resets the bonus counter and keeps the larger value when merging", () => {
+		const base = createEmptyProgressState({
+			id: "puzzle-1",
+			initialShuffledLetters: ["a", "b", "c"],
+		});
+		const counted = { ...base, bonusWordsFound: 7 };
+
+		const reset = applyPuzzleEvent(
+			counted,
+			{
+				id: "reset",
+				at: "2026-03-10T10:10:00.000Z",
+				type: "progress_reset",
+				payload: {},
+			},
+			3,
+		);
+		expect(reset.bonusWordsFound).toBe(0);
+
+		const merged = mergeProgressStates(counted, {
+			...base,
+			bonusWordsFound: 3,
+		});
+		expect(merged.bonusWordsFound).toBe(7);
+	});
 });
