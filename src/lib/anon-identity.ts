@@ -7,6 +7,7 @@ const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
 const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
 const VIBRATION_KEY = "paraules-vibration-v1";
+const LETTER_LAYOUT_KEY = "paraules-letter-layout-v1";
 
 export type AnonReportedProgress = {
 	wordsFound: number;
@@ -142,6 +143,35 @@ export function isVibrationEnabled(): boolean {
 	const preference = getVibrationPreference();
 	if (preference !== null) return preference;
 	return !deviceWantsReducedMotion();
+}
+
+export type LetterLayout = "circle" | "grid";
+
+// Circle is the default letter layout; we only persist an explicit "grid"
+// opt-out so the absence of a stored value cleanly means "use the new default".
+export function getLetterLayout(): LetterLayout {
+	if (typeof window === "undefined") return "circle";
+	try {
+		if (window.localStorage.getItem(LETTER_LAYOUT_KEY) === "grid") {
+			return "grid";
+		}
+	} catch {
+		// Storage may be unavailable (private mode); fall back to the default.
+	}
+	return "circle";
+}
+
+export function setLetterLayout(layout: LetterLayout): void {
+	if (typeof window === "undefined") return;
+	try {
+		if (layout === "grid") {
+			window.localStorage.setItem(LETTER_LAYOUT_KEY, "grid");
+		} else {
+			window.localStorage.removeItem(LETTER_LAYOUT_KEY);
+		}
+	} catch {
+		// Best-effort persistence; ignore storage failures.
+	}
 }
 
 export function getReportedAnonProgress(dateKey: string): AnonReportedProgress {
