@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+	getBonusCluesEnabled,
 	getLetterLayout,
 	getSkipSharePreview,
 	isVibrationEnabled,
@@ -43,6 +44,7 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getNextHintCellKey,
+	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	getWordCellKeys,
@@ -144,6 +146,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	>({});
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
+	// Bonus clues for valid off-puzzle words (default on; off = hardcore mode).
+	// Read from localStorage on mount, so SSR renders the default first.
+	const [bonusCluesEnabled, setBonusCluesEnabled] = useState(true);
 	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
 		() => initialData.historyEntries ?? [],
 	);
@@ -232,6 +237,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				window.clearTimeout(locateClearTimerRef.current);
 			}
 		};
+	}, []);
+
+	useEffect(() => {
+		setBonusCluesEnabled(getBonusCluesEnabled());
 	}, []);
 
 	useEffect(() => {
@@ -705,14 +714,41 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			result_kind: result.kind,
 		});
 
+		const isNewBonusWord =
+			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
+
 		if (!result.isRepeatGuess) {
 			applyLocalEvent(
 				createPuzzleEvent("guess_added", {
 					guessHash: result.guessHash,
 					matchedWordId: result.matchedSlotId,
 					unlockToken: result.unlockToken,
+					validNotInPuzzle: isNewBonusWord,
 				}),
 			);
+		}
+
+		// Every 10th valid off-puzzle word grants a free random letter reveal. The
+		// counter updates asynchronously via the event above, so we look one ahead.
+		if (isNewBonusWord && bonusCluesEnabled) {
+			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
+			if (nextBonusCount % 10 === 0) {
+				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
+				if (cellKey) {
+					applyLocalEvent(
+						createPuzzleEvent("bonus_clue_revealed", { cellKey }),
+					);
+					triggerHaptic(HAPTIC_SUCCESS_PATTERN);
+					captureEvent("bonus_clue_granted", {
+						bonus_words_found: nextBonusCount,
+						date_key: puzzle.dateKey,
+						puzzle_id: puzzle.id,
+					});
+					toast.success("Pista desbloquejada!", {
+						description: "Has trobat 10 paraules vàlides de fora del joc.",
+					});
+				}
+			}
 		}
 
 		if (result.kind === "new_word") {
@@ -740,10 +776,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		setCurrentGuess("");
 	}, [
 		applyLocalEvent,
+		bonusCluesEnabled,
 		captureEvent,
 		currentGuess,
 		derivedProgress,
 		puzzle,
+		revealedCells,
 		showSubmitFeedback,
 		totalWords,
 		triggerHaptic,
@@ -1126,40 +1164,77 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										(derivedProgress.guessedWordIds.length / totalWords) * 100,
 									),
 								);
+								// Bottom meter fills 0→10 toward the next bonus clue and
+								// resets each time one is earned; the label keeps the total.
+								const bonusCount = derivedProgress.bonusWordsFound;
+								const bonusInCycle = bonusCount % 10;
+								const bonusPercent = (bonusInCycle / 10) * 100;
+								const wordsToNextClue = 10 - bonusInCycle;
+								const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
 								return (
 									<div className="flex items-center gap-1.5">
-										<div
-											className="relative h-8 flex-1 overflow-hidden rounded-full bg-muted/40"
-											role="progressbar"
-											aria-valuenow={derivedProgress.guessedWordIds.length}
-											aria-valuemin={0}
-											aria-valuemax={totalWords}
-											aria-label="Paraules trobades"
-										>
+										<div className="flex flex-1 flex-col gap-1">
 											<div
-												className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
-												style={{ width: `${percent}%` }}
-											/>
-											<div className="relative flex h-full items-center justify-between gap-3 px-3 text-xs font-semibold font-ui">
-												<span className="flex items-baseline gap-1">
-													<span className="text-foreground tabular-nums text-sm">
-														{derivedProgress.guessedWordIds.length}
+												className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
+												role="progressbar"
+												aria-valuenow={derivedProgress.guessedWordIds.length}
+												aria-valuemin={0}
+												aria-valuemax={totalWords}
+												aria-label="Paraules trobades"
+											>
+												<div
+													className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
+													style={{ width: `${percent}%` }}
+												/>
+												<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+													<span className="flex items-baseline gap-1">
+														<span className="text-foreground tabular-nums text-xs">
+															{derivedProgress.guessedWordIds.length}
+														</span>
+														<span className="text-muted-foreground/50">/</span>
+														<span className="text-muted-foreground tabular-nums">
+															{totalWords}
+														</span>
+														<span className="ml-1 hidden text-muted-foreground sm:inline">
+															paraules
+														</span>
 													</span>
-													<span className="text-muted-foreground/50">/</span>
 													<span className="text-muted-foreground tabular-nums">
-														{totalWords}
+														{derivedProgress.guessCount}{" "}
+														{derivedProgress.guessCount === 1
+															? "intent"
+															: "intents"}
 													</span>
-													<span className="ml-1 hidden text-muted-foreground sm:inline">
-														paraules
-													</span>
-												</span>
-												<span className="text-muted-foreground tabular-nums">
-													{derivedProgress.guessCount}{" "}
-													{derivedProgress.guessCount === 1
-														? "intent"
-														: "intents"}
-												</span>
+												</div>
 											</div>
+											{bonusCluesEnabled ? (
+												<div
+													className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
+													role="progressbar"
+													aria-valuenow={bonusInCycle}
+													aria-valuemin={0}
+													aria-valuemax={10}
+													aria-label="Paraules vàlides de fora del joc"
+												>
+													<div
+														className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
+														style={{ width: `${bonusPercent}%` }}
+													/>
+													<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+														<span className="flex items-baseline gap-1">
+															<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
+																{bonusCount}
+															</span>
+															<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
+																paraules extra
+															</span>
+														</span>
+														<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
+															{wordsToNextClue} per a una pista
+														</span>
+													</div>
+												</div>
+											) : null}
 										</div>
 										<Button
 											variant="ghost"

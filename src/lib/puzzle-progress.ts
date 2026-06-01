@@ -16,6 +16,7 @@ export function createEmptyProgressState(
 		clueWordIds: [],
 		hintsUsed: 0,
 		guessCount: 0,
+		bonusWordsFound: 0,
 		shuffledLetters: [...puzzle.initialShuffledLetters],
 		completedAt: null,
 		lastSyncedAt: null,
@@ -80,6 +81,10 @@ export function pickPreferredProgressState(
 		return left.hintsUsed > right.hintsUsed ? left : right;
 	}
 
+	if (left.bonusWordsFound !== right.bonusWordsFound) {
+		return left.bonusWordsFound > right.bonusWordsFound ? left : right;
+	}
+
 	if (left.guessHashes.length !== right.guessHashes.length) {
 		return left.guessHashes.length > right.guessHashes.length ? left : right;
 	}
@@ -95,6 +100,7 @@ export function isSameProgressState(
 		left.puzzleId === right.puzzleId &&
 		left.guessCount === right.guessCount &&
 		left.hintsUsed === right.hintsUsed &&
+		left.bonusWordsFound === right.bonusWordsFound &&
 		left.completedAt === right.completedAt &&
 		JSON.stringify(left.guessHashes) === JSON.stringify(right.guessHashes) &&
 		JSON.stringify(left.guessedWordIds) ===
@@ -137,6 +143,10 @@ export function mergeProgressStates(
 			]),
 		),
 		hintsUsed: Math.max(existing?.hintsUsed ?? 0, incoming.hintsUsed),
+		bonusWordsFound: Math.max(
+			existing?.bonusWordsFound ?? 0,
+			incoming.bonusWordsFound,
+		),
 		guessCount: guessHashes.length,
 		shuffledLetters:
 			incoming.shuffledLetters.length > 0
@@ -178,12 +188,18 @@ export function applyPuzzleEvent(
 					? (state.completedAt ?? event.at)
 					: state.completedAt;
 
+			const bonusWordsFound =
+				event.payload.validNotInPuzzle && event.payload.matchedWordId == null
+					? state.bonusWordsFound + 1
+					: state.bonusWordsFound;
+
 			return {
 				...state,
 				guessHashes,
 				guessCount: guessHashes.length,
 				guessedWordIds,
 				revealedWordTokens,
+				bonusWordsFound,
 				completedAt: isComplete,
 			};
 		}
@@ -230,6 +246,19 @@ export function applyPuzzleEvent(
 				hintedCells: [...state.hintedCells, event.payload.cellKey],
 			};
 		}
+		case "bonus_clue_revealed": {
+			// Free letter reveal earned every 10 valid off-puzzle words. Adds the
+			// cell to hintedCells (so it decodes onto the grid) without touching the
+			// 3-hint budget. Idempotent on cellKey so replays never reveal extras.
+			if (state.hintedCells.includes(event.payload.cellKey)) {
+				return state;
+			}
+
+			return {
+				...state,
+				hintedCells: [...state.hintedCells, event.payload.cellKey],
+			};
+		}
 		case "letters_shuffled": {
 			return {
 				...state,
@@ -246,6 +275,7 @@ export function applyPuzzleEvent(
 				clueWordIds: [],
 				hintsUsed: 0,
 				guessCount: 0,
+				bonusWordsFound: 0,
 				completedAt: null,
 			};
 		}

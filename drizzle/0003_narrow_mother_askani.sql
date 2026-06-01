@@ -1,0 +1,1 @@
+ALTER TABLE "user_puzzle_progress" ADD COLUMN "bonus_words_found" integer DEFAULT 0 NOT NULL;
