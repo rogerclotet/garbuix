@@ -9,7 +9,7 @@ import {
 import { useRef, useState } from "react";
 import { ClueResponder } from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
-import type { ClueRequest } from "@/lib/clue-request-types";
+import type { ClueRequest, ClueResponse } from "@/lib/clue-request-types";
 import { wordRowId } from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
@@ -28,7 +28,7 @@ type DailyWordListProps = {
 	// help on a specific unfound word.
 	canRequestHelp?: boolean;
 	requestedHelpWordIds?: number[];
-	peerClueTextsByWordId?: Record<number, string>;
+	peerCluesByWordId?: Record<number, ClueResponse>;
 	onRequestHelp?: (wordId: number) => void;
 	// The other side: requests from other players this user can help with.
 	incomingRequests?: ClueRequest[];
@@ -46,7 +46,7 @@ export function DailyWordList({
 	onWordTap,
 	canRequestHelp = false,
 	requestedHelpWordIds = [],
-	peerClueTextsByWordId = {},
+	peerCluesByWordId = {},
 	onRequestHelp,
 	incomingRequests = [],
 	onRespondToClue,
@@ -199,11 +199,11 @@ export function DailyWordList({
 		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
-				const peerClueText = peerClueTextsByWordId[slot.id];
+				const peerClue = peerCluesByWordId[slot.id];
 				const hasIncoming = requestsByWordId.has(slot.id);
 				const isHighlighted =
-					cluedWordIds.has(slot.id) || Boolean(peerClueText) || hasIncoming;
-				const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClueText;
+					cluedWordIds.has(slot.id) || Boolean(peerClue) || hasIncoming;
+				const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClue;
 
 				return (
 					<div
@@ -227,9 +227,12 @@ export function DailyWordList({
 							</span>
 						</button>
 						{clueText ? renderClueLine(slot.id, clueText, "muted") : null}
-						{peerClueText ? (
-							<span className="block text-sm italic text-foreground pl-7 font-ui">
-								{peerClueText}
+						{peerClue ? (
+							<span className="block text-sm pl-7 font-ui">
+								<span className="italic text-foreground">{peerClue.text}</span>
+								<span className="ml-1.5 text-xs not-italic text-muted-foreground">
+									— {peerClue.responderName}
+								</span>
 							</span>
 						) : null}
 						{renderIncomingRequests(slot.id)}

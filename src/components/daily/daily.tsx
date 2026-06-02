@@ -145,15 +145,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
 		[],
 	);
-	// Clue texts delivered by other players, keyed by word id. Sourced from the
+	// Clues delivered by other players, keyed by word id. Sourced from the
 	// provider so they persist across SSE reconnects (replayed in the snapshot).
-	const peerClueTextsByWordId = useMemo(() => {
-		const map: Record<number, string> = {};
-		for (const [wordId, response] of Object.entries(receivedClues)) {
-			map[Number(wordId)] = response.text;
-		}
-		return map;
-	}, [receivedClues]);
+	// Each response carries the responder's name so we can attribute the clue.
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
 	// Bonus clues for valid off-puzzle words (default on; off = hardcore mode).
@@ -1337,7 +1331,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									onWordTap={handleLocateWord}
 									canRequestHelp={canRequestHelp}
 									requestedHelpWordIds={requestedHelpWordIds}
-									peerClueTextsByWordId={peerClueTextsByWordId}
+									peerCluesByWordId={receivedClues}
 									onRequestHelp={handleRequestHelp}
 									incomingRequests={incomingRequests}
 									onRespondToClue={respondToClue}
