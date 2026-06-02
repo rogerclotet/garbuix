@@ -61,6 +61,11 @@ services:
       - app_node_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
 
+  # The clue pre-generator calls the Anthropic API; keep it off by default in
+  # local dev. It stays profile-less in compose.yml, so production still runs it.
+  pre-generator:
+    profiles: ["scheduler"]
+
   backfill:
     build:
       context: .
