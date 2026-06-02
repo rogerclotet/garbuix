@@ -268,10 +268,10 @@ export function DailyControls({
 						espai.
 					</p>
 				</div>
-				<div className="p-6 lg:px-0 lg:pt-4">
-					<div className="flex flex-col items-center gap-4 lg:gap-6">
-						<div className="relative h-10 sm:h-12 w-full overflow-hidden border-b-2 border-primary/60">
-							<div className="absolute inset-0 flex items-center justify-center text-center text-2xl font-bold tracking-widest uppercase sm:text-3xl">
+				<div className="p-2 lg:px-0 lg:pt-2">
+					<div className="flex flex-col items-center gap-3 lg:gap-6">
+						<div className="relative h-9 sm:h-12 w-full overflow-hidden border-b-2 border-primary/60">
+							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
 								<span data-slot="current-guess">{currentGuess}</span>
 								{submitFeedback ? (
 									<span
