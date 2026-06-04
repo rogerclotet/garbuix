@@ -38,6 +38,9 @@ function sortEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
 		if (b.wordsFound !== a.wordsFound) {
 			return b.wordsFound - a.wordsFound;
 		}
+		if (a.clueCount !== b.clueCount) {
+			return a.clueCount - b.clueCount; // fewer clues ranks higher
+		}
 		const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : null;
 		const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : null;
 		if (aCompleted && bCompleted) return aCompleted - bCompleted;

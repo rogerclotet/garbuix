@@ -11,6 +11,7 @@ import {
 	userPuzzleProgress,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { getClueInbox } from "@/lib/clue-request.server";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
@@ -206,6 +207,8 @@ async function publishLeaderboardForUser(input: {
 	userId: string;
 	wordsFound: number;
 	totalWords: number;
+	freeCluesUsed: number;
+	tryCount: number;
 	completedAt: string | null;
 	previousWordsFound: number;
 	previousCompletedAt: string | null;
@@ -219,6 +222,11 @@ async function publishLeaderboardForUser(input: {
 		const profile = profiles[0];
 		if (!profile) return;
 
+		// Total clues = the free clues spent plus every clue a friend delivered
+		// (one inbox entry per word).
+		const friendClues = (await getClueInbox(input.userId, input.dateKey))
+			.length;
+
 		await recordLeaderboardProgress({
 			dateKey: input.dateKey,
 			participantId: userParticipantId(input.userId),
@@ -227,6 +235,8 @@ async function publishLeaderboardForUser(input: {
 			image: profile.image ?? null,
 			wordsFound: input.wordsFound,
 			totalWords: input.totalWords,
+			clueCount: input.freeCluesUsed + friendClues,
+			tryCount: input.tryCount,
 			completedAt: input.completedAt,
 			previousWordsFound: input.previousWordsFound,
 			previousCompletedAt: input.previousCompletedAt,
@@ -555,6 +565,8 @@ export async function syncPuzzleEventsForUser(options: {
 			userId,
 			wordsFound: nextProgress.guessedWordIds.length,
 			totalWords: privateSnapshot.wordSlots.length,
+			freeCluesUsed: nextProgress.hintsUsed,
+			tryCount: nextProgress.guessCount,
 			completedAt: nextCompletedAt,
 			previousWordsFound,
 			previousCompletedAt,
