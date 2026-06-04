@@ -72,6 +72,10 @@ export function LeaderboardRow({
 					{entry.wordsFound}
 					<span className="text-muted-foreground"> / {entry.totalWords}</span>
 				</div>
+				<div className="text-muted-foreground text-xs tabular-nums">
+					{entry.clueCount} {entry.clueCount === 1 ? "pista" : "pistes"} ·{" "}
+					{entry.tryCount} {entry.tryCount === 1 ? "intent" : "intents"}
+				</div>
 			</div>
 		</li>
 	);

@@ -12,17 +12,30 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 export { anonParticipantId, userParticipantId };
 
 const TTL_SECONDS = 60 * 60 * 48;
-const WORDS_FOUND_MULTIPLIER = 1e13;
-const COMPLETION_HORIZON_MS = 1e13;
+// Ranking tiers, highest priority first, packed into a single sorted-set score:
+//   1. words found  — each worth far more than any clue or time delta
+//   2. clues used   — fewer is better, so each clue subtracts a fixed amount
+//   3. completion    — earlier finishers edge ahead, as a sub-1 tiebreak
+// Tries are intentionally absent: they never affect the score.
+const WORDS_FOUND_MULTIPLIER = 1e12;
+const CLUE_PENALTY = 1e6;
+const COMPLETION_HORIZON_MS = 1e14;
 
-function scoreFor(wordsFound: number, completedAt: string | null): number {
-	const wordsComponent = wordsFound * WORDS_FOUND_MULTIPLIER;
+function scoreFor(
+	wordsFound: number,
+	clueCount: number,
+	completedAt: string | null,
+): number {
+	const base = wordsFound * WORDS_FOUND_MULTIPLIER - clueCount * CLUE_PENALTY;
 	if (!completedAt) {
-		return wordsComponent;
+		return base;
 	}
-	const completionMs = new Date(completedAt).getTime();
-	const completionComponent = Math.max(0, COMPLETION_HORIZON_MS - completionMs);
-	return wordsComponent + completionComponent;
+	// Stays in [0, 1) so it only breaks ties between equal words and clues.
+	const completionComponent = Math.max(
+		0,
+		1 - new Date(completedAt).getTime() / COMPLETION_HORIZON_MS,
+	);
+	return base + completionComponent;
 }
 
 function scoresKey(dateKey: string): string {
@@ -45,6 +58,8 @@ type RecordProgressInput = {
 	image: string | null;
 	wordsFound: number;
 	totalWords: number;
+	clueCount: number;
+	tryCount: number;
 	completedAt: string | null;
 	previousWordsFound?: number;
 	previousCompletedAt?: string | null;
@@ -74,7 +89,7 @@ export async function recordProgress(
 	}
 
 	const updatedAt = new Date().toISOString();
-	const score = scoreFor(input.wordsFound, input.completedAt);
+	const score = scoreFor(input.wordsFound, input.clueCount, input.completedAt);
 
 	const entry: LeaderboardEntry = {
 		participantId: input.participantId,
@@ -83,6 +98,8 @@ export async function recordProgress(
 		image: input.image,
 		wordsFound: input.wordsFound,
 		totalWords: input.totalWords,
+		clueCount: input.clueCount,
+		tryCount: input.tryCount,
 		completedAt: input.completedAt,
 		updatedAt,
 	};
@@ -97,6 +114,8 @@ export async function recordProgress(
 		image: entry.image ?? "",
 		wordsFound: String(entry.wordsFound),
 		totalWords: String(entry.totalWords),
+		clueCount: String(entry.clueCount),
+		tryCount: String(entry.tryCount),
 		completedAt: entry.completedAt ?? "",
 		updatedAt: entry.updatedAt,
 	});
@@ -145,6 +164,8 @@ function parseMeta(
 	}
 	const wordsFound = Number.parseInt(hash.wordsFound ?? "0", 10);
 	const totalWords = Number.parseInt(hash.totalWords ?? "0", 10);
+	const clueCount = Number.parseInt(hash.clueCount ?? "0", 10);
+	const tryCount = Number.parseInt(hash.tryCount ?? "0", 10);
 	return {
 		participantId,
 		kind,
@@ -152,6 +173,8 @@ function parseMeta(
 		image: hash.image && hash.image.length > 0 ? hash.image : null,
 		wordsFound: Number.isFinite(wordsFound) ? wordsFound : 0,
 		totalWords: Number.isFinite(totalWords) ? totalWords : 0,
+		clueCount: Number.isFinite(clueCount) ? clueCount : 0,
+		tryCount: Number.isFinite(tryCount) ? tryCount : 0,
 		completedAt:
 			hash.completedAt && hash.completedAt.length > 0 ? hash.completedAt : null,
 		updatedAt: hash.updatedAt ?? new Date(0).toISOString(),
@@ -245,7 +268,11 @@ export async function renameAnonToUser(options: {
 			image: options.image,
 		};
 
-		const score = scoreFor(updated.wordsFound, updated.completedAt);
+		const score = scoreFor(
+			updated.wordsFound,
+			updated.clueCount,
+			updated.completedAt,
+		);
 		const pipeline = redis.pipeline();
 		pipeline.del(fromMeta);
 		pipeline.zrem(scoresKey(options.dateKey), fromId);
@@ -255,6 +282,8 @@ export async function renameAnonToUser(options: {
 			image: updated.image ?? "",
 			wordsFound: String(updated.wordsFound),
 			totalWords: String(updated.totalWords),
+			clueCount: String(updated.clueCount),
+			tryCount: String(updated.tryCount),
 			completedAt: updated.completedAt ?? "",
 			updatedAt: new Date().toISOString(),
 		});

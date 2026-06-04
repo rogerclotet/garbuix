@@ -29,6 +29,8 @@ async function backfillDay(dateKey: string): Promise<number> {
 		.select({
 			userId: userPuzzleProgress.userId,
 			guessedWordIds: userPuzzleProgress.guessedWordIds,
+			hintsUsed: userPuzzleProgress.hintsUsed,
+			guessCount: userPuzzleProgress.guessCount,
 			completedAt: userPuzzleProgress.completedAt,
 			name: user.name,
 			image: user.image,
@@ -50,6 +52,10 @@ async function backfillDay(dateKey: string): Promise<number> {
 			image: row.image ?? null,
 			wordsFound,
 			totalWords,
+			// Friend clues live only in Redis and may have expired by backfill
+			// time, so seed with the durable free-clue count from the DB.
+			clueCount: row.hintsUsed,
+			tryCount: row.guessCount,
 			completedAt: row.completedAt?.toISOString() ?? null,
 			previousWordsFound: wordsFound,
 			previousCompletedAt: row.completedAt?.toISOString() ?? null,

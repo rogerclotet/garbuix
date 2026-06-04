@@ -593,6 +593,10 @@ export function useDailyProgress({
 				name: identity.name,
 				wordsFound,
 				totalWords,
+				// Anon players can't use the friend-clue system, so their clue
+				// count is just the free clues they've spent.
+				clueCount: derivedProgress.hintsUsed,
+				tryCount: derivedProgress.guessCount,
 				completedAt,
 				previousWordsFound,
 				previousCompletedAt,
@@ -604,6 +608,8 @@ export function useDailyProgress({
 		activeUser,
 		derivedProgress.guessedWordIds.length,
 		derivedProgress.completedAt,
+		derivedProgress.hintsUsed,
+		derivedProgress.guessCount,
 		puzzle.dateKey,
 		totalWords,
 	]);

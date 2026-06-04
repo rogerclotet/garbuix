@@ -7,6 +7,11 @@ export type LeaderboardEntry = {
 	image: string | null;
 	wordsFound: number;
 	totalWords: number;
+	// Clues used while solving: the 3 free clues plus any a friend gave. Fewer
+	// ranks higher on the leaderboard.
+	clueCount: number;
+	// Total guesses made. Shown for context but never affects ranking.
+	tryCount: number;
 	completedAt: string | null;
 	updatedAt: string;
 };
