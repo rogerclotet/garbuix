@@ -608,6 +608,8 @@ export function useDailyProgress({
 		activeUser,
 		derivedProgress.guessedWordIds.length,
 		derivedProgress.completedAt,
+		derivedProgress.hintsUsed,
+		derivedProgress.guessCount,
 		puzzle.dateKey,
 		totalWords,
 	]);

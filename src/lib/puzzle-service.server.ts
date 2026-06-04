@@ -11,8 +11,8 @@ import {
 	userPuzzleProgress,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import { getClueInbox } from "@/lib/clue-request.server";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
+import { getClueInbox } from "@/lib/clue-request.server";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import {
