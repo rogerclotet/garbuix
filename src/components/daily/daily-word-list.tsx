@@ -58,11 +58,17 @@ export function DailyWordList({
 	);
 	const cluedWordIds = new Set(clueWordIds);
 	const requestedHelp = new Set(requestedHelpWordIds);
+	const foundWordIds = new Set(guessedWordIds);
 
 	const requestsByWordId = new Map<number, ClueRequest[]>();
 	for (const request of incomingRequests) {
+		// You can only give a useful clue for a word you've found yourself, so
+		// don't surface help requests for words still unsolved on your board.
+		if (!foundWordIds.has(request.wordId)) continue;
 		const existing = requestsByWordId.get(request.wordId);
 		if (existing) {
+			// One row per asker: skip a friend already listed for this word.
+			if (existing.some((r) => r.requesterId === request.requesterId)) continue;
 			existing.push(request);
 		} else {
 			requestsByWordId.set(request.wordId, [request]);
@@ -235,8 +241,6 @@ export function DailyWordList({
 								</span>
 							</span>
 						) : null}
-						{renderIncomingRequests(slot.id)}
-						{renderHelpedConfirmation(slot.id)}
 						{canRequestHelp ? (
 							<div className="pl-7">
 								<Button
