@@ -29,6 +29,10 @@ type ClueRequestsContextValue = {
 	requestClue(wordId: number): Promise<boolean>;
 	respondToClue(requestId: string, text: string): Promise<RespondResult>;
 	resolveClue(wordId: number): Promise<void>;
+	// The puzzle page publishes which words this user has solved. Requests for
+	// unsolved words are filtered out of incomingRequests everywhere (badge +
+	// list), since you can't give a useful clue for a word you haven't found.
+	publishSolvedWordIds(wordIds: number[]): void;
 };
 
 const noop = () => {};
@@ -43,6 +47,7 @@ const defaultValue: ClueRequestsContextValue = {
 	requestClue: async () => false,
 	respondToClue: async () => ({ ok: false, reason: null }),
 	resolveClue: async () => {},
+	publishSolvedWordIds: noop,
 };
 
 const ClueRequestsContext =
@@ -67,6 +72,10 @@ export function ClueRequestsProvider({
 	// Requests this user has already answered, hidden from the badge/list so the
 	// count reflects only outstanding requests they could still help with.
 	const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
+	// Words this user has solved, published by the puzzle page. Used to hide
+	// requests for words still unsolved on their own board.
+	const [solvedWordIds, setSolvedWordIds] = useState<number[]>([]);
+	const solvedWordIdsRef = useRef<number[]>([]);
 	const [status, setStatus] = useState<ClueRequestsStatus>("idle");
 	const listenersRef = useRef<Set<(event: ClueRequestStreamEvent) => void>>(
 		new Set(),
@@ -265,10 +274,27 @@ export function ClueRequestsProvider({
 		[dateKey],
 	);
 
-	const visibleRequests = useMemo(
-		() => incomingRequests.filter((r) => !respondedRequestIds.includes(r.id)),
-		[incomingRequests, respondedRequestIds],
-	);
+	// Stable identity unless the actual set of solved words changes, so the puzzle
+	// page can hand us a fresh array every render without churning consumers.
+	const publishSolvedWordIds = useCallback((wordIds: number[]) => {
+		const sorted = [...wordIds].sort((a, b) => a - b);
+		const prev = solvedWordIdsRef.current;
+		if (
+			prev.length === sorted.length &&
+			prev.every((id, i) => id === sorted[i])
+		) {
+			return;
+		}
+		solvedWordIdsRef.current = sorted;
+		setSolvedWordIds(sorted);
+	}, []);
+
+	const visibleRequests = useMemo(() => {
+		const solved = new Set(solvedWordIds);
+		return incomingRequests.filter(
+			(r) => !respondedRequestIds.includes(r.id) && solved.has(r.wordId),
+		);
+	}, [incomingRequests, respondedRequestIds, solvedWordIds]);
 
 	const value = useMemo<ClueRequestsContextValue>(
 		() => ({
@@ -281,6 +307,7 @@ export function ClueRequestsProvider({
 			requestClue,
 			respondToClue,
 			resolveClue,
+			publishSolvedWordIds,
 		}),
 		[
 			dateKey,
@@ -292,6 +319,7 @@ export function ClueRequestsProvider({
 			requestClue,
 			respondToClue,
 			resolveClue,
+			publishSolvedWordIds,
 		],
 	);
 
