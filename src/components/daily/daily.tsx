@@ -140,6 +140,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		incomingRequests,
 		respondToClue,
 		receivedClues,
+		publishSolvedWordIds,
 	} = useClueRequests();
 	// Word ids the player has asked other players for help with (awaiting a reply).
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
@@ -538,6 +539,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// Stable primitive key so the found-clue fetch refires only when the set of
 	// found words actually changes, not on every render.
 	const guessedWordIdsKey = derivedProgress.guessedWordIds.join(",");
+
+	// Tell the clue-requests context which words we've solved so it can hide
+	// incoming help requests (badge + list) for words we haven't found yet.
+	useEffect(() => {
+		const wordIds =
+			guessedWordIdsKey === "" ? [] : guessedWordIdsKey.split(",").map(Number);
+		publishSolvedWordIds(wordIds);
+	}, [publishSolvedWordIds, guessedWordIdsKey]);
 
 	// Fetch clues for words the player has already found so they can be shown in
 	// the list. No toast, no letter fallback, no grid highlight — these are just
