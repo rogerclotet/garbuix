@@ -81,39 +81,75 @@ export function ClueRequestsProvider({
 		new Set(),
 	);
 	// Clues we've already surfaced to listeners (toasts), keyed by word + delivery
-	// time. Persists across SSE reconnects within a mount so the snapshot replayed
-	// on every reconnect doesn't re-notify clues already seen this session. A fresh
-	// page load starts empty, so reopening the game does notify of pending clues.
+	// time. Persisted to localStorage so a clue notifies exactly once across the
+	// snapshot replay, SSE reconnects, polls, and full page reloads — the snapshot
+	// re-sends every inbox clue (24h TTL) on every connect, so without this a reload
+	// would re-toast clues already seen.
 	const notifiedClueKeysRef = useRef<Set<string>>(new Set());
 
 	const active = enabled && dateKey != null && localUserId != null;
 
+	// Per-user, per-day so a clue's notified-state doesn't leak across accounts on a
+	// shared browser or across days (the inbox is scoped to the day too).
+	const notifiedStorageKey =
+		dateKey && localUserId ? `clue-notified:${localUserId}:${dateKey}` : null;
+
+	// Hydrate the seen-set from localStorage before any clue is ingested. The
+	// snapshot/poll only deliver clues after a network round-trip, well after this
+	// synchronous load runs on mount.
+	useEffect(() => {
+		if (!notifiedStorageKey || typeof window === "undefined") {
+			return;
+		}
+		try {
+			const raw = window.localStorage.getItem(notifiedStorageKey);
+			notifiedClueKeysRef.current = new Set(
+				raw ? (JSON.parse(raw) as string[]) : [],
+			);
+		} catch {
+			notifiedClueKeysRef.current = new Set();
+		}
+	}, [notifiedStorageKey]);
+
 	// Merge delivered clues from any path (snapshot on open, live event, or the
 	// polling fallback) into state, and notify listeners once per clue so a clue
 	// surfaces the same way whether it arrives while playing or on opening the game.
-	const ingestResponses = useCallback((responses: ClueResponse[]) => {
-		const fresh = responses.filter(
-			(r) => !notifiedClueKeysRef.current.has(`${r.wordId}:${r.at}`),
-		);
-		if (fresh.length === 0) {
-			return;
-		}
-		for (const response of fresh) {
-			notifiedClueKeysRef.current.add(`${response.wordId}:${response.at}`);
-		}
-		setReceivedClues((current) => {
-			const next = { ...current };
-			for (const response of fresh) {
-				next[response.wordId] = response;
+	const ingestResponses = useCallback(
+		(responses: ClueResponse[]) => {
+			const fresh = responses.filter(
+				(r) => !notifiedClueKeysRef.current.has(`${r.wordId}:${r.at}`),
+			);
+			if (fresh.length === 0) {
+				return;
 			}
-			return next;
-		});
-		for (const listener of listenersRef.current) {
 			for (const response of fresh) {
-				listener({ type: "response", response });
+				notifiedClueKeysRef.current.add(`${response.wordId}:${response.at}`);
 			}
-		}
-	}, []);
+			if (notifiedStorageKey && typeof window !== "undefined") {
+				try {
+					window.localStorage.setItem(
+						notifiedStorageKey,
+						JSON.stringify([...notifiedClueKeysRef.current]),
+					);
+				} catch {
+					// best-effort; persistence is an enhancement, display still works
+				}
+			}
+			setReceivedClues((current) => {
+				const next = { ...current };
+				for (const response of fresh) {
+					next[response.wordId] = response;
+				}
+				return next;
+			});
+			for (const listener of listenersRef.current) {
+				for (const response of fresh) {
+					listener({ type: "response", response });
+				}
+			}
+		},
+		[notifiedStorageKey],
+	);
 
 	useEffect(() => {
 		if (!active || typeof window === "undefined") {
