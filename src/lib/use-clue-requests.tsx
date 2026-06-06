@@ -80,8 +80,40 @@ export function ClueRequestsProvider({
 	const listenersRef = useRef<Set<(event: ClueRequestStreamEvent) => void>>(
 		new Set(),
 	);
+	// Clues we've already surfaced to listeners (toasts), keyed by word + delivery
+	// time. Persists across SSE reconnects within a mount so the snapshot replayed
+	// on every reconnect doesn't re-notify clues already seen this session. A fresh
+	// page load starts empty, so reopening the game does notify of pending clues.
+	const notifiedClueKeysRef = useRef<Set<string>>(new Set());
 
 	const active = enabled && dateKey != null && localUserId != null;
+
+	// Merge delivered clues from any path (snapshot on open, live event, or the
+	// polling fallback) into state, and notify listeners once per clue so a clue
+	// surfaces the same way whether it arrives while playing or on opening the game.
+	const ingestResponses = useCallback((responses: ClueResponse[]) => {
+		const fresh = responses.filter(
+			(r) => !notifiedClueKeysRef.current.has(`${r.wordId}:${r.at}`),
+		);
+		if (fresh.length === 0) {
+			return;
+		}
+		for (const response of fresh) {
+			notifiedClueKeysRef.current.add(`${response.wordId}:${response.at}`);
+		}
+		setReceivedClues((current) => {
+			const next = { ...current };
+			for (const response of fresh) {
+				next[response.wordId] = response;
+			}
+			return next;
+		});
+		for (const listener of listenersRef.current) {
+			for (const response of fresh) {
+				listener({ type: "response", response });
+			}
+		}
+	}, []);
 
 	useEffect(() => {
 		if (!active || typeof window === "undefined") {
@@ -98,17 +130,10 @@ export function ClueRequestsProvider({
 					responses?: ClueResponse[];
 				};
 				setIncomingRequests(snapshot.requests ?? []);
-				// Merge replayed clues so a previously-missed live event recovers,
-				// without re-toasting (snapshot responses don't reach subscribers).
-				if (snapshot.responses && snapshot.responses.length > 0) {
-					setReceivedClues((current) => {
-						const next = { ...current };
-						for (const response of snapshot.responses ?? []) {
-							next[response.wordId] = response;
-						}
-						return next;
-					});
-				}
+				// Replay delivered clues so opening the game (or recovering a dropped
+				// live event) notifies of clues left while away. ingestResponses
+				// dedupes, so a reconnect within the session won't re-notify.
+				ingestResponses(snapshot.responses ?? []);
 				setStatus("open");
 			} catch {
 				// ignore
@@ -135,10 +160,9 @@ export function ClueRequestsProvider({
 						current.filter((r) => r.id !== payload.requestId),
 					);
 				} else if (payload.type === "response") {
-					setReceivedClues((current) => ({
-						...current,
-						[payload.response.wordId]: payload.response,
-					}));
+					// ingestResponses handles state + deduped listener notification.
+					ingestResponses([payload.response]);
+					return;
 				}
 				for (const listener of listenersRef.current) {
 					listener(payload);
@@ -159,12 +183,12 @@ export function ClueRequestsProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [active, dateKey, localUserId]);
+	}, [active, dateKey, localUserId, ingestResponses]);
 
 	// Polling fallback for delivered clues: the live SSE event can be dropped (a
 	// proxy buffering the open stream in production), so the asker would otherwise
-	// wait forever. The inbox is tiny; merge it in every few seconds. No toast on
-	// this path — only live events toast.
+	// wait forever. The inbox is tiny; merge it in every few seconds. ingestResponses
+	// dedupes against the live/snapshot paths, so a clue notifies exactly once.
 	useEffect(() => {
 		if (!active || !dateKey || typeof window === "undefined") {
 			return;
@@ -180,13 +204,7 @@ export function ClueRequestsProvider({
 				if (cancelled || !data.responses || data.responses.length === 0) {
 					return;
 				}
-				setReceivedClues((current) => {
-					const next = { ...current };
-					for (const clue of data.responses ?? []) {
-						next[clue.wordId] = clue;
-					}
-					return next;
-				});
+				ingestResponses(data.responses);
 			} catch {
 				// best-effort; the SSE path or the next poll will recover
 			}
@@ -197,7 +215,7 @@ export function ClueRequestsProvider({
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, [active, dateKey]);
+	}, [active, dateKey, ingestResponses]);
 
 	const subscribe = useCallback(
 		(listener: (event: ClueRequestStreamEvent) => void) => {
