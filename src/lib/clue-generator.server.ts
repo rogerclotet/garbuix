@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
+import { findLeakingTokens } from "@/lib/clue-fairness";
 import { db } from "@/lib/db";
 import { captureServerException } from "@/lib/observability-server";
 import { normalizeWord } from "@/lib/puzzle-text";
@@ -117,39 +118,6 @@ async function callModel(options: {
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Returns the original tokens of `clue` that reveal the hidden word — the word
-// itself, an inflection (plural/feminine/diminutive/conjugation), or a clear
-// truncation of it. Used to reject and, as a last resort, mask leaks.
-function findLeakingTokens(clue: string, normalizedWord: string): string[] {
-	if (!normalizedWord) {
-		return [];
-	}
-
-	const tokens = clue.split(/[^\p{L}·]+/u).filter(Boolean);
-	const leaks: string[] = [];
-
-	for (const token of tokens) {
-		const normalizedToken = normalizeWord(token);
-		if (normalizedToken.length < 3) {
-			continue;
-		}
-
-		const isInflectionOrMatch =
-			normalizedToken === normalizedWord ||
-			normalizedToken.startsWith(normalizedWord);
-		const isTruncation =
-			normalizedWord.length >= 5 &&
-			normalizedToken.length >= 4 &&
-			normalizedWord.startsWith(normalizedToken);
-
-		if (isInflectionOrMatch || isTruncation) {
-			leaks.push(token);
-		}
-	}
-
-	return leaks;
 }
 
 function maskLeaks(clue: string, leakingTokens: string[]): string {

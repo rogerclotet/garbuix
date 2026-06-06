@@ -37,18 +37,31 @@ describe("clue-fairness", () => {
 		});
 	});
 
-	it("rejects a token that contains the answer as a substring", () => {
+	it("rejects an inflection that keeps the answer as a prefix", () => {
 		expect(validateClueText("plural: arbres", "arbre")).toEqual({
 			ok: false,
 			reason: "too_similar",
 		});
 	});
 
-	it("rejects a near-miss spelling", () => {
-		// one substitution away from "arbre"
-		expect(validateClueText("arbra", "arbre")).toEqual({
+	it("rejects a truncation of the answer", () => {
+		// "munta" is "muntanya" cut short — still reveals it.
+		expect(validateClueText("puja fins a munta", "muntanya")).toEqual({
 			ok: false,
 			reason: "too_similar",
+		});
+	});
+
+	it("allows a near-miss spelling that isn't an inflection or truncation", () => {
+		// One substitution away from "arbre"; coincidental near-spellings aren't
+		// blocked, matching the AI generator's leak standard.
+		expect(validateClueText("arbra", "arbre")).toEqual({ ok: true });
+	});
+
+	it("allows a real word whose letters sit inside the answer", () => {
+		// "anca" is a substring of "branca" but an unrelated, legitimate word.
+		expect(validateClueText("li fa mal l'anca", "branca")).toEqual({
+			ok: true,
 		});
 	});
 

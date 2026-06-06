@@ -114,11 +114,22 @@ export function DailyWordList({
 		setPrefillText("");
 	};
 
-	// Lazy route: drop a word's AI clue straight into the open composer.
+	// True while a response composer for one of this word's requests is open —
+	// the only time it makes sense to copy the word's AI clue into a reply.
+	const isComposingForWord = (wordId: number): boolean => {
+		if (activeRequestId === null) return false;
+		const requests = requestsByWordId.get(wordId);
+		return Boolean(requests?.some((request) => request.id === activeRequestId));
+	};
+
+	// Drop the word's AI clue into the composer that's currently open for it.
 	const handleUseClue = (wordId: number, clueText: string) => {
-		const first = requestsByWordId.get(wordId)?.[0];
-		if (!first) return;
-		openComposer(first.id, clueText);
+		const requests = requestsByWordId.get(wordId);
+		const target =
+			requests?.find((request) => request.id === activeRequestId) ??
+			requests?.[0];
+		if (!target) return;
+		openComposer(target.id, clueText);
 	};
 
 	const renderIncomingRequests = (wordId: number) => {
@@ -171,7 +182,7 @@ export function DailyWordList({
 	};
 
 	// An AI clue shown next to a word can be copied into the response composer,
-	// but only when there's actually a request to answer for that word.
+	// but only while a composer for that word is actually open.
 	const renderClueLine = (
 		wordId: number,
 		clueText: string,
@@ -185,7 +196,7 @@ export function DailyWordList({
 			>
 				{clueText}
 			</span>
-			{requestsByWordId.has(wordId) && onRespondToClue ? (
+			{isComposingForWord(wordId) && onRespondToClue ? (
 				<Button
 					type="button"
 					variant="ghost"
