@@ -1298,7 +1298,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							/>
 						</div>
 
-						<div className="mt-6 lg:mt-0 lg:space-y-6">
+						<div className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6">
 							<DailyControls
 								aiClueMode={useTextClue}
 								circleLetters={circleLetters}
@@ -1324,7 +1324,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								runPressAction={runPressAction}
 							/>
 
-							<div id={WORD_LIST_SECTION_ID} className="scroll-mt-4">
+							<div
+								id={WORD_LIST_SECTION_ID}
+								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+							>
 								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
 									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
 									)
