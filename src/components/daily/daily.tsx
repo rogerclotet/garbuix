@@ -167,6 +167,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
+	// On desktop the puzzle and the word-list column sit in a 2-col grid whose
+	// row stretches to the taller column. We pin the right column to the
+	// puzzle's intrinsic height so a long word list scrolls internally instead
+	// of growing the whole page. null on mobile (single column, no constraint).
+	const [desktopColumnHeight, setDesktopColumnHeight] = useState<number | null>(
+		null,
+	);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -978,6 +985,40 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
+	// Track the puzzle's intrinsic height (the grid column uses `lg:self-start`,
+	// so it never stretches) and mirror it onto the word-list column on desktop.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run once the loading state clears and the grid (gridRef) actually mounts.
+	useEffect(() => {
+		const grid = gridRef.current;
+		if (!grid) return;
+
+		const desktop = window.matchMedia("(min-width: 1024px)");
+		let observer: ResizeObserver | null = null;
+
+		const measure = () => {
+			setDesktopColumnHeight(grid.offsetHeight);
+		};
+
+		const sync = () => {
+			if (desktop.matches) {
+				measure();
+				observer ??= new ResizeObserver(measure);
+				observer.observe(grid);
+			} else {
+				observer?.disconnect();
+				observer = null;
+				setDesktopColumnHeight(null);
+			}
+		};
+
+		sync();
+		desktop.addEventListener("change", sync);
+		return () => {
+			desktop.removeEventListener("change", sync);
+			observer?.disconnect();
+		};
+	}, [isProgressReady]);
+
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
 	// Delay the visual completion state so the submit feedback animation plays first
@@ -1286,7 +1327,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					</div>
 
 					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div ref={gridRef}>
+						<div ref={gridRef} className="lg:self-start">
 							<DailyGrid
 								puzzle={puzzle}
 								revealedCells={revealedCells}
@@ -1298,7 +1339,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							/>
 						</div>
 
-						<div className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6">
+						<div
+							className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6"
+							style={
+								desktopColumnHeight != null
+									? { height: desktopColumnHeight }
+									: undefined
+							}
+						>
 							<DailyControls
 								aiClueMode={useTextClue}
 								circleLetters={circleLetters}
