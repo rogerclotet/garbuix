@@ -213,7 +213,7 @@ export function DailyWordList({
 	);
 
 	return (
-		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
+		<div className="space-y-2">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
 				const peerClue = peerCluesByWordId[slot.id];
