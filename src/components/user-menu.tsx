@@ -6,7 +6,6 @@ import {
 	LogOut,
 	Menu,
 	Settings,
-	Trophy,
 } from "lucide-react";
 import { useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
@@ -101,12 +100,6 @@ export function UserMenu() {
 						<DropdownMenuSeparator />
 					</>
 				) : null}
-				<DropdownMenuItem asChild>
-					<Link to="/classificacio">
-						<Trophy className="size-4" />
-						<span>Classificació</span>
-					</Link>
-				</DropdownMenuItem>
 				<DropdownMenuItem asChild>
 					<Link to="/dies-anteriors">
 						<History className="size-4" />
