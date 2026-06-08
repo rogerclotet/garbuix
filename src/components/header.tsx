@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft, HelpingHand } from "lucide-react";
+import { ChevronLeft, HelpingHand, Trophy } from "lucide-react";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
 	setHowToPlayOpen,
@@ -81,6 +81,18 @@ export default function Header() {
 						</Link>
 					)}
 					<div className="flex items-center gap-2">
+						{pathname !== "/classificacio" ? (
+							<Button
+								variant="ghost"
+								size="icon-lg"
+								asChild
+								className="size-11 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
+							>
+								<Link to="/classificacio" aria-label="Classificació">
+									<Trophy className="size-6 sm:size-5" />
+								</Link>
+							</Button>
+						) : null}
 						{helpRequestCount > 0 ? (
 							<Button
 								variant="ghost"
