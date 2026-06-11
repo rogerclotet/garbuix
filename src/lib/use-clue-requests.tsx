@@ -23,6 +23,10 @@ type ClueRequestsContextValue = {
 	incomingRequests: ClueRequest[];
 	// Clues delivered to this user, keyed by word id (live + replayed snapshot).
 	receivedClues: Record<number, ClueResponse>;
+	// Words this user has asked other players for help with (awaiting a reply).
+	// Seeded from the snapshot's own-requests replay so a reload keeps showing
+	// the "waiting for help" state while the request is still pending server-side.
+	requestedHelpWordIds: number[];
 	status: ClueRequestsStatus;
 	enabled: boolean;
 	subscribe(listener: (event: ClueRequestStreamEvent) => void): () => void;
@@ -41,6 +45,7 @@ const defaultValue: ClueRequestsContextValue = {
 	dateKey: null,
 	incomingRequests: [],
 	receivedClues: {},
+	requestedHelpWordIds: [],
 	status: "idle",
 	enabled: false,
 	subscribe: () => noop,
@@ -69,6 +74,11 @@ export function ClueRequestsProvider({
 	const [receivedClues, setReceivedClues] = useState<
 		Record<number, ClueResponse>
 	>({});
+	// Words this user asked help for. Added optimistically on request, restored
+	// from the snapshot's own-requests replay on (re)connect, dropped on resolve.
+	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
+		[],
+	);
 	// Requests this user has already answered, hidden from the badge/list so the
 	// count reflects only outstanding requests they could still help with.
 	const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
@@ -116,6 +126,27 @@ export function ClueRequestsProvider({
 	// surfaces the same way whether it arrives while playing or on opening the game.
 	const ingestResponses = useCallback(
 		(responses: ClueResponse[]) => {
+			if (responses.length === 0) {
+				return;
+			}
+			// Display state merges every clue unconditionally: the notified-set only
+			// gates toasts. After a reload the replayed inbox clues were all notified
+			// in the previous session, but they still need to render under the words.
+			setReceivedClues((current) => {
+				let changed = false;
+				const next = { ...current };
+				for (const response of responses) {
+					const existing = next[response.wordId];
+					if (existing?.at === response.at) {
+						continue;
+					}
+					next[response.wordId] = response;
+					changed = true;
+				}
+				// Identity-stable when nothing changed so the 8s inbox poll doesn't
+				// re-render consumers with an equal-but-new object.
+				return changed ? next : current;
+			});
 			const fresh = responses.filter(
 				(r) => !notifiedClueKeysRef.current.has(`${r.wordId}:${r.at}`),
 			);
@@ -135,13 +166,6 @@ export function ClueRequestsProvider({
 					// best-effort; persistence is an enhancement, display still works
 				}
 			}
-			setReceivedClues((current) => {
-				const next = { ...current };
-				for (const response of fresh) {
-					next[response.wordId] = response;
-				}
-				return next;
-			});
 			for (const listener of listenersRef.current) {
 				for (const response of fresh) {
 					listener({ type: "response", response });
@@ -163,9 +187,20 @@ export function ClueRequestsProvider({
 			try {
 				const snapshot = JSON.parse(event.data) as {
 					requests?: ClueRequest[];
+					ownRequests?: ClueRequest[];
 					responses?: ClueResponse[];
 				};
 				setIncomingRequests(snapshot.requests ?? []);
+				// Restore this user's own still-pending requests so a reload keeps
+				// the "waiting for help" state. Merged (not replaced) so a reconnect
+				// can't wipe an optimistic request that's still in flight.
+				const ownWordIds = (snapshot.ownRequests ?? []).map((r) => r.wordId);
+				if (ownWordIds.length > 0) {
+					setRequestedHelpWordIds((current) => {
+						const merged = ownWordIds.filter((id) => !current.includes(id));
+						return merged.length > 0 ? [...current, ...merged] : current;
+					});
+				}
 				// Replay delivered clues so opening the game (or recovering a dropped
 				// live event) notifies of clues left while away. ingestResponses
 				// dedupes, so a reconnect within the session won't re-notify.
@@ -266,16 +301,40 @@ export function ClueRequestsProvider({
 	const requestClue = useCallback(
 		async (wordId: number): Promise<boolean> => {
 			if (!dateKey) return false;
+			// Optimistic so the button flips to "waiting" immediately; rolled back
+			// below if the server couldn't register the request.
+			setRequestedHelpWordIds((current) =>
+				current.includes(wordId) ? current : [...current, wordId],
+			);
+			const rollback = () =>
+				setRequestedHelpWordIds((current) =>
+					current.filter((id) => id !== wordId),
+				);
 			try {
 				const response = await fetch(`/api/clue-requests/${dateKey}/request`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ wordId }),
 				});
-				if (!response.ok) return false;
-				const data = (await response.json()) as { created?: boolean };
-				return Boolean(data.created);
+				if (!response.ok) {
+					rollback();
+					return false;
+				}
+				const data = (await response.json()) as {
+					created?: boolean;
+					reason?: string;
+				};
+				// "duplicate" means an earlier request for this word is still pending
+				// server-side (e.g. re-asking after a reload), so the waiting state is
+				// accurate — keep it and report success.
+				const pendingOnServer =
+					Boolean(data.created) || data.reason === "duplicate";
+				if (!pendingOnServer) {
+					rollback();
+				}
+				return pendingOnServer;
 			} catch {
+				rollback();
 				return false;
 			}
 		},
@@ -315,6 +374,11 @@ export function ClueRequestsProvider({
 	const resolveClue = useCallback(
 		async (wordId: number): Promise<void> => {
 			if (!dateKey) return;
+			// The asker no longer needs help (found the word) — clear the local
+			// waiting state regardless of whether the server call lands.
+			setRequestedHelpWordIds((current) =>
+				current.filter((id) => id !== wordId),
+			);
 			try {
 				await fetch(`/api/clue-requests/${dateKey}/resolve`, {
 					method: "POST",
@@ -355,6 +419,7 @@ export function ClueRequestsProvider({
 			dateKey,
 			incomingRequests: visibleRequests,
 			receivedClues,
+			requestedHelpWordIds,
 			status,
 			enabled: active,
 			subscribe,
@@ -367,6 +432,7 @@ export function ClueRequestsProvider({
 			dateKey,
 			visibleRequests,
 			receivedClues,
+			requestedHelpWordIds,
 			status,
 			active,
 			subscribe,
