@@ -305,11 +305,13 @@ function openSseStream(dateKey: string, userId: string): Response {
 					getPendingClueRequests(dateKey),
 					getClueInbox(userId, dateKey),
 				]);
-				// Don't echo the viewer's own open requests back as actionable; replay
-				// any clues already delivered to them so a missed live event recovers.
+				// Don't echo the viewer's own open requests back as actionable; ship
+				// them separately so a reload restores the "waiting for help" state.
+				// Replay any clues already delivered so a missed live event recovers.
 				const requests = pending.filter((r) => r.requesterId !== userId);
+				const ownRequests = pending.filter((r) => r.requesterId === userId);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, responses })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses })}\n\n`,
 				);
 			} catch (error) {
 				console.warn("[clue-request:sse] initial snapshot failed", error);

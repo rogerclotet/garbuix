@@ -140,14 +140,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		incomingRequests,
 		respondToClue,
 		receivedClues,
+		requestedHelpWordIds,
 		publishSolvedWordIds,
 	} = useClueRequests();
-	// Word ids the player has asked other players for help with (awaiting a reply).
-	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
-		[],
-	);
-	// Clues delivered by other players, keyed by word id. Sourced from the
-	// provider so they persist across SSE reconnects (replayed in the snapshot).
+	// Clues delivered by other players (receivedClues) and the words this player
+	// asked help for (requestedHelpWordIds) both live in the provider so they
+	// persist across SSE reconnects and page reloads (replayed in the snapshot).
 	// Each response carries the responder's name so we can attribute the clue.
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
@@ -899,21 +897,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
 			triggerHaptic(HAPTIC_TAP_MS);
-			setRequestedHelpWordIds((current) =>
-				current.includes(wordId) ? current : [...current, wordId],
-			);
 			captureEvent("peer_clue_requested", {
 				date_key: puzzle.dateKey,
 				puzzle_id: puzzle.id,
 				word_id: wordId,
 			});
+			// The provider tracks the pending state (optimistic add + rollback on
+			// failure); here we only surface the failure to the player.
 			void requestClue(wordId).then((created) => {
 				if (!created) {
-					// Couldn't register the request (e.g. no other players / offline);
-					// drop the pending state so the button is actionable again.
-					setRequestedHelpWordIds((current) =>
-						current.filter((id) => id !== wordId),
-					);
 					toast.error("No s'ha pogut demanar ajuda");
 				}
 			});
@@ -936,8 +928,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	}, [subscribeClueRequests]);
 
 	// Once the asker finds a word they'd asked help for, the request is no longer
-	// needed: resolve it so other players' badges/buttons clear, and stop showing
-	// the local "waiting" state.
+	// needed: resolve it so other players' badges/buttons clear. resolveClue also
+	// drops the word from the provider's "waiting" state.
 	useEffect(() => {
 		const found = requestedHelpWordIds.filter((wordId) =>
 			derivedProgress.guessedWordIds.includes(wordId),
@@ -946,9 +938,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		for (const wordId of found) {
 			void resolveClue(wordId);
 		}
-		setRequestedHelpWordIds((current) =>
-			current.filter((wordId) => !found.includes(wordId)),
-		);
 	}, [derivedProgress.guessedWordIds, requestedHelpWordIds, resolveClue]);
 
 	// Tapping an incomplete word flashes its grid cells in off-white teal so the
