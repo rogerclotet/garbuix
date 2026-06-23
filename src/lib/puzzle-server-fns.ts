@@ -6,6 +6,7 @@ import {
 	checkDailyPuzzleExists,
 	getAuthSession,
 	getDailyPuzzlePublicData,
+	getHistoryEntriesPageForUser,
 	getHistoryPageDataForUser,
 	getSessionUserData,
 	getUserPuzzleProgressData,
@@ -14,9 +15,11 @@ import {
 	syncPuzzleEventsForUser,
 	triggerDailyPuzzleGeneration,
 } from "@/lib/puzzle-service.server";
-import type {
-	AnonymousImportPayload,
-	PuzzleClientEvent,
+import {
+	type AnonymousImportPayload,
+	HISTORY_PAGE_SIZE,
+	type HistoryEntriesPage,
+	type PuzzleClientEvent,
 } from "@/lib/puzzle-types";
 
 export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
@@ -215,6 +218,34 @@ export const getHistoryPageData = createServerFn({ method: "POST" })
 			{
 				properties: {
 					date_key: data?.dateKey,
+				},
+			},
+		);
+	});
+
+export const getMoreHistoryEntries = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			offset: z.number().int().nonnegative(),
+		}),
+	)
+	.handler(async ({ data }): Promise<HistoryEntriesPage> => {
+		return observeServerAction(
+			"getMoreHistoryEntries",
+			async () => {
+				const session = await getAuthSession();
+				if (!session) {
+					return { entries: [], hasMore: false };
+				}
+
+				return getHistoryEntriesPageForUser(session.user.id, {
+					offset: data.offset,
+					limit: HISTORY_PAGE_SIZE,
+				});
+			},
+			{
+				properties: {
+					offset: data.offset,
 				},
 			},
 		);

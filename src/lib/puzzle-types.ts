@@ -176,6 +176,24 @@ export type HistorySummaryEntry = {
 	legacy?: boolean;
 };
 
+// Number of history entries fetched/rendered per page. Keeps the initial page
+// load light now that accounts can accumulate hundreds of daily results.
+export const HISTORY_PAGE_SIZE = 5;
+
+export type HistoryStats = {
+	totalDays: number;
+	completedDays: number;
+	completionRate: number;
+	currentStreak: number;
+	bestStreak: number;
+	avgGuesses: number;
+};
+
+export type HistoryEntriesPage = {
+	entries: HistorySummaryEntry[];
+	hasMore: boolean;
+};
+
 export type AnonymousImportPayload = {
 	historyEntries: HistorySummaryEntry[];
 	activeProgressByDate: Record<string, PuzzleProgressState>;
