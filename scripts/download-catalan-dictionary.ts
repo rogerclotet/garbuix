@@ -4,9 +4,14 @@ import { join } from "node:path";
 
 const MIN_LENGTH = 4;
 const MAX_LENGTH = 12;
-const MIN_FREQUENCY = 50;
+// Generated puzzles only draw from common words, so the generation dictionary
+// keeps a high frequency floor. Guess validation accepts any word attested in
+// the corpus, so the guess dictionary only requires a frequency of at least 1.
+const GENERATION_MIN_FREQUENCY = 50;
+const GUESS_MIN_FREQUENCY = 1;
 const DATA_DIR = join(process.cwd(), "src", "data");
 const OUTPUT_FILE = join(DATA_DIR, "catalan-words.json");
+const GUESS_OUTPUT_FILE = join(DATA_DIR, "catalan-guess-words.json");
 const SOURCE_BASE_URL =
 	"https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/master";
 
@@ -51,8 +56,8 @@ type WordAccumulator = {
 };
 
 async function main() {
-	if (ONLY_IF_MISSING && existsSync(OUTPUT_FILE)) {
-		console.log(`📚 Using existing dictionary at ${OUTPUT_FILE}`);
+	if (ONLY_IF_MISSING && existsSync(OUTPUT_FILE) && existsSync(GUESS_OUTPUT_FILE)) {
+		console.log(`📚 Using existing dictionaries at ${DATA_DIR}`);
 		return;
 	}
 
@@ -82,7 +87,7 @@ async function main() {
 				}
 
 				const frequency = frequencies.get(name) ?? 0;
-				if (frequency < MIN_FREQUENCY) {
+				if (frequency < GUESS_MIN_FREQUENCY) {
 					continue;
 				}
 
@@ -99,7 +104,7 @@ async function main() {
 		}
 	}
 
-	const result = Array.from(words.values())
+	const entries = Array.from(words.values())
 		.map(
 				(entry): WordEntry => ({
 					name: entry.name,
@@ -112,14 +117,33 @@ async function main() {
 				b.frequency - a.frequency || a.name.localeCompare(b.name, "ca"),
 		);
 
+	const generationWords = entries.filter(
+		(word) => word.frequency >= GENERATION_MIN_FREQUENCY,
+	);
+	// Guesses only need the word names; metadata stays in the generation file.
+	const guessWordNames = entries.map((word) => word.name);
+
 	mkdirSync(DATA_DIR, { recursive: true });
-	writeFileSync(OUTPUT_FILE, JSON.stringify(result satisfies Word[], null, 2));
+	writeFileSync(
+		OUTPUT_FILE,
+		JSON.stringify(generationWords satisfies Word[], null, 2),
+	);
+	writeFileSync(
+		GUESS_OUTPUT_FILE,
+		JSON.stringify(guessWordNames satisfies string[], null, 2),
+	);
 
 	console.log(
-		`✅ Saved ${result.length} crossword-friendly words to ${OUTPUT_FILE}`,
+		`✅ Saved ${generationWords.length} generation words to ${OUTPUT_FILE}`,
 	);
 	console.log(
-		`ℹ️ Filters: ${MIN_LENGTH}-${MAX_LENGTH} letters, lowercase alphabetic forms, frequency >= ${MIN_FREQUENCY}`,
+		`✅ Saved ${guessWordNames.length} guess words to ${GUESS_OUTPUT_FILE}`,
+	);
+	console.log(
+		`ℹ️ Generation filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GENERATION_MIN_FREQUENCY}`,
+	);
+	console.log(
+		`ℹ️ Guess filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GUESS_MIN_FREQUENCY}`,
 	);
 }
 

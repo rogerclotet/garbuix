@@ -3,7 +3,6 @@ import {
 	buildCellLetters,
 	getDisplayedSlotWord,
 	getGuessKeyboardAction,
-	getNextHintCellKey,
 	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
@@ -68,58 +67,6 @@ describe("getGuessKeyboardAction", () => {
 		expect(getGuessKeyboardAction("Delete", ["a", "m", "ç"])).toEqual({
 			type: "backspace",
 		});
-	});
-});
-
-describe("getNextHintCellKey", () => {
-	it("returns the first hidden hint cell", () => {
-		expect(
-			getNextHintCellKey(
-				{
-					id: "puzzle-1",
-					dateKey: "2026-03-10",
-					seed: 123,
-					algorithmVersion: "1",
-					rows: 1,
-					cols: 3,
-					gridMask: [[{ wordIds: [0] }, { wordIds: [0] }, { wordIds: [0] }]],
-					letters: ["a", "b", "c"],
-					initialShuffledLetters: ["a", "b", "c"],
-					validNormalizedGuesses: [],
-					wordSlots: [],
-					hintCapsules: [
-						{ cellKey: "0,0", hintSalt: "salt-0", hintCapsule: "capsule-0" },
-						{ cellKey: "0,1", hintSalt: "salt-1", hintCapsule: "capsule-1" },
-					],
-				},
-				new Set(["0,0"]),
-			),
-		).toBe("0,1");
-	});
-
-	it("returns null when there are no hidden letters left", () => {
-		expect(
-			getNextHintCellKey(
-				{
-					id: "puzzle-1",
-					dateKey: "2026-03-10",
-					seed: 123,
-					algorithmVersion: "1",
-					rows: 1,
-					cols: 2,
-					gridMask: [[{ wordIds: [0] }, { wordIds: [0] }]],
-					letters: ["a", "b"],
-					initialShuffledLetters: ["a", "b"],
-					validNormalizedGuesses: [],
-					wordSlots: [],
-					hintCapsules: [
-						{ cellKey: "0,0", hintSalt: "salt-0", hintCapsule: "capsule-0" },
-						{ cellKey: "0,1", hintSalt: "salt-1", hintCapsule: "capsule-1" },
-					],
-				},
-				new Set(["0,0", "0,1"]),
-			),
-		).toBeNull();
 	});
 });
 

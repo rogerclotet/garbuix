@@ -13,4 +13,5 @@ count.txt
 .vinxi
 .pnpm-store
 src/data/catalan-words.json
+src/data/catalan-guess-words.json
 public/version.json

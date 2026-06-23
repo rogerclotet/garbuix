@@ -7,26 +7,10 @@ import {
 describe("puzzle-dictionary", () => {
 	it("normalizes, deduplicates, and excludes short words", () => {
 		const normalizedWords = buildNormalizedDictionary([
-			{
-				name: "Còs",
-				areatematica: "Nom",
-				frequency: 10,
-			},
-			{
-				name: "Cosa",
-				areatematica: "Nom",
-				frequency: 8,
-			},
-			{
-				name: "cósa",
-				areatematica: "Nom",
-				frequency: 6,
-			},
-			{
-				name: "col·laborar",
-				areatematica: "Verb",
-				frequency: 4,
-			},
+			"Còs",
+			"Cosa",
+			"cósa",
+			"col·laborar",
 		]);
 
 		expect(normalizedWords).toEqual(["collaborar", "cosa"]);
