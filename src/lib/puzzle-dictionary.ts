@@ -1,11 +1,10 @@
-import type { Word } from "@/data/types";
 import { normalizeWord } from "@/lib/puzzle-text";
 
-export function buildNormalizedDictionary(words: Word[]): string[] {
+export function buildNormalizedDictionary(names: readonly string[]): string[] {
 	const normalizedWords = new Set<string>();
 
-	for (const word of words) {
-		const normalizedWord = normalizeWord(word.name);
+	for (const name of names) {
+		const normalizedWord = normalizeWord(name);
 		if (normalizedWord.length < 4) {
 			continue;
 		}

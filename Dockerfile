@@ -29,6 +29,7 @@ COPY src ./src
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/src/data/catalan-words.json ./src/data/catalan-words.json
+COPY --from=builder /app/src/data/catalan-guess-words.json ./src/data/catalan-guess-words.json
 
 EXPOSE 3000
 

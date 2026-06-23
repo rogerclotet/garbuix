@@ -1,5 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { user } from "@/db/auth-schema";
@@ -67,8 +68,12 @@ import {
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
 
+// Puzzles are generated only from the common-word dictionary (frequency-floored),
+// while guesses are validated against the wider name-only dictionary so players
+// get credit for any corpus-attested word, however rare. See
+// scripts/download-catalan-dictionary.ts.
 const serverWords = allWords as Word[];
-const normalizedServerWords = buildNormalizedDictionary(serverWords);
+const normalizedServerWords = buildNormalizedDictionary(guessWords);
 
 let cachedDictionaryVersion: Promise<string> | null = null;
 const validNormalizedGuessesCache = new Map<string, string[]>();
