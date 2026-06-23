@@ -22,6 +22,7 @@ type LeaderboardContextValue = {
 	status: LeaderboardStatus;
 	localParticipantId: string | null;
 	subscribe(listener: (event: LeaderboardEvent) => void): () => void;
+	refresh(): void;
 };
 
 const LeaderboardContext = createContext<LeaderboardContextValue | null>(null);
@@ -72,10 +73,17 @@ export function LeaderboardProvider({
 		initialSnapshot ? sortEntries(initialSnapshot.entries) : [],
 	);
 	const [status, setStatus] = useState<LeaderboardStatus>("idle");
+	// Bumping this token tears down and reopens the EventSource, which re-pulls a
+	// fresh snapshot from the server. Used to force a refresh when the user opens
+	// the leaderboard, in case the long-lived stream has gone stale.
+	const [refreshToken, setRefreshToken] = useState(0);
 	const listenersRef = useRef<Set<(event: LeaderboardEvent) => void>>(
 		new Set(),
 	);
 
+	// refreshToken is intentionally in the dependency list: bumping it reconnects
+	// the stream even though it isn't read inside the effect body.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: see above
 	useEffect(() => {
 		if (!enabled || !dateKey || typeof window === "undefined") {
 			return;
@@ -117,7 +125,7 @@ export function LeaderboardProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [dateKey, enabled]);
+	}, [dateKey, enabled, refreshToken]);
 
 	const subscribe = useCallback(
 		(listener: (event: LeaderboardEvent) => void) => {
@@ -129,6 +137,10 @@ export function LeaderboardProvider({
 		[],
 	);
 
+	const refresh = useCallback(() => {
+		setRefreshToken((token) => token + 1);
+	}, []);
+
 	const value = useMemo<LeaderboardContextValue>(
 		() => ({
 			dateKey,
@@ -136,8 +148,9 @@ export function LeaderboardProvider({
 			status,
 			localParticipantId,
 			subscribe,
+			refresh,
 		}),
-		[dateKey, entries, status, localParticipantId, subscribe],
+		[dateKey, entries, status, localParticipantId, subscribe, refresh],
 	);
 
 	return (
@@ -156,6 +169,7 @@ export function useLeaderboard(): LeaderboardContextValue {
 			status: "idle",
 			localParticipantId: null,
 			subscribe: () => () => {},
+			refresh: () => {},
 		};
 	}
 	return ctx;
