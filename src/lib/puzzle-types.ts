@@ -80,7 +80,7 @@ export type PuzzleProgressState = {
 	hintsUsed: number;
 	guessCount: number;
 	// Valid dictionary words the player found that aren't part of the puzzle.
-	// Every 10th such word grants a free bonus clue (see bonus_clue_revealed).
+	// Every 5th such word grants a free bonus clue (see bonus_clue_revealed).
 	bonusWordsFound: number;
 	shuffledLetters: string[];
 	completedAt: string | null;

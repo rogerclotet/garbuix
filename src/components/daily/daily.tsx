@@ -73,6 +73,8 @@ const CLUE_GRID_HIGHLIGHT_MS = 5000;
 const CLUE_GRID_FADE_MS = 600;
 // Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
 const LOCATE_FLASH_MS = 1300;
+// Number of valid off-puzzle words the player must find to earn a free letter reveal.
+const WORDS_PER_BONUS_CLUE = 5;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -746,11 +748,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			);
 		}
 
-		// Every 10th valid off-puzzle word grants a free random letter reveal. The
-		// counter updates asynchronously via the event above, so we look one ahead.
+		// Every WORDS_PER_BONUS_CLUE-th valid off-puzzle word grants a free random
+		// letter reveal. The counter updates asynchronously via the event above, so
+		// we look one ahead.
 		if (isNewBonusWord && bonusCluesEnabled) {
 			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
-			if (nextBonusCount % 10 === 0) {
+			if (nextBonusCount % WORDS_PER_BONUS_CLUE === 0) {
 				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
 				if (cellKey) {
 					applyLocalEvent(
@@ -763,7 +766,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						puzzle_id: puzzle.id,
 					});
 					toast.success("Pista desbloquejada!", {
-						description: "Has trobat 10 paraules vàlides de fora del joc.",
+						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
 				}
 			}
@@ -1222,12 +1225,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										(derivedProgress.guessedWordIds.length / totalWords) * 100,
 									),
 								);
-								// Bottom meter fills 0→10 toward the next bonus clue and
-								// resets each time one is earned; the label keeps the total.
+								// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+								// clue and resets each time one is earned; the label keeps the total.
 								const bonusCount = derivedProgress.bonusWordsFound;
-								const bonusInCycle = bonusCount % 10;
-								const bonusPercent = (bonusInCycle / 10) * 100;
-								const wordsToNextClue = 10 - bonusInCycle;
+								const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+								const bonusPercent =
+									(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+								const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
 								const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
 								return (
 									<div className="flex items-center gap-1.5">
