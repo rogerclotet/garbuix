@@ -73,6 +73,8 @@ const CLUE_GRID_HIGHLIGHT_MS = 5000;
 const CLUE_GRID_FADE_MS = 600;
 // Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
 const LOCATE_FLASH_MS = 1300;
+// Number of valid off-puzzle words the player must find to earn a free letter reveal.
+const WORDS_PER_BONUS_CLUE = 5;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -182,6 +184,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const completionTransitionTimerRef = useRef<number | null>(null);
 	const [displayComplete, setDisplayComplete] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
+	// Once the day rolls over we swap the rendered tree to a loading state before
+	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
+	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
@@ -344,10 +349,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		const rolloverAt = new Date(initialData.rolloverAt).getTime();
 		const delay = Math.max(1_000, rolloverAt - Date.now());
-		const timer = window.setTimeout(() => window.location.reload(), delay);
+		// Don't reload straight from the visibility/focus handler: that keeps the
+		// stale puzzle painted for the whole reload round-trip. Flip to the loading
+		// state first (see the reload effect below) so the old day is hidden at once.
+		const beginRollover = () => setIsRollingOver(true);
+		const timer = window.setTimeout(beginRollover, delay);
 		const refreshIfExpired = () => {
 			if (Date.now() >= rolloverAt) {
-				window.location.reload();
+				beginRollover();
 			}
 		};
 
@@ -362,6 +371,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			document.removeEventListener("visibilitychange", refreshIfExpired);
 		};
 	}, [initialData.rolloverAt]);
+
+	// Reload only after the loading state has painted, so the resumed PWA shows the
+	// spinner instead of yesterday's puzzle while the new day's data is fetched.
+	useEffect(() => {
+		if (!isRollingOver || typeof window === "undefined") return;
+
+		const frame = window.requestAnimationFrame(() => window.location.reload());
+		return () => window.cancelAnimationFrame(frame);
+	}, [isRollingOver]);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -746,11 +764,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			);
 		}
 
-		// Every 10th valid off-puzzle word grants a free random letter reveal. The
-		// counter updates asynchronously via the event above, so we look one ahead.
+		// Every WORDS_PER_BONUS_CLUE-th valid off-puzzle word grants a free random
+		// letter reveal. The counter updates asynchronously via the event above, so
+		// we look one ahead.
 		if (isNewBonusWord && bonusCluesEnabled) {
 			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
-			if (nextBonusCount % 10 === 0) {
+			if (nextBonusCount % WORDS_PER_BONUS_CLUE === 0) {
 				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
 				if (cellKey) {
 					applyLocalEvent(
@@ -763,7 +782,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						puzzle_id: puzzle.id,
 					});
 					toast.success("Pista desbloquejada!", {
-						description: "Has trobat 10 paraules vàlides de fora del joc.",
+						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
 				}
 			}
@@ -1163,6 +1182,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		isComplete,
 	]);
 
+	if (isRollingOver) {
+		return <DailyRolloverLoadingState />;
+	}
+
 	if (!isProgressReady) {
 		return <DailyProgressLoadingState />;
 	}
@@ -1222,12 +1245,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										(derivedProgress.guessedWordIds.length / totalWords) * 100,
 									),
 								);
-								// Bottom meter fills 0→10 toward the next bonus clue and
-								// resets each time one is earned; the label keeps the total.
+								// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+								// clue and resets each time one is earned; the label keeps the total.
 								const bonusCount = derivedProgress.bonusWordsFound;
-								const bonusInCycle = bonusCount % 10;
-								const bonusPercent = (bonusInCycle / 10) * 100;
-								const wordsToNextClue = 10 - bonusInCycle;
+								const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+								const bonusPercent =
+									(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+								const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
 								const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
 								return (
 									<div className="flex items-center gap-1.5">
@@ -1426,6 +1450,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}}
 			/>
 		</>
+	);
+}
+
+function DailyRolloverLoadingState() {
+	return (
+		<div className="relative overflow-hidden">
+			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />
+			<div className="mx-auto flex min-h-[calc(100svh-6rem)] max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+				<div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary shadow-sm">
+					<Loader2Icon className="size-8 animate-spin" />
+				</div>
+				<div className="space-y-2">
+					<h2 className="text-2xl font-semibold tracking-tight">
+						Carregant el repte d'avui
+					</h2>
+					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
+						Ha començat un nou dia. Preparant el trencaclosques d'avui.
+					</p>
+				</div>
+			</div>
+		</div>
 	);
 }
 

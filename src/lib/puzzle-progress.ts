@@ -247,7 +247,7 @@ export function applyPuzzleEvent(
 			};
 		}
 		case "bonus_clue_revealed": {
-			// Free letter reveal earned every 10 valid off-puzzle words. Adds the
+			// Free letter reveal earned every 5 valid off-puzzle words. Adds the
 			// cell to hintedCells (so it decodes onto the grid) without touching the
 			// 3-hint budget. Idempotent on cellKey so replays never reveal extras.
 			if (state.hintedCells.includes(event.payload.cellKey)) {

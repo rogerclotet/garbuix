@@ -47,18 +47,22 @@ import {
 	hydratePublicSnapshotWordMetadata,
 	toPuzzlePreview,
 } from "@/lib/puzzle-snapshot";
+import { calculateHistoryStats } from "@/lib/puzzle-streaks";
 import {
 	collectAckedEventIds,
 	filterSyncablePuzzleEvents,
 } from "@/lib/puzzle-sync";
-import type {
-	AnonymousImportPayload,
-	DailyPuzzlePrivateWord,
-	DailyPuzzlePublic,
-	HistorySummaryEntry,
-	PuzzleClientEvent,
-	PuzzleProgressState,
-	SessionUser,
+import {
+	type AnonymousImportPayload,
+	type DailyPuzzlePrivateWord,
+	type DailyPuzzlePublic,
+	HISTORY_PAGE_SIZE,
+	type HistoryEntriesPage,
+	type HistoryStats,
+	type HistorySummaryEntry,
+	type PuzzleClientEvent,
+	type PuzzleProgressState,
+	type SessionUser,
 } from "@/lib/puzzle-types";
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
@@ -599,6 +603,34 @@ export async function syncPuzzleEventsForUser(options: {
 	};
 }
 
+// Deduplicates by dateKey, preferring full progress over legacy summaries and
+// the most recently updated entry among the same source, sorted newest first.
+function dedupeHistoryEntriesByDate(
+	entries: HistorySummaryEntry[],
+): HistorySummaryEntry[] {
+	const deduped = new Map<string, HistorySummaryEntry>();
+	for (const entry of entries) {
+		const existing = deduped.get(entry.dateKey);
+		if (!existing) {
+			deduped.set(entry.dateKey, entry);
+			continue;
+		}
+		// Prefer non-legacy (full progress) over legacy (summary-only)
+		if (!entry.legacy && existing.legacy) {
+			deduped.set(entry.dateKey, entry);
+			continue;
+		}
+		// Among same type, prefer more recently updated
+		if (entry.lastUpdated > existing.lastUpdated) {
+			deduped.set(entry.dateKey, entry);
+		}
+	}
+
+	return Array.from(deduped.values()).sort((left, right) =>
+		right.dateKey.localeCompare(left.dateKey),
+	);
+}
+
 export async function getHistoryEntriesForUser(userId: string) {
 	const progressRows = await db.query.userPuzzleProgress.findMany({
 		where: eq(userPuzzleProgress.userId, userId),
@@ -637,35 +669,151 @@ export async function getHistoryEntriesForUser(userId: string) {
 		});
 	}
 
-	const deduped = new Map<string, HistorySummaryEntry>();
-	for (const entry of entries) {
-		const existing = deduped.get(entry.dateKey);
-		if (!existing) {
-			deduped.set(entry.dateKey, entry);
-			continue;
-		}
-		// Prefer non-legacy (full progress) over legacy (summary-only)
-		if (!entry.legacy && existing.legacy) {
-			deduped.set(entry.dateKey, entry);
-			continue;
-		}
-		// Among same type, prefer more recently updated
-		if (entry.lastUpdated > existing.lastUpdated) {
-			deduped.set(entry.dateKey, entry);
-		}
+	return dedupeHistoryEntriesByDate(entries);
+}
+
+// Fetches a single page of detailed history entries ordered newest first. Only
+// over-fetches `offset + limit + 1` rows per source table so the initial load
+// stays cheap regardless of how many days the account has accumulated. The
+// extra row lets us report `hasMore` without a separate count query, and
+// over-fetching from both tables keeps the page correct after deduplication
+// (the true top-K of the union is always within each table's top-K).
+export async function getHistoryEntriesPageForUser(
+	userId: string,
+	{ offset, limit }: { offset: number; limit: number },
+): Promise<HistoryEntriesPage> {
+	const fetchCount = offset + limit + 1;
+
+	const progressRows = await db
+		.select({
+			dateKey: dailyPuzzles.dateKey,
+			seed: dailyPuzzles.seed,
+			wordCount: dailyPuzzles.wordCount,
+			guessedWordIds: userPuzzleProgress.guessedWordIds,
+			guessCount: userPuzzleProgress.guessCount,
+			hintsUsed: userPuzzleProgress.hintsUsed,
+			completedAt: userPuzzleProgress.completedAt,
+			lastSyncedAt: userPuzzleProgress.lastSyncedAt,
+		})
+		.from(userPuzzleProgress)
+		.innerJoin(dailyPuzzles, eq(userPuzzleProgress.puzzleId, dailyPuzzles.id))
+		.where(eq(userPuzzleProgress.userId, userId))
+		.orderBy(desc(dailyPuzzles.dateKey))
+		.limit(fetchCount);
+
+	const legacyRows = await db
+		.select()
+		.from(legacyImportedResults)
+		.where(eq(legacyImportedResults.userId, userId))
+		.orderBy(desc(legacyImportedResults.dateKey))
+		.limit(fetchCount);
+
+	const entries: HistorySummaryEntry[] = progressRows.map((row) => ({
+		dateKey: row.dateKey,
+		seed: row.seed,
+		totalWords: row.wordCount,
+		guessedWords: row.guessedWordIds.length,
+		guessCount: row.guessCount,
+		hintsUsed: row.hintsUsed,
+		completed: row.completedAt != null,
+		lastUpdated: row.lastSyncedAt.toISOString(),
+	}));
+
+	for (const row of legacyRows) {
+		entries.push({
+			dateKey: row.dateKey,
+			seed: row.seed,
+			totalWords: row.totalWords,
+			guessedWords: row.guessedWords,
+			guessCount: row.guessCount,
+			hintsUsed: row.hintsUsed,
+			completed: row.completed,
+			lastUpdated: row.lastUpdated.toISOString(),
+			legacy: true,
+		});
 	}
 
-	return Array.from(deduped.values()).sort((left, right) =>
-		right.dateKey.localeCompare(left.dateKey),
-	);
+	const deduped = dedupeHistoryEntriesByDate(entries);
+
+	return {
+		entries: deduped.slice(offset, offset + limit),
+		hasMore: deduped.length > offset + limit,
+	};
 }
+
+// Computes the aggregate stats independently from the paginated entry list so
+// streaks/totals stay accurate without loading every day's heavy columns. Reads
+// only the lightweight columns the stats need.
+export async function getHistoryStatsForUser(
+	userId: string,
+): Promise<HistoryStats> {
+	const progressRows = await db
+		.select({
+			dateKey: dailyPuzzles.dateKey,
+			completedAt: userPuzzleProgress.completedAt,
+			guessCount: userPuzzleProgress.guessCount,
+			lastSyncedAt: userPuzzleProgress.lastSyncedAt,
+		})
+		.from(userPuzzleProgress)
+		.innerJoin(dailyPuzzles, eq(userPuzzleProgress.puzzleId, dailyPuzzles.id))
+		.where(eq(userPuzzleProgress.userId, userId));
+
+	const legacyRows = await db
+		.select({
+			dateKey: legacyImportedResults.dateKey,
+			completed: legacyImportedResults.completed,
+			guessCount: legacyImportedResults.guessCount,
+			lastUpdated: legacyImportedResults.lastUpdated,
+		})
+		.from(legacyImportedResults)
+		.where(eq(legacyImportedResults.userId, userId));
+
+	const entries: HistorySummaryEntry[] = progressRows.map((row) => ({
+		dateKey: row.dateKey,
+		seed: null,
+		totalWords: 0,
+		guessedWords: 0,
+		guessCount: row.guessCount,
+		hintsUsed: 0,
+		completed: row.completedAt != null,
+		lastUpdated: row.lastSyncedAt.toISOString(),
+	}));
+
+	for (const row of legacyRows) {
+		entries.push({
+			dateKey: row.dateKey,
+			seed: null,
+			totalWords: 0,
+			guessedWords: 0,
+			guessCount: row.guessCount,
+			hintsUsed: 0,
+			completed: row.completed,
+			lastUpdated: row.lastUpdated.toISOString(),
+			legacy: true,
+		});
+	}
+
+	return calculateHistoryStats(dedupeHistoryEntriesByDate(entries));
+}
+
+export type AccountHistoryPage = HistoryEntriesPage & {
+	stats: HistoryStats;
+};
 
 export async function getHistoryPageDataForUser(
 	userId?: string,
 	dateKey = getYesterdayDateKey(),
 ) {
 	const yesterdayPuzzleRow = await ensureDailyPuzzleSnapshot(dateKey);
-	const accountHistory = userId ? await getHistoryEntriesForUser(userId) : null;
+	const accountHistory: AccountHistoryPage | null = userId
+		? {
+				...(await getHistoryEntriesPageForUser(userId, {
+					offset: 0,
+					limit: HISTORY_PAGE_SIZE,
+				})),
+				stats: await getHistoryStatsForUser(userId),
+			}
+		: null;
 	const yesterdayLeaderboard = await getLeaderboard(yesterdayPuzzleRow.dateKey);
 
 	captureServerEvent({
@@ -674,7 +822,7 @@ export async function getHistoryPageDataForUser(
 		properties: {
 			date_key: dateKey,
 			has_account_history: Boolean(accountHistory),
-			history_entry_count: accountHistory?.length ?? 0,
+			history_entry_count: accountHistory?.stats.totalDays ?? 0,
 			yesterday_leaderboard_entry_count: yesterdayLeaderboard.entries.length,
 		},
 	});

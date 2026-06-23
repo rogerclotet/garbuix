@@ -80,7 +80,7 @@ export type PuzzleProgressState = {
 	hintsUsed: number;
 	guessCount: number;
 	// Valid dictionary words the player found that aren't part of the puzzle.
-	// Every 10th such word grants a free bonus clue (see bonus_clue_revealed).
+	// Every 5th such word grants a free bonus clue (see bonus_clue_revealed).
 	bonusWordsFound: number;
 	shuffledLetters: string[];
 	completedAt: string | null;
@@ -174,6 +174,24 @@ export type HistorySummaryEntry = {
 	completed: boolean;
 	lastUpdated: string;
 	legacy?: boolean;
+};
+
+// Number of history entries fetched/rendered per page. Keeps the initial page
+// load light now that accounts can accumulate hundreds of daily results.
+export const HISTORY_PAGE_SIZE = 5;
+
+export type HistoryStats = {
+	totalDays: number;
+	completedDays: number;
+	completionRate: number;
+	currentStreak: number;
+	bestStreak: number;
+	avgGuesses: number;
+};
+
+export type HistoryEntriesPage = {
+	entries: HistorySummaryEntry[];
+	hasMore: boolean;
 };
 
 export type AnonymousImportPayload = {

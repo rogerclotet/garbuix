@@ -1,5 +1,5 @@
 import { getTodayDateKey } from "@/lib/puzzle-dates";
-import type { HistorySummaryEntry } from "@/lib/puzzle-types";
+import type { HistoryStats, HistorySummaryEntry } from "@/lib/puzzle-types";
 
 type HistoryStreaks = {
 	currentStreak: number;
@@ -107,5 +107,38 @@ export function calculateHistoryStreaks(
 	return {
 		currentStreak,
 		bestStreak,
+	};
+}
+
+// Aggregates the summary stats shown on the history page. Expects entries that
+// are already deduplicated by dateKey (totals are counted per entry).
+export function calculateHistoryStats(
+	entries: HistorySummaryEntry[],
+	options?: {
+		referenceDateKey?: string;
+	},
+): HistoryStats {
+	const totalDays = entries.length;
+	const completedDays = entries.filter((entry) => entry.completed).length;
+	const { bestStreak, currentStreak } = calculateHistoryStreaks(
+		entries,
+		options,
+	);
+	const completionRate = totalDays
+		? Math.round((completedDays / totalDays) * 100)
+		: 0;
+	const totalGuesses = entries.reduce(
+		(total, entry) => total + entry.guessCount,
+		0,
+	);
+	const avgGuesses = totalDays ? totalGuesses / totalDays : 0;
+
+	return {
+		totalDays,
+		completedDays,
+		completionRate,
+		currentStreak,
+		bestStreak,
+		avgGuesses,
 	};
 }

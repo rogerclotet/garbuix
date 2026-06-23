@@ -95,7 +95,7 @@ export function getNextHintCellKey(
 }
 
 // Picks a uniformly random not-yet-revealed hint-capsule cell for the bonus
-// clue earned every 10 valid off-puzzle words. Only capsule cells are eligible
+// clue earned every 5 valid off-puzzle words. Only capsule cells are eligible
 // so the revealed letter can be decoded. Returns null when none remain.
 export function getRandomHintCellKey(
 	puzzle: DailyPuzzlePublic,
