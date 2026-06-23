@@ -184,6 +184,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const completionTransitionTimerRef = useRef<number | null>(null);
 	const [displayComplete, setDisplayComplete] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
+	// Once the day rolls over we swap the rendered tree to a loading state before
+	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
+	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
@@ -346,10 +349,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		const rolloverAt = new Date(initialData.rolloverAt).getTime();
 		const delay = Math.max(1_000, rolloverAt - Date.now());
-		const timer = window.setTimeout(() => window.location.reload(), delay);
+		// Don't reload straight from the visibility/focus handler: that keeps the
+		// stale puzzle painted for the whole reload round-trip. Flip to the loading
+		// state first (see the reload effect below) so the old day is hidden at once.
+		const beginRollover = () => setIsRollingOver(true);
+		const timer = window.setTimeout(beginRollover, delay);
 		const refreshIfExpired = () => {
 			if (Date.now() >= rolloverAt) {
-				window.location.reload();
+				beginRollover();
 			}
 		};
 
@@ -364,6 +371,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			document.removeEventListener("visibilitychange", refreshIfExpired);
 		};
 	}, [initialData.rolloverAt]);
+
+	// Reload only after the loading state has painted, so the resumed PWA shows the
+	// spinner instead of yesterday's puzzle while the new day's data is fetched.
+	useEffect(() => {
+		if (!isRollingOver || typeof window === "undefined") return;
+
+		const frame = window.requestAnimationFrame(() => window.location.reload());
+		return () => window.cancelAnimationFrame(frame);
+	}, [isRollingOver]);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -1166,6 +1182,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		isComplete,
 	]);
 
+	if (isRollingOver) {
+		return <DailyRolloverLoadingState />;
+	}
+
 	if (!isProgressReady) {
 		return <DailyProgressLoadingState />;
 	}
@@ -1430,6 +1450,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}}
 			/>
 		</>
+	);
+}
+
+function DailyRolloverLoadingState() {
+	return (
+		<div className="relative overflow-hidden">
+			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />
+			<div className="mx-auto flex min-h-[calc(100svh-6rem)] max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+				<div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary shadow-sm">
+					<Loader2Icon className="size-8 animate-spin" />
+				</div>
+				<div className="space-y-2">
+					<h2 className="text-2xl font-semibold tracking-tight">
+						Carregant el repte d'avui
+					</h2>
+					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
+						Ha començat un nou dia. Preparant el trencaclosques d'avui.
+					</p>
+				</div>
+			</div>
+		</div>
 	);
 }
 
