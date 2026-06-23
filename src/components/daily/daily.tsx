@@ -42,7 +42,6 @@ import {
 	buildHistoryEntry,
 	buildRevealedCells,
 	getGuessKeyboardAction,
-	getNextHintCellKey,
 	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
@@ -398,7 +397,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	const nextHintCellKey = useMemo(
-		() => getNextHintCellKey(puzzle, revealedCells),
+		() => getRandomHintCellKey(puzzle, revealedCells),
 		[puzzle, revealedCells],
 	);
 
@@ -414,7 +413,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			cellLetters,
 		);
 		const requested = new Set(derivedProgress.clueWordIds);
-		return notFoundSlots.find((slot) => !requested.has(slot.id))?.id ?? null;
+		const candidates = notFoundSlots.filter((slot) => !requested.has(slot.id));
+		if (candidates.length === 0) return null;
+		const choice = candidates[Math.floor(Math.random() * candidates.length)];
+		return choice?.id ?? null;
 	}, [
 		useTextClue,
 		puzzle.wordSlots,
