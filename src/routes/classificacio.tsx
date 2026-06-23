@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { getLeaderboardSnapshot } from "@/lib/leaderboard-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
@@ -40,6 +41,14 @@ function LeaderboardPending() {
 function LeaderboardPage() {
 	const { dateKey, snapshot } = Route.useLoaderData();
 	const live = useLeaderboard();
+
+	// Force the (long-lived, root-level) stream to reconnect when the page opens
+	// so a stale connection can't keep showing old values until a manual refresh.
+	const { refresh } = live;
+	useEffect(() => {
+		refresh();
+	}, [refresh]);
+
 	const entries =
 		live.dateKey === dateKey && live.entries.length > 0
 			? live.entries
