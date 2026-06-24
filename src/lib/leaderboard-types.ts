@@ -21,6 +21,30 @@ export type LeaderboardSnapshot = {
 	entries: LeaderboardEntry[];
 };
 
+// Canonical leaderboard ordering, shared by the live ("same day") view and the
+// historical ("previous day") view so a board never reorders between them.
+// Mirrors the ranking tiers packed into the Redis sorted-set score: words found,
+// then fewer clues, then earlier completion, with updatedAt as a stable final
+// tiebreak. Returns a new array; the input is left untouched.
+export function sortLeaderboardEntries(
+	entries: LeaderboardEntry[],
+): LeaderboardEntry[] {
+	return [...entries].sort((a, b) => {
+		if (b.wordsFound !== a.wordsFound) {
+			return b.wordsFound - a.wordsFound;
+		}
+		if (a.clueCount !== b.clueCount) {
+			return a.clueCount - b.clueCount; // fewer clues ranks higher
+		}
+		const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : null;
+		const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : null;
+		if (aCompleted && bCompleted) return aCompleted - bCompleted;
+		if (aCompleted) return -1;
+		if (bCompleted) return 1;
+		return a.updatedAt.localeCompare(b.updatedAt);
+	});
+}
+
 export type LeaderboardEventDelta = {
 	wordsAdded: number;
 	justCompleted: boolean;
