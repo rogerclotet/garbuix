@@ -8,10 +8,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type {
-	LeaderboardEntry,
-	LeaderboardEvent,
-	LeaderboardSnapshot,
+import {
+	type LeaderboardEntry,
+	type LeaderboardEvent,
+	type LeaderboardSnapshot,
+	sortLeaderboardEntries,
 } from "@/lib/leaderboard-types";
 
 type LeaderboardStatus = "idle" | "connecting" | "open" | "error" | "closed";
@@ -34,22 +35,7 @@ export type LeaderboardProviderProps = PropsWithChildren<{
 	enabled?: boolean;
 }>;
 
-function sortEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
-	return [...entries].sort((a, b) => {
-		if (b.wordsFound !== a.wordsFound) {
-			return b.wordsFound - a.wordsFound;
-		}
-		if (a.clueCount !== b.clueCount) {
-			return a.clueCount - b.clueCount; // fewer clues ranks higher
-		}
-		const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : null;
-		const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : null;
-		if (aCompleted && bCompleted) return aCompleted - bCompleted;
-		if (aCompleted) return -1;
-		if (bCompleted) return 1;
-		return a.updatedAt.localeCompare(b.updatedAt);
-	});
-}
+const sortEntries = sortLeaderboardEntries;
 
 function applyEntry(
 	entries: LeaderboardEntry[],

@@ -5,6 +5,7 @@ import {
 	type LeaderboardEventDelta,
 	type LeaderboardParticipantKind,
 	type LeaderboardSnapshot,
+	sortLeaderboardEntries,
 	userParticipantId,
 } from "@/lib/leaderboard-types";
 import { getRedis, isRedisConfigured } from "@/lib/redis.server";
@@ -230,7 +231,11 @@ export async function getLeaderboard(
 		}
 	}
 
-	return { dateKey, entries };
+	// Redis returns members in packed-score order, which can break ties (e.g.
+	// players with equal words who haven't completed) differently than the live
+	// client sort. Apply the shared canonical sort so the same board never
+	// reorders between the same-day and previous-day views.
+	return { dateKey, entries: sortLeaderboardEntries(entries) };
 }
 
 export async function renameAnonToUser(options: {
