@@ -118,6 +118,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 
 	afterEach(() => {
 		cleanup();
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
@@ -199,6 +200,83 @@ describe("ClueRequestsProvider snapshot replay", () => {
 
 		expect(result).toBe(true);
 		expect(context().requestedHelpWordIds).toContain(7);
+	});
+
+	it("recovers a request whose live event was missed via the inbox poll", async () => {
+		const request = {
+			id: "req-9",
+			dateKey: DATE_KEY,
+			puzzleId: "puzzle-1",
+			wordId: 2,
+			wordLength: 4,
+			requesterId: "user-2",
+			requesterName: "Bru",
+			createdAt: "2026-06-11T08:00:00.000Z",
+		};
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => ({
+				ok: true,
+				json: async () => ({ requests: [request], responses: [] }),
+			})),
+		);
+		vi.useFakeTimers();
+		renderProvider();
+		// The responder has found this word, so the recovered request is actionable.
+		act(() => {
+			context().publishSolvedWordIds([2]);
+		});
+
+		// No live "request" event arrives; the 8s inbox poll must surface it anyway.
+		expect(context().incomingRequests).toHaveLength(0);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(8000);
+		});
+
+		expect(context().incomingRequests.map((r) => r.id)).toContain("req-9");
+	});
+
+	it("drops a resolved request whose live event was missed via the inbox poll", async () => {
+		const request = {
+			id: "req-9",
+			dateKey: DATE_KEY,
+			puzzleId: "puzzle-1",
+			wordId: 2,
+			wordLength: 4,
+			requesterId: "user-2",
+			requesterName: "Bru",
+			createdAt: "2026-06-11T08:00:00.000Z",
+		};
+		// First poll surfaces the request, second poll no longer lists it (resolved).
+		let polls = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				polls += 1;
+				return {
+					ok: true,
+					json: async () => ({
+						requests: polls === 1 ? [request] : [],
+						responses: [],
+					}),
+				};
+			}),
+		);
+		vi.useFakeTimers();
+		renderProvider();
+		act(() => {
+			context().publishSolvedWordIds([2]);
+		});
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(8000);
+		});
+		expect(context().incomingRequests.map((r) => r.id)).toContain("req-9");
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(8000);
+		});
+		expect(context().incomingRequests).toHaveLength(0);
 	});
 
 	it("rolls back the waiting state when the request fails", async () => {
