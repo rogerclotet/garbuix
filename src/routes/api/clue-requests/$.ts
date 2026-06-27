@@ -87,12 +87,19 @@ async function handleGet(request: Request) {
 	if (!user) {
 		return new Response("Unauthorized", { status: 401 });
 	}
-	// Polling fallback for clues delivered to the asker, in case the live SSE
-	// event is dropped (e.g. a proxy buffering the open stream in production).
+	// Polling fallback for both directions, in case the live SSE event is dropped
+	// (e.g. a proxy buffering the open stream in production): clues delivered to
+	// the asker, plus the pending requests this user could still answer. Requests
+	// exclude the viewer's own — same shape the SSE snapshot ships — so the client
+	// can reconcile them and recover a missed "request" (or "resolved") event.
 	if (parsed.kind === "inbox") {
-		const responses = await getClueInbox(user.id, parsed.dateKey);
+		const [responses, pending] = await Promise.all([
+			getClueInbox(user.id, parsed.dateKey),
+			getPendingClueRequests(parsed.dateKey),
+		]);
+		const requests = pending.filter((r) => r.requesterId !== user.id);
 		return Response.json(
-			{ responses },
+			{ responses, requests },
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}
@@ -205,7 +212,12 @@ async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
 
 	const clueRequest = await getClueRequest(dateKey, requestId);
 	if (!clueRequest) {
-		return new Response("Request not found", { status: 410 });
+		// The request is gone: the asker found the word, another responder answered
+		// first (first-responder-wins resolves it), or it simply expired. In every
+		// case the asker no longer needs this clue, so accept it silently and report
+		// success — surfacing an error here only confuses a responder who did nothing
+		// wrong. Nothing is delivered since there's no one waiting.
+		return Response.json({ delivered: true });
 	}
 
 	// A player can't answer their own request.

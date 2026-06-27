@@ -256,10 +256,35 @@ export function ClueRequestsProvider({
 		};
 	}, [active, dateKey, localUserId, ingestResponses]);
 
-	// Polling fallback for delivered clues: the live SSE event can be dropped (a
+	// Reconcile the set of requests we could answer against the server's
+	// authoritative pending set (delivered by the snapshot and the inbox poll).
+	// Mirrors how the snapshot replaces incomingRequests, so a missed live
+	// "request" event (added) or "resolved" event (dropped) self-heals — the
+	// asker's clue request shows up for responders even when the proxy ate the
+	// live event. Own requests are filtered server-side; we re-filter defensively.
+	const reconcileIncomingRequests = useCallback(
+		(serverRequests: ClueRequest[]) => {
+			setIncomingRequests((current) => {
+				const next = serverRequests.filter(
+					(r) => r.requesterId !== localUserId,
+				);
+				// Identity-stable when the id-set is unchanged, so the 8s poll doesn't
+				// re-render consumers with an equal-but-new array.
+				const currentIds = new Set(current.map((r) => r.id));
+				const unchanged =
+					next.length === current.length &&
+					next.every((r) => currentIds.has(r.id));
+				return unchanged ? current : next;
+			});
+		},
+		[localUserId],
+	);
+
+	// Polling fallback for both directions: the live SSE event can be dropped (a
 	// proxy buffering the open stream in production), so the asker would otherwise
-	// wait forever. The inbox is tiny; merge it in every few seconds. ingestResponses
-	// dedupes against the live/snapshot paths, so a clue notifies exactly once.
+	// wait forever and responders would never see the request. Every few seconds we
+	// merge the inbox (clues for us) and reconcile the pending requests (clues we
+	// could give). ingestResponses dedupes, so a clue notifies exactly once.
 	useEffect(() => {
 		if (!active || !dateKey || typeof window === "undefined") {
 			return;
@@ -271,11 +296,17 @@ export function ClueRequestsProvider({
 			try {
 				const response = await fetch(`/api/clue-requests/${dateKey}/inbox`);
 				if (!response.ok) return;
-				const data = (await response.json()) as { responses?: ClueResponse[] };
-				if (cancelled || !data.responses || data.responses.length === 0) {
-					return;
+				const data = (await response.json()) as {
+					responses?: ClueResponse[];
+					requests?: ClueRequest[];
+				};
+				if (cancelled) return;
+				if (data.requests) {
+					reconcileIncomingRequests(data.requests);
 				}
-				ingestResponses(data.responses);
+				if (data.responses && data.responses.length > 0) {
+					ingestResponses(data.responses);
+				}
 			} catch {
 				// best-effort; the SSE path or the next poll will recover
 			}
@@ -286,7 +317,7 @@ export function ClueRequestsProvider({
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, [active, dateKey, ingestResponses]);
+	}, [active, dateKey, ingestResponses, reconcileIncomingRequests]);
 
 	const subscribe = useCallback(
 		(listener: (event: ClueRequestStreamEvent) => void) => {
