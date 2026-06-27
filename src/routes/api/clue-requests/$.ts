@@ -297,7 +297,7 @@ function openSseStream(dateKey: string, userId: string): Response {
 
 	const sub = getRedisSub();
 	const requestsChannelName = clueRequestsChannel(dateKey);
-	const responsesChannelName = clueResponsesChannel(userId);
+	const responsesChannelName = clueResponsesChannel(userId, dateKey);
 	const encoder = new TextEncoder();
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let listener: ((channel: string, message: string) => void) | null = null;
