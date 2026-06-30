@@ -908,12 +908,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		useTextClue,
 	]);
 
-	// Peer clue requests: a logged-in player who is out of hints can ask other
-	// connected players for a clue about a specific unfound word.
+	// Self-serve hint availability: a hint remains in the budget AND there's an
+	// eligible target — an unclued missing word for text clues, or an unrevealed
+	// cell for the anonymous letter reveal.
+	const canUseSelfHint =
+		derivedProgress.hintsUsed < 3 &&
+		(useTextClue ? nextClueWordId != null : nextHintCellKey != null);
+
+	// Peer clue requests: a logged-in player can ask other connected players for
+	// a clue about an unfound word once self-serve hints can't help — either the
+	// 3-hint budget is spent, or every missing word already has a clue so a
+	// remaining hint can't be spent on a new one.
 	const canRequestHelp =
 		Boolean(activeUser) &&
-		derivedProgress.hintsUsed >= 3 &&
-		derivedProgress.guessedWordIds.length < totalWords;
+		derivedProgress.guessedWordIds.length < totalWords &&
+		!canUseSelfHint;
 
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
@@ -1365,12 +1374,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							<DailyControls
 								aiClueMode={useTextClue}
 								circleLetters={circleLetters}
-								canUseHint={
-									derivedProgress.hintsUsed < 3 &&
-									(useTextClue
-										? nextClueWordId != null
-										: nextHintCellKey != null)
-								}
+								canUseHint={canUseSelfHint}
 								currentGuess={currentGuess}
 								hintsUsed={derivedProgress.hintsUsed}
 								isComplete={displayComplete}
