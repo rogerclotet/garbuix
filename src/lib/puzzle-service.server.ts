@@ -36,6 +36,7 @@ import {
 	buildNormalizedDictionary,
 	getValidNormalizedGuessesForLetters,
 } from "@/lib/puzzle-dictionary";
+import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	buildSyncedProgressState,
 	createEmptyProgressState,
@@ -116,6 +117,14 @@ function toSessionUser(
 				image: sessionData.user.image,
 			}
 		: null;
+}
+
+// Narrows a stored difficulty (a nullable integer column or snapshot value) to
+// the 1-3 star union, dropping anything out of range to null.
+function toPuzzleDifficulty(
+	value: number | null | undefined,
+): PuzzleDifficulty | null {
+	return value === 1 || value === 2 || value === 3 ? value : null;
 }
 
 function serializeProgressRow(
@@ -321,6 +330,7 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 			algorithmVersion: PUZZLE_ALGORITHM_VERSION,
 			dictionaryVersion: await getDictionaryVersion(),
 			wordCount: privateSnapshot.wordSlots.length,
+			difficulty: publicSnapshot.difficulty ?? null,
 			publicSnapshotJson: publicSnapshot,
 			privateSnapshotJson: privateSnapshot,
 		})
@@ -378,6 +388,11 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 			hintCapsules,
 			validNormalizedGuesses: getDailyValidNormalizedGuesses(
 				publicSnapshot.letters,
+			),
+			// The column is authoritative (kept in sync by generation and backfill);
+			// fall back to the snapshot JSON for rows persisted before the column.
+			difficulty: toPuzzleDifficulty(
+				puzzle.difficulty ?? publicSnapshot.difficulty,
 			),
 		},
 		rolloverAt: getNextRolloverAt().toISOString(),
@@ -658,6 +673,7 @@ export async function getHistoryEntriesForUser(userId: string) {
 		hintsUsed: row.hintsUsed,
 		completed: row.completedAt != null,
 		lastUpdated: row.lastSyncedAt.toISOString(),
+		difficulty: toPuzzleDifficulty(row.puzzle.difficulty),
 	}));
 
 	for (const row of legacyRows) {
@@ -694,6 +710,7 @@ export async function getHistoryEntriesPageForUser(
 			dateKey: dailyPuzzles.dateKey,
 			seed: dailyPuzzles.seed,
 			wordCount: dailyPuzzles.wordCount,
+			difficulty: dailyPuzzles.difficulty,
 			guessedWordIds: userPuzzleProgress.guessedWordIds,
 			guessCount: userPuzzleProgress.guessCount,
 			hintsUsed: userPuzzleProgress.hintsUsed,
@@ -722,6 +739,7 @@ export async function getHistoryEntriesPageForUser(
 		hintsUsed: row.hintsUsed,
 		completed: row.completedAt != null,
 		lastUpdated: row.lastSyncedAt.toISOString(),
+		difficulty: toPuzzleDifficulty(row.difficulty),
 	}));
 
 	for (const row of legacyRows) {
@@ -837,6 +855,10 @@ export async function getHistoryPageDataForUser(
 		yesterdayPuzzle: {
 			dateKey: yesterdayPuzzleRow.dateKey,
 			preview: toPuzzlePreview(yesterdayPuzzleRow.privateSnapshotJson),
+			difficulty: toPuzzleDifficulty(
+				yesterdayPuzzleRow.difficulty ??
+					yesterdayPuzzleRow.publicSnapshotJson.difficulty,
+			),
 		},
 		yesterdayLeaderboard,
 	};

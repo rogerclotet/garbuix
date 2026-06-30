@@ -36,6 +36,7 @@ import { useClueRequests } from "@/lib/use-clue-requests";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
+import { setDailyDifficulty } from "./daily-difficulty-store";
 import { DailyGrid } from "./daily-grid";
 import {
 	buildCellLetters,
@@ -300,6 +301,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleWelcomeContinueAnonymous = useCallback(() => {
 		captureEvent("welcome_dismissed", { choice: "anonymous" });
 	}, [captureEvent]);
+
+	// Publish today's difficulty to the shared header (rendered above this route),
+	// and clear it when leaving the daily puzzle so other pages don't show it.
+	useEffect(() => {
+		setDailyDifficulty(puzzle.difficulty ?? null);
+		return () => setDailyDifficulty(null);
+	}, [puzzle.difficulty]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {

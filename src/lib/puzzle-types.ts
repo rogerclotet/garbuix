@@ -1,3 +1,5 @@
+import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
+
 export type PuzzleDirection = "horizontal" | "vertical";
 
 export type SessionUser = {
@@ -42,6 +44,9 @@ export type DailyPuzzlePublic = {
 	validNormalizedGuesses: string[];
 	wordSlots: DailyPuzzleWordSlot[];
 	hintCapsules: DailyPuzzleHintCapsule[];
+	// 1-3 star difficulty derived from the puzzle's word frequencies. Optional
+	// for puzzles generated before the feature existed (filled by backfill).
+	difficulty?: PuzzleDifficulty | null;
 };
 
 export type DailyPuzzlePrivateWord = {
@@ -174,6 +179,9 @@ export type HistorySummaryEntry = {
 	completed: boolean;
 	lastUpdated: string;
 	legacy?: boolean;
+	// Puzzle-level difficulty (same for every player on a given day). Absent for
+	// legacy/anonymous entries that have no linked puzzle row.
+	difficulty?: PuzzleDifficulty | null;
 };
 
 // Number of history entries fetched/rendered per page. Keeps the initial page

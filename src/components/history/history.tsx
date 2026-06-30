@@ -8,11 +8,13 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
+import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	buildAnonymousImportPayload,
 	getDeviceId,
@@ -54,6 +56,7 @@ type HistoryData = {
 	yesterdayPuzzle: {
 		dateKey: string;
 		preview: DailyPuzzlePreview;
+		difficulty?: PuzzleDifficulty | null;
 	};
 	yesterdayLeaderboard?: LeaderboardSnapshot;
 };
@@ -308,6 +311,12 @@ export function History({ initialData }: { initialData: HistoryData }) {
 														{entry.legacy ? (
 															<Badge variant="outline">Importat</Badge>
 														) : null}
+														{entry.difficulty ? (
+															<DifficultyBars
+																difficulty={entry.difficulty}
+																showLabel
+															/>
+														) : null}
 														<span className="text-sm text-muted-foreground font-ui">
 															{entry.guessCount} intent
 															{entry.guessCount === 1 ? "" : "s"} ·{" "}
@@ -348,15 +357,23 @@ export function History({ initialData }: { initialData: HistoryData }) {
 
 					<div className="order-1 lg:order-2">
 						<div className="rounded-xl bg-muted/30 p-4 sm:p-5 space-y-4">
-							<div>
+							<div className="space-y-1.5">
 								<h3 className="text-base font-semibold">Resultat d'ahir</h3>
-								<span className="text-sm text-muted-foreground font-ui">
-									{dateFormatter.format(
-										new Date(
-											`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
-										),
-									)}
-								</span>
+								<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+									<span className="text-sm text-muted-foreground font-ui">
+										{dateFormatter.format(
+											new Date(
+												`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
+											),
+										)}
+									</span>
+									{initialData.yesterdayPuzzle.difficulty ? (
+										<DifficultyBars
+											difficulty={initialData.yesterdayPuzzle.difficulty}
+											showLabel
+										/>
+									) : null}
+								</div>
 							</div>
 
 							<div

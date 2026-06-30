@@ -29,6 +29,13 @@
       "when": 1780296716495,
       "tag": "0003_narrow_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782809881325,
+      "tag": "0004_sticky_dreadnoughts",
+      "breakpoints": true
     }
   ]
 }

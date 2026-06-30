@@ -1,10 +1,12 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, HelpingHand, Trophy } from "lucide-react";
+import { useDailyDifficulty } from "@/components/daily/daily-difficulty-store";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
 	setHowToPlayOpen,
 	useHowToPlayOpen,
 } from "@/components/daily/how-to-play-store";
+import { DifficultyBars } from "@/components/difficulty-bars";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -21,6 +23,7 @@ export default function Header() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
+	const dailyDifficulty = useDailyDifficulty();
 	const navigate = useNavigate();
 	const { incomingRequests } = useClueRequests();
 	// "How many players are requesting help" — distinct askers, not raw requests.
@@ -80,6 +83,9 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
+					{!innerTitle ? (
+						<DifficultyBars difficulty={dailyDifficulty} showLabel />
+					) : null}
 					<div className="flex items-center gap-2">
 						{pathname !== "/classificacio" ? (
 							<Button
