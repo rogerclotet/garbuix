@@ -1,4 +1,10 @@
-import { CornerDownLeft, Delete, Lightbulb, Shuffle } from "lucide-react";
+import {
+	CornerDownLeft,
+	Delete,
+	Lightbulb,
+	Shuffle,
+	Trophy,
+} from "lucide-react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -75,6 +81,11 @@ export function HowToPlayDialog({ open, onOpenChange }: HowToPlayDialogProps) {
 						icon={<Shuffle className="size-4" />}
 						title="Barreja les lletres"
 						description="Reordena les lletres si necessites una nova perspectiva."
+					/>
+					<ControlRow
+						icon={<Trophy className="size-4 text-amber-500" />}
+						title="Puja a la classificació"
+						description="Completa el garbuix amb menys pistes per encapçalar-la. Si empateu, desempata qui fa menys intents i, si tot continua igual, qui acaba abans."
 					/>
 				</div>
 

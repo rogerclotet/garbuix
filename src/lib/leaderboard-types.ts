@@ -10,7 +10,8 @@ export type LeaderboardEntry = {
 	// Clues used while solving: the 3 free clues plus any a friend gave. Fewer
 	// ranks higher on the leaderboard.
 	clueCount: number;
-	// Total guesses made. Shown for context but never affects ranking.
+	// Total guesses made. Breaks ties between players with equal clues: fewer
+	// tries ranks higher.
 	tryCount: number;
 	completedAt: string | null;
 	updatedAt: string;
@@ -24,8 +25,8 @@ export type LeaderboardSnapshot = {
 // Canonical leaderboard ordering, shared by the live ("same day") view and the
 // historical ("previous day") view so a board never reorders between them.
 // Mirrors the ranking tiers packed into the Redis sorted-set score: words found,
-// then fewer clues, then earlier completion, with updatedAt as a stable final
-// tiebreak. Returns a new array; the input is left untouched.
+// then fewer clues, then fewer tries, then earlier completion, with updatedAt as
+// a stable final tiebreak. Returns a new array; the input is left untouched.
 export function sortLeaderboardEntries(
 	entries: LeaderboardEntry[],
 ): LeaderboardEntry[] {
@@ -35,6 +36,9 @@ export function sortLeaderboardEntries(
 		}
 		if (a.clueCount !== b.clueCount) {
 			return a.clueCount - b.clueCount; // fewer clues ranks higher
+		}
+		if (a.tryCount !== b.tryCount) {
+			return a.tryCount - b.tryCount; // fewer tries ranks higher
 		}
 		const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : null;
 		const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : null;

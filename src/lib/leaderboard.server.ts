@@ -14,24 +14,30 @@ export { anonParticipantId, userParticipantId };
 
 const TTL_SECONDS = 60 * 60 * 48;
 // Ranking tiers, highest priority first, packed into a single sorted-set score:
-//   1. words found  — each worth far more than any clue or time delta
+//   1. words found  — each worth far more than any clue, try, or time delta
 //   2. clues used   — fewer is better, so each clue subtracts a fixed amount
-//   3. completion    — earlier finishers edge ahead, as a sub-1 tiebreak
-// Tries are intentionally absent: they never affect the score.
+//   3. tries used   — fewer is better, breaking ties between equal clues
+//   4. completion    — earlier finishers edge ahead, as a sub-1 tiebreak
+// Each tier's band is wide enough to dominate every lower tier combined.
 const WORDS_FOUND_MULTIPLIER = 1e12;
-const CLUE_PENALTY = 1e6;
+const CLUE_PENALTY = 1e8;
+const TRY_PENALTY = 1e2;
 const COMPLETION_HORIZON_MS = 1e14;
 
 function scoreFor(
 	wordsFound: number,
 	clueCount: number,
+	tryCount: number,
 	completedAt: string | null,
 ): number {
-	const base = wordsFound * WORDS_FOUND_MULTIPLIER - clueCount * CLUE_PENALTY;
+	const base =
+		wordsFound * WORDS_FOUND_MULTIPLIER -
+		clueCount * CLUE_PENALTY -
+		tryCount * TRY_PENALTY;
 	if (!completedAt) {
 		return base;
 	}
-	// Stays in [0, 1) so it only breaks ties between equal words and clues.
+	// Stays in [0, 1) so it only breaks ties between equal words, clues, and tries.
 	const completionComponent = Math.max(
 		0,
 		1 - new Date(completedAt).getTime() / COMPLETION_HORIZON_MS,
@@ -90,7 +96,12 @@ export async function recordProgress(
 	}
 
 	const updatedAt = new Date().toISOString();
-	const score = scoreFor(input.wordsFound, input.clueCount, input.completedAt);
+	const score = scoreFor(
+		input.wordsFound,
+		input.clueCount,
+		input.tryCount,
+		input.completedAt,
+	);
 
 	const entry: LeaderboardEntry = {
 		participantId: input.participantId,
@@ -276,6 +287,7 @@ export async function renameAnonToUser(options: {
 		const score = scoreFor(
 			updated.wordsFound,
 			updated.clueCount,
+			updated.tryCount,
 			updated.completedAt,
 		);
 		const pipeline = redis.pipeline();
