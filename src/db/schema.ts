@@ -29,6 +29,9 @@ export const dailyPuzzles = pgTable(
 		algorithmVersion: text("algorithm_version").notNull(),
 		dictionaryVersion: text("dictionary_version").notNull(),
 		wordCount: integer("word_count").notNull(),
+		// 1-3 star difficulty from word frequencies. Nullable so puzzles created
+		// before this column existed can be filled in by the backfill script.
+		difficulty: integer("difficulty"),
 		publicSnapshotJson: jsonb("public_snapshot_json")
 			.$type<DailyPuzzlePublic>()
 			.notNull(),
