@@ -112,7 +112,7 @@ export function UserMenu() {
 					}}
 				>
 					<HelpCircle className="size-4" />
-					<span>Com es juga</span>
+					<span>Com s'hi juga</span>
 				</DropdownMenuItem>
 				<DropdownMenuItem asChild>
 					<Link to="/preferencies">

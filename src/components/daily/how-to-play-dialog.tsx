@@ -1,8 +1,10 @@
+import { getRouteApi } from "@tanstack/react-router";
 import {
 	CornerDownLeft,
 	Delete,
 	Lightbulb,
 	Shuffle,
+	Sparkles,
 	Trophy,
 } from "lucide-react";
 import {
@@ -14,6 +16,9 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useActiveSessionUser } from "@/lib/use-active-session-user";
+
+const rootRoute = getRouteApi("__root__");
 
 type HowToPlayDialogProps = {
 	open: boolean;
@@ -45,11 +50,24 @@ function ControlRow({
 }
 
 export function HowToPlayDialog({ open, onOpenChange }: HowToPlayDialogProps) {
+	const rootData = rootRoute.useLoaderData();
+	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
+	const hintDescription = activeUser
+		? "Et dona una pista descriptiva per a una paraula que encara no has trobat. Tens 3 pistes per partida."
+		: "Revela una lletra al tauler. Tens 3 pistes per partida.";
+	const hintIcon = activeUser ? (
+		<Sparkles className="size-4 text-amber-500" />
+	) : (
+		<Lightbulb className="size-4 text-amber-500" />
+	);
+
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
-					<AlertDialogTitle className="text-base">Com es juga</AlertDialogTitle>
+					<AlertDialogTitle className="text-base">
+						Com s'hi juga
+					</AlertDialogTitle>
 					<AlertDialogDescription>
 						Forma paraules de 4 lletres o més amb les lletres del dia. Cada
 						paraula encertada es revela a la quadrícula.
@@ -73,9 +91,9 @@ export function HowToPlayDialog({ open, onOpenChange }: HowToPlayDialogProps) {
 						description="Treu l'última lletra del que estàs escrivint."
 					/>
 					<ControlRow
-						icon={<Lightbulb className="size-4 text-amber-500" />}
+						icon={hintIcon}
 						title="Mantén premut per una pista"
-						description="Revela una lletra al tauler. Tens 3 pistes per partida."
+						description={hintDescription}
 					/>
 					<ControlRow
 						icon={<Shuffle className="size-4" />}
