@@ -64,7 +64,7 @@ export default function Header() {
 								asChild
 								className="size-11 -ml-2 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9 sm:-ml-1"
 							>
-								<Link to="/" aria-label="Tornar">
+								<Link to="/" replace aria-label="Tornar">
 									<ChevronLeft className="size-6 sm:size-5" />
 								</Link>
 							</Button>
