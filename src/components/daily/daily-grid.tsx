@@ -62,14 +62,13 @@ export function DailyGrid({
 
 	return (
 		<div
-			className="flex w-full items-center justify-center @container lg:h-full lg:min-h-0"
+			className="flex items-center justify-center w-full @container"
 			style={{ "--cols": puzzle.cols } as CSSProperties}
 		>
 			<div
-				className="mx-auto grid w-full max-w-2xl gap-[3px] sm:gap-1 lg:h-auto lg:max-h-full lg:w-auto lg:max-w-2xl"
+				className="grid gap-[3px] sm:gap-1 w-full max-w-2xl mx-auto"
 				style={{
 					gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
-					aspectRatio: `${puzzle.cols} / ${puzzle.rows}`,
 				}}
 			>
 				{puzzle.gridMask.map((row, rowIdx) =>
