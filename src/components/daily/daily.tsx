@@ -167,13 +167,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
-	// On desktop the puzzle and the word-list column sit in a 2-col grid whose
-	// row stretches to the taller column. We pin the right column to the
-	// puzzle's intrinsic height so a long word list scrolls internally instead
-	// of growing the whole page. null on mobile (single column, no constraint).
-	const [desktopColumnHeight, setDesktopColumnHeight] = useState<number | null>(
-		null,
-	);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -1012,40 +1005,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
-	// Track the puzzle's intrinsic height (the grid column uses `lg:self-start`,
-	// so it never stretches) and mirror it onto the word-list column on desktop.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run once the loading state clears and the grid (gridRef) actually mounts.
-	useEffect(() => {
-		const grid = gridRef.current;
-		if (!grid) return;
-
-		const desktop = window.matchMedia("(min-width: 1024px)");
-		let observer: ResizeObserver | null = null;
-
-		const measure = () => {
-			setDesktopColumnHeight(grid.offsetHeight);
-		};
-
-		const sync = () => {
-			if (desktop.matches) {
-				measure();
-				observer ??= new ResizeObserver(measure);
-				observer.observe(grid);
-			} else {
-				observer?.disconnect();
-				observer = null;
-				setDesktopColumnHeight(null);
-			}
-		};
-
-		sync();
-		desktop.addEventListener("change", sync);
-		return () => {
-			desktop.removeEventListener("change", sync);
-			observer?.disconnect();
-		};
-	}, [isProgressReady]);
-
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
 	// Delay the visual completion state so the submit feedback animation plays first
@@ -1213,15 +1172,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		<>
 			<DailyConfetti fire={shouldFireConfetti} />
 			<div
-				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
+				className={`min-h-full px-3 sm:px-4 pt-2 sm:pt-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-8 lg:pt-4 ${
 					displayComplete
-						? "pb-6 sm:pb-8 lg:pb-24"
-						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
+						? "pb-6 sm:pb-8 lg:pb-4"
+						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-4"
 				}`}
 			>
-				<div className="max-w-5xl mx-auto">
+				<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
 					<div
-						className={`mb-4 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+						className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
 					>
 						{displayComplete ? (
 							<div className="space-y-1">
@@ -1358,8 +1317,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						)}
 					</div>
 
-					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div ref={gridRef} className="lg:self-start">
+					<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
+						<div
+							ref={gridRef}
+							className="lg:flex lg:min-h-0 lg:items-center lg:justify-center"
+						>
 							<DailyGrid
 								puzzle={puzzle}
 								revealedCells={revealedCells}
@@ -1371,39 +1333,34 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							/>
 						</div>
 
-						<div
-							className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6"
-							style={
-								desktopColumnHeight != null
-									? { height: desktopColumnHeight }
-									: undefined
-							}
-						>
-							<DailyControls
-								aiClueMode={useTextClue}
-								circleLetters={circleLetters}
-								canUseHint={canUseSelfHint}
-								currentGuess={currentGuess}
-								hintsUsed={derivedProgress.hintsUsed}
-								isComplete={displayComplete}
-								shuffledLetters={derivedProgress.shuffledLetters}
-								onBackspace={handleBackspace}
-								onHint={handleHint}
-								onLetterClick={handleLetterClick}
-								onShuffle={handleShuffle}
-								onSubmitGuess={() => {
-									void handleGuess();
-								}}
-								submitFeedback={submitFeedback}
-								runClickAction={runClickAction}
-								runPressAction={runPressAction}
-							/>
+						<div className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6">
+							<div className="lg:shrink-0">
+								<DailyControls
+									aiClueMode={useTextClue}
+									circleLetters={circleLetters}
+									canUseHint={canUseSelfHint}
+									currentGuess={currentGuess}
+									hintsUsed={derivedProgress.hintsUsed}
+									isComplete={displayComplete}
+									shuffledLetters={derivedProgress.shuffledLetters}
+									onBackspace={handleBackspace}
+									onHint={handleHint}
+									onLetterClick={handleLetterClick}
+									onShuffle={handleShuffle}
+									onSubmitGuess={() => {
+										void handleGuess();
+									}}
+									submitFeedback={submitFeedback}
+									runClickAction={runClickAction}
+									runPressAction={runPressAction}
+								/>
+							</div>
 
 							<div
 								id={WORD_LIST_SECTION_ID}
 								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
 							>
-								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
+								<h3 className="mb-3 shrink-0 text-sm font-semibold uppercase tracking-wider text-muted-foreground font-ui">
 									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
 									)
 								</h3>
