@@ -1,5 +1,11 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+	Link,
+	useNavigate,
+	useRouter,
+	useRouterState,
+} from "@tanstack/react-router";
 import { ChevronLeft, HelpingHand, Trophy } from "lucide-react";
+import { useLayoutEffect, useRef } from "react";
 import { useDailyDifficulty } from "@/components/daily/daily-difficulty-store";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
@@ -21,10 +27,22 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 
 export default function Header() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const historyIndex = useRouterState({
+		select: (s) => s.location.state.__TSR_index,
+	});
+	const homeHistoryIndexRef = useRef<number | null>(null);
+
+	useLayoutEffect(() => {
+		if (pathname === "/" && typeof historyIndex === "number") {
+			homeHistoryIndexRef.current = historyIndex;
+		}
+	}, [pathname, historyIndex]);
+
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
 	const dailyDifficulty = useDailyDifficulty();
 	const navigate = useNavigate();
+	const router = useRouter();
 	const { incomingRequests } = useClueRequests();
 	// "How many players are requesting help" — distinct askers, not raw requests.
 	const helpRequestCount = new Set(
@@ -52,6 +70,22 @@ export default function Header() {
 		});
 	};
 
+	const goHome = () => {
+		const homeHistoryIndex = homeHistoryIndexRef.current;
+
+		// Rewind to the last game entry, dropping every inner page visited since.
+		if (
+			typeof homeHistoryIndex === "number" &&
+			typeof historyIndex === "number" &&
+			historyIndex > homeHistoryIndex
+		) {
+			router.history.go(homeHistoryIndex - historyIndex);
+			return;
+		}
+
+		void navigate({ to: "/", replace: true });
+	};
+
 	return (
 		<header className="bg-background transition-colors duration-300">
 			<div className="max-w-5xl mx-auto px-3 sm:px-4 pb-1 sm:pb-1.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-[calc(env(safe-area-inset-top)+1rem)]">
@@ -61,12 +95,11 @@ export default function Header() {
 							<Button
 								variant="ghost"
 								size="icon-lg"
-								asChild
+								onClick={goHome}
 								className="size-11 -ml-2 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9 sm:-ml-1"
+								aria-label="Tornar"
 							>
-								<Link to="/" replace aria-label="Tornar">
-									<ChevronLeft className="size-6 sm:size-5" />
-								</Link>
+								<ChevronLeft className="size-6 sm:size-5" />
 							</Button>
 							<h1 className="truncate text-xl sm:text-2xl font-bold text-primary">
 								{innerTitle}
