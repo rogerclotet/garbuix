@@ -211,19 +211,19 @@ export function useDailyProgress({
 				) {
 					importAttemptedRef.current = activeUser.id;
 					const payload = buildAnonymousImportPayload();
-
-					if (
+					const hasLocalProgress =
 						payload.historyEntries.length > 0 ||
-						Object.keys(payload.activeProgressByDate).length > 0
-					) {
-						try {
-							const result = await importProgress({
-								data: {
-									deviceId,
-									payload,
-								},
-							});
-							markAnonymousDataImported(activeUser.id);
+						Object.keys(payload.activeProgressByDate).length > 0;
+
+					try {
+						const result = await importProgress({
+							data: {
+								deviceId,
+								payload,
+							},
+						});
+						markAnonymousDataImported(activeUser.id);
+						if (hasLocalProgress) {
 							captureEvent("anonymous_progress_imported", {
 								active_progress_count: Object.keys(payload.activeProgressByDate)
 									.length,
@@ -234,17 +234,15 @@ export function useDailyProgress({
 								await refreshProgressFromServer();
 							}
 							toast.success("S'han sincronitzat els resultats locals");
-						} catch (error) {
-							console.error("Failed to import anonymous progress", error);
-							if (!isLikelyOfflineOrNetworkError(error)) {
-								captureException(error, {
-									puzzle_date: puzzle.dateKey,
-									scope: "anonymous_progress_import",
-								});
-							}
 						}
-					} else {
-						markAnonymousDataImported(activeUser.id);
+					} catch (error) {
+						console.error("Failed to import anonymous progress", error);
+						if (!isLikelyOfflineOrNetworkError(error)) {
+							captureException(error, {
+								puzzle_date: puzzle.dateKey,
+								scope: "anonymous_progress_import",
+							});
+						}
 					}
 				}
 

@@ -18,6 +18,7 @@ import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import {
 	getLeaderboard,
+	mergeAnonLeaderboardForUser,
 	recordProgress as recordLeaderboardProgress,
 	userParticipantId,
 } from "@/lib/leaderboard.server";
@@ -907,9 +908,10 @@ export async function getHistoryPageDataForUser(
 
 export async function importAnonymousProgressForUser(options: {
 	userId: string;
+	deviceId: string;
 	payload: AnonymousImportPayload;
 }) {
-	const { payload, userId } = options;
+	const { payload, userId, deviceId } = options;
 	const importedDates: string[] = [];
 	const skippedLegacyDates: string[] = [];
 
@@ -1017,6 +1019,34 @@ export async function importAnonymousProgressForUser(options: {
 		importedDates.push(historyEntry.dateKey);
 	}
 
+	const dateKeysForLeaderboardMerge = [
+		getTodayDateKey(),
+		...importedDates,
+		...skippedLegacyDates,
+		...Object.keys(payload.activeProgressByDate),
+		...payload.historyEntries.map((entry) => entry.dateKey),
+	];
+
+	try {
+		const profiles = await db
+			.select({ name: user.name, image: user.image })
+			.from(user)
+			.where(eq(user.id, userId))
+			.limit(1);
+		const profile = profiles[0];
+		if (profile) {
+			await mergeAnonLeaderboardForUser({
+				deviceId,
+				userId,
+				name: profile.name,
+				image: profile.image ?? null,
+				dateKeys: dateKeysForLeaderboardMerge,
+			});
+		}
+	} catch (error) {
+		console.warn("[leaderboard] merge anon on import failed", error);
+	}
+
 	captureServerEvent({
 		distinctId: userId,
 		event: "anonymous_progress_imported_server",
@@ -1024,6 +1054,7 @@ export async function importAnonymousProgressForUser(options: {
 			active_progress_count: Object.keys(payload.activeProgressByDate).length,
 			imported_dates: importedDates.length,
 			legacy_dates: skippedLegacyDates.length,
+			merged_leaderboard_dates: dateKeysForLeaderboardMerge.length,
 		},
 	});
 
