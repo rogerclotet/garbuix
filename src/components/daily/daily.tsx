@@ -29,7 +29,7 @@ import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
-import { formatGuess } from "@/lib/puzzle-text";
+import { formatGuess, getPlayableWordLetters } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
@@ -37,6 +37,14 @@ import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
 import { setDailyDifficulty } from "./daily-difficulty-store";
+import {
+	buildFlyingLetterPaths,
+	DailyFlyingLetters,
+	type FlyingLettersAnimation,
+	GRID_GUESS_BOUNCE_MS,
+	getWordCellKeysInOrder,
+	HIGHLIGHT_AFTER_LAND_MS,
+} from "./daily-flying-letters";
 import { DailyGrid } from "./daily-grid";
 import {
 	buildCellLetters,
@@ -44,6 +52,7 @@ import {
 	buildRevealedCells,
 	getGuessKeyboardAction,
 	getRandomHintCellKey,
+	getSlotCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	getWordCellKeys,
@@ -117,6 +126,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);
+	const [flyingLettersAnimation, setFlyingLettersAnimation] =
+		useState<FlyingLettersAnimation | null>(null);
+	const [animatingWordId, setAnimatingWordId] = useState<number | null>(null);
+	const [animatingPreExistingLetters, setAnimatingPreExistingLetters] =
+		useState<Set<string>>(() => new Set());
+	const [landedAnimatingCells, setLandedAnimatingCells] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const [bounceCells, setBounceCells] = useState<Set<string>>(() => new Set());
+	const bounceClearTimersRef = useRef<Map<string, number>>(new Map());
+	const flyingLettersIdRef = useRef(0);
+	const pendingFlyCompleteRef = useRef<{
+		wordId: number;
+		pathCount: number;
+	} | null>(null);
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
@@ -250,6 +274,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (locateClearTimerRef.current != null) {
 				window.clearTimeout(locateClearTimerRef.current);
 			}
+			for (const timer of bounceClearTimersRef.current.values()) {
+				window.clearTimeout(timer);
+			}
+			bounceClearTimersRef.current.clear();
 		};
 	}, []);
 
@@ -723,6 +751,141 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		setSubmitFeedback(null);
 	}, []);
 
+	const startWordHighlight = useCallback((wordId: number) => {
+		setHighlightedWordId(wordId);
+		if (highlightResetTimerRef.current != null) {
+			window.clearTimeout(highlightResetTimerRef.current);
+		}
+		highlightResetTimerRef.current = window.setTimeout(() => {
+			setHighlightedWordId((current) => (current === wordId ? null : current));
+			highlightResetTimerRef.current = null;
+		}, HIGHLIGHT_AFTER_LAND_MS);
+	}, []);
+
+	const finishFlyingLettersCleanup = useCallback(() => {
+		setAnimatingWordId(null);
+		setAnimatingPreExistingLetters(new Set());
+		setLandedAnimatingCells(new Set());
+		setBounceCells(new Set());
+		setFlyingLettersAnimation(null);
+		pendingFlyCompleteRef.current = null;
+		for (const timer of bounceClearTimersRef.current.values()) {
+			window.clearTimeout(timer);
+		}
+		bounceClearTimersRef.current.clear();
+	}, []);
+
+	const finishFlyingLettersFallback = useCallback(
+		(wordId: number) => {
+			finishFlyingLettersCleanup();
+			startWordHighlight(wordId);
+		},
+		[finishFlyingLettersCleanup, startWordHighlight],
+	);
+
+	const handleFlyingLetterLand = useCallback((cellKey: string) => {
+		setLandedAnimatingCells((previous) => {
+			if (previous.has(cellKey)) {
+				return previous;
+			}
+			const next = new Set(previous);
+			next.add(cellKey);
+			return next;
+		});
+		setBounceCells((previous) => {
+			if (previous.has(cellKey)) {
+				return previous;
+			}
+			const next = new Set(previous);
+			next.add(cellKey);
+			return next;
+		});
+
+		const existingTimer = bounceClearTimersRef.current.get(cellKey);
+		if (existingTimer != null) {
+			window.clearTimeout(existingTimer);
+		}
+
+		const timer = window.setTimeout(() => {
+			setBounceCells((previous) => {
+				if (!previous.has(cellKey)) {
+					return previous;
+				}
+				const next = new Set(previous);
+				next.delete(cellKey);
+				return next;
+			});
+			bounceClearTimersRef.current.delete(cellKey);
+		}, GRID_GUESS_BOUNCE_MS);
+		bounceClearTimersRef.current.set(cellKey, timer);
+	}, []);
+
+	const triggerFlyingLetters = useCallback(
+		(
+			wordId: number,
+			displayWord: string,
+			preExistingLetterCells: Set<string>,
+		) => {
+			const slot = puzzle.wordSlots.find((wordSlot) => wordSlot.id === wordId);
+			const gridRoot = gridRef.current;
+			if (!slot || !gridRoot) {
+				finishFlyingLettersFallback(wordId);
+				return;
+			}
+
+			const prefersReducedMotion =
+				typeof window !== "undefined" &&
+				typeof window.matchMedia === "function" &&
+				window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			if (prefersReducedMotion) {
+				finishFlyingLettersFallback(wordId);
+				return;
+			}
+
+			setAnimatingWordId(wordId);
+			setAnimatingPreExistingLetters(preExistingLetterCells);
+			setLandedAnimatingCells(new Set());
+			setBounceCells(new Set());
+
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(() => {
+					const sourceElement = document.querySelector<HTMLElement>(
+						'[data-slot="submit-feedback"]',
+					);
+					if (!sourceElement) {
+						finishFlyingLettersFallback(wordId);
+						return;
+					}
+
+					const letters = getPlayableWordLetters(displayWord);
+					const paths = buildFlyingLetterPaths({
+						sourceElement,
+						targetCellKeys: getWordCellKeysInOrder(slot),
+						letters,
+						gridRoot,
+					});
+
+					if (paths.length === 0) {
+						finishFlyingLettersFallback(wordId);
+						return;
+					}
+
+					pendingFlyCompleteRef.current = {
+						wordId,
+						pathCount: paths.length,
+					};
+					flyingLettersIdRef.current += 1;
+					setFlyingLettersAnimation({
+						id: flyingLettersIdRef.current,
+						paths,
+					});
+				});
+			});
+		},
+		[finishFlyingLettersFallback, puzzle.wordSlots],
+	);
+
 	const handleGuess = useCallback(async () => {
 		triggerHaptic(HAPTIC_SUBMIT_MS);
 
@@ -762,6 +925,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		const isNewBonusWord =
 			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
 
+		const preExistingLetterCells = new Set<string>();
+		if (result.kind === "new_word" && result.matchedSlotId != null) {
+			const matchedSlot = puzzle.wordSlots.find(
+				(wordSlot) => wordSlot.id === result.matchedSlotId,
+			);
+			if (matchedSlot) {
+				for (let index = 0; index < matchedSlot.length; index += 1) {
+					const cellKey = getSlotCellKey(matchedSlot, index);
+					if (cellLetters.has(cellKey)) {
+						preExistingLetterCells.add(cellKey);
+					}
+				}
+			}
+		}
+
 		if (!result.isRepeatGuess) {
 			applyLocalEvent(
 				createPuzzleEvent("guess_added", {
@@ -799,17 +977,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		if (result.kind === "new_word") {
 			triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-			if (result.matchedSlotId != null) {
-				setHighlightedWordId(result.matchedSlotId);
-				if (highlightResetTimerRef.current != null) {
-					window.clearTimeout(highlightResetTimerRef.current);
-				}
-				highlightResetTimerRef.current = window.setTimeout(() => {
-					setHighlightedWordId((current) =>
-						current === result.matchedSlotId ? null : current,
-					);
-					highlightResetTimerRef.current = null;
-				}, 1400);
+			if (result.matchedSlotId != null && result.displayWord) {
+				triggerFlyingLetters(
+					result.matchedSlotId,
+					result.displayWord,
+					preExistingLetterCells,
+				);
 			}
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
@@ -824,12 +997,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		applyLocalEvent,
 		bonusCluesEnabled,
 		captureEvent,
+		cellLetters,
 		currentGuess,
 		derivedProgress,
 		puzzle,
 		revealedCells,
 		showSubmitFeedback,
 		totalWords,
+		triggerFlyingLetters,
 		triggerHaptic,
 	]);
 
@@ -1227,6 +1402,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	return (
 		<>
 			<DailyConfetti fire={shouldFireConfetti} />
+			<DailyFlyingLetters
+				animation={flyingLettersAnimation}
+				onLetterLand={handleFlyingLetterLand}
+				onComplete={() => {
+					const pending = pendingFlyCompleteRef.current;
+					if (!pending) {
+						return;
+					}
+					finishFlyingLettersCleanup();
+				}}
+			/>
 			<div
 				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
@@ -1387,6 +1573,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								revealedCells={revealedCells}
 								cellLetters={cellLetters}
 								highlightedWordId={highlightedWordId}
+								animatingWordId={animatingWordId}
+								animatingPreExistingLetters={animatingPreExistingLetters}
+								landedAnimatingCells={landedAnimatingCells}
+								bounceCells={bounceCells}
 								clueCells={clueGridCells}
 								clueCellsFading={clueGridFading}
 								locateCells={locateCells}

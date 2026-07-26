@@ -7,6 +7,10 @@ type DailyGridProps = {
 	revealedCells: Set<string>;
 	cellLetters: Map<string, string>;
 	highlightedWordId: number | null;
+	animatingWordId?: number | null;
+	animatingPreExistingLetters?: Set<string>;
+	landedAnimatingCells?: Set<string>;
+	bounceCells?: Set<string>;
 	clueCells?: Set<string>;
 	clueCellsFading?: boolean;
 	locateCells?: Set<string>;
@@ -17,10 +21,32 @@ export function DailyGrid({
 	revealedCells,
 	cellLetters,
 	highlightedWordId,
+	animatingWordId = null,
+	animatingPreExistingLetters = new Set(),
+	landedAnimatingCells = new Set(),
+	bounceCells = new Set(),
 	clueCells,
 	clueCellsFading = false,
 	locateCells,
 }: DailyGridProps) {
+	const animatingCellKeys = useMemo(() => {
+		if (animatingWordId == null) {
+			return new Set<string>();
+		}
+
+		const slot = puzzle.wordSlots.find(
+			(wordSlot) => wordSlot.id === animatingWordId,
+		);
+		if (!slot) {
+			return new Set<string>();
+		}
+
+		return new Set<string>(
+			Array.from({ length: slot.length }, (_, index) =>
+				getSlotCellKey(slot, index),
+			),
+		);
+	}, [animatingWordId, puzzle.wordSlots]);
 	const highlightedCellOrder = useMemo(() => {
 		const slot = puzzle.wordSlots.find(
 			(wordSlot) => wordSlot.id === highlightedWordId,
@@ -75,8 +101,17 @@ export function DailyGrid({
 					row.map((cell, colIdx) => {
 						const key = `${rowIdx},${colIdx}`;
 						const isRevealed = revealedCells.has(key);
+						const isAnimatingCell = animatingCellKeys.has(key);
+						const showLetter =
+							isRevealed &&
+							cellLetters.has(key) &&
+							(!isAnimatingCell ||
+								animatingPreExistingLetters.has(key) ||
+								landedAnimatingCells.has(key));
 						const highlightedLetterIndex = highlightedCellOrder.get(key);
-						const isJustGuessed = highlightedLetterIndex != null;
+						const isJustLanded = bounceCells.has(key);
+						const isJustGuessed =
+							isJustLanded || highlightedLetterIndex != null;
 						const isClueCell = clueCells?.has(key) ?? false;
 						const isLocateCell = locateCells?.has(key) ?? false;
 						const middleDotMarker = middleDotMarkers.get(key);
@@ -88,10 +123,13 @@ export function DailyGrid({
 						return (
 							<div
 								key={key}
+								data-cell-key={key}
 								style={
 									isJustGuessed
 										? ({
-												"--guess-letter-delay": `${highlightedLetterIndex * 34}ms`,
+												"--guess-letter-delay": isJustLanded
+													? "0ms"
+													: `${(highlightedLetterIndex ?? 0) * 34}ms`,
 											} as CSSProperties)
 										: undefined
 								}
@@ -101,7 +139,7 @@ export function DailyGrid({
 										: "bg-muted border-border/50"
 								} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 							>
-								{isRevealed ? (
+								{showLetter ? (
 									<span
 										className={
 											isJustGuessed ? "grid-word-just-guessed-letter" : ""
