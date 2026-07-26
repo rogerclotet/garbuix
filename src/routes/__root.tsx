@@ -110,9 +110,9 @@ function RootDocument() {
 						<ServiceWorkerRegister />
 						<LeaderboardRoot>
 							<ClueRequestsRoot>
-								<div className="flex min-h-svh flex-col">
+								<div className="flex h-svh flex-col">
 									<Header />
-									<main className="flex-1">
+									<main className="flex-1 min-h-0 overflow-y-auto">
 										<Outlet />
 									</main>
 								</div>
