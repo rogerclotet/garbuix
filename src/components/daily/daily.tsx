@@ -75,6 +75,8 @@ const CLUE_GRID_FADE_MS = 600;
 const LOCATE_FLASH_MS = 1300;
 // Number of valid off-puzzle words the player must find to earn a free letter reveal.
 const WORDS_PER_BONUS_CLUE = 5;
+// Matches `lg:pb-4` on the daily page shell when sizing the desktop grid row.
+const DESKTOP_PAGE_BOTTOM_PADDING_PX = 16;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -167,13 +169,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
-	// On desktop the puzzle and the word-list column sit in a 2-col grid whose
-	// row stretches to the taller column. We pin the right column to the
-	// puzzle's intrinsic height so a long word list scrolls internally instead
-	// of growing the whole page. null on mobile (single column, no constraint).
-	const [desktopColumnHeight, setDesktopColumnHeight] = useState<number | null>(
-		null,
-	);
+	const layoutRef = useRef<HTMLDivElement>(null);
+	// Desktop grid row height: at least the puzzle, or the remaining viewport when
+	// the board is shorter — keeps the word list scrolling inside the sidebar.
+	const [desktopRowHeight, setDesktopRowHeight] = useState<number | null>(null);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -1012,18 +1011,30 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
-	// Track the puzzle's intrinsic height (the grid column uses `lg:self-start`,
-	// so it never stretches) and mirror it onto the word-list column on desktop.
+	// Pin the desktop grid row to max(puzzle height, viewport fill) so the sidebar
+	// has a bounded height and the word list scrolls internally.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run once the loading state clears and the grid (gridRef) actually mounts.
 	useEffect(() => {
 		const grid = gridRef.current;
-		if (!grid) return;
+		const layout = layoutRef.current;
+		if (!grid || !layout) return;
 
 		const desktop = window.matchMedia("(min-width: 1024px)");
 		let observer: ResizeObserver | null = null;
+		let frame = 0;
 
 		const measure = () => {
-			setDesktopColumnHeight(grid.offsetHeight);
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				const puzzleHeight = grid.offsetHeight;
+				const gridTop = grid.getBoundingClientRect().top;
+				const availableHeight =
+					window.innerHeight - gridTop - DESKTOP_PAGE_BOTTOM_PADDING_PX;
+				const rowHeight = Math.max(puzzleHeight, availableHeight);
+				setDesktopRowHeight((current) =>
+					current === rowHeight ? current : rowHeight,
+				);
+			});
 		};
 
 		const sync = () => {
@@ -1031,17 +1042,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				measure();
 				observer ??= new ResizeObserver(measure);
 				observer.observe(grid);
+				observer.observe(layout);
 			} else {
 				observer?.disconnect();
 				observer = null;
-				setDesktopColumnHeight(null);
+				setDesktopRowHeight(null);
 			}
 		};
 
 		sync();
 		desktop.addEventListener("change", sync);
+		window.addEventListener("resize", measure);
 		return () => {
+			cancelAnimationFrame(frame);
 			desktop.removeEventListener("change", sync);
+			window.removeEventListener("resize", measure);
 			observer?.disconnect();
 		};
 	}, [isProgressReady]);
@@ -1215,11 +1230,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			<div
 				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
-						? "pb-6 sm:pb-8 lg:pb-24"
-						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
+						? "pb-6 sm:pb-8 lg:pb-6"
+						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-4"
 				}`}
 			>
-				<div className="max-w-5xl mx-auto">
+				<div ref={layoutRef} className="mx-auto max-w-5xl">
 					<div
 						className={`mb-4 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
 					>
@@ -1358,7 +1373,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						)}
 					</div>
 
-					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
+					<div
+						className="lg:grid lg:min-h-0 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]"
+						style={
+							desktopRowHeight != null
+								? { height: desktopRowHeight }
+								: undefined
+						}
+					>
 						<div ref={gridRef} className="lg:self-start">
 							<DailyGrid
 								puzzle={puzzle}
@@ -1371,14 +1393,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							/>
 						</div>
 
-						<div
-							className="mt-6 lg:mt-0 lg:flex lg:min-h-0 lg:flex-col lg:gap-6"
-							style={
-								desktopColumnHeight != null
-									? { height: desktopColumnHeight }
-									: undefined
-							}
-						>
+						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
 							<DailyControls
 								aiClueMode={useTextClue}
 								circleLetters={circleLetters}
@@ -1401,9 +1416,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 							<div
 								id={WORD_LIST_SECTION_ID}
-								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
 							>
-								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
+								<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
 									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
 									)
 								</h3>

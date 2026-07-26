@@ -32,7 +32,7 @@ services:
       [
         "sh",
         "-lc",
-        "pnpm install --frozen-lockfile && pnpm db:migrate && pnpm dev --host 0.0.0.0 --port 3000",
+        "pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm db:migrate && pnpm dev --host 0.0.0.0 --port 3000",
       ]
     depends_on:
       redis:
@@ -72,7 +72,7 @@ services:
       target: dev
     image: paraules-app:dev
     command:
-      ["sh", "-lc", "pnpm install --frozen-lockfile && pnpm backfill:puzzles"]
+      ["sh", "-lc", "pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm backfill:puzzles"]
     environment:
       NODE_ENV: development
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
