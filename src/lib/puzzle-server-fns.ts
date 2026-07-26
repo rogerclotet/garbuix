@@ -269,6 +269,7 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 
 				return importAnonymousProgressForUser({
 					userId: session.user.id,
+					deviceId: data.deviceId,
 					payload: data.payload,
 				});
 			},

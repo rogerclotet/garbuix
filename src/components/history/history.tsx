@@ -111,18 +111,19 @@ export function History({ initialData }: { initialData: HistoryData }) {
 			) {
 				importAttemptedRef.current = activeUser.id;
 				const payload = buildAnonymousImportPayload();
-				if (
+				const hasLocalProgress =
 					payload.historyEntries.length > 0 ||
-					Object.keys(payload.activeProgressByDate).length > 0
-				) {
-					try {
-						const result = await importProgress({
-							data: {
-								deviceId,
-								payload,
-							},
-						});
-						markAnonymousDataImported(activeUser.id);
+					Object.keys(payload.activeProgressByDate).length > 0;
+
+				try {
+					const result = await importProgress({
+						data: {
+							deviceId,
+							payload,
+						},
+					});
+					markAnonymousDataImported(activeUser.id);
+					if (hasLocalProgress) {
 						captureEvent("anonymous_history_imported", {
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
@@ -130,14 +131,12 @@ export function History({ initialData }: { initialData: HistoryData }) {
 							legacy_dates: result.skippedLegacyDates.length,
 						});
 						toast.success("S'han sincronitzat els resultats locals");
-					} catch (error) {
-						console.error("Failed to import anonymous history", error);
-						captureException(error, {
-							scope: "anonymous_history_import",
-						});
 					}
-				} else {
-					markAnonymousDataImported(activeUser.id);
+				} catch (error) {
+					console.error("Failed to import anonymous history", error);
+					captureException(error, {
+						scope: "anonymous_history_import",
+					});
 				}
 			}
 

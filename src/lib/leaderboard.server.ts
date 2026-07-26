@@ -249,7 +249,35 @@ export async function getLeaderboard(
 	return { dateKey, entries: sortLeaderboardEntries(entries) };
 }
 
-export async function renameAnonToUser(options: {
+function writeLeaderboardEntry(
+	pipeline: ReturnType<NonNullable<ReturnType<typeof getRedis>>["pipeline"]>,
+	dateKey: string,
+	entry: LeaderboardEntry,
+): void {
+	const score = scoreFor(
+		entry.wordsFound,
+		entry.clueCount,
+		entry.tryCount,
+		entry.completedAt,
+	);
+	const meta = metaKey(dateKey, entry.participantId);
+	pipeline.hset(meta, {
+		kind: entry.kind,
+		name: entry.name,
+		image: entry.image ?? "",
+		wordsFound: String(entry.wordsFound),
+		totalWords: String(entry.totalWords),
+		clueCount: String(entry.clueCount),
+		tryCount: String(entry.tryCount),
+		completedAt: entry.completedAt ?? "",
+		updatedAt: entry.updatedAt,
+	});
+	pipeline.expire(meta, TTL_SECONDS);
+	pipeline.zadd(scoresKey(dateKey), score, entry.participantId);
+	pipeline.expire(scoresKey(dateKey), TTL_SECONDS);
+}
+
+export async function mergeAnonLeaderboardEntry(options: {
 	dateKey: string;
 	deviceId: string;
 	userId: string;
@@ -270,46 +298,74 @@ export async function renameAnonToUser(options: {
 	const toMeta = metaKey(options.dateKey, toId);
 
 	try {
-		const hash = await redis.hgetall(fromMeta);
-		const parsed = parseMeta(fromId, Object.keys(hash).length ? hash : null);
-		if (!parsed) {
+		const readPipeline = redis.pipeline();
+		readPipeline.hgetall(fromMeta);
+		readPipeline.hgetall(toMeta);
+		const readResults = (await readPipeline.exec()) ?? [];
+		const [, anonHash] = readResults[0] ?? [null, null];
+		const [, userHash] = readResults[1] ?? [null, null];
+
+		const anonEntry = parseMeta(
+			fromId,
+			anonHash && Object.keys(anonHash).length > 0
+				? (anonHash as Record<string, string>)
+				: null,
+		);
+		if (!anonEntry) {
 			return;
 		}
 
-		const updated: LeaderboardEntry = {
-			...parsed,
-			participantId: toId,
-			kind: "user",
+		const userEntry = parseMeta(
+			toId,
+			userHash && Object.keys(userHash).length > 0
+				? (userHash as Record<string, string>)
+				: null,
+		);
+
+		const updatedAt = new Date().toISOString();
+		const mergedEntry: LeaderboardEntry = userEntry
+			? {
+					...sortLeaderboardEntries([anonEntry, userEntry])[0],
+					participantId: toId,
+					kind: "user",
+					name: options.name,
+					image: options.image,
+					updatedAt,
+				}
+			: {
+					...anonEntry,
+					participantId: toId,
+					kind: "user",
+					name: options.name,
+					image: options.image,
+					updatedAt,
+				};
+
+		const writePipeline = redis.pipeline();
+		writePipeline.del(fromMeta);
+		writePipeline.zrem(scoresKey(options.dateKey), fromId);
+		writeLeaderboardEntry(writePipeline, options.dateKey, mergedEntry);
+		await writePipeline.exec();
+	} catch (error) {
+		console.warn("[leaderboard] mergeAnonLeaderboardEntry failed", error);
+	}
+}
+
+export async function mergeAnonLeaderboardForUser(options: {
+	deviceId: string;
+	userId: string;
+	name: string;
+	image: string | null;
+	dateKeys: string[];
+}): Promise<void> {
+	for (const dateKey of new Set(options.dateKeys)) {
+		await mergeAnonLeaderboardEntry({
+			dateKey,
+			deviceId: options.deviceId,
+			userId: options.userId,
 			name: options.name,
 			image: options.image,
-		};
-
-		const score = scoreFor(
-			updated.wordsFound,
-			updated.clueCount,
-			updated.tryCount,
-			updated.completedAt,
-		);
-		const pipeline = redis.pipeline();
-		pipeline.del(fromMeta);
-		pipeline.zrem(scoresKey(options.dateKey), fromId);
-		pipeline.hset(toMeta, {
-			kind: updated.kind,
-			name: updated.name,
-			image: updated.image ?? "",
-			wordsFound: String(updated.wordsFound),
-			totalWords: String(updated.totalWords),
-			clueCount: String(updated.clueCount),
-			tryCount: String(updated.tryCount),
-			completedAt: updated.completedAt ?? "",
-			updatedAt: new Date().toISOString(),
 		});
-		pipeline.expire(toMeta, TTL_SECONDS);
-		pipeline.zadd(scoresKey(options.dateKey), score, toId);
-		pipeline.expire(scoresKey(options.dateKey), TTL_SECONDS);
-		await pipeline.exec();
-	} catch (error) {
-		console.warn("[leaderboard] renameAnonToUser failed", error);
 	}
 }
 
