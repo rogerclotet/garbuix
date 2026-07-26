@@ -6,3 +6,5 @@ allowBuilds:
   msw: false
   protobufjs: false
   sharp: true
+minimumReleaseAgeExclude:
+  - lucide-react@1.27.0
