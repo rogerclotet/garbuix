@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { getSlotCellKey } from "./daily-helpers";
 import type { DailyPuzzleWordSlot } from "@/lib/puzzle-types";
+import { getSlotCellKey } from "./daily-helpers";
 
 const FLY_DURATION_MS = 740;
 const STAGGER_MS = 42;
@@ -91,7 +91,8 @@ function measureTextLetterPositions(element: HTMLElement) {
 
 	if (!(textNode instanceof Text) || textNode.data.length === 0) {
 		const rect = element.getBoundingClientRect();
-		const fontSize = Number.parseFloat(getComputedStyle(element).fontSize) || 24;
+		const fontSize =
+			Number.parseFloat(getComputedStyle(element).fontSize) || 24;
 		return [
 			{
 				x: rect.left + rect.width / 2,

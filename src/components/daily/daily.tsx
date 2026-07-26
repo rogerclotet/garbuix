@@ -36,15 +36,15 @@ import { useClueRequests } from "@/lib/use-clue-requests";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
+import { setDailyDifficulty } from "./daily-difficulty-store";
 import {
 	buildFlyingLetterPaths,
 	DailyFlyingLetters,
-	getWordCellKeysInOrder,
-	GRID_GUESS_BOUNCE_MS,
-	HIGHLIGHT_AFTER_LAND_MS,
 	type FlyingLettersAnimation,
+	GRID_GUESS_BOUNCE_MS,
+	getWordCellKeysInOrder,
+	HIGHLIGHT_AFTER_LAND_MS,
 } from "./daily-flying-letters";
-import { setDailyDifficulty } from "./daily-difficulty-store";
 import { DailyGrid } from "./daily-grid";
 import {
 	buildCellLetters,
@@ -131,9 +131,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [animatingWordId, setAnimatingWordId] = useState<number | null>(null);
 	const [animatingPreExistingLetters, setAnimatingPreExistingLetters] =
 		useState<Set<string>>(() => new Set());
-	const [landedAnimatingCells, setLandedAnimatingCells] = useState<
-		Set<string>
-	>(() => new Set());
+	const [landedAnimatingCells, setLandedAnimatingCells] = useState<Set<string>>(
+		() => new Set(),
+	);
 	const [bounceCells, setBounceCells] = useState<Set<string>>(() => new Set());
 	const bounceClearTimersRef = useRef<Map<string, number>>(new Map());
 	const flyingLettersIdRef = useRef(0);
@@ -925,7 +925,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		const isNewBonusWord =
 			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
 
-		let preExistingLetterCells = new Set<string>();
+		const preExistingLetterCells = new Set<string>();
 		if (result.kind === "new_word" && result.matchedSlotId != null) {
 			const matchedSlot = puzzle.wordSlots.find(
 				(wordSlot) => wordSlot.id === result.matchedSlotId,
