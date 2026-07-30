@@ -78,6 +78,9 @@ export type DailyPuzzlePreview = {
 	gridLetters: (string | null)[][];
 };
 
+// Valid off-puzzle words needed to earn one free bonus letter reveal.
+export const WORDS_PER_BONUS_CLUE = 5;
+
 export type PuzzleProgressState = {
 	puzzleId: string;
 	guessHashes: string[];
