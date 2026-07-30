@@ -11,6 +11,8 @@ const ACCOUNT_CACHE_PREFIX = "paraules-account-cache-v1:";
 const IMPORT_MARKER_PREFIX = "paraules-account-import-v1:";
 const DEVICE_ID_KEY = "paraules-device-id-v1";
 const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
+const PROFILE_PREFERENCES_TIP_SEEN_KEY =
+	"paraules-profile-preferences-tip-seen-v1";
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
 // Re-show the welcome dialog to anonymous users periodically so they keep
 // getting nudged to sign in. We store the last-shown timestamp and only
@@ -147,6 +149,16 @@ export function hasSeenHowToPlay(): boolean {
 export function markHowToPlaySeen() {
 	if (typeof window === "undefined") return;
 	window.localStorage.setItem(HOW_TO_PLAY_SEEN_KEY, "1");
+}
+
+export function hasSeenProfilePreferencesTip(): boolean {
+	if (typeof window === "undefined") return true;
+	return window.localStorage.getItem(PROFILE_PREFERENCES_TIP_SEEN_KEY) === "1";
+}
+
+export function markProfilePreferencesTipSeen() {
+	if (typeof window === "undefined") return;
+	window.localStorage.setItem(PROFILE_PREFERENCES_TIP_SEEN_KEY, "1");
 }
 
 export function hasSeenWelcome(): boolean {

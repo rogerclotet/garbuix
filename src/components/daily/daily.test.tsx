@@ -17,9 +17,12 @@ const {
 	captureExceptionMock,
 	hasSeenHowToPlayMock,
 	markHowToPlaySeenMock,
+	hasSeenProfilePreferencesTipMock,
+	markProfilePreferencesTipSeenMock,
 	hasSeenWelcomeMock,
 	markWelcomeSeenMock,
 	openHowToPlayMock,
+	openProfilePreferencesTipMock,
 } = vi.hoisted(() => ({
 	resolveGuessMock: vi.fn(),
 	applyLocalEventMock: vi.fn(),
@@ -27,9 +30,12 @@ const {
 	captureExceptionMock: vi.fn(),
 	hasSeenHowToPlayMock: vi.fn(() => true),
 	markHowToPlaySeenMock: vi.fn(),
+	hasSeenProfilePreferencesTipMock: vi.fn(() => true),
+	markProfilePreferencesTipSeenMock: vi.fn(),
 	hasSeenWelcomeMock: vi.fn(() => true),
 	markWelcomeSeenMock: vi.fn(),
 	openHowToPlayMock: vi.fn(),
+	openProfilePreferencesTipMock: vi.fn(),
 }));
 
 vi.mock("@/lib/puzzle-client", async () => {
@@ -50,12 +56,18 @@ vi.mock("@/lib/puzzle-local", () => ({
 	getSortedAnonymousHistoryEntries: vi.fn(() => []),
 	hasSeenHowToPlay: hasSeenHowToPlayMock,
 	markHowToPlaySeen: markHowToPlaySeenMock,
+	hasSeenProfilePreferencesTip: hasSeenProfilePreferencesTipMock,
+	markProfilePreferencesTipSeen: markProfilePreferencesTipSeenMock,
 	hasSeenWelcome: hasSeenWelcomeMock,
 	markWelcomeSeen: markWelcomeSeenMock,
 }));
 
 vi.mock("./how-to-play-store", () => ({
 	openHowToPlay: openHowToPlayMock,
+}));
+
+vi.mock("@/components/profile-preferences-tip-store", () => ({
+	openProfilePreferencesTip: openProfilePreferencesTipMock,
 }));
 
 vi.mock("@/lib/puzzle-streaks", () => ({
@@ -239,10 +251,14 @@ describe("Daily submit feedback", () => {
 		hasSeenHowToPlayMock.mockReset();
 		hasSeenHowToPlayMock.mockReturnValue(true);
 		markHowToPlaySeenMock.mockReset();
+		hasSeenProfilePreferencesTipMock.mockReset();
+		hasSeenProfilePreferencesTipMock.mockReturnValue(true);
+		markProfilePreferencesTipSeenMock.mockReset();
 		hasSeenWelcomeMock.mockReset();
 		hasSeenWelcomeMock.mockReturnValue(true);
 		markWelcomeSeenMock.mockReset();
 		openHowToPlayMock.mockReset();
+		openProfilePreferencesTipMock.mockReset();
 		installMatchMediaMock(false);
 	});
 
@@ -377,6 +393,50 @@ describe("Daily submit feedback", () => {
 		});
 		expect(openHowToPlayMock).not.toHaveBeenCalled();
 		expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
+	});
+
+	it("opens the profile preferences tip after the how-to-play tutorial and marks it seen", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(true);
+		hasSeenProfilePreferencesTipMock.mockReturnValueOnce(false);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(markProfilePreferencesTipSeenMock).toHaveBeenCalledTimes(1);
+		});
+		expect(openProfilePreferencesTipMock).toHaveBeenCalledTimes(1);
+		expect(captureEventMock).toHaveBeenCalledWith(
+			"profile_preferences_tip_shown",
+			{ trigger: "return_visit" },
+		);
+	});
+
+	it("does not auto-open the profile preferences tip on first visit before how-to-play", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(false);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
+		});
+		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
+		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
+	});
+
+	it("does not auto-open the profile preferences tip once it has been seen", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(true);
+		hasSeenProfilePreferencesTipMock.mockReturnValueOnce(true);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(captureEventMock).toHaveBeenCalledWith(
+				"puzzle_loaded",
+				expect.any(Object),
+			);
+		});
+		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
+		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
 	});
 
 	it("triggers haptics on the first touch release", async () => {

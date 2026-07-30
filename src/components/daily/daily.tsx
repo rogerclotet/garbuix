@@ -1,6 +1,7 @@
 import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { openProfilePreferencesTip } from "@/components/profile-preferences-tip-store";
 import { Button } from "@/components/ui/button";
 import {
 	getBonusCluesEnabled,
@@ -20,8 +21,10 @@ import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
+	hasSeenProfilePreferencesTip,
 	hasSeenWelcome,
 	markHowToPlaySeen,
+	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import { getWordClues } from "@/lib/puzzle-server-fns";
@@ -311,6 +314,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		captureEvent("how_to_play_shown", { trigger: "first_visit" });
 	}, [captureEvent]);
 
+	const openProfilePreferencesTipIfNeeded = useCallback(() => {
+		if (!hasSeenHowToPlay()) return;
+		if (hasSeenProfilePreferencesTip()) return;
+		markProfilePreferencesTipSeen();
+		openProfilePreferencesTip();
+		captureEvent("profile_preferences_tip_shown", { trigger: "return_visit" });
+	}, [captureEvent]);
+
 	useEffect(() => {
 		if (firstVisitChecked.current) return;
 		firstVisitChecked.current = true;
@@ -322,17 +333,31 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			return;
 		}
 
-		openHowToPlayIfFirstVisit();
-	}, [activeUser, captureEvent, openHowToPlayIfFirstVisit]);
+		if (!hasSeenHowToPlay()) {
+			openHowToPlayIfFirstVisit();
+			return;
+		}
+
+		openProfilePreferencesTipIfNeeded();
+	}, [
+		activeUser,
+		captureEvent,
+		openHowToPlayIfFirstVisit,
+		openProfilePreferencesTipIfNeeded,
+	]);
 
 	const handleWelcomeOpenChange = useCallback(
 		(next: boolean) => {
 			setWelcomeOpen(next);
 			if (next) return;
 			markWelcomeSeen();
-			openHowToPlayIfFirstVisit();
+			if (!hasSeenHowToPlay()) {
+				openHowToPlayIfFirstVisit();
+				return;
+			}
+			openProfilePreferencesTipIfNeeded();
 		},
-		[openHowToPlayIfFirstVisit],
+		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
 	);
 
 	const handleWelcomeContinueAnonymous = useCallback(() => {
