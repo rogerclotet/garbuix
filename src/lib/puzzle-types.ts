@@ -5,8 +5,11 @@ export type PuzzleDirection = "horizontal" | "vertical";
 export type SessionUser = {
 	id: string;
 	name: string;
+	displayName?: string | null;
 	email: string;
 	image?: string | null;
+	googleImage?: string | null;
+	useGoogleAvatar?: boolean;
 } | null;
 
 export type PuzzleGridMaskCell = {

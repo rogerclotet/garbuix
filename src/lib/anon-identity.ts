@@ -1,5 +1,7 @@
 import anonNameWords from "@/data/anon-name-words.json";
+import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getDeviceId } from "@/lib/puzzle-local";
+import { normalizeDisplayNameInput } from "@/lib/user-profile";
 
 const ANON_IDENTITY_KEY = "paraules-anon-identity-v2";
 const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
@@ -69,6 +71,48 @@ export function getOrCreateAnonIdentity(): AnonIdentity {
 	};
 	window.localStorage.setItem(ANON_IDENTITY_KEY, JSON.stringify(identity));
 	return { deviceId: identity.deviceId, name: identity.name };
+}
+
+export function setAnonDisplayName(name: string): boolean {
+	const normalized = normalizeDisplayNameInput(name);
+	if (!normalized) {
+		return false;
+	}
+	if (typeof window === "undefined") {
+		return false;
+	}
+	const identity = getOrCreateAnonIdentity();
+	const payload: StoredIdentity = {
+		version: 2,
+		deviceId: identity.deviceId,
+		name: normalized,
+	};
+	window.localStorage.setItem(ANON_IDENTITY_KEY, JSON.stringify(payload));
+	return true;
+}
+
+export async function refreshAnonLeaderboardName(name: string): Promise<void> {
+	if (typeof window === "undefined") {
+		return;
+	}
+	const dateKey = getTodayDateKey();
+	const reported = getReportedAnonProgress(dateKey);
+	if (reported.wordsFound === 0 && !reported.completedAt) {
+		return;
+	}
+	const identity = getOrCreateAnonIdentity();
+	try {
+		await fetch(`/api/leaderboard/${dateKey}/anon/profile`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				deviceId: identity.deviceId,
+				name,
+			}),
+		});
+	} catch {
+		// non-fatal: leaderboard profile refresh can quietly fail
+	}
 }
 
 export function getSkipSharePreview(): boolean {

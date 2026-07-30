@@ -14,6 +14,7 @@ import {
 	importAnonymousProgressForUser,
 	syncPuzzleEventsForUser,
 	triggerDailyPuzzleGeneration,
+	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
 import {
 	type AnonymousImportPayload,
@@ -277,6 +278,37 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 						.length,
 					device_id: data.deviceId,
 					history_entry_count: data.payload.historyEntries.length,
+				},
+			},
+		);
+	});
+
+export const updateUserProfile = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			displayName: z.string().optional(),
+			useGoogleAvatar: z.boolean().optional(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"updateUserProfile",
+			async () => {
+				const session = await getAuthSession();
+				if (!session) {
+					throw new Error("Unauthorized");
+				}
+
+				return updateUserProfileData({
+					userId: session.user.id,
+					displayName: data.displayName,
+					useGoogleAvatar: data.useGoogleAvatar,
+				});
+			},
+			{
+				properties: {
+					has_display_name: data.displayName !== undefined,
+					has_avatar_preference: data.useGoogleAvatar !== undefined,
 				},
 			},
 		);

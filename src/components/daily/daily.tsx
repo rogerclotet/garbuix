@@ -216,6 +216,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
 	const winDialogTimerRef = useRef<number | null>(null);
 	const { captureEvent, captureException } = useObservability();
+	const captureExceptionRef = useRef(captureException);
+	captureExceptionRef.current = captureException;
 	const { applyLocalEvent, derivedProgress, isProgressReady } =
 		useDailyProgress({
 			activeUser,
@@ -234,12 +236,20 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				]);
 
 				if (!cancelled) {
-					setRevealedAnswers(nextAnswers);
-					setHintLetters(nextHints);
+					setRevealedAnswers((current) =>
+						JSON.stringify(current) === JSON.stringify(nextAnswers)
+							? current
+							: nextAnswers,
+					);
+					setHintLetters((current) =>
+						JSON.stringify(current) === JSON.stringify(nextHints)
+							? current
+							: nextHints,
+					);
 				}
 			} catch (error) {
 				console.error("Failed to decode puzzle progress", error);
-				captureException(error, {
+				captureExceptionRef.current(error, {
 					puzzle_date: puzzle.dateKey,
 					scope: "decode_progress",
 				});
@@ -249,7 +259,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [captureException, derivedProgress, puzzle]);
+	}, [derivedProgress, puzzle]);
 
 	useEffect(() => {
 		return () => {

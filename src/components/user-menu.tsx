@@ -22,6 +22,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
+import { initialsFromName } from "@/lib/user-profile";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -37,6 +38,7 @@ export function UserMenu() {
 		: "Obrir el menú";
 	const imageSrc = activeUser?.image ?? null;
 	const showUserImage = Boolean(imageSrc) && failedImageSrc !== imageSrc;
+	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
 	const handleSignIn = async () => {
 		captureEvent("auth_sign_in_started", {
@@ -77,8 +79,8 @@ export function UserMenu() {
 									}}
 								/>
 							) : (
-								<AvatarFallback className="bg-muted text-muted-foreground">
-									<Menu className="size-5 sm:size-4" />
+								<AvatarFallback className="bg-muted text-muted-foreground text-xs">
+									{avatarInitials || <Menu className="size-5 sm:size-4" />}
 								</AvatarFallback>
 							)}
 						</Avatar>
