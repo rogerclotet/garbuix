@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -11,7 +12,6 @@ import {
 	type PuzzleDifficulty,
 } from "@/lib/puzzle-difficulty";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
 
 // Ascending bar heights (signal-strength style), one per difficulty level.
 const BAR_HEIGHTS = ["h-1.5", "h-2.5", "h-3.5"];
