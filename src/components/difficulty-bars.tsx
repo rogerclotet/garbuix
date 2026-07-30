@@ -11,6 +11,7 @@ import {
 	type PuzzleDifficulty,
 } from "@/lib/puzzle-difficulty";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 // Ascending bar heights (signal-strength style), one per difficulty level.
 const BAR_HEIGHTS = ["h-1.5", "h-2.5", "h-3.5"];
@@ -24,6 +25,20 @@ type DifficultyBarsProps = {
 	showLabel?: boolean;
 	className?: string;
 };
+
+function useCoarsePointer(): boolean {
+	const [coarsePointer, setCoarsePointer] = useState(false);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+		const update = () => setCoarsePointer(mediaQuery.matches);
+		update();
+		mediaQuery.addEventListener("change", update);
+		return () => mediaQuery.removeEventListener("change", update);
+	}, []);
+
+	return coarsePointer;
+}
 
 function DifficultyTooltipContent({
 	difficulty,
@@ -51,6 +66,9 @@ export function DifficultyBars({
 	showLabel = false,
 	className,
 }: DifficultyBarsProps) {
+	const [open, setOpen] = useState(false);
+	const coarsePointer = useCoarsePointer();
+
 	if (difficulty == null) {
 		return null;
 	}
@@ -59,15 +77,28 @@ export function DifficultyBars({
 	const phrase = formatDifficultyPhrase(difficulty);
 
 	return (
-		<Tooltip>
+		<Tooltip
+			open={coarsePointer ? open : undefined}
+			onOpenChange={coarsePointer ? setOpen : undefined}
+		>
 			<TooltipTrigger asChild>
-				<span
+				<button
+					type="button"
 					className={cn(
-						"inline-flex cursor-help items-center gap-1.5 font-ui text-foreground",
+						"inline-flex cursor-help items-center gap-1.5 border-0 bg-transparent p-0 font-ui text-foreground",
 						className,
 					)}
-					role="img"
 					aria-label={phrase}
+					onPointerDown={(event) => {
+						if (coarsePointer) {
+							event.preventDefault();
+						}
+					}}
+					onClick={() => {
+						if (coarsePointer) {
+							setOpen((current) => !current);
+						}
+					}}
 				>
 					<span
 						className="inline-flex h-3.5 items-end gap-[3px]"
@@ -89,7 +120,7 @@ export function DifficultyBars({
 					{showLabel ? (
 						<span className="text-xs font-medium">{label}</span>
 					) : null}
-				</span>
+				</button>
 			</TooltipTrigger>
 			<TooltipContent
 				side="bottom"
