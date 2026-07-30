@@ -12,8 +12,6 @@ import {
 } from "@/lib/puzzle-difficulty";
 import { cn } from "@/lib/utils";
 
-const DIFFICULTY_LEVELS: PuzzleDifficulty[] = [1, 2, 3];
-
 // Ascending bar heights (signal-strength style), one per difficulty level.
 const BAR_HEIGHTS = ["h-1.5", "h-2.5", "h-3.5"];
 const BAR_POSITIONS = Array.from(
@@ -35,24 +33,11 @@ function DifficultyTooltipContent({
 	const phrase = formatDifficultyPhrase(difficulty);
 
 	return (
-		<div className="space-y-1.5 text-left">
+		<div className="space-y-1 text-left">
 			<p className="font-medium">{phrase}</p>
 			<p className="text-background/85">
-				{PUZZLE_DIFFICULTY_SUMMARIES[difficulty]} al corpus català.
+				{PUZZLE_DIFFICULTY_SUMMARIES[difficulty]}
 			</p>
-			<ul className="space-y-0.5 text-background/75">
-				{DIFFICULTY_LEVELS.map((level) => (
-					<li
-						key={level}
-						className={cn(
-							level === difficulty && "text-background font-medium",
-						)}
-					>
-						{formatDifficultyPhrase(level)}:{" "}
-						{PUZZLE_DIFFICULTY_SUMMARIES[level].toLowerCase()}
-					</li>
-				))}
-			</ul>
 		</div>
 	);
 }
