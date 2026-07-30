@@ -36,6 +36,13 @@
       "when": 1782809881325,
       "tag": "0004_sticky_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782900000000,
+      "tag": "0005_user_profile_prefs",
+      "breakpoints": true
     }
   ]
 }

@@ -9,23 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PreferenciesRouteImport } from './routes/preferencies'
-import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
-import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClassificacioRouteImport } from './routes/classificacio'
+import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
+import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
-import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
-import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
+import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
 
-const PreferenciesRoute = PreferenciesRouteImport.update({
-  id: '/preferencies',
-  path: '/preferencies',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
-  id: '/dies-anteriors',
-  path: '/dies-anteriors',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClassificacioRoute = ClassificacioRouteImport.update({
@@ -33,9 +28,14 @@ const ClassificacioRoute = ClassificacioRouteImport.update({
   path: '/classificacio',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
+  id: '/dies-anteriors',
+  path: '/dies-anteriors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreferenciesRoute = PreferenciesRouteImport.update({
+  id: '/preferencies',
+  path: '/preferencies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PhSplatRoute = PhSplatRouteImport.update({
@@ -43,9 +43,9 @@ const PhSplatRoute = PhSplatRouteImport.update({
   path: '/ph/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
-  id: '/api/leaderboard/$',
-  path: '/api/leaderboard/$',
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiClueRequestsSplatRoute = ApiClueRequestsSplatRouteImport.update({
@@ -53,9 +53,9 @@ const ApiClueRequestsSplatRoute = ApiClueRequestsSplatRouteImport.update({
   path: '/api/clue-requests/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
+const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
+  id: '/api/leaderboard/$',
+  path: '/api/leaderboard/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -136,18 +136,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/preferencies': {
-      id: '/preferencies'
-      path: '/preferencies'
-      fullPath: '/preferencies'
-      preLoaderRoute: typeof PreferenciesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dies-anteriors': {
-      id: '/dies-anteriors'
-      path: '/dies-anteriors'
-      fullPath: '/dies-anteriors'
-      preLoaderRoute: typeof DiesAnteriorsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/classificacio': {
@@ -157,11 +150,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClassificacioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/dies-anteriors': {
+      id: '/dies-anteriors'
+      path: '/dies-anteriors'
+      fullPath: '/dies-anteriors'
+      preLoaderRoute: typeof DiesAnteriorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preferencies': {
+      id: '/preferencies'
+      path: '/preferencies'
+      fullPath: '/preferencies'
+      preLoaderRoute: typeof PreferenciesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ph/$': {
@@ -171,11 +171,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PhSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/leaderboard/$': {
-      id: '/api/leaderboard/$'
-      path: '/api/leaderboard/$'
-      fullPath: '/api/leaderboard/$'
-      preLoaderRoute: typeof ApiLeaderboardSplatRouteImport
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/clue-requests/$': {
@@ -185,11 +185,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClueRequestsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
+    '/api/leaderboard/$': {
+      id: '/api/leaderboard/$'
+      path: '/api/leaderboard/$'
+      fullPath: '/api/leaderboard/$'
+      preLoaderRoute: typeof ApiLeaderboardSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

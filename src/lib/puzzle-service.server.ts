@@ -18,8 +18,10 @@ import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import {
 	getLeaderboard,
+	leaderboardDisplayName,
 	mergeAnonLeaderboardForUser,
 	recordProgress as recordLeaderboardProgress,
+	updateLeaderboardProfile,
 	userParticipantId,
 } from "@/lib/leaderboard.server";
 import {
@@ -71,6 +73,11 @@ import {
 	type PuzzleProgressState,
 	type SessionUser,
 } from "@/lib/puzzle-types";
+import {
+	normalizeDisplayNameInput,
+	resolveAvatarImage,
+	resolveDisplayName,
+} from "@/lib/user-profile";
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
 
@@ -150,15 +157,51 @@ function triggerCluesGeneration(
 
 function toSessionUser(
 	sessionData: Awaited<ReturnType<typeof getAuthSession>>,
+	profile?: {
+		displayName: string | null;
+		useGoogleAvatar: boolean;
+	} | null,
 ): SessionUser {
-	return sessionData
-		? {
-				id: sessionData.user.id,
-				name: sessionData.user.name,
-				email: sessionData.user.email,
-				image: sessionData.user.image,
-			}
-		: null;
+	if (!sessionData) {
+		return null;
+	}
+	const userRecord = {
+		name: sessionData.user.name,
+		displayName: profile?.displayName ?? null,
+		image: sessionData.user.image,
+		useGoogleAvatar: profile?.useGoogleAvatar ?? true,
+	};
+	return {
+		id: sessionData.user.id,
+		name: resolveDisplayName(userRecord),
+		displayName: profile?.displayName ?? null,
+		email: sessionData.user.email,
+		image: resolveAvatarImage(userRecord),
+		googleImage: sessionData.user.image ?? null,
+		useGoogleAvatar: profile?.useGoogleAvatar ?? true,
+	};
+}
+
+async function getUserProfileFields(userId: string) {
+	const profiles = await db
+		.select({
+			displayName: user.displayName,
+			useGoogleAvatar: user.useGoogleAvatar,
+		})
+		.from(user)
+		.where(eq(user.id, userId))
+		.limit(1);
+	return profiles[0] ?? null;
+}
+
+async function toEnrichedSessionUser(
+	sessionData: Awaited<ReturnType<typeof getAuthSession>>,
+): Promise<SessionUser> {
+	if (!sessionData) {
+		return null;
+	}
+	const profile = await getUserProfileFields(sessionData.user.id);
+	return toSessionUser(sessionData, profile);
 }
 
 // Narrows a stored difficulty (a nullable integer column or snapshot value) to
@@ -275,12 +318,20 @@ async function publishLeaderboardForUser(input: {
 }) {
 	try {
 		const profiles = await db
-			.select({ name: user.name, image: user.image })
+			.select({
+				name: user.name,
+				displayName: user.displayName,
+				image: user.image,
+				useGoogleAvatar: user.useGoogleAvatar,
+			})
 			.from(user)
 			.where(eq(user.id, input.userId))
 			.limit(1);
 		const profile = profiles[0];
 		if (!profile) return;
+
+		const displayName = leaderboardDisplayName(resolveDisplayName(profile));
+		const avatarImage = resolveAvatarImage(profile);
 
 		// Total clues = the free clues spent plus every clue a friend delivered
 		// (one inbox entry per word).
@@ -291,8 +342,8 @@ async function publishLeaderboardForUser(input: {
 			dateKey: input.dateKey,
 			participantId: userParticipantId(input.userId),
 			kind: "user",
-			name: profile.name,
-			image: profile.image ?? null,
+			name: displayName,
+			image: avatarImage,
 			wordsFound: input.wordsFound,
 			totalWords: input.totalWords,
 			clueCount: input.freeCluesUsed + friendClues,
@@ -438,12 +489,12 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 			),
 		},
 		rolloverAt: getNextRolloverAt().toISOString(),
-		sessionUser: toSessionUser(sessionData),
+		sessionUser: await toEnrichedSessionUser(sessionData),
 	};
 }
 
 export async function getSessionUserData() {
-	return toSessionUser(await getAuthSession());
+	return toEnrichedSessionUser(await getAuthSession());
 }
 
 export async function getUserPuzzleProgressData(
@@ -490,10 +541,8 @@ export async function syncPuzzleEventsForUser(options: {
 	userId: string;
 	deviceId: string;
 	events: PuzzleClientEvent[];
-	leaderboardOptOut?: boolean;
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
-	const leaderboardOptOut = options.leaderboardOptOut ?? false;
 	const puzzleRow = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.id, puzzleId),
 	});
@@ -625,7 +674,7 @@ export async function syncPuzzleEventsForUser(options: {
 		nextProgress.guessedWordIds.length > previousWordsFound ||
 		(Boolean(nextCompletedAt) && !previousCompletedAt);
 
-	if (hasProgressDelta && !leaderboardOptOut) {
+	if (hasProgressDelta) {
 		void publishLeaderboardForUser({
 			dateKey: puzzleRow.dateKey,
 			userId,
@@ -914,6 +963,14 @@ export async function importAnonymousProgressForUser(options: {
 	const { payload, userId, deviceId } = options;
 	const importedDates: string[] = [];
 	const skippedLegacyDates: string[] = [];
+	const importedForLeaderboard: Array<{
+		dateKey: string;
+		wordsFound: number;
+		totalWords: number;
+		freeCluesUsed: number;
+		tryCount: number;
+		completedAt: string | null;
+	}> = [];
 
 	for (const historyEntry of payload.historyEntries) {
 		const activeProgress = payload.activeProgressByDate[historyEntry.dateKey];
@@ -1017,6 +1074,14 @@ export async function importAnonymousProgressForUser(options: {
 			});
 
 		importedDates.push(historyEntry.dateKey);
+		importedForLeaderboard.push({
+			dateKey: historyEntry.dateKey,
+			wordsFound: merged.guessedWordIds.length,
+			totalWords: puzzle.privateSnapshotJson.wordSlots.length,
+			freeCluesUsed: merged.hintsUsed,
+			tryCount: merged.guessCount,
+			completedAt: merged.completedAt,
+		});
 	}
 
 	const dateKeysForLeaderboardMerge = [
@@ -1029,7 +1094,12 @@ export async function importAnonymousProgressForUser(options: {
 
 	try {
 		const profiles = await db
-			.select({ name: user.name, image: user.image })
+			.select({
+				name: user.name,
+				displayName: user.displayName,
+				image: user.image,
+				useGoogleAvatar: user.useGoogleAvatar,
+			})
 			.from(user)
 			.where(eq(user.id, userId))
 			.limit(1);
@@ -1038,13 +1108,34 @@ export async function importAnonymousProgressForUser(options: {
 			await mergeAnonLeaderboardForUser({
 				deviceId,
 				userId,
-				name: profile.name,
-				image: profile.image ?? null,
+				name: resolveDisplayName(profile),
+				image: resolveAvatarImage(profile),
 				dateKeys: dateKeysForLeaderboardMerge,
 			});
 		}
 	} catch (error) {
 		console.warn("[leaderboard] merge anon on import failed", error);
+	}
+
+	for (const imported of importedForLeaderboard) {
+		if (imported.wordsFound === 0 && !imported.completedAt) {
+			continue;
+		}
+		try {
+			await publishLeaderboardForUser({
+				dateKey: imported.dateKey,
+				userId,
+				wordsFound: imported.wordsFound,
+				totalWords: imported.totalWords,
+				freeCluesUsed: imported.freeCluesUsed,
+				tryCount: imported.tryCount,
+				completedAt: imported.completedAt,
+				previousWordsFound: 0,
+				previousCompletedAt: null,
+			});
+		} catch (error) {
+			console.warn("[leaderboard] publish on import failed", error);
+		}
 	}
 
 	captureServerEvent({
@@ -1061,6 +1152,103 @@ export async function importAnonymousProgressForUser(options: {
 	return {
 		importedDates,
 		skippedLegacyDates,
+	};
+}
+
+export async function updateUserProfileData(input: {
+	userId: string;
+	displayName?: string;
+	useGoogleAvatar?: boolean;
+}) {
+	const normalizedName =
+		input.displayName === undefined
+			? undefined
+			: normalizeDisplayNameInput(input.displayName);
+
+	if (input.displayName !== undefined && normalizedName === null) {
+		throw new Error("Invalid display name");
+	}
+
+	const updates: {
+		displayName?: string | null;
+		useGoogleAvatar?: boolean;
+	} = {};
+
+	if (normalizedName !== undefined) {
+		const profiles = await db
+			.select({ name: user.name })
+			.from(user)
+			.where(eq(user.id, input.userId))
+			.limit(1);
+		const oauthName = profiles[0]?.name.trim();
+		const normalizedOauthName =
+			(oauthName ? normalizeDisplayNameInput(oauthName) : null) ?? oauthName;
+		updates.displayName =
+			normalizedName && normalizedName !== normalizedOauthName
+				? normalizedName
+				: null;
+	}
+
+	if (input.useGoogleAvatar !== undefined) {
+		updates.useGoogleAvatar = input.useGoogleAvatar;
+	}
+
+	if (Object.keys(updates).length === 0) {
+		const profile = await db
+			.select({
+				name: user.name,
+				displayName: user.displayName,
+				image: user.image,
+				useGoogleAvatar: user.useGoogleAvatar,
+			})
+			.from(user)
+			.where(eq(user.id, input.userId))
+			.limit(1);
+		const saved = profile[0];
+		if (!saved) {
+			throw new Error("User not found");
+		}
+		return {
+			displayName: saved.displayName,
+			useGoogleAvatar: saved.useGoogleAvatar,
+			name: resolveDisplayName(saved),
+			image: resolveAvatarImage(saved),
+		};
+	}
+
+	await db.update(user).set(updates).where(eq(user.id, input.userId));
+
+	const profile = await db
+		.select({
+			name: user.name,
+			displayName: user.displayName,
+			image: user.image,
+			useGoogleAvatar: user.useGoogleAvatar,
+		})
+		.from(user)
+		.where(eq(user.id, input.userId))
+		.limit(1);
+	const saved = profile[0];
+	if (!saved) {
+		throw new Error("User not found");
+	}
+
+	try {
+		await updateLeaderboardProfile({
+			dateKey: getTodayDateKey(),
+			participantId: userParticipantId(input.userId),
+			name: leaderboardDisplayName(resolveDisplayName(saved)),
+			image: resolveAvatarImage(saved),
+		});
+	} catch (error) {
+		console.warn("[leaderboard] profile refresh failed", error);
+	}
+
+	return {
+		displayName: saved.displayName,
+		useGoogleAvatar: saved.useGoogleAvatar,
+		name: resolveDisplayName(saved),
+		image: resolveAvatarImage(saved),
 	};
 }
 

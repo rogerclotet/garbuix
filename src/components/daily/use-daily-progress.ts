@@ -2,7 +2,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-	getLeaderboardOptOut,
 	getOrCreateAnonIdentity,
 	getReportedAnonProgress,
 	setReportedAnonProgress,
@@ -83,6 +82,7 @@ export function useDailyProgress({
 }: UseDailyProgressOptions) {
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
+	const activeUserId = activeUser?.id ?? null;
 	const syncEvents = useServerFn(syncUserPuzzleEvents);
 	const fetchUserProgress = useServerFn(getUserPuzzleProgress);
 	const importProgress = useServerFn(importAnonymousProgress);
@@ -111,18 +111,18 @@ export function useDailyProgress({
 
 	const derivedProgress = useMemo(
 		() =>
-			activeUser
+			activeUserId
 				? applyPuzzleEventsChronologically(
 						baseProgress,
 						queuedEvents,
 						totalWords,
 					)
 				: baseProgress,
-		[activeUser, baseProgress, queuedEvents, totalWords],
+		[activeUserId, baseProgress, queuedEvents, totalWords],
 	);
 
 	const fetchLatestProgress = useCallback(async () => {
-		if (!activeUser) {
+		if (!activeUserId) {
 			return null;
 		}
 
@@ -147,7 +147,7 @@ export function useDailyProgress({
 			);
 		}
 	}, [
-		activeUser,
+		activeUserId,
 		captureException,
 		emptyProgress,
 		fetchUserProgress,
@@ -158,10 +158,11 @@ export function useDailyProgress({
 	const refreshProgressFromServer = useCallback(async () => {
 		const latestProgress = await fetchLatestProgress();
 		if (latestProgress) {
-			setBaseProgress(
-				(current) =>
-					pickPreferredProgressState(current, latestProgress) ?? latestProgress,
-			);
+			setBaseProgress((current) => {
+				const next =
+					pickPreferredProgressState(current, latestProgress) ?? latestProgress;
+				return isSameProgressState(current, next) ? current : next;
+			});
 		}
 	}, [fetchLatestProgress]);
 
@@ -169,12 +170,12 @@ export function useDailyProgress({
 		let cancelled = false;
 
 		const loadProgress = async () => {
-			if (activeUser) {
+			if (activeUserId) {
 				if (!cancelled) {
 					setIsProgressReady(true);
 				}
 
-				const cached = getAccountPuzzleCache(activeUser.id, puzzle.dateKey);
+				const cached = getAccountPuzzleCache(activeUserId, puzzle.dateKey);
 				if (cached?.puzzleId === puzzle.id) {
 					const cachedQueuedEvents = cached.queuedEvents ?? [];
 					const cachedBaseProgress =
@@ -190,15 +191,25 @@ export function useDailyProgress({
 							: (serverBaseProgress ?? cachedBaseProgress ?? emptyProgress);
 
 					if (!cancelled) {
-						setBaseProgress(preferredCachedBase);
-						setQueuedEvents(cachedQueuedEvents);
+						setBaseProgress((current) =>
+							isSameProgressState(current, preferredCachedBase)
+								? current
+								: preferredCachedBase,
+						);
+						setQueuedEvents((current) =>
+							current === cachedQueuedEvents ? current : cachedQueuedEvents,
+						);
 					}
 				} else if (!cancelled) {
-					setBaseProgress(
+					const nextBaseProgress =
 						getCompatibleProgress(initialData.progress, puzzle) ??
-							emptyProgress,
+						emptyProgress;
+					setBaseProgress((current) =>
+						isSameProgressState(current, nextBaseProgress)
+							? current
+							: nextBaseProgress,
 					);
-					setQueuedEvents([]);
+					setQueuedEvents((current) => (current.length === 0 ? current : []));
 				}
 
 				if (!cancelled) {
@@ -206,10 +217,10 @@ export function useDailyProgress({
 				}
 
 				if (
-					!hasImportedAnonymousData(activeUser.id) &&
-					importAttemptedRef.current !== activeUser.id
+					!hasImportedAnonymousData(activeUserId) &&
+					importAttemptedRef.current !== activeUserId
 				) {
-					importAttemptedRef.current = activeUser.id;
+					importAttemptedRef.current = activeUserId;
 					const payload = buildAnonymousImportPayload();
 					const hasLocalProgress =
 						payload.historyEntries.length > 0 ||
@@ -222,7 +233,7 @@ export function useDailyProgress({
 								payload,
 							},
 						});
-						markAnonymousDataImported(activeUser.id);
+						markAnonymousDataImported(activeUserId);
 						if (hasLocalProgress) {
 							captureEvent("anonymous_progress_imported", {
 								active_progress_count: Object.keys(payload.activeProgressByDate)
@@ -254,11 +265,15 @@ export function useDailyProgress({
 			}
 
 			if (!cancelled) {
-				setQueuedEvents([]);
-				setBaseProgress(
+				setQueuedEvents((current) => (current.length === 0 ? current : []));
+				const nextBaseProgress =
 					getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
-						getCompatibleProgress(initialData.progress, puzzle) ??
-						emptyProgress,
+					getCompatibleProgress(initialData.progress, puzzle) ??
+					emptyProgress;
+				setBaseProgress((current) =>
+					isSameProgressState(current, nextBaseProgress)
+						? current
+						: nextBaseProgress,
 				);
 				setIsProgressReady(true);
 			}
@@ -270,7 +285,7 @@ export function useDailyProgress({
 			cancelled = true;
 		};
 	}, [
-		activeUser,
+		activeUserId,
 		captureEvent,
 		captureException,
 		deviceId,
@@ -282,7 +297,7 @@ export function useDailyProgress({
 	]);
 
 	useEffect(() => {
-		if (!activeUser || typeof window === "undefined") {
+		if (!activeUserId || typeof window === "undefined") {
 			return;
 		}
 
@@ -310,10 +325,10 @@ export function useDailyProgress({
 			window.removeEventListener("focus", handleFocus);
 			window.removeEventListener("pageshow", handleFocus);
 		};
-	}, [activeUser, refreshProgressFromServer]);
+	}, [activeUserId, refreshProgressFromServer]);
 
 	useEffect(() => {
-		if (!activeUser || !isOnline || typeof window === "undefined") {
+		if (!activeUserId || !isOnline || typeof window === "undefined") {
 			return;
 		}
 
@@ -334,11 +349,11 @@ export function useDailyProgress({
 				window.clearTimeout(timeoutId);
 			}
 		};
-	}, [activeUser, isOnline, refreshProgressFromServer]);
+	}, [activeUserId, isOnline, refreshProgressFromServer]);
 
 	useEffect(() => {
-		if (activeUser) {
-			saveAccountPuzzleCache(activeUser.id, puzzle.dateKey, {
+		if (activeUserId) {
+			saveAccountPuzzleCache(activeUserId, puzzle.dateKey, {
 				puzzleId: puzzle.id,
 				baseProgress,
 				queuedEvents,
@@ -348,7 +363,7 @@ export function useDailyProgress({
 
 		saveAnonymousProgress(puzzle.dateKey, derivedProgress);
 		saveAnonymousHistoryEntry(buildHistoryEntry(puzzle, derivedProgress));
-	}, [activeUser, baseProgress, derivedProgress, puzzle, queuedEvents]);
+	}, [activeUserId, baseProgress, derivedProgress, puzzle, queuedEvents]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -365,7 +380,7 @@ export function useDailyProgress({
 	}, []);
 
 	useEffect(() => {
-		if (activeUser || !hasActiveSyncFailureToastRef.current) {
+		if (activeUserId || !hasActiveSyncFailureToastRef.current) {
 			return;
 		}
 
@@ -373,11 +388,11 @@ export function useDailyProgress({
 		syncFailureCountRef.current = 0;
 		setNextSyncRetryAt(null);
 		toast.dismiss(SYNC_FAILURE_TOAST_ID);
-	}, [activeUser]);
+	}, [activeUserId]);
 
 	useEffect(() => {
 		if (
-			!activeUser ||
+			!activeUserId ||
 			queuedEvents.length === 0 ||
 			!isOnline ||
 			isSyncingRef.current
@@ -403,7 +418,6 @@ export function useDailyProgress({
 				puzzleId: puzzle.id,
 				deviceId,
 				events: pendingEvents,
-				leaderboardOptOut: getLeaderboardOptOut(),
 			},
 		})
 			.then((result) => {
@@ -486,7 +500,7 @@ export function useDailyProgress({
 			cancelled = true;
 		};
 	}, [
-		activeUser,
+		activeUserId,
 		captureEvent,
 		captureException,
 		deviceId,
@@ -499,10 +513,10 @@ export function useDailyProgress({
 	]);
 
 	useEffect(() => {
-		if (!activeUser || !isOnline) return;
+		if (!activeUserId || !isOnline) return;
 
 		const staleCaches = getStaleAccountCachesWithEvents(
-			activeUser.id,
+			activeUserId,
 			puzzle.dateKey,
 		);
 		if (staleCaches.length === 0) return;
@@ -516,14 +530,13 @@ export function useDailyProgress({
 					puzzleId: cache.puzzleId,
 					deviceId,
 					events: cache.queuedEvents ?? [],
-					leaderboardOptOut: getLeaderboardOptOut(),
 				},
 			})
 				.then((result) => {
 					const remainingEvents = (cache.queuedEvents ?? []).filter(
 						(event) => !result.ackedEventIds.includes(event.id),
 					);
-					saveAccountPuzzleCache(activeUser.id, dateKey, {
+					saveAccountPuzzleCache(activeUserId, dateKey, {
 						...cache,
 						queuedEvents: remainingEvents,
 					});
@@ -537,7 +550,7 @@ export function useDailyProgress({
 					syncedOrphanedDaysRef.current.delete(dateKey);
 				});
 		}
-	}, [activeUser, deviceId, isOnline, puzzle.dateKey, syncEvents]);
+	}, [activeUserId, deviceId, isOnline, puzzle.dateKey, syncEvents]);
 
 	const lastReportedAnonRef = useRef<{
 		dateKey: string | null;
@@ -546,7 +559,7 @@ export function useDailyProgress({
 	}>({ dateKey: null, wordsFound: 0, completedAt: null });
 
 	useEffect(() => {
-		if (activeUser) {
+		if (activeUserId) {
 			lastReportedAnonRef.current = {
 				dateKey: null,
 				wordsFound: 0,
@@ -555,7 +568,6 @@ export function useDailyProgress({
 			return;
 		}
 		if (typeof window === "undefined") return;
-		if (getLeaderboardOptOut()) return;
 
 		if (lastReportedAnonRef.current.dateKey !== puzzle.dateKey) {
 			const stored = getReportedAnonProgress(puzzle.dateKey);
@@ -603,7 +615,7 @@ export function useDailyProgress({
 			// non-fatal: leaderboard reporting can quietly fail
 		});
 	}, [
-		activeUser,
+		activeUserId,
 		derivedProgress.guessedWordIds.length,
 		derivedProgress.completedAt,
 		derivedProgress.hintsUsed,

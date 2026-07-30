@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
+import { initialsFromName } from "@/lib/user-profile";
 import { cn } from "@/lib/utils";
 
 const timeFormatter = new Intl.DateTimeFormat("ca-ES", {
@@ -12,14 +13,6 @@ type LeaderboardRowProps = {
 	entry: LeaderboardEntry;
 	highlighted?: boolean;
 };
-
-function initials(name: string): string {
-	const parts = name.trim().split(/\s+/);
-	if (parts.length === 0) return "?";
-	const first = parts[0]?.[0] ?? "";
-	const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-	return `${first}${last}`.toUpperCase() || "?";
-}
 
 export function LeaderboardRow({
 	rank,
@@ -47,7 +40,7 @@ export function LeaderboardRow({
 					/>
 				) : (
 					<AvatarFallback className="bg-muted text-muted-foreground text-xs">
-						{initials(entry.name)}
+						{initialsFromName(entry.name)}
 					</AvatarFallback>
 				)}
 			</Avatar>

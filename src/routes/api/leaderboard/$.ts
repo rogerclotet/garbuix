@@ -5,9 +5,11 @@ import {
 	getLeaderboard,
 	leaderboardChannel,
 	recordProgress,
+	updateLeaderboardProfile,
 } from "@/lib/leaderboard.server";
 import { observeServerAction } from "@/lib/observability-server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
+import { normalizeDisplayNameInput } from "@/lib/user-profile";
 
 export const Route = createFileRoute("/api/leaderboard/$")({
 	server: {
@@ -22,6 +24,7 @@ type ParsedPath =
 	| { kind: "snapshot"; dateKey: string }
 	| { kind: "stream"; dateKey: string }
 	| { kind: "anon"; dateKey: string }
+	| { kind: "anonProfile"; dateKey: string }
 	| { kind: "unknown" };
 
 function parsePath(pathname: string): ParsedPath {
@@ -43,6 +46,9 @@ function parsePath(pathname: string): ParsedPath {
 	}
 	if (rest.length === 2 && rest[1] === "anon") {
 		return { kind: "anon", dateKey };
+	}
+	if (rest.length === 3 && rest[1] === "anon" && rest[2] === "profile") {
+		return { kind: "anonProfile", dateKey };
 	}
 	return { kind: "unknown" };
 }
@@ -83,12 +89,23 @@ const anonSchema = z.object({
 	completedAt: z.string().datetime().nullable().optional(),
 	previousWordsFound: z.number().int().min(0).max(200).optional(),
 	previousCompletedAt: z.string().datetime().nullable().optional(),
-	optOut: z.boolean().optional(),
 });
+
+const anonProfileSchema = z.object({
+	deviceId: z.string().min(1).max(128),
+	name: z.string().min(1).max(48),
+});
+
+function normalizeAnonLeaderboardName(name: string): string | null {
+	return normalizeDisplayNameInput(name);
+}
 
 async function handlePost(request: Request) {
 	const url = new URL(request.url);
 	const parsed = parsePath(url.pathname);
+	if (parsed.kind === "anonProfile" && isValidDateKey(parsed.dateKey)) {
+		return handleAnonProfilePost(request, parsed.dateKey);
+	}
 	if (parsed.kind !== "anon" || !isValidDateKey(parsed.dateKey)) {
 		return new Response("Not Found", { status: 404 });
 	}
@@ -105,8 +122,9 @@ async function handlePost(request: Request) {
 			return new Response("Invalid body", { status: 400 });
 		}
 		const payload = result.data;
-		if (payload.optOut) {
-			return Response.json({ recorded: false });
+		const normalizedName = normalizeAnonLeaderboardName(payload.name);
+		if (!normalizedName) {
+			return new Response("Invalid body", { status: 400 });
 		}
 		const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
 		const completedAt =
@@ -115,7 +133,7 @@ async function handlePost(request: Request) {
 			dateKey: parsed.dateKey,
 			participantId: anonParticipantId(payload.deviceId),
 			kind: "anon",
-			name: payload.name,
+			name: normalizedName,
 			image: null,
 			wordsFound,
 			totalWords: payload.totalWords,
@@ -126,6 +144,33 @@ async function handlePost(request: Request) {
 			previousCompletedAt: payload.previousCompletedAt ?? null,
 		});
 		return Response.json({ recorded: true });
+	});
+}
+
+async function handleAnonProfilePost(request: Request, dateKey: string) {
+	return observeServerAction("leaderboard_anon_profile", async () => {
+		let raw: unknown;
+		try {
+			raw = await request.json();
+		} catch {
+			return new Response("Invalid body", { status: 400 });
+		}
+		const result = anonProfileSchema.safeParse(raw);
+		if (!result.success) {
+			return new Response("Invalid body", { status: 400 });
+		}
+		const payload = result.data;
+		const normalizedName = normalizeAnonLeaderboardName(payload.name);
+		if (!normalizedName) {
+			return new Response("Invalid body", { status: 400 });
+		}
+		await updateLeaderboardProfile({
+			dateKey,
+			participantId: anonParticipantId(payload.deviceId),
+			name: normalizedName,
+			image: null,
+		});
+		return Response.json({ updated: true });
 	});
 }
 

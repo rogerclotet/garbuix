@@ -12,6 +12,25 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 
 export { anonParticipantId, userParticipantId };
 
+const LEADERBOARD_FALLBACK_NAME = "Algú";
+
+export function leaderboardDisplayName(
+	preferred: string,
+	...fallbacks: Array<string | undefined | null>
+): string {
+	const trimmedPreferred = preferred.trim();
+	if (trimmedPreferred) {
+		return trimmedPreferred;
+	}
+	for (const fallback of fallbacks) {
+		const trimmed = fallback?.trim();
+		if (trimmed) {
+			return trimmed;
+		}
+	}
+	return LEADERBOARD_FALLBACK_NAME;
+}
+
 const TTL_SECONDS = 60 * 60 * 48;
 // Ranking tiers, highest priority first, packed into a single sorted-set score:
 //   1. words found  — each worth far more than any clue, try, or time delta
@@ -157,6 +176,68 @@ export async function recordProgress(
 	}
 
 	return { recorded: true, entry, delta };
+}
+
+export async function updateLeaderboardProfile(input: {
+	dateKey: string;
+	participantId: string;
+	name: string;
+	image: string | null;
+}): Promise<boolean> {
+	if (!isRedisConfigured()) {
+		return false;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return false;
+	}
+
+	const meta = metaKey(input.dateKey, input.participantId);
+	let hash: Record<string, string>;
+	try {
+		hash = await redis.hgetall(meta);
+	} catch (error) {
+		console.warn("[leaderboard] profile read failed", error);
+		return false;
+	}
+
+	const entry = parseMeta(
+		input.participantId,
+		hash && Object.keys(hash).length > 0 ? hash : null,
+	);
+	if (!entry) {
+		return false;
+	}
+
+	const updatedEntry: LeaderboardEntry = {
+		...entry,
+		name: input.name,
+		image: input.image,
+		updatedAt: new Date().toISOString(),
+	};
+
+	const pipeline = redis.pipeline();
+	writeLeaderboardEntry(pipeline, input.dateKey, updatedEntry);
+	try {
+		await pipeline.exec();
+	} catch (error) {
+		console.warn("[leaderboard] profile update failed", error);
+		return false;
+	}
+
+	const event: LeaderboardEvent = {
+		type: "update",
+		dateKey: input.dateKey,
+		entry: updatedEntry,
+		delta: { wordsAdded: 0, justCompleted: false },
+	};
+	try {
+		await redis.publish(channel(input.dateKey), JSON.stringify(event));
+	} catch (error) {
+		console.warn("[leaderboard] profile publish failed", error);
+	}
+
+	return true;
 }
 
 function parseMeta(
@@ -323,12 +404,17 @@ export async function mergeAnonLeaderboardEntry(options: {
 		);
 
 		const updatedAt = new Date().toISOString();
+		const displayName = leaderboardDisplayName(
+			options.name,
+			userEntry?.name,
+			anonEntry.name,
+		);
 		const mergedEntry: LeaderboardEntry = userEntry
 			? {
 					...sortLeaderboardEntries([anonEntry, userEntry])[0],
 					participantId: toId,
 					kind: "user",
-					name: options.name,
+					name: displayName,
 					image: options.image,
 					updatedAt,
 				}
@@ -336,7 +422,7 @@ export async function mergeAnonLeaderboardEntry(options: {
 					...anonEntry,
 					participantId: toId,
 					kind: "user",
-					name: options.name,
+					name: displayName,
 					image: options.image,
 					updatedAt,
 				};

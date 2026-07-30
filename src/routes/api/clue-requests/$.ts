@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import { user } from "@/db/auth-schema";
 import { dailyPuzzles, userPuzzleProgress } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { validateClueText } from "@/lib/clue-fairness";
@@ -21,6 +22,7 @@ import {
 import { db } from "@/lib/db";
 import { observeServerAction } from "@/lib/observability-server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
+import { resolveDisplayName } from "@/lib/user-profile";
 
 export const Route = createFileRoute("/api/clue-requests/$")({
 	server: {
@@ -71,7 +73,19 @@ async function requireUser(request: Request): Promise<SessionUser | null> {
 	if (!session?.user?.id) {
 		return null;
 	}
-	return { id: session.user.id, name: session.user.name ?? "Algú" };
+	const profiles = await db
+		.select({
+			name: user.name,
+			displayName: user.displayName,
+		})
+		.from(user)
+		.where(eq(user.id, session.user.id))
+		.limit(1);
+	const profile = profiles[0];
+	return {
+		id: session.user.id,
+		name: profile ? resolveDisplayName(profile) : (session.user.name ?? "Algú"),
+	};
 }
 
 async function handleGet(request: Request) {
