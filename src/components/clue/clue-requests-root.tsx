@@ -27,10 +27,7 @@ export function ClueRequestsRoot({ children }: PropsWithChildren) {
 			return;
 		}
 		const identity = getOrCreateAnonIdentity();
-		setAnonCredentials({
-			deviceId: identity.deviceId,
-			name: identity.name,
-		});
+		setAnonCredentials({ deviceId: identity.deviceId });
 	}, [sessionUser?.id]);
 
 	const localUserId =
