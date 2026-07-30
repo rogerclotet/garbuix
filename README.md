@@ -93,7 +93,9 @@ docker compose --profile ops run --rm backfill
 - `pnpm run download-dict` - Force-refresh and rebuild the Catalan dictionary
 - `pnpm run db:migrate` - Apply Drizzle migrations
 - `pnpm run backfill:puzzles` - Persist daily puzzle snapshots for a date range
+- `pnpm run backfill:difficulty` - Fill in the 1-3 star difficulty for stored puzzles (defaults to today + yesterday)
 - `pnpm run analyze:randomness` - Simulate daily generation and report letter/word repetition over time
+- `pnpm run analyze:difficulty` - Simulate daily generation and report the difficulty (star) distribution over time
 - `pnpm run format` - Format code with Biome
 - `pnpm run lint` - Lint code with Biome
 - `pnpm run check` - Check code quality with Biome
@@ -140,6 +142,37 @@ The crossword generator:
 - Dictionary words are stored with proper spelling
 - Matching is accent-insensitive
 - Display shows correctly spelled words
+
+### Difficulty Rating
+
+Each daily puzzle gets a 1-3 star difficulty based on the corpus frequency of
+the words it contains:
+
+- The score is the mean `log10(frequency)` of the puzzle's words. The generator
+  biases word selection toward common words, so a lower mean means rarer words
+  and a harder puzzle.
+- The two thresholds in `src/lib/puzzle-difficulty.ts` are the empirical
+  terciles of a 365-day simulation, so the long-run distribution across
+  easy/medium/hard stays roughly even.
+- The rating is stored on the puzzle row and shown as a 1-3 bar indicator
+  (green/amber/red, with a label) on today's puzzle and on the previous-days
+  history.
+
+Check the distribution (and re-tune the thresholds if it drifts) with:
+
+```bash
+pnpm run analyze:difficulty -- --days 365
+```
+
+Existing puzzle rows created before the rating existed don't have a star value
+until backfilled. Fill today and yesterday (so the previous-day history shows
+it) with:
+
+```bash
+pnpm run backfill:difficulty            # today + yesterday
+pnpm run backfill:difficulty -- --all   # every stored puzzle
+pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
+```
 
 ### Word Selection Quality
 

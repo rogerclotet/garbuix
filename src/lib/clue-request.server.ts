@@ -3,6 +3,7 @@ import {
 	type ClueRequestStreamEvent,
 	type ClueResponse,
 	clueInboxKey,
+	clueRequestRecordsKey,
 	clueRequestsChannel,
 	clueResponsesChannel,
 	pendingRequestsKey,
@@ -14,13 +15,22 @@ import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 // leaderboard's Redis usage; every function degrades to a no-op when Redis is
 // not configured.
 
-// How long a request stays answerable. Pruned lazily on read since Redis hashes
-// have no per-field TTL. Long enough for another player to notice and reply.
-const REQUEST_TTL_MS = 15 * 60 * 1000;
-// Whole-hash expiry, refreshed on each write, so abandoned puzzles get cleaned up.
-const HASH_TTL_SECONDS = 60 * 60;
-// How long a delivered clue stays in the asker's inbox (covers a full session).
+// How long a request is advertised to responders (shown as an "Ajuda" button and
+// in the snapshot). Pruned lazily on read since Redis hashes have no per-field
+// TTL. Generous because the player base is small — there isn't always someone
+// playing within a few minutes, so a request needs to stay visible long enough
+// for another player to come along and notice it.
+const REQUEST_TTL_MS = 3 * 60 * 60 * 1000;
+// Whole-hash expiry, refreshed on each write, so abandoned puzzles get cleaned
+// up. Must cover the advertise window, otherwise the hash could evict a request
+// that should still be shown before it expires on its own.
+const HASH_TTL_SECONDS = REQUEST_TTL_MS / 1000;
+// How long a delivered clue stays in the asker's inbox (covers a full session),
+// and — matching it — how long a request stays deliverable via its durable
+// record. Delivery must outlive the short advertise TTL so a clue sent after the
+// asker goes offline still lands in their inbox for the next time they connect.
 const INBOX_TTL_SECONDS = 24 * 60 * 60;
+const RECORD_TTL_SECONDS = INBOX_TTL_SECONDS;
 
 type StoredRequest = {
 	request: ClueRequest;
@@ -61,11 +71,16 @@ export async function createClueRequest(
 
 	const stored: StoredRequest = { request, expiresAt: now + REQUEST_TTL_MS };
 	const hashKey = pendingRequestsKey(input.dateKey);
+	const recordsKey = clueRequestRecordsKey(input.dateKey);
 
 	try {
 		const pipeline = redis.pipeline();
+		// Pending entry drives the short-lived advertise window; the records entry
+		// keeps the request deliverable for the full inbox window (see getClueRequest).
 		pipeline.hset(hashKey, request.id, JSON.stringify(stored));
 		pipeline.expire(hashKey, HASH_TTL_SECONDS);
+		pipeline.hset(recordsKey, request.id, JSON.stringify(request));
+		pipeline.expire(recordsKey, RECORD_TTL_SECONDS);
 		await pipeline.exec();
 
 		const event: ClueRequestStreamEvent = { type: "request", request };
@@ -95,6 +110,13 @@ export async function hasActiveClueRequest(
 	);
 }
 
+// Loads a request for the purpose of answering it. Reads the durable records
+// hash, not the pending hash, so a clue can be delivered for the full inbox
+// window even after the advertise TTL pruned the pending entry — the asker may be
+// offline and only see it on their next connect. Returns null only when the
+// request is genuinely gone (resolved, or older than the 24h record TTL), in
+// which case the caller treats the send as a silent success. Falls back to the
+// pending hash for requests created before durable records existed (deploy gap).
 export async function getClueRequest(
 	dateKey: string,
 	requestId: string,
@@ -108,16 +130,15 @@ export async function getClueRequest(
 	}
 
 	try {
-		const raw = await redis.hget(pendingRequestsKey(dateKey), requestId);
-		if (!raw) {
+		const record = await redis.hget(clueRequestRecordsKey(dateKey), requestId);
+		if (record) {
+			return JSON.parse(record) as ClueRequest;
+		}
+		const pending = await redis.hget(pendingRequestsKey(dateKey), requestId);
+		if (!pending) {
 			return null;
 		}
-		const stored = JSON.parse(raw) as StoredRequest;
-		if (stored.expiresAt <= Date.now()) {
-			await redis.hdel(pendingRequestsKey(dateKey), requestId);
-			return null;
-		}
-		return stored.request;
+		return (JSON.parse(pending) as StoredRequest).request;
 	} catch (error) {
 		console.warn("[clue-request] failed to load request", error);
 		return null;
@@ -204,7 +225,10 @@ export async function publishClueResponse(options: {
 		await pipeline.exec();
 
 		await redis.publish(
-			clueResponsesChannel(options.request.requesterId),
+			clueResponsesChannel(
+				options.request.requesterId,
+				options.request.dateKey,
+			),
 			JSON.stringify(event),
 		);
 	} catch (error) {
@@ -243,7 +267,9 @@ export async function getClueInbox(
 	}
 }
 
-// Removes a request from the pending set and tells every connected responder to
+// Removes a request from both the pending set (stops advertising it) and the
+// durable records (stops further delivery, so first-responder-wins and "asker
+// found it" actually close the request), and tells every connected responder to
 // drop it from their badge/list. Idempotent — broadcasts even if the entry was
 // already gone, so late subscribers converge.
 export async function resolveClueRequest(
@@ -266,21 +292,52 @@ export async function resolveClueRequest(
 
 	try {
 		await redis.hdel(pendingRequestsKey(dateKey), request.id);
+		await redis.hdel(clueRequestRecordsKey(dateKey), request.id);
 		await redis.publish(clueRequestsChannel(dateKey), JSON.stringify(event));
 	} catch (error) {
 		console.warn("[clue-request] failed to resolve request", error);
 	}
 }
 
-// Resolves any of a requester's own pending requests for a word — used when the
-// asker finds the word and no longer needs help.
+// Durable records for a puzzle (the full deliverable set, including requests past
+// their advertise window). Used to close out a request from the asker's side.
+async function getClueRequestRecords(dateKey: string): Promise<ClueRequest[]> {
+	if (!isRedisConfigured()) {
+		return [];
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return [];
+	}
+
+	try {
+		const entries = await redis.hgetall(clueRequestRecordsKey(dateKey));
+		return Object.values(entries)
+			.map((raw) => {
+				try {
+					return JSON.parse(raw) as ClueRequest;
+				} catch {
+					return null;
+				}
+			})
+			.filter((request): request is ClueRequest => request !== null);
+	} catch (error) {
+		console.warn("[clue-request] failed to read records", error);
+		return [];
+	}
+}
+
+// Resolves any of a requester's own requests for a word — used when the asker
+// finds the word and no longer needs help. Reads the durable records (not just
+// the advertised pending set) so a request still closes even after its advertise
+// window lapsed, stopping a late responder's clue from landing for a found word.
 export async function resolveOwnClueRequestsForWord(options: {
 	dateKey: string;
 	requesterId: string;
 	wordId: number;
 }): Promise<void> {
-	const pending = await getPendingClueRequests(options.dateKey);
-	const matches = pending.filter(
+	const records = await getClueRequestRecords(options.dateKey);
+	const matches = records.filter(
 		(request) =>
 			request.requesterId === options.requesterId &&
 			request.wordId === options.wordId,

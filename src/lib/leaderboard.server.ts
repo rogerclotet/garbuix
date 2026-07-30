@@ -5,24 +5,63 @@ import {
 	type LeaderboardEventDelta,
 	type LeaderboardParticipantKind,
 	type LeaderboardSnapshot,
+	sortLeaderboardEntries,
 	userParticipantId,
 } from "@/lib/leaderboard-types";
 import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 
 export { anonParticipantId, userParticipantId };
 
-const TTL_SECONDS = 60 * 60 * 48;
-const WORDS_FOUND_MULTIPLIER = 1e13;
-const COMPLETION_HORIZON_MS = 1e13;
+const LEADERBOARD_FALLBACK_NAME = "Algú";
 
-function scoreFor(wordsFound: number, completedAt: string | null): number {
-	const wordsComponent = wordsFound * WORDS_FOUND_MULTIPLIER;
-	if (!completedAt) {
-		return wordsComponent;
+export function leaderboardDisplayName(
+	preferred: string,
+	...fallbacks: Array<string | undefined | null>
+): string {
+	const trimmedPreferred = preferred.trim();
+	if (trimmedPreferred) {
+		return trimmedPreferred;
 	}
-	const completionMs = new Date(completedAt).getTime();
-	const completionComponent = Math.max(0, COMPLETION_HORIZON_MS - completionMs);
-	return wordsComponent + completionComponent;
+	for (const fallback of fallbacks) {
+		const trimmed = fallback?.trim();
+		if (trimmed) {
+			return trimmed;
+		}
+	}
+	return LEADERBOARD_FALLBACK_NAME;
+}
+
+const TTL_SECONDS = 60 * 60 * 48;
+// Ranking tiers, highest priority first, packed into a single sorted-set score:
+//   1. words found  — each worth far more than any clue, try, or time delta
+//   2. clues used   — fewer is better, so each clue subtracts a fixed amount
+//   3. tries used   — fewer is better, breaking ties between equal clues
+//   4. completion    — earlier finishers edge ahead, as a sub-1 tiebreak
+// Each tier's band is wide enough to dominate every lower tier combined.
+const WORDS_FOUND_MULTIPLIER = 1e12;
+const CLUE_PENALTY = 1e8;
+const TRY_PENALTY = 1e2;
+const COMPLETION_HORIZON_MS = 1e14;
+
+function scoreFor(
+	wordsFound: number,
+	clueCount: number,
+	tryCount: number,
+	completedAt: string | null,
+): number {
+	const base =
+		wordsFound * WORDS_FOUND_MULTIPLIER -
+		clueCount * CLUE_PENALTY -
+		tryCount * TRY_PENALTY;
+	if (!completedAt) {
+		return base;
+	}
+	// Stays in [0, 1) so it only breaks ties between equal words, clues, and tries.
+	const completionComponent = Math.max(
+		0,
+		1 - new Date(completedAt).getTime() / COMPLETION_HORIZON_MS,
+	);
+	return base + completionComponent;
 }
 
 function scoresKey(dateKey: string): string {
@@ -45,6 +84,8 @@ type RecordProgressInput = {
 	image: string | null;
 	wordsFound: number;
 	totalWords: number;
+	clueCount: number;
+	tryCount: number;
 	completedAt: string | null;
 	previousWordsFound?: number;
 	previousCompletedAt?: string | null;
@@ -74,7 +115,12 @@ export async function recordProgress(
 	}
 
 	const updatedAt = new Date().toISOString();
-	const score = scoreFor(input.wordsFound, input.completedAt);
+	const score = scoreFor(
+		input.wordsFound,
+		input.clueCount,
+		input.tryCount,
+		input.completedAt,
+	);
 
 	const entry: LeaderboardEntry = {
 		participantId: input.participantId,
@@ -83,6 +129,8 @@ export async function recordProgress(
 		image: input.image,
 		wordsFound: input.wordsFound,
 		totalWords: input.totalWords,
+		clueCount: input.clueCount,
+		tryCount: input.tryCount,
 		completedAt: input.completedAt,
 		updatedAt,
 	};
@@ -97,6 +145,8 @@ export async function recordProgress(
 		image: entry.image ?? "",
 		wordsFound: String(entry.wordsFound),
 		totalWords: String(entry.totalWords),
+		clueCount: String(entry.clueCount),
+		tryCount: String(entry.tryCount),
 		completedAt: entry.completedAt ?? "",
 		updatedAt: entry.updatedAt,
 	});
@@ -128,6 +178,68 @@ export async function recordProgress(
 	return { recorded: true, entry, delta };
 }
 
+export async function updateLeaderboardProfile(input: {
+	dateKey: string;
+	participantId: string;
+	name: string;
+	image: string | null;
+}): Promise<boolean> {
+	if (!isRedisConfigured()) {
+		return false;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return false;
+	}
+
+	const meta = metaKey(input.dateKey, input.participantId);
+	let hash: Record<string, string>;
+	try {
+		hash = await redis.hgetall(meta);
+	} catch (error) {
+		console.warn("[leaderboard] profile read failed", error);
+		return false;
+	}
+
+	const entry = parseMeta(
+		input.participantId,
+		hash && Object.keys(hash).length > 0 ? hash : null,
+	);
+	if (!entry) {
+		return false;
+	}
+
+	const updatedEntry: LeaderboardEntry = {
+		...entry,
+		name: input.name,
+		image: input.image,
+		updatedAt: new Date().toISOString(),
+	};
+
+	const pipeline = redis.pipeline();
+	writeLeaderboardEntry(pipeline, input.dateKey, updatedEntry);
+	try {
+		await pipeline.exec();
+	} catch (error) {
+		console.warn("[leaderboard] profile update failed", error);
+		return false;
+	}
+
+	const event: LeaderboardEvent = {
+		type: "update",
+		dateKey: input.dateKey,
+		entry: updatedEntry,
+		delta: { wordsAdded: 0, justCompleted: false },
+	};
+	try {
+		await redis.publish(channel(input.dateKey), JSON.stringify(event));
+	} catch (error) {
+		console.warn("[leaderboard] profile publish failed", error);
+	}
+
+	return true;
+}
+
 function parseMeta(
 	participantId: string,
 	hash: Record<string, string> | null,
@@ -145,6 +257,8 @@ function parseMeta(
 	}
 	const wordsFound = Number.parseInt(hash.wordsFound ?? "0", 10);
 	const totalWords = Number.parseInt(hash.totalWords ?? "0", 10);
+	const clueCount = Number.parseInt(hash.clueCount ?? "0", 10);
+	const tryCount = Number.parseInt(hash.tryCount ?? "0", 10);
 	return {
 		participantId,
 		kind,
@@ -152,6 +266,8 @@ function parseMeta(
 		image: hash.image && hash.image.length > 0 ? hash.image : null,
 		wordsFound: Number.isFinite(wordsFound) ? wordsFound : 0,
 		totalWords: Number.isFinite(totalWords) ? totalWords : 0,
+		clueCount: Number.isFinite(clueCount) ? clueCount : 0,
+		tryCount: Number.isFinite(tryCount) ? tryCount : 0,
 		completedAt:
 			hash.completedAt && hash.completedAt.length > 0 ? hash.completedAt : null,
 		updatedAt: hash.updatedAt ?? new Date(0).toISOString(),
@@ -207,10 +323,42 @@ export async function getLeaderboard(
 		}
 	}
 
-	return { dateKey, entries };
+	// Redis returns members in packed-score order, which can break ties (e.g.
+	// players with equal words who haven't completed) differently than the live
+	// client sort. Apply the shared canonical sort so the same board never
+	// reorders between the same-day and previous-day views.
+	return { dateKey, entries: sortLeaderboardEntries(entries) };
 }
 
-export async function renameAnonToUser(options: {
+function writeLeaderboardEntry(
+	pipeline: ReturnType<NonNullable<ReturnType<typeof getRedis>>["pipeline"]>,
+	dateKey: string,
+	entry: LeaderboardEntry,
+): void {
+	const score = scoreFor(
+		entry.wordsFound,
+		entry.clueCount,
+		entry.tryCount,
+		entry.completedAt,
+	);
+	const meta = metaKey(dateKey, entry.participantId);
+	pipeline.hset(meta, {
+		kind: entry.kind,
+		name: entry.name,
+		image: entry.image ?? "",
+		wordsFound: String(entry.wordsFound),
+		totalWords: String(entry.totalWords),
+		clueCount: String(entry.clueCount),
+		tryCount: String(entry.tryCount),
+		completedAt: entry.completedAt ?? "",
+		updatedAt: entry.updatedAt,
+	});
+	pipeline.expire(meta, TTL_SECONDS);
+	pipeline.zadd(scoresKey(dateKey), score, entry.participantId);
+	pipeline.expire(scoresKey(dateKey), TTL_SECONDS);
+}
+
+export async function mergeAnonLeaderboardEntry(options: {
 	dateKey: string;
 	deviceId: string;
 	userId: string;
@@ -231,39 +379,79 @@ export async function renameAnonToUser(options: {
 	const toMeta = metaKey(options.dateKey, toId);
 
 	try {
-		const hash = await redis.hgetall(fromMeta);
-		const parsed = parseMeta(fromId, Object.keys(hash).length ? hash : null);
-		if (!parsed) {
+		const readPipeline = redis.pipeline();
+		readPipeline.hgetall(fromMeta);
+		readPipeline.hgetall(toMeta);
+		const readResults = (await readPipeline.exec()) ?? [];
+		const [, anonHash] = readResults[0] ?? [null, null];
+		const [, userHash] = readResults[1] ?? [null, null];
+
+		const anonEntry = parseMeta(
+			fromId,
+			anonHash && Object.keys(anonHash).length > 0
+				? (anonHash as Record<string, string>)
+				: null,
+		);
+		if (!anonEntry) {
 			return;
 		}
 
-		const updated: LeaderboardEntry = {
-			...parsed,
-			participantId: toId,
-			kind: "user",
+		const userEntry = parseMeta(
+			toId,
+			userHash && Object.keys(userHash).length > 0
+				? (userHash as Record<string, string>)
+				: null,
+		);
+
+		const updatedAt = new Date().toISOString();
+		const displayName = leaderboardDisplayName(
+			options.name,
+			userEntry?.name,
+			anonEntry.name,
+		);
+		const mergedEntry: LeaderboardEntry = userEntry
+			? {
+					...sortLeaderboardEntries([anonEntry, userEntry])[0],
+					participantId: toId,
+					kind: "user",
+					name: displayName,
+					image: options.image,
+					updatedAt,
+				}
+			: {
+					...anonEntry,
+					participantId: toId,
+					kind: "user",
+					name: displayName,
+					image: options.image,
+					updatedAt,
+				};
+
+		const writePipeline = redis.pipeline();
+		writePipeline.del(fromMeta);
+		writePipeline.zrem(scoresKey(options.dateKey), fromId);
+		writeLeaderboardEntry(writePipeline, options.dateKey, mergedEntry);
+		await writePipeline.exec();
+	} catch (error) {
+		console.warn("[leaderboard] mergeAnonLeaderboardEntry failed", error);
+	}
+}
+
+export async function mergeAnonLeaderboardForUser(options: {
+	deviceId: string;
+	userId: string;
+	name: string;
+	image: string | null;
+	dateKeys: string[];
+}): Promise<void> {
+	for (const dateKey of new Set(options.dateKeys)) {
+		await mergeAnonLeaderboardEntry({
+			dateKey,
+			deviceId: options.deviceId,
+			userId: options.userId,
 			name: options.name,
 			image: options.image,
-		};
-
-		const score = scoreFor(updated.wordsFound, updated.completedAt);
-		const pipeline = redis.pipeline();
-		pipeline.del(fromMeta);
-		pipeline.zrem(scoresKey(options.dateKey), fromId);
-		pipeline.hset(toMeta, {
-			kind: updated.kind,
-			name: updated.name,
-			image: updated.image ?? "",
-			wordsFound: String(updated.wordsFound),
-			totalWords: String(updated.totalWords),
-			completedAt: updated.completedAt ?? "",
-			updatedAt: new Date().toISOString(),
 		});
-		pipeline.expire(toMeta, TTL_SECONDS);
-		pipeline.zadd(scoresKey(options.dateKey), score, toId);
-		pipeline.expire(scoresKey(options.dateKey), TTL_SECONDS);
-		await pipeline.exec();
-	} catch (error) {
-		console.warn("[leaderboard] renameAnonToUser failed", error);
 	}
 }
 

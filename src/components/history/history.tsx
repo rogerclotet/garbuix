@@ -8,10 +8,13 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
+import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	buildAnonymousImportPayload,
 	getDeviceId,
@@ -21,12 +24,15 @@ import {
 } from "@/lib/puzzle-local";
 import {
 	getHistoryPageData,
+	getMoreHistoryEntries,
 	importAnonymousProgress,
 } from "@/lib/puzzle-server-fns";
-import { calculateHistoryStreaks } from "@/lib/puzzle-streaks";
-import type {
-	DailyPuzzlePreview,
-	HistorySummaryEntry,
+import { calculateHistoryStats } from "@/lib/puzzle-streaks";
+import {
+	type DailyPuzzlePreview,
+	HISTORY_PAGE_SIZE,
+	type HistoryStats,
+	type HistorySummaryEntry,
 } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
@@ -39,29 +45,50 @@ const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
 	year: "numeric",
 });
 
+type AccountHistoryPage = {
+	entries: HistorySummaryEntry[];
+	hasMore: boolean;
+	stats: HistoryStats;
+};
+
 type HistoryData = {
-	accountHistory: HistorySummaryEntry[] | null;
+	accountHistory: AccountHistoryPage | null;
 	yesterdayPuzzle: {
 		dateKey: string;
 		preview: DailyPuzzlePreview;
+		difficulty?: PuzzleDifficulty | null;
 	};
 	yesterdayLeaderboard?: LeaderboardSnapshot;
+};
+
+const EMPTY_STATS: HistoryStats = {
+	totalDays: 0,
+	completedDays: 0,
+	completionRate: 0,
+	currentStreak: 0,
+	bestStreak: 0,
+	avgGuesses: 0,
 };
 
 export function History({ initialData }: { initialData: HistoryData }) {
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
 	const fetchHistory = useServerFn(getHistoryPageData);
+	const fetchMoreHistory = useServerFn(getMoreHistoryEntries);
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);
 	const importAttemptedRef = useRef<string | null>(null);
 	const { captureEvent, captureException } = useObservability();
-	const [accountHistory, setAccountHistory] = useState<
-		HistorySummaryEntry[] | null
-	>(initialData.accountHistory);
+	const [accountHistory, setAccountHistory] =
+		useState<AccountHistoryPage | null>(initialData.accountHistory);
 	const [anonymousHistory, setAnonymousHistory] = useState<
 		HistorySummaryEntry[]
 	>([]);
+	// How many anonymous (localStorage) entries are currently revealed. Account
+	// pagination is server-driven, so it only tracks accountHistory length.
+	const [anonymousVisibleCount, setAnonymousVisibleCount] =
+		useState(HISTORY_PAGE_SIZE);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
 
 	useEffect(() => {
 		setAnonymousHistory(getSortedAnonymousHistoryEntries());
@@ -84,18 +111,19 @@ export function History({ initialData }: { initialData: HistoryData }) {
 			) {
 				importAttemptedRef.current = activeUser.id;
 				const payload = buildAnonymousImportPayload();
-				if (
+				const hasLocalProgress =
 					payload.historyEntries.length > 0 ||
-					Object.keys(payload.activeProgressByDate).length > 0
-				) {
-					try {
-						const result = await importProgress({
-							data: {
-								deviceId,
-								payload,
-							},
-						});
-						markAnonymousDataImported(activeUser.id);
+					Object.keys(payload.activeProgressByDate).length > 0;
+
+				try {
+					const result = await importProgress({
+						data: {
+							deviceId,
+							payload,
+						},
+					});
+					markAnonymousDataImported(activeUser.id);
+					if (hasLocalProgress) {
 						captureEvent("anonymous_history_imported", {
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
@@ -103,21 +131,19 @@ export function History({ initialData }: { initialData: HistoryData }) {
 							legacy_dates: result.skippedLegacyDates.length,
 						});
 						toast.success("S'han sincronitzat els resultats locals");
-					} catch (error) {
-						console.error("Failed to import anonymous history", error);
-						captureException(error, {
-							scope: "anonymous_history_import",
-						});
 					}
-				} else {
-					markAnonymousDataImported(activeUser.id);
+				} catch (error) {
+					console.error("Failed to import anonymous history", error);
+					captureException(error, {
+						scope: "anonymous_history_import",
+					});
 				}
 			}
 
 			try {
 				const data = await fetchHistory();
 				if (!cancelled) {
-					setAccountHistory(data.accountHistory ?? []);
+					setAccountHistory(data.accountHistory);
 				}
 			} catch (error) {
 				console.error("Failed to load account history", error);
@@ -141,30 +167,58 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		importProgress,
 	]);
 
-	const entries = activeUser ? (accountHistory ?? []) : anonymousHistory;
+	const entries = activeUser
+		? (accountHistory?.entries ?? [])
+		: anonymousHistory.slice(0, anonymousVisibleCount);
 
-	const stats = useMemo(() => {
-		const totalDays = entries.length;
-		const completedDays = entries.filter((entry) => entry.completed).length;
-		const { bestStreak, currentStreak } = calculateHistoryStreaks(entries);
-		const completionRate = totalDays
-			? Math.round((completedDays / totalDays) * 100)
-			: 0;
-		const totalGuesses = entries.reduce(
-			(total, entry) => total + entry.guessCount,
-			0,
-		);
-		const avgGuesses = totalDays ? totalGuesses / totalDays : 0;
+	const hasMore = activeUser
+		? (accountHistory?.hasMore ?? false)
+		: anonymousVisibleCount < anonymousHistory.length;
 
-		return {
-			totalDays,
-			completedDays,
-			currentStreak,
-			bestStreak,
-			completionRate,
-			avgGuesses,
-		};
-	}, [entries]);
+	// Account stats come precomputed from the server over the full history;
+	// anonymous stats are derived locally from the complete localStorage set.
+	const anonymousStats = useMemo(
+		() => calculateHistoryStats(anonymousHistory),
+		[anonymousHistory],
+	);
+	const stats = activeUser
+		? (accountHistory?.stats ?? EMPTY_STATS)
+		: anonymousStats;
+
+	const handleLoadMore = async () => {
+		if (isLoadingMore) {
+			return;
+		}
+
+		if (!activeUser) {
+			setAnonymousVisibleCount((count) => count + HISTORY_PAGE_SIZE);
+			return;
+		}
+
+		setIsLoadingMore(true);
+		try {
+			const page = await fetchMoreHistory({
+				data: { offset: accountHistory?.entries.length ?? 0 },
+			});
+			setAccountHistory((current) =>
+				current
+					? {
+							...current,
+							entries: [...current.entries, ...page.entries],
+							hasMore: page.hasMore,
+						}
+					: current,
+			);
+		} catch (error) {
+			console.error("Failed to load more history", error);
+			captureException(error, {
+				scope: "history_load_more",
+			});
+			toast.error("No s'han pogut carregar més resultats");
+		} finally {
+			setIsLoadingMore(false);
+		}
+	};
 
 	const statCards = [
 		{
@@ -256,6 +310,12 @@ export function History({ initialData }: { initialData: HistoryData }) {
 														{entry.legacy ? (
 															<Badge variant="outline">Importat</Badge>
 														) : null}
+														{entry.difficulty ? (
+															<DifficultyBars
+																difficulty={entry.difficulty}
+																showLabel
+															/>
+														) : null}
 														<span className="text-sm text-muted-foreground font-ui">
 															{entry.guessCount} intent
 															{entry.guessCount === 1 ? "" : "s"} ·{" "}
@@ -278,6 +338,17 @@ export function History({ initialData }: { initialData: HistoryData }) {
 											);
 										})}
 									</div>
+									{hasMore ? (
+										<div className="flex justify-center pt-1">
+											<Button
+												variant="outline"
+												onClick={handleLoadMore}
+												disabled={isLoadingMore}
+											>
+												{isLoadingMore ? "Carregant…" : "Carrega'n més"}
+											</Button>
+										</div>
+									) : null}
 								</div>
 							</>
 						)}
@@ -285,15 +356,23 @@ export function History({ initialData }: { initialData: HistoryData }) {
 
 					<div className="order-1 lg:order-2">
 						<div className="rounded-xl bg-muted/30 p-4 sm:p-5 space-y-4">
-							<div>
+							<div className="space-y-1.5">
 								<h3 className="text-base font-semibold">Resultat d'ahir</h3>
-								<span className="text-sm text-muted-foreground font-ui">
-									{dateFormatter.format(
-										new Date(
-											`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
-										),
-									)}
-								</span>
+								<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+									<span className="text-sm text-muted-foreground font-ui">
+										{dateFormatter.format(
+											new Date(
+												`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
+											),
+										)}
+									</span>
+									{initialData.yesterdayPuzzle.difficulty ? (
+										<DifficultyBars
+											difficulty={initialData.yesterdayPuzzle.difficulty}
+											showLabel
+										/>
+									) : null}
+								</div>
 							</div>
 
 							<div
@@ -327,7 +406,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 												return (
 													<div
 														key={key}
-														className="aspect-square border rounded-[0.2rem] sm:rounded-md flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
+														className="aspect-square border rounded-[18%] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
 													>
 														{cell.toUpperCase()}
 													</div>

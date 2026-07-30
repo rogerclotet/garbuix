@@ -17,9 +17,12 @@ const {
 	captureExceptionMock,
 	hasSeenHowToPlayMock,
 	markHowToPlaySeenMock,
+	hasSeenProfilePreferencesTipMock,
+	markProfilePreferencesTipSeenMock,
 	hasSeenWelcomeMock,
 	markWelcomeSeenMock,
 	openHowToPlayMock,
+	openProfilePreferencesTipMock,
 } = vi.hoisted(() => ({
 	resolveGuessMock: vi.fn(),
 	applyLocalEventMock: vi.fn(),
@@ -27,9 +30,12 @@ const {
 	captureExceptionMock: vi.fn(),
 	hasSeenHowToPlayMock: vi.fn(() => true),
 	markHowToPlaySeenMock: vi.fn(),
+	hasSeenProfilePreferencesTipMock: vi.fn(() => true),
+	markProfilePreferencesTipSeenMock: vi.fn(),
 	hasSeenWelcomeMock: vi.fn(() => true),
 	markWelcomeSeenMock: vi.fn(),
 	openHowToPlayMock: vi.fn(),
+	openProfilePreferencesTipMock: vi.fn(),
 }));
 
 vi.mock("@/lib/puzzle-client", async () => {
@@ -50,12 +56,18 @@ vi.mock("@/lib/puzzle-local", () => ({
 	getSortedAnonymousHistoryEntries: vi.fn(() => []),
 	hasSeenHowToPlay: hasSeenHowToPlayMock,
 	markHowToPlaySeen: markHowToPlaySeenMock,
+	hasSeenProfilePreferencesTip: hasSeenProfilePreferencesTipMock,
+	markProfilePreferencesTipSeen: markProfilePreferencesTipSeenMock,
 	hasSeenWelcome: hasSeenWelcomeMock,
 	markWelcomeSeen: markWelcomeSeenMock,
 }));
 
 vi.mock("./how-to-play-store", () => ({
 	openHowToPlay: openHowToPlayMock,
+}));
+
+vi.mock("@/components/profile-preferences-tip-store", () => ({
+	openProfilePreferencesTip: openProfilePreferencesTipMock,
 }));
 
 vi.mock("@/lib/puzzle-streaks", () => ({
@@ -239,10 +251,14 @@ describe("Daily submit feedback", () => {
 		hasSeenHowToPlayMock.mockReset();
 		hasSeenHowToPlayMock.mockReturnValue(true);
 		markHowToPlaySeenMock.mockReset();
+		hasSeenProfilePreferencesTipMock.mockReset();
+		hasSeenProfilePreferencesTipMock.mockReturnValue(true);
+		markProfilePreferencesTipSeenMock.mockReset();
 		hasSeenWelcomeMock.mockReset();
 		hasSeenWelcomeMock.mockReturnValue(true);
 		markWelcomeSeenMock.mockReset();
 		openHowToPlayMock.mockReset();
+		openProfilePreferencesTipMock.mockReset();
 		installMatchMediaMock(false);
 	});
 
@@ -255,64 +271,71 @@ describe("Daily submit feedback", () => {
 		["already_found", "text-foreground"],
 		["valid_but_not_in_puzzle", "opacity-65"],
 		["not_in_dictionary", "text-destructive"],
-	] as const)("shows %s feedback with the correct tone and clears the input", async (kind, expectedClassName) => {
-		resolveGuessMock.mockResolvedValue({
-			kind,
-			isRepeatGuess: false,
-			displayWord: kind === "new_word" ? "cosa" : null,
-			guessHash: `guess-${kind}`,
-			normalizedGuess: "cosa",
-			matchedSlotId: kind === "new_word" || kind === "already_found" ? 0 : null,
-			unlockToken: kind === "new_word" ? "unlock-0" : null,
-		});
+	] as const)(
+		"shows %s feedback with the correct tone and clears the input",
+		async (kind, expectedClassName) => {
+			resolveGuessMock.mockResolvedValue({
+				kind,
+				isRepeatGuess: false,
+				displayWord: kind === "new_word" ? "cosa" : null,
+				guessHash: `guess-${kind}`,
+				normalizedGuess: "cosa",
+				matchedSlotId:
+					kind === "new_word" || kind === "already_found" ? 0 : null,
+				unlockToken: kind === "new_word" ? "unlock-0" : null,
+			});
 
-		renderDaily();
-		await submitCurrentGuess();
+			renderDaily();
+			await submitCurrentGuess();
 
-		const feedback = await waitFor(() => {
-			const nextFeedback = document.querySelector(
-				'[data-slot="submit-feedback"]',
-			);
-			expect(nextFeedback).not.toBeNull();
-			return nextFeedback as HTMLElement;
-		});
+			const feedback = await waitFor(() => {
+				const nextFeedback = document.querySelector(
+					'[data-slot="submit-feedback"]',
+				);
+				expect(nextFeedback).not.toBeNull();
+				return nextFeedback as HTMLElement;
+			});
 
-		expect(feedback.getAttribute("data-feedback-kind")).toBe(kind);
-		expect(feedback.className).toContain(expectedClassName);
-		expect(
-			document.querySelector('[data-slot="current-guess"]')?.textContent,
-		).toBe("");
-	});
+			expect(feedback.getAttribute("data-feedback-kind")).toBe(kind);
+			expect(feedback.className).toContain(expectedClassName);
+			expect(
+				document.querySelector('[data-slot="current-guess"]')?.textContent,
+			).toBe("");
+		},
+	);
 
 	it.each([
 		["valid_but_not_in_puzzle", "opacity-65"],
 		["not_in_dictionary", "text-destructive"],
-	] as const)("shows %s feedback on repeated submit and does not apply a duplicate event", async (kind, expectedClassName) => {
-		resolveGuessMock.mockResolvedValue({
-			kind,
-			isRepeatGuess: true,
-			displayWord: null,
-			guessHash: `guess-${kind}`,
-			normalizedGuess: "cosa",
-			matchedSlotId: null,
-			unlockToken: null,
-		});
+	] as const)(
+		"shows %s feedback on repeated submit and does not apply a duplicate event",
+		async (kind, expectedClassName) => {
+			resolveGuessMock.mockResolvedValue({
+				kind,
+				isRepeatGuess: true,
+				displayWord: null,
+				guessHash: `guess-${kind}`,
+				normalizedGuess: "cosa",
+				matchedSlotId: null,
+				unlockToken: null,
+			});
 
-		renderDaily();
-		await submitCurrentGuess();
+			renderDaily();
+			await submitCurrentGuess();
 
-		const feedback = await waitFor(() => {
-			const nextFeedback = document.querySelector(
-				'[data-slot="submit-feedback"]',
-			);
-			expect(nextFeedback).not.toBeNull();
-			return nextFeedback as HTMLElement;
-		});
+			const feedback = await waitFor(() => {
+				const nextFeedback = document.querySelector(
+					'[data-slot="submit-feedback"]',
+				);
+				expect(nextFeedback).not.toBeNull();
+				return nextFeedback as HTMLElement;
+			});
 
-		expect(feedback.getAttribute("data-feedback-kind")).toBe(kind);
-		expect(feedback.className).toContain(expectedClassName);
-		expect(applyLocalEventMock).not.toHaveBeenCalled();
-	});
+			expect(feedback.getAttribute("data-feedback-kind")).toBe(kind);
+			expect(feedback.className).toContain(expectedClassName);
+			expect(applyLocalEventMock).not.toHaveBeenCalled();
+		},
+	);
 
 	it("disables the feedback animation path when reduced motion is preferred", async () => {
 		installMatchMediaMock(true);
@@ -370,6 +393,50 @@ describe("Daily submit feedback", () => {
 		});
 		expect(openHowToPlayMock).not.toHaveBeenCalled();
 		expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
+	});
+
+	it("opens the profile preferences tip after the how-to-play tutorial and marks it seen", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(true);
+		hasSeenProfilePreferencesTipMock.mockReturnValueOnce(false);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(markProfilePreferencesTipSeenMock).toHaveBeenCalledTimes(1);
+		});
+		expect(openProfilePreferencesTipMock).toHaveBeenCalledTimes(1);
+		expect(captureEventMock).toHaveBeenCalledWith(
+			"profile_preferences_tip_shown",
+			{ trigger: "return_visit" },
+		);
+	});
+
+	it("does not auto-open the profile preferences tip on first visit before how-to-play", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(false);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
+		});
+		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
+		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
+	});
+
+	it("does not auto-open the profile preferences tip once it has been seen", async () => {
+		hasSeenHowToPlayMock.mockReturnValueOnce(true);
+		hasSeenProfilePreferencesTipMock.mockReturnValueOnce(true);
+
+		renderDaily();
+
+		await waitFor(() => {
+			expect(captureEventMock).toHaveBeenCalledWith(
+				"puzzle_loaded",
+				expect.any(Object),
+			);
+		});
+		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
+		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
 	});
 
 	it("triggers haptics on the first touch release", async () => {

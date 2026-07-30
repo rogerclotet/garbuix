@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
+import { findLeakingTokens } from "@/lib/clue-fairness";
 import { db } from "@/lib/db";
 import { captureServerException } from "@/lib/observability-server";
 import { normalizeWord } from "@/lib/puzzle-text";
@@ -23,14 +24,15 @@ const CLUE_MAX_TOKENS = 150;
 const ANTHROPIC_REQUEST_TIMEOUT_MS = 60_000;
 const ANTHROPIC_MAX_RETRIES = 2;
 
-const SYSTEM_PROMPT = `Ets l'autor de pistes d'un joc de paraules en català (estil mots encreuats). Et donaré una paraula amagada i la seva categoria temàtica. Has d'escriure UNA pista en català que ajudi a endevinar-la.
+const SYSTEM_PROMPT = `Ets l'autor de pistes per a un joc de paraules en català (estil mots encreuats). Et donaré una paraula amagada i la seva categoria temàtica. Has d'escriure UNA pista curta en català que orienti cap a la paraula sense revelar-la.
 
 Regles estrictes:
 - Escriu sempre en català.
 - NO escriguis mai la paraula amagada ni cap de les seves formes (plural, femení, diminutiu, verb conjugat, derivats) ni cap fragment evident d'aquesta.
-- La pista ha de ser suggerent i interessant, però NO òbvia: no donis la resposta amb un sinònim directe ni amb una definició de diccionari massa transparent.
-- No facis servir la longitud, el nombre de lletres ni la categoria literal com a pista.
-- Una sola frase, sense cometes, sense dos punts i sense posar la paraula entre parèntesis.
+- La pista ha de ser concreta i directa: descriu què és, on es fa servir o quin context evoca. Evita metàfores, endevinalles i associacions llunyanes.
+- No donis la resposta amb un sinònim directe ni amb una definició de diccionari massa transparent.
+- No facis servir la longitud, el nombre de lletres ni el nom de la categoria com a pista; usa la categoria només per orientar el context de la pista.
+- Màxim 12 paraules. Una sola frase, sense cometes, sense dos punts i sense posar la paraula entre parèntesis.
 
 Respon NOMÉS amb el text de la pista, res més.`;
 
@@ -117,39 +119,6 @@ async function callModel(options: {
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Returns the original tokens of `clue` that reveal the hidden word — the word
-// itself, an inflection (plural/feminine/diminutive/conjugation), or a clear
-// truncation of it. Used to reject and, as a last resort, mask leaks.
-function findLeakingTokens(clue: string, normalizedWord: string): string[] {
-	if (!normalizedWord) {
-		return [];
-	}
-
-	const tokens = clue.split(/[^\p{L}·]+/u).filter(Boolean);
-	const leaks: string[] = [];
-
-	for (const token of tokens) {
-		const normalizedToken = normalizeWord(token);
-		if (normalizedToken.length < 3) {
-			continue;
-		}
-
-		const isInflectionOrMatch =
-			normalizedToken === normalizedWord ||
-			normalizedToken.startsWith(normalizedWord);
-		const isTruncation =
-			normalizedWord.length >= 5 &&
-			normalizedToken.length >= 4 &&
-			normalizedWord.startsWith(normalizedToken);
-
-		if (isInflectionOrMatch || isTruncation) {
-			leaks.push(token);
-		}
-	}
-
-	return leaks;
 }
 
 function maskLeaks(clue: string, leakingTokens: string[]): string {

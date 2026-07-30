@@ -101,9 +101,9 @@ function getRequestObservabilityContext(options?: {
 }) {
 	const headers = getRequestHeaders();
 	const distinctId =
-		options?.distinctId ?? headers["x-posthog-distinct-id"] ?? undefined;
-	const sessionId = headers["x-posthog-session-id"] ?? undefined;
-	const windowId = headers["x-posthog-window-id"] ?? undefined;
+		options?.distinctId ?? headers.get("x-posthog-distinct-id") ?? undefined;
+	const sessionId = headers.get("x-posthog-session-id") ?? undefined;
+	const windowId = headers.get("x-posthog-window-id") ?? undefined;
 
 	return {
 		distinctId,

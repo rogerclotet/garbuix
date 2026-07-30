@@ -1,10 +1,15 @@
+import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
+
 export type PuzzleDirection = "horizontal" | "vertical";
 
 export type SessionUser = {
 	id: string;
 	name: string;
+	displayName?: string | null;
 	email: string;
 	image?: string | null;
+	googleImage?: string | null;
+	useGoogleAvatar?: boolean;
 } | null;
 
 export type PuzzleGridMaskCell = {
@@ -42,6 +47,9 @@ export type DailyPuzzlePublic = {
 	validNormalizedGuesses: string[];
 	wordSlots: DailyPuzzleWordSlot[];
 	hintCapsules: DailyPuzzleHintCapsule[];
+	// 1-3 star difficulty derived from the puzzle's word frequencies. Optional
+	// for puzzles generated before the feature existed (filled by backfill).
+	difficulty?: PuzzleDifficulty | null;
 };
 
 export type DailyPuzzlePrivateWord = {
@@ -80,7 +88,7 @@ export type PuzzleProgressState = {
 	hintsUsed: number;
 	guessCount: number;
 	// Valid dictionary words the player found that aren't part of the puzzle.
-	// Every 10th such word grants a free bonus clue (see bonus_clue_revealed).
+	// Every 5th such word grants a free bonus clue (see bonus_clue_revealed).
 	bonusWordsFound: number;
 	shuffledLetters: string[];
 	completedAt: string | null;
@@ -174,6 +182,27 @@ export type HistorySummaryEntry = {
 	completed: boolean;
 	lastUpdated: string;
 	legacy?: boolean;
+	// Puzzle-level difficulty (same for every player on a given day). Absent for
+	// legacy/anonymous entries that have no linked puzzle row.
+	difficulty?: PuzzleDifficulty | null;
+};
+
+// Number of history entries fetched/rendered per page. Keeps the initial page
+// load light now that accounts can accumulate hundreds of daily results.
+export const HISTORY_PAGE_SIZE = 5;
+
+export type HistoryStats = {
+	totalDays: number;
+	completedDays: number;
+	completionRate: number;
+	currentStreak: number;
+	bestStreak: number;
+	avgGuesses: number;
+};
+
+export type HistoryEntriesPage = {
+	entries: HistorySummaryEntry[];
+	hasMore: boolean;
 };
 
 export type AnonymousImportPayload = {

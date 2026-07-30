@@ -6,6 +6,7 @@ import {
 	checkDailyPuzzleExists,
 	getAuthSession,
 	getDailyPuzzlePublicData,
+	getHistoryEntriesPageForUser,
 	getHistoryPageDataForUser,
 	getSessionUserData,
 	getUserPuzzleProgressData,
@@ -13,10 +14,13 @@ import {
 	importAnonymousProgressForUser,
 	syncPuzzleEventsForUser,
 	triggerDailyPuzzleGeneration,
+	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
-import type {
-	AnonymousImportPayload,
-	PuzzleClientEvent,
+import {
+	type AnonymousImportPayload,
+	HISTORY_PAGE_SIZE,
+	type HistoryEntriesPage,
+	type PuzzleClientEvent,
 } from "@/lib/puzzle-types";
 
 export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
@@ -140,7 +144,6 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 			puzzleId: z.string(),
 			deviceId: z.string(),
 			events: z.custom<PuzzleClientEvent[]>(),
-			leaderboardOptOut: z.boolean().optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -157,7 +160,6 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 					userId: session.user.id,
 					deviceId: data.deviceId,
 					events: data.events,
-					leaderboardOptOut: data.leaderboardOptOut ?? false,
 				});
 			},
 			{
@@ -180,14 +182,7 @@ export const getWordClues = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getWordClues",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					return {} as Record<number, string>;
-				}
-
-				return getWordCluesData(data.puzzleId, data.wordIds);
-			},
+			async () => getWordCluesData(data.puzzleId, data.wordIds),
 			{
 				properties: {
 					puzzle_id: data.puzzleId,
@@ -220,6 +215,34 @@ export const getHistoryPageData = createServerFn({ method: "POST" })
 		);
 	});
 
+export const getMoreHistoryEntries = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			offset: z.number().int().nonnegative(),
+		}),
+	)
+	.handler(async ({ data }): Promise<HistoryEntriesPage> => {
+		return observeServerAction(
+			"getMoreHistoryEntries",
+			async () => {
+				const session = await getAuthSession();
+				if (!session) {
+					return { entries: [], hasMore: false };
+				}
+
+				return getHistoryEntriesPageForUser(session.user.id, {
+					offset: data.offset,
+					limit: HISTORY_PAGE_SIZE,
+				});
+			},
+			{
+				properties: {
+					offset: data.offset,
+				},
+			},
+		);
+	});
+
 export const importAnonymousProgress = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
@@ -238,6 +261,7 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 
 				return importAnonymousProgressForUser({
 					userId: session.user.id,
+					deviceId: data.deviceId,
 					payload: data.payload,
 				});
 			},
@@ -247,6 +271,37 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 						.length,
 					device_id: data.deviceId,
 					history_entry_count: data.payload.historyEntries.length,
+				},
+			},
+		);
+	});
+
+export const updateUserProfile = createServerFn({ method: "POST" })
+	.inputValidator(
+		z.object({
+			displayName: z.string().optional(),
+			useGoogleAvatar: z.boolean().optional(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"updateUserProfile",
+			async () => {
+				const session = await getAuthSession();
+				if (!session) {
+					throw new Error("Unauthorized");
+				}
+
+				return updateUserProfileData({
+					userId: session.user.id,
+					displayName: data.displayName,
+					useGoogleAvatar: data.useGoogleAvatar,
+				});
+			},
+			{
+				properties: {
+					has_display_name: data.displayName !== undefined,
+					has_avatar_preference: data.useGoogleAvatar !== undefined,
 				},
 			},
 		);

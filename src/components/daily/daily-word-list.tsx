@@ -58,11 +58,17 @@ export function DailyWordList({
 	);
 	const cluedWordIds = new Set(clueWordIds);
 	const requestedHelp = new Set(requestedHelpWordIds);
+	const foundWordIds = new Set(guessedWordIds);
 
 	const requestsByWordId = new Map<number, ClueRequest[]>();
 	for (const request of incomingRequests) {
+		// You can only give a useful clue for a word you've found yourself, so
+		// don't surface help requests for words still unsolved on your board.
+		if (!foundWordIds.has(request.wordId)) continue;
 		const existing = requestsByWordId.get(request.wordId);
 		if (existing) {
+			// One row per asker: skip a friend already listed for this word.
+			if (existing.some((r) => r.requesterId === request.requesterId)) continue;
 			existing.push(request);
 		} else {
 			requestsByWordId.set(request.wordId, [request]);
@@ -108,11 +114,22 @@ export function DailyWordList({
 		setPrefillText("");
 	};
 
-	// Lazy route: drop a word's AI clue straight into the open composer.
+	// True while a response composer for one of this word's requests is open —
+	// the only time it makes sense to copy the word's AI clue into a reply.
+	const isComposingForWord = (wordId: number): boolean => {
+		if (activeRequestId === null) return false;
+		const requests = requestsByWordId.get(wordId);
+		return Boolean(requests?.some((request) => request.id === activeRequestId));
+	};
+
+	// Drop the word's AI clue into the composer that's currently open for it.
 	const handleUseClue = (wordId: number, clueText: string) => {
-		const first = requestsByWordId.get(wordId)?.[0];
-		if (!first) return;
-		openComposer(first.id, clueText);
+		const requests = requestsByWordId.get(wordId);
+		const target =
+			requests?.find((request) => request.id === activeRequestId) ??
+			requests?.[0];
+		if (!target) return;
+		openComposer(target.id, clueText);
 	};
 
 	const renderIncomingRequests = (wordId: number) => {
@@ -165,7 +182,7 @@ export function DailyWordList({
 	};
 
 	// An AI clue shown next to a word can be copied into the response composer,
-	// but only when there's actually a request to answer for that word.
+	// but only while a composer for that word is actually open.
 	const renderClueLine = (
 		wordId: number,
 		clueText: string,
@@ -179,7 +196,7 @@ export function DailyWordList({
 			>
 				{clueText}
 			</span>
-			{requestsByWordId.has(wordId) && onRespondToClue ? (
+			{isComposingForWord(wordId) && onRespondToClue ? (
 				<Button
 					type="button"
 					variant="ghost"
@@ -196,7 +213,7 @@ export function DailyWordList({
 	);
 
 	return (
-		<div className="space-y-2 lg:max-h-96 lg:overflow-y-auto">
+		<div className="space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
 			{notFoundSlots.map((slot) => {
 				const clueText = clueTextsByWordId[slot.id];
 				const peerClue = peerCluesByWordId[slot.id];
@@ -235,8 +252,6 @@ export function DailyWordList({
 								</span>
 							</span>
 						) : null}
-						{renderIncomingRequests(slot.id)}
-						{renderHelpedConfirmation(slot.id)}
 						{canRequestHelp ? (
 							<div className="pl-7">
 								<Button

@@ -1,0 +1,1 @@
+ALTER TABLE "daily_puzzles" ADD COLUMN "difficulty" integer;

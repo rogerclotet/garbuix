@@ -84,19 +84,10 @@ export function buildCellLetters(
 	return letters;
 }
 
-export function getNextHintCellKey(
-	puzzle: DailyPuzzlePublic,
-	revealedCells: Set<string>,
-) {
-	return (
-		puzzle.hintCapsules.find((capsule) => !revealedCells.has(capsule.cellKey))
-			?.cellKey ?? null
-	);
-}
-
-// Picks a uniformly random not-yet-revealed hint-capsule cell for the bonus
-// clue earned every 10 valid off-puzzle words. Only capsule cells are eligible
-// so the revealed letter can be decoded. Returns null when none remain.
+// Picks a uniformly random not-yet-revealed hint-capsule cell. Used for both
+// the main letter hint and the bonus clue earned every 5 valid off-puzzle
+// words. Only capsule cells are eligible so the revealed letter can be decoded.
+// Returns null when none remain.
 export function getRandomHintCellKey(
 	puzzle: DailyPuzzlePublic,
 	revealedCells: Set<string>,

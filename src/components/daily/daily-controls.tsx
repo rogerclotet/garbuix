@@ -158,7 +158,7 @@ export function DailyControls({
 	);
 
 	const lettersLayout = circleLetters ? (
-		<div className="relative w-[12rem] h-[12rem] sm:w-[13rem] sm:h-[13rem] shrink-0">
+		<div className="relative h-[12rem] w-[12rem] shrink-0 overflow-visible sm:h-[13rem] sm:w-[13rem]">
 			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
 				{submitButton}
 			</div>
@@ -257,7 +257,7 @@ export function DailyControls({
 					: "text-foreground";
 
 	return (
-		<div className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:touch-auto lg:overscroll-auto">
+		<div className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto">
 			<div className="rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto">
 				<div className="hidden lg:block lg:text-left">
 					<h2 className="font-semibold leading-none tracking-tight">
@@ -268,10 +268,10 @@ export function DailyControls({
 						espai.
 					</p>
 				</div>
-				<div className="p-6 lg:px-0 lg:pt-4">
-					<div className="flex flex-col items-center gap-4 lg:gap-6">
-						<div className="relative h-10 sm:h-12 w-full overflow-hidden border-b-2 border-primary/60">
-							<div className="absolute inset-0 flex items-center justify-center text-center text-2xl font-bold tracking-widest uppercase sm:text-3xl">
+				<div className="p-2 lg:px-0 lg:pt-2">
+					<div className="flex flex-col items-center gap-3 lg:gap-6">
+						<div className="relative h-9 sm:h-12 w-full overflow-hidden border-b-2 border-primary/60">
+							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
 								<span data-slot="current-guess">{currentGuess}</span>
 								{submitFeedback ? (
 									<span
@@ -295,7 +295,7 @@ export function DailyControls({
 						</div>
 
 						{circleLetters ? (
-							<div className="flex w-full items-center justify-center gap-4 sm:gap-6">
+							<div className="flex w-full items-center justify-center gap-4 overflow-visible sm:gap-6">
 								<div className="flex flex-col-reverse gap-2 font-ui">
 									{actionButtons}
 								</div>

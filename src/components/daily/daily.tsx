@@ -1,6 +1,7 @@
 import { Loader2Icon, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { openProfilePreferencesTip } from "@/components/profile-preferences-tip-store";
 import { Button } from "@/components/ui/button";
 import {
 	getBonusCluesEnabled,
@@ -20,8 +21,10 @@ import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
+	hasSeenProfilePreferencesTip,
 	hasSeenWelcome,
 	markHowToPlaySeen,
+	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import { getWordClues } from "@/lib/puzzle-server-fns";
@@ -29,21 +32,30 @@ import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
-import { formatGuess } from "@/lib/puzzle-text";
+import { formatGuess, getPlayableWordLetters } from "@/lib/puzzle-text";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
+import { setDailyDifficulty } from "./daily-difficulty-store";
+import {
+	buildFlyingLetterPaths,
+	DailyFlyingLetters,
+	type FlyingLettersAnimation,
+	GRID_GUESS_BOUNCE_MS,
+	getWordCellKeysInOrder,
+	HIGHLIGHT_AFTER_LAND_MS,
+} from "./daily-flying-letters";
 import { DailyGrid } from "./daily-grid";
 import {
 	buildCellLetters,
 	buildHistoryEntry,
 	buildRevealedCells,
 	getGuessKeyboardAction,
-	getNextHintCellKey,
 	getRandomHintCellKey,
+	getSlotCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	getWordCellKeys,
@@ -73,6 +85,8 @@ const CLUE_GRID_HIGHLIGHT_MS = 5000;
 const CLUE_GRID_FADE_MS = 600;
 // Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
 const LOCATE_FLASH_MS = 1300;
+// Number of valid off-puzzle words the player must find to earn a free letter reveal.
+const WORDS_PER_BONUS_CLUE = 5;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -113,6 +127,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);
+	const [flyingLettersAnimation, setFlyingLettersAnimation] =
+		useState<FlyingLettersAnimation | null>(null);
+	const [animatingWordId, setAnimatingWordId] = useState<number | null>(null);
+	const [animatingPreExistingLetters, setAnimatingPreExistingLetters] =
+		useState<Set<string>>(() => new Set());
+	const [landedAnimatingCells, setLandedAnimatingCells] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const [bounceCells, setBounceCells] = useState<Set<string>>(() => new Set());
+	const bounceClearTimersRef = useRef<Map<string, number>>(new Map());
+	const flyingLettersIdRef = useRef(0);
+	const pendingFlyCompleteRef = useRef<{
+		wordId: number;
+		pathCount: number;
+	} | null>(null);
 	const [clueTextsByWordId, setClueTextsByWordId] = useState<
 		Record<number, string>
 	>({});
@@ -140,13 +169,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		incomingRequests,
 		respondToClue,
 		receivedClues,
+		requestedHelpWordIds,
+		publishSolvedWordIds,
 	} = useClueRequests();
-	// Word ids the player has asked other players for help with (awaiting a reply).
-	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
-		[],
-	);
-	// Clues delivered by other players, keyed by word id. Sourced from the
-	// provider so they persist across SSE reconnects (replayed in the snapshot).
+	// Clues delivered by other players (receivedClues) and the words this player
+	// asked help for (requestedHelpWordIds) both live in the provider so they
+	// persist across SSE reconnects and page reloads (replayed in the snapshot).
 	// Each response carries the responder's name so we can attribute the clue.
 	const [submitFeedback, setSubmitFeedback] =
 		useState<DailySubmitFeedback | null>(null);
@@ -176,12 +204,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const completionTransitionTimerRef = useRef<number | null>(null);
 	const [displayComplete, setDisplayComplete] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
+	// Once the day rolls over we swap the rendered tree to a loading state before
+	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
+	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
 	const winDialogTimerRef = useRef<number | null>(null);
 	const { captureEvent, captureException } = useObservability();
+	const captureExceptionRef = useRef(captureException);
+	captureExceptionRef.current = captureException;
 	const { applyLocalEvent, derivedProgress, isProgressReady } =
 		useDailyProgress({
 			activeUser,
@@ -200,12 +233,20 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				]);
 
 				if (!cancelled) {
-					setRevealedAnswers(nextAnswers);
-					setHintLetters(nextHints);
+					setRevealedAnswers((current) =>
+						JSON.stringify(current) === JSON.stringify(nextAnswers)
+							? current
+							: nextAnswers,
+					);
+					setHintLetters((current) =>
+						JSON.stringify(current) === JSON.stringify(nextHints)
+							? current
+							: nextHints,
+					);
 				}
 			} catch (error) {
 				console.error("Failed to decode puzzle progress", error);
-				captureException(error, {
+				captureExceptionRef.current(error, {
 					puzzle_date: puzzle.dateKey,
 					scope: "decode_progress",
 				});
@@ -215,7 +256,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [captureException, derivedProgress, puzzle]);
+	}, [derivedProgress, puzzle]);
 
 	useEffect(() => {
 		return () => {
@@ -240,6 +281,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (locateClearTimerRef.current != null) {
 				window.clearTimeout(locateClearTimerRef.current);
 			}
+			for (const timer of bounceClearTimersRef.current.values()) {
+				window.clearTimeout(timer);
+			}
+			bounceClearTimersRef.current.clear();
 		};
 	}, []);
 
@@ -263,6 +308,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		captureEvent("how_to_play_shown", { trigger: "first_visit" });
 	}, [captureEvent]);
 
+	const openProfilePreferencesTipIfNeeded = useCallback(() => {
+		if (!hasSeenHowToPlay()) return;
+		if (hasSeenProfilePreferencesTip()) return;
+		markProfilePreferencesTipSeen();
+		openProfilePreferencesTip();
+		captureEvent("profile_preferences_tip_shown", { trigger: "return_visit" });
+	}, [captureEvent]);
+
 	useEffect(() => {
 		if (firstVisitChecked.current) return;
 		firstVisitChecked.current = true;
@@ -274,22 +327,43 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			return;
 		}
 
-		openHowToPlayIfFirstVisit();
-	}, [activeUser, captureEvent, openHowToPlayIfFirstVisit]);
+		if (!hasSeenHowToPlay()) {
+			openHowToPlayIfFirstVisit();
+			return;
+		}
+
+		openProfilePreferencesTipIfNeeded();
+	}, [
+		activeUser,
+		captureEvent,
+		openHowToPlayIfFirstVisit,
+		openProfilePreferencesTipIfNeeded,
+	]);
 
 	const handleWelcomeOpenChange = useCallback(
 		(next: boolean) => {
 			setWelcomeOpen(next);
 			if (next) return;
 			markWelcomeSeen();
-			openHowToPlayIfFirstVisit();
+			if (!hasSeenHowToPlay()) {
+				openHowToPlayIfFirstVisit();
+				return;
+			}
+			openProfilePreferencesTipIfNeeded();
 		},
-		[openHowToPlayIfFirstVisit],
+		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
 	);
 
 	const handleWelcomeContinueAnonymous = useCallback(() => {
 		captureEvent("welcome_dismissed", { choice: "anonymous" });
 	}, [captureEvent]);
+
+	// Publish today's difficulty to the shared header (rendered above this route),
+	// and clear it when leaving the daily puzzle so other pages don't show it.
+	useEffect(() => {
+		setDailyDifficulty(puzzle.difficulty ?? null);
+		return () => setDailyDifficulty(null);
+	}, [puzzle.difficulty]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
@@ -338,10 +412,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		const rolloverAt = new Date(initialData.rolloverAt).getTime();
 		const delay = Math.max(1_000, rolloverAt - Date.now());
-		const timer = window.setTimeout(() => window.location.reload(), delay);
+		// Don't reload straight from the visibility/focus handler: that keeps the
+		// stale puzzle painted for the whole reload round-trip. Flip to the loading
+		// state first (see the reload effect below) so the old day is hidden at once.
+		const beginRollover = () => setIsRollingOver(true);
+		const timer = window.setTimeout(beginRollover, delay);
 		const refreshIfExpired = () => {
 			if (Date.now() >= rolloverAt) {
-				window.location.reload();
+				beginRollover();
 			}
 		};
 
@@ -356,6 +434,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			document.removeEventListener("visibilitychange", refreshIfExpired);
 		};
 	}, [initialData.rolloverAt]);
+
+	// Reload only after the loading state has painted, so the resumed PWA shows the
+	// spinner instead of yesterday's puzzle while the new day's data is fetched.
+	useEffect(() => {
+		if (!isRollingOver || typeof window === "undefined") return;
+
+		const frame = window.requestAnimationFrame(() => window.location.reload());
+		return () => window.cancelAnimationFrame(frame);
+	}, [isRollingOver]);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -373,26 +460,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
 	);
 
-	const nextHintCellKey = useMemo(
-		() => getNextHintCellKey(puzzle, revealedCells),
-		[puzzle, revealedCells],
-	);
-
-	// Logged-in players get AI text clues; anonymous players keep the
-	// single-letter reveal.
-	const useTextClue = Boolean(activeUser);
-
 	const nextClueWordId = useMemo(() => {
-		if (!useTextClue) return null;
 		const { notFoundSlots } = getSortedWordSlots(
 			puzzle.wordSlots,
 			derivedProgress.guessedWordIds,
 			cellLetters,
 		);
 		const requested = new Set(derivedProgress.clueWordIds);
-		return notFoundSlots.find((slot) => !requested.has(slot.id))?.id ?? null;
+		const candidates = notFoundSlots.filter((slot) => !requested.has(slot.id));
+		if (candidates.length === 0) return null;
+		const choice = candidates[Math.floor(Math.random() * candidates.length)];
+		return choice?.id ?? null;
 	}, [
-		useTextClue,
 		puzzle.wordSlots,
 		derivedProgress.guessedWordIds,
 		derivedProgress.clueWordIds,
@@ -435,7 +514,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	useEffect(() => {
-		if (!useTextClue || clueWordIdsKey === "") {
+		if (clueWordIdsKey === "") {
 			setClueTextsByWordId({});
 			return;
 		}
@@ -527,7 +606,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (timeoutId != null) window.clearTimeout(timeoutId);
 		};
 	}, [
-		useTextClue,
 		puzzle.id,
 		puzzle.dateKey,
 		clueWordIdsKey,
@@ -539,11 +617,19 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// found words actually changes, not on every render.
 	const guessedWordIdsKey = derivedProgress.guessedWordIds.join(",");
 
+	// Tell the clue-requests context which words we've solved so it can hide
+	// incoming help requests (badge + list) for words we haven't found yet.
+	useEffect(() => {
+		const wordIds =
+			guessedWordIdsKey === "" ? [] : guessedWordIdsKey.split(",").map(Number);
+		publishSolvedWordIds(wordIds);
+	}, [publishSolvedWordIds, guessedWordIdsKey]);
+
 	// Fetch clues for words the player has already found so they can be shown in
 	// the list. No toast, no letter fallback, no grid highlight — these are just
 	// for reading after the fact. Same availability as requested clues.
 	useEffect(() => {
-		if (!useTextClue || guessedWordIdsKey === "") {
+		if (guessedWordIdsKey === "") {
 			setFoundClueTextsByWordId({});
 			return;
 		}
@@ -571,13 +657,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		useTextClue,
-		puzzle.id,
-		puzzle.dateKey,
-		guessedWordIdsKey,
-		captureException,
-	]);
+	}, [puzzle.id, puzzle.dateKey, guessedWordIdsKey, captureException]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])
@@ -682,6 +762,141 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		setSubmitFeedback(null);
 	}, []);
 
+	const startWordHighlight = useCallback((wordId: number) => {
+		setHighlightedWordId(wordId);
+		if (highlightResetTimerRef.current != null) {
+			window.clearTimeout(highlightResetTimerRef.current);
+		}
+		highlightResetTimerRef.current = window.setTimeout(() => {
+			setHighlightedWordId((current) => (current === wordId ? null : current));
+			highlightResetTimerRef.current = null;
+		}, HIGHLIGHT_AFTER_LAND_MS);
+	}, []);
+
+	const finishFlyingLettersCleanup = useCallback(() => {
+		setAnimatingWordId(null);
+		setAnimatingPreExistingLetters(new Set());
+		setLandedAnimatingCells(new Set());
+		setBounceCells(new Set());
+		setFlyingLettersAnimation(null);
+		pendingFlyCompleteRef.current = null;
+		for (const timer of bounceClearTimersRef.current.values()) {
+			window.clearTimeout(timer);
+		}
+		bounceClearTimersRef.current.clear();
+	}, []);
+
+	const finishFlyingLettersFallback = useCallback(
+		(wordId: number) => {
+			finishFlyingLettersCleanup();
+			startWordHighlight(wordId);
+		},
+		[finishFlyingLettersCleanup, startWordHighlight],
+	);
+
+	const handleFlyingLetterLand = useCallback((cellKey: string) => {
+		setLandedAnimatingCells((previous) => {
+			if (previous.has(cellKey)) {
+				return previous;
+			}
+			const next = new Set(previous);
+			next.add(cellKey);
+			return next;
+		});
+		setBounceCells((previous) => {
+			if (previous.has(cellKey)) {
+				return previous;
+			}
+			const next = new Set(previous);
+			next.add(cellKey);
+			return next;
+		});
+
+		const existingTimer = bounceClearTimersRef.current.get(cellKey);
+		if (existingTimer != null) {
+			window.clearTimeout(existingTimer);
+		}
+
+		const timer = window.setTimeout(() => {
+			setBounceCells((previous) => {
+				if (!previous.has(cellKey)) {
+					return previous;
+				}
+				const next = new Set(previous);
+				next.delete(cellKey);
+				return next;
+			});
+			bounceClearTimersRef.current.delete(cellKey);
+		}, GRID_GUESS_BOUNCE_MS);
+		bounceClearTimersRef.current.set(cellKey, timer);
+	}, []);
+
+	const triggerFlyingLetters = useCallback(
+		(
+			wordId: number,
+			displayWord: string,
+			preExistingLetterCells: Set<string>,
+		) => {
+			const slot = puzzle.wordSlots.find((wordSlot) => wordSlot.id === wordId);
+			const gridRoot = gridRef.current;
+			if (!slot || !gridRoot) {
+				finishFlyingLettersFallback(wordId);
+				return;
+			}
+
+			const prefersReducedMotion =
+				typeof window !== "undefined" &&
+				typeof window.matchMedia === "function" &&
+				window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			if (prefersReducedMotion) {
+				finishFlyingLettersFallback(wordId);
+				return;
+			}
+
+			setAnimatingWordId(wordId);
+			setAnimatingPreExistingLetters(preExistingLetterCells);
+			setLandedAnimatingCells(new Set());
+			setBounceCells(new Set());
+
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(() => {
+					const sourceElement = document.querySelector<HTMLElement>(
+						'[data-slot="submit-feedback"]',
+					);
+					if (!sourceElement) {
+						finishFlyingLettersFallback(wordId);
+						return;
+					}
+
+					const letters = getPlayableWordLetters(displayWord);
+					const paths = buildFlyingLetterPaths({
+						sourceElement,
+						targetCellKeys: getWordCellKeysInOrder(slot),
+						letters,
+						gridRoot,
+					});
+
+					if (paths.length === 0) {
+						finishFlyingLettersFallback(wordId);
+						return;
+					}
+
+					pendingFlyCompleteRef.current = {
+						wordId,
+						pathCount: paths.length,
+					};
+					flyingLettersIdRef.current += 1;
+					setFlyingLettersAnimation({
+						id: flyingLettersIdRef.current,
+						paths,
+					});
+				});
+			});
+		},
+		[finishFlyingLettersFallback, puzzle.wordSlots],
+	);
+
 	const handleGuess = useCallback(async () => {
 		triggerHaptic(HAPTIC_SUBMIT_MS);
 
@@ -721,6 +936,21 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		const isNewBonusWord =
 			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
 
+		const preExistingLetterCells = new Set<string>();
+		if (result.kind === "new_word" && result.matchedSlotId != null) {
+			const matchedSlot = puzzle.wordSlots.find(
+				(wordSlot) => wordSlot.id === result.matchedSlotId,
+			);
+			if (matchedSlot) {
+				for (let index = 0; index < matchedSlot.length; index += 1) {
+					const cellKey = getSlotCellKey(matchedSlot, index);
+					if (cellLetters.has(cellKey)) {
+						preExistingLetterCells.add(cellKey);
+					}
+				}
+			}
+		}
+
 		if (!result.isRepeatGuess) {
 			applyLocalEvent(
 				createPuzzleEvent("guess_added", {
@@ -732,11 +962,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			);
 		}
 
-		// Every 10th valid off-puzzle word grants a free random letter reveal. The
-		// counter updates asynchronously via the event above, so we look one ahead.
+		// Every WORDS_PER_BONUS_CLUE-th valid off-puzzle word grants a free random
+		// letter reveal. The counter updates asynchronously via the event above, so
+		// we look one ahead.
 		if (isNewBonusWord && bonusCluesEnabled) {
 			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
-			if (nextBonusCount % 10 === 0) {
+			if (nextBonusCount % WORDS_PER_BONUS_CLUE === 0) {
 				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
 				if (cellKey) {
 					applyLocalEvent(
@@ -749,7 +980,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						puzzle_id: puzzle.id,
 					});
 					toast.success("Pista desbloquejada!", {
-						description: "Has trobat 10 paraules vàlides de fora del joc.",
+						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
 				}
 			}
@@ -757,17 +988,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 		if (result.kind === "new_word") {
 			triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-			if (result.matchedSlotId != null) {
-				setHighlightedWordId(result.matchedSlotId);
-				if (highlightResetTimerRef.current != null) {
-					window.clearTimeout(highlightResetTimerRef.current);
-				}
-				highlightResetTimerRef.current = window.setTimeout(() => {
-					setHighlightedWordId((current) =>
-						current === result.matchedSlotId ? null : current,
-					);
-					highlightResetTimerRef.current = null;
-				}, 1400);
+			if (result.matchedSlotId != null && result.displayWord) {
+				triggerFlyingLetters(
+					result.matchedSlotId,
+					result.displayWord,
+					preExistingLetterCells,
+				);
 			}
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
@@ -782,12 +1008,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		applyLocalEvent,
 		bonusCluesEnabled,
 		captureEvent,
+		cellLetters,
 		currentGuess,
 		derivedProgress,
 		puzzle,
 		revealedCells,
 		showSubmitFeedback,
 		totalWords,
+		triggerFlyingLetters,
 		triggerHaptic,
 	]);
 
@@ -830,74 +1058,56 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleHint = useCallback(() => {
 		triggerHaptic(HAPTIC_TAP_MS);
 		if (derivedProgress.hintsUsed >= 3) return;
+		if (nextClueWordId == null) return;
 
-		if (useTextClue) {
-			if (nextClueWordId == null) return;
-			captureEvent("puzzle_text_hint_requested", {
-				date_key: puzzle.dateKey,
-				hints_used_after: derivedProgress.hintsUsed + 1,
-				puzzle_id: puzzle.id,
-				word_id: nextClueWordId,
-			});
-			applyLocalEvent(
-				createPuzzleEvent("text_hint_requested", {
-					wordId: nextClueWordId,
-				}),
-			);
-			pendingClueToastWordIdsRef.current.add(nextClueWordId);
-			// The grid ring is lit only once the clue text resolves (see the
-			// clue-fetch effect); a letter fallback adds the letter without it.
-			return;
-		}
-
-		if (!nextHintCellKey) return;
-		captureEvent("puzzle_hint_used", {
+		captureEvent("puzzle_text_hint_requested", {
 			date_key: puzzle.dateKey,
 			hints_used_after: derivedProgress.hintsUsed + 1,
 			puzzle_id: puzzle.id,
+			word_id: nextClueWordId,
 		});
 		applyLocalEvent(
-			createPuzzleEvent("hint_used", {
-				cellKey: nextHintCellKey,
+			createPuzzleEvent("text_hint_requested", {
+				wordId: nextClueWordId,
 			}),
 		);
+		pendingClueToastWordIdsRef.current.add(nextClueWordId);
+		// The grid ring is lit only once the clue text resolves (see the
+		// clue-fetch effect); a letter fallback adds the letter without it.
 	}, [
 		applyLocalEvent,
 		captureEvent,
 		derivedProgress.hintsUsed,
 		nextClueWordId,
-		nextHintCellKey,
 		puzzle.dateKey,
 		puzzle.id,
 		triggerHaptic,
-		useTextClue,
 	]);
 
-	// Peer clue requests: a logged-in player who is out of hints can ask other
-	// connected players for a clue about a specific unfound word.
+	// Self-serve hint availability: a hint remains in the budget AND there's an
+	// unclued missing word to target.
+	const canUseSelfHint =
+		derivedProgress.hintsUsed < 3 && nextClueWordId != null;
+
+	// Peer clue requests: ask other connected players for a clue about an unfound
+	// word once self-serve hints can't help — either the 3-hint budget is spent,
+	// or every missing word already has a clue so a remaining hint can't be spent
+	// on a new one.
 	const canRequestHelp =
-		Boolean(activeUser) &&
-		derivedProgress.hintsUsed >= 3 &&
-		derivedProgress.guessedWordIds.length < totalWords;
+		derivedProgress.guessedWordIds.length < totalWords && !canUseSelfHint;
 
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
 			triggerHaptic(HAPTIC_TAP_MS);
-			setRequestedHelpWordIds((current) =>
-				current.includes(wordId) ? current : [...current, wordId],
-			);
 			captureEvent("peer_clue_requested", {
 				date_key: puzzle.dateKey,
 				puzzle_id: puzzle.id,
 				word_id: wordId,
 			});
+			// The provider tracks the pending state (optimistic add + rollback on
+			// failure); here we only surface the failure to the player.
 			void requestClue(wordId).then((created) => {
 				if (!created) {
-					// Couldn't register the request (e.g. no other players / offline);
-					// drop the pending state so the button is actionable again.
-					setRequestedHelpWordIds((current) =>
-						current.filter((id) => id !== wordId),
-					);
 					toast.error("No s'ha pogut demanar ajuda");
 				}
 			});
@@ -920,8 +1130,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	}, [subscribeClueRequests]);
 
 	// Once the asker finds a word they'd asked help for, the request is no longer
-	// needed: resolve it so other players' badges/buttons clear, and stop showing
-	// the local "waiting" state.
+	// needed: resolve it so other players' badges/buttons clear. resolveClue also
+	// drops the word from the provider's "waiting" state.
 	useEffect(() => {
 		const found = requestedHelpWordIds.filter((wordId) =>
 			derivedProgress.guessedWordIds.includes(wordId),
@@ -930,9 +1140,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		for (const wordId of found) {
 			void resolveClue(wordId);
 		}
-		setRequestedHelpWordIds((current) =>
-			current.filter((wordId) => !found.includes(wordId)),
-		);
 	}, [derivedProgress.guessedWordIds, requestedHelpWordIds, resolveClue]);
 
 	// Tapping an incomplete word flashes its grid cells in off-white teal so the
@@ -1124,6 +1331,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		isComplete,
 	]);
 
+	if (isRollingOver) {
+		return <DailyRolloverLoadingState />;
+	}
+
 	if (!isProgressReady) {
 		return <DailyProgressLoadingState />;
 	}
@@ -1131,16 +1342,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	return (
 		<>
 			<DailyConfetti fire={shouldFireConfetti} />
+			<DailyFlyingLetters
+				animation={flyingLettersAnimation}
+				onLetterLand={handleFlyingLetterLand}
+				onComplete={() => {
+					const pending = pendingFlyCompleteRef.current;
+					if (!pending) {
+						return;
+					}
+					finishFlyingLettersCleanup();
+				}}
+			/>
 			<div
-				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
+				className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
-						? "pb-6 sm:pb-8 lg:pb-24"
-						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-24"
+						? "pb-6 sm:pb-8 lg:pb-8"
+						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
 				}`}
 			>
-				<div className="max-w-5xl mx-auto">
+				<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
 					<div
-						className={`mb-4 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+						className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
 					>
 						{displayComplete ? (
 							<div className="space-y-1">
@@ -1183,12 +1405,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										(derivedProgress.guessedWordIds.length / totalWords) * 100,
 									),
 								);
-								// Bottom meter fills 0→10 toward the next bonus clue and
-								// resets each time one is earned; the label keeps the total.
+								// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+								// clue and resets each time one is earned; the label keeps the total.
 								const bonusCount = derivedProgress.bonusWordsFound;
-								const bonusInCycle = bonusCount % 10;
-								const bonusPercent = (bonusInCycle / 10) * 100;
-								const wordsToNextClue = 10 - bonusInCycle;
+								const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+								const bonusPercent =
+									(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+								const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
 								const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
 								return (
 									<div className="flex items-center gap-1.5">
@@ -1276,29 +1499,28 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						)}
 					</div>
 
-					<div className="lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div ref={gridRef}>
+					<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
+						<div ref={gridRef} className="lg:pb-8 lg:self-start">
 							<DailyGrid
 								puzzle={puzzle}
 								revealedCells={revealedCells}
 								cellLetters={cellLetters}
 								highlightedWordId={highlightedWordId}
+								animatingWordId={animatingWordId}
+								animatingPreExistingLetters={animatingPreExistingLetters}
+								landedAnimatingCells={landedAnimatingCells}
+								bounceCells={bounceCells}
 								clueCells={clueGridCells}
 								clueCellsFading={clueGridFading}
 								locateCells={locateCells}
 							/>
 						</div>
 
-						<div className="mt-6 lg:mt-0 lg:space-y-6">
+						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
 							<DailyControls
-								aiClueMode={useTextClue}
+								aiClueMode
 								circleLetters={circleLetters}
-								canUseHint={
-									derivedProgress.hintsUsed < 3 &&
-									(useTextClue
-										? nextClueWordId != null
-										: nextHintCellKey != null)
-								}
+								canUseHint={canUseSelfHint}
 								currentGuess={currentGuess}
 								hintsUsed={derivedProgress.hintsUsed}
 								isComplete={displayComplete}
@@ -1315,8 +1537,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								runPressAction={runPressAction}
 							/>
 
-							<div id={WORD_LIST_SECTION_ID} className="scroll-mt-4">
-								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-ui">
+							<div
+								id={WORD_LIST_SECTION_ID}
+								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
+							>
+								<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
 									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
 									)
 								</h3>
@@ -1377,6 +1602,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}}
 			/>
 		</>
+	);
+}
+
+function DailyRolloverLoadingState() {
+	return (
+		<div className="relative overflow-hidden">
+			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />
+			<div className="mx-auto flex min-h-[calc(100svh-6rem)] max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+				<div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary shadow-sm">
+					<Loader2Icon className="size-8 animate-spin" />
+				</div>
+				<div className="space-y-2">
+					<h2 className="text-2xl font-semibold tracking-tight">
+						Carregant el repte d'avui
+					</h2>
+					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
+						Ha començat un nou dia. Preparant el trencaclosques d'avui.
+					</p>
+				</div>
+			</div>
+		</div>
 	);
 }
 

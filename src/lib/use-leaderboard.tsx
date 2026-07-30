@@ -8,10 +8,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type {
-	LeaderboardEntry,
-	LeaderboardEvent,
-	LeaderboardSnapshot,
+import {
+	type LeaderboardEntry,
+	type LeaderboardEvent,
+	type LeaderboardSnapshot,
+	sortLeaderboardEntries,
 } from "@/lib/leaderboard-types";
 
 type LeaderboardStatus = "idle" | "connecting" | "open" | "error" | "closed";
@@ -22,6 +23,7 @@ type LeaderboardContextValue = {
 	status: LeaderboardStatus;
 	localParticipantId: string | null;
 	subscribe(listener: (event: LeaderboardEvent) => void): () => void;
+	refresh(): void;
 };
 
 const LeaderboardContext = createContext<LeaderboardContextValue | null>(null);
@@ -33,19 +35,7 @@ export type LeaderboardProviderProps = PropsWithChildren<{
 	enabled?: boolean;
 }>;
 
-function sortEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
-	return [...entries].sort((a, b) => {
-		if (b.wordsFound !== a.wordsFound) {
-			return b.wordsFound - a.wordsFound;
-		}
-		const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : null;
-		const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : null;
-		if (aCompleted && bCompleted) return aCompleted - bCompleted;
-		if (aCompleted) return -1;
-		if (bCompleted) return 1;
-		return a.updatedAt.localeCompare(b.updatedAt);
-	});
-}
+const sortEntries = sortLeaderboardEntries;
 
 function applyEntry(
 	entries: LeaderboardEntry[],
@@ -69,10 +59,17 @@ export function LeaderboardProvider({
 		initialSnapshot ? sortEntries(initialSnapshot.entries) : [],
 	);
 	const [status, setStatus] = useState<LeaderboardStatus>("idle");
+	// Bumping this token tears down and reopens the EventSource, which re-pulls a
+	// fresh snapshot from the server. Used to force a refresh when the user opens
+	// the leaderboard, in case the long-lived stream has gone stale.
+	const [refreshToken, setRefreshToken] = useState(0);
 	const listenersRef = useRef<Set<(event: LeaderboardEvent) => void>>(
 		new Set(),
 	);
 
+	// refreshToken is intentionally in the dependency list: bumping it reconnects
+	// the stream even though it isn't read inside the effect body.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: see above
 	useEffect(() => {
 		if (!enabled || !dateKey || typeof window === "undefined") {
 			return;
@@ -114,7 +111,7 @@ export function LeaderboardProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [dateKey, enabled]);
+	}, [dateKey, enabled, refreshToken]);
 
 	const subscribe = useCallback(
 		(listener: (event: LeaderboardEvent) => void) => {
@@ -126,6 +123,10 @@ export function LeaderboardProvider({
 		[],
 	);
 
+	const refresh = useCallback(() => {
+		setRefreshToken((token) => token + 1);
+	}, []);
+
 	const value = useMemo<LeaderboardContextValue>(
 		() => ({
 			dateKey,
@@ -133,8 +134,9 @@ export function LeaderboardProvider({
 			status,
 			localParticipantId,
 			subscribe,
+			refresh,
 		}),
-		[dateKey, entries, status, localParticipantId, subscribe],
+		[dateKey, entries, status, localParticipantId, subscribe, refresh],
 	);
 
 	return (
@@ -153,6 +155,7 @@ export function useLeaderboard(): LeaderboardContextValue {
 			status: "idle",
 			localParticipantId: null,
 			subscribe: () => () => {},
+			refresh: () => {},
 		};
 	}
 	return ctx;

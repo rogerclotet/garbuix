@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { dailyPuzzles, userPuzzleProgress } from "@/db/schema";
-import { auth } from "@/lib/auth";
 import { validateClueText } from "@/lib/clue-fairness";
 import {
 	createClueRequest,
@@ -14,6 +13,10 @@ import {
 	resolveClueRequest,
 	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
+import {
+	type ClueRequestParticipant,
+	resolveClueRequestParticipant,
+} from "@/lib/clue-request-participant.server";
 import {
 	clueRequestsChannel,
 	clueResponsesChannel,
@@ -64,15 +67,10 @@ function isValidDateKey(dateKey: string): boolean {
 	return dateKeyPattern.test(dateKey);
 }
 
-type SessionUser = { id: string; name: string };
-
-async function requireUser(request: Request): Promise<SessionUser | null> {
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (!session?.user?.id) {
-		return null;
-	}
-	return { id: session.user.id, name: session.user.name ?? "Algú" };
-}
+const anonAuthFields = {
+	deviceId: z.string().min(1).max(128).optional(),
+	name: z.string().min(1).max(48).optional(),
+};
 
 async function handleGet(request: Request) {
 	const url = new URL(request.url);
@@ -83,29 +81,43 @@ async function handleGet(request: Request) {
 	) {
 		return new Response("Not Found", { status: 404 });
 	}
-	const user = await requireUser(request);
-	if (!user) {
+	const participant = await resolveClueRequestParticipant(request);
+	if (!participant) {
 		return new Response("Unauthorized", { status: 401 });
 	}
-	// Polling fallback for clues delivered to the asker, in case the live SSE
-	// event is dropped (e.g. a proxy buffering the open stream in production).
+	// Polling fallback for both directions, in case the live SSE event is dropped
+	// (e.g. a proxy buffering the open stream in production): clues delivered to
+	// the asker, plus the pending requests this user could still answer. Requests
+	// exclude the viewer's own — same shape the SSE snapshot ships — so the client
+	// can reconcile them and recover a missed "request" (or "resolved") event.
 	if (parsed.kind === "inbox") {
-		const responses = await getClueInbox(user.id, parsed.dateKey);
+		const [responses, pending] = await Promise.all([
+			getClueInbox(participant.id, parsed.dateKey),
+			getPendingClueRequests(parsed.dateKey),
+		]);
+		const requests = pending.filter((r) => r.requesterId !== participant.id);
 		return Response.json(
-			{ responses },
+			{ responses, requests },
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}
-	return openSseStream(parsed.dateKey, user.id);
+	return openSseStream(parsed.dateKey, participant.id);
 }
 
 const requestSchema = z.object({
 	wordId: z.number().int().min(0),
+	...anonAuthFields,
 });
 
 const respondSchema = z.object({
 	requestId: z.string().min(1).max(128),
 	text: z.string().min(1).max(280),
+	...anonAuthFields,
+});
+
+const resolveSchema = z.object({
+	wordId: z.number().int().min(0),
+	...anonAuthFields,
 });
 
 async function handlePost(request: Request) {
@@ -120,11 +132,6 @@ async function handlePost(request: Request) {
 		return new Response("Not Found", { status: 404 });
 	}
 
-	const user = await requireUser(request);
-	if (!user) {
-		return new Response("Unauthorized", { status: 401 });
-	}
-
 	let raw: unknown;
 	try {
 		raw = await request.json();
@@ -132,24 +139,35 @@ async function handlePost(request: Request) {
 		return new Response("Invalid body", { status: 400 });
 	}
 
+	const participant = await resolveClueRequestParticipant(
+		request,
+		raw as {
+			deviceId?: string;
+			name?: string;
+		},
+	);
+	if (!participant) {
+		return new Response("Unauthorized", { status: 401 });
+	}
+
 	if (parsed.kind === "request") {
 		return observeServerAction("clue_request_create", () =>
-			handleCreateRequest(parsed.dateKey, user, raw),
+			handleCreateRequest(parsed.dateKey, participant, raw),
 		);
 	}
 	if (parsed.kind === "resolve") {
 		return observeServerAction("clue_request_resolve", () =>
-			handleResolve(parsed.dateKey, user, raw),
+			handleResolve(parsed.dateKey, participant, raw),
 		);
 	}
 	return observeServerAction("clue_request_respond", () =>
-		handleRespond(parsed.dateKey, user, raw),
+		handleRespond(parsed.dateKey, participant, raw),
 	);
 }
 
 async function handleCreateRequest(
 	dateKey: string,
-	user: SessionUser,
+	participant: ClueRequestParticipant,
 	raw: unknown,
 ) {
 	const result = requestSchema.safeParse(raw);
@@ -170,17 +188,19 @@ async function handleCreateRequest(
 		return new Response("Unknown word", { status: 400 });
 	}
 
-	const progress = await db.query.userPuzzleProgress.findFirst({
-		where: and(
-			eq(userPuzzleProgress.puzzleId, puzzle.id),
-			eq(userPuzzleProgress.userId, user.id),
-		),
-	});
-	if (progress?.guessedWordIds.includes(wordId)) {
-		return new Response("Already found", { status: 409 });
+	if (participant.kind === "user") {
+		const progress = await db.query.userPuzzleProgress.findFirst({
+			where: and(
+				eq(userPuzzleProgress.puzzleId, puzzle.id),
+				eq(userPuzzleProgress.userId, participant.id),
+			),
+		});
+		if (progress?.guessedWordIds.includes(wordId)) {
+			return new Response("Already found", { status: 409 });
+		}
 	}
 
-	if (await hasActiveClueRequest(dateKey, user.id, wordId)) {
+	if (await hasActiveClueRequest(dateKey, participant.id, wordId)) {
 		return Response.json({ created: false, reason: "duplicate" });
 	}
 
@@ -189,14 +209,18 @@ async function handleCreateRequest(
 		puzzleId: puzzle.id,
 		wordId,
 		wordLength: slot.length,
-		requesterId: user.id,
-		requesterName: user.name,
+		requesterId: participant.id,
+		requesterName: participant.name,
 	});
 
 	return Response.json({ created: Boolean(created) });
 }
 
-async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
+async function handleRespond(
+	dateKey: string,
+	participant: ClueRequestParticipant,
+	raw: unknown,
+) {
 	const result = respondSchema.safeParse(raw);
 	if (!result.success) {
 		return new Response("Invalid body", { status: 400 });
@@ -205,11 +229,16 @@ async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
 
 	const clueRequest = await getClueRequest(dateKey, requestId);
 	if (!clueRequest) {
-		return new Response("Request not found", { status: 410 });
+		// The request is gone: the asker found the word, another responder answered
+		// first (first-responder-wins resolves it), or it simply expired. In every
+		// case the asker no longer needs this clue, so accept it silently and report
+		// success — surfacing an error here only confuses a responder who did nothing
+		// wrong. Nothing is delivered since there's no one waiting.
+		return Response.json({ delivered: true });
 	}
 
 	// A player can't answer their own request.
-	if (clueRequest.requesterId === user.id) {
+	if (clueRequest.requesterId === participant.id) {
 		return new Response("Cannot answer own request", { status: 400 });
 	}
 
@@ -238,7 +267,7 @@ async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
 	await publishClueResponse({
 		request: clueRequest,
 		text,
-		responderName: user.name,
+		responderName: participant.name,
 	});
 	// First responder wins: clear the request so other helpers' badges/buttons
 	// update live and the asker isn't flooded with duplicate clues.
@@ -247,11 +276,11 @@ async function handleRespond(dateKey: string, user: SessionUser, raw: unknown) {
 	return Response.json({ delivered: true });
 }
 
-const resolveSchema = z.object({
-	wordId: z.number().int().min(0),
-});
-
-async function handleResolve(dateKey: string, user: SessionUser, raw: unknown) {
+async function handleResolve(
+	dateKey: string,
+	participant: ClueRequestParticipant,
+	raw: unknown,
+) {
 	const result = resolveSchema.safeParse(raw);
 	if (!result.success) {
 		return new Response("Invalid body", { status: 400 });
@@ -259,7 +288,7 @@ async function handleResolve(dateKey: string, user: SessionUser, raw: unknown) {
 	// Only the asker can resolve their own request (e.g. they found the word).
 	await resolveOwnClueRequestsForWord({
 		dateKey,
-		requesterId: user.id,
+		requesterId: participant.id,
 		wordId: result.data.wordId,
 	});
 	return Response.json({ resolved: true });
@@ -285,7 +314,7 @@ function openSseStream(dateKey: string, userId: string): Response {
 
 	const sub = getRedisSub();
 	const requestsChannelName = clueRequestsChannel(dateKey);
-	const responsesChannelName = clueResponsesChannel(userId);
+	const responsesChannelName = clueResponsesChannel(userId, dateKey);
 	const encoder = new TextEncoder();
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let listener: ((channel: string, message: string) => void) | null = null;
@@ -305,11 +334,13 @@ function openSseStream(dateKey: string, userId: string): Response {
 					getPendingClueRequests(dateKey),
 					getClueInbox(userId, dateKey),
 				]);
-				// Don't echo the viewer's own open requests back as actionable; replay
-				// any clues already delivered to them so a missed live event recovers.
+				// Don't echo the viewer's own open requests back as actionable; ship
+				// them separately so a reload restores the "waiting for help" state.
+				// Replay any clues already delivered so a missed live event recovers.
 				const requests = pending.filter((r) => r.requesterId !== userId);
+				const ownRequests = pending.filter((r) => r.requesterId === userId);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, responses })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses })}\n\n`,
 				);
 			} catch (error) {
 				console.warn("[clue-request:sse] initial snapshot failed", error);

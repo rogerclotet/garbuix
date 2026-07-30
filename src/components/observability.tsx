@@ -101,7 +101,12 @@ function ObservabilityRuntime() {
 		select: (state) => state.location,
 	});
 	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
-	const lastIdentifiedUserIdRef = useRef<string | null>(null);
+	const lastIdentifiedUserRef = useRef<{
+		id: string;
+		name: string;
+		email: string;
+		image?: string | null;
+	} | null>(null);
 	const { captureEvent, identifyUser, resetUser, toWebVitalProperties } =
 		useObservability();
 
@@ -140,13 +145,27 @@ function ObservabilityRuntime() {
 
 	useEffect(() => {
 		if (activeUser) {
-			lastIdentifiedUserIdRef.current = activeUser.id;
+			const last = lastIdentifiedUserRef.current;
+			if (
+				last?.id === activeUser.id &&
+				last.name === activeUser.name &&
+				last.email === activeUser.email &&
+				last.image === activeUser.image
+			) {
+				return;
+			}
+			lastIdentifiedUserRef.current = {
+				id: activeUser.id,
+				name: activeUser.name,
+				email: activeUser.email,
+				image: activeUser.image,
+			};
 			identifyUser(activeUser);
 			return;
 		}
 
-		if (lastIdentifiedUserIdRef.current) {
-			lastIdentifiedUserIdRef.current = null;
+		if (lastIdentifiedUserRef.current) {
+			lastIdentifiedUserRef.current = null;
 			resetUser();
 		}
 	}, [activeUser, identifyUser, resetUser]);

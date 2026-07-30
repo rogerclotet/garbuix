@@ -6,7 +6,6 @@ import {
 	LogOut,
 	Menu,
 	Settings,
-	Trophy,
 } from "lucide-react";
 import { useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
@@ -23,6 +22,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
+import { initialsFromName } from "@/lib/user-profile";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -38,6 +38,7 @@ export function UserMenu() {
 		: "Obrir el menú";
 	const imageSrc = activeUser?.image ?? null;
 	const showUserImage = Boolean(imageSrc) && failedImageSrc !== imageSrc;
+	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
 	const handleSignIn = async () => {
 		captureEvent("auth_sign_in_started", {
@@ -78,8 +79,8 @@ export function UserMenu() {
 									}}
 								/>
 							) : (
-								<AvatarFallback className="bg-muted text-muted-foreground">
-									<Menu className="size-5 sm:size-4" />
+								<AvatarFallback className="bg-muted text-muted-foreground text-xs">
+									{avatarInitials || <Menu className="size-5 sm:size-4" />}
 								</AvatarFallback>
 							)}
 						</Avatar>
@@ -102,12 +103,6 @@ export function UserMenu() {
 					</>
 				) : null}
 				<DropdownMenuItem asChild>
-					<Link to="/classificacio">
-						<Trophy className="size-4" />
-						<span>Classificació</span>
-					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
 					<Link to="/dies-anteriors">
 						<History className="size-4" />
 						<span>Historial</span>
@@ -119,7 +114,7 @@ export function UserMenu() {
 					}}
 				>
 					<HelpCircle className="size-4" />
-					<span>Com es juga</span>
+					<span>Com s'hi juga</span>
 				</DropdownMenuItem>
 				<DropdownMenuItem asChild>
 					<Link to="/preferencies">
