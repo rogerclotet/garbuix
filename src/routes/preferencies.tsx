@@ -322,7 +322,8 @@ function PreferencesPage() {
 							Nom visible
 						</label>
 						<p className="text-sm text-muted-foreground font-ui">
-							Aquest nom es mostra a la classificació i quan demanes pistes.
+							Aquest nom es mostra a la classificació i quan demanes o dones
+							pistes.
 						</p>
 					</div>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-start">

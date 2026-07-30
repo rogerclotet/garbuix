@@ -14,6 +14,11 @@ import {
 } from "@/components/daily/how-to-play-store";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { Logo } from "@/components/logo";
+import { ProfilePreferencesTipDialog } from "@/components/profile-preferences-tip-dialog";
+import {
+	setProfilePreferencesTipOpen,
+	useProfilePreferencesTipOpen,
+} from "@/components/profile-preferences-tip-store";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
@@ -40,6 +45,7 @@ export default function Header() {
 
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
+	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const dailyDifficulty = useDailyDifficulty();
 	const navigate = useNavigate();
 	const router = useRouter();
@@ -155,6 +161,10 @@ export default function Header() {
 				</div>
 			</div>
 			<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+			<ProfilePreferencesTipDialog
+				open={profilePreferencesTipOpen}
+				onOpenChange={setProfilePreferencesTipOpen}
+			/>
 		</header>
 	);
 }
