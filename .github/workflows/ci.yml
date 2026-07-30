@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: node:25.2-slim
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install unzip
+        run: apt-get update && apt-get install -y unzip
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "25.2"
+          cache: pnpm
+
+      - run: pnpm install
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm download-dict
+      - run: pnpm typecheck
+
+  deploy:
+    needs: lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    container:
+      image: alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH client
+        run: apk add --no-cache openssh-client sshpass
+
+      - run: chmod +x scripts/deploy.sh
+      - run: scripts/deploy.sh
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_IP: ${{ secrets.SSH_IP }}
+          SSH_PROJECT_DIRECTORY: ${{ secrets.SSH_PROJECT_DIRECTORY }}
+          PORT: ${{ secrets.PORT }}
