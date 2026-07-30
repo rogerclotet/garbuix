@@ -3,7 +3,6 @@ import { getDeviceId } from "@/lib/puzzle-local";
 
 const ANON_IDENTITY_KEY = "paraules-anon-identity-v2";
 const LEGACY_ANON_IDENTITY_KEY = "paraules-anon-identity-v1";
-const ANON_OPT_OUT_KEY = "paraules-leaderboard-opt-out-v1";
 const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
 const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
 const VIBRATION_KEY = "paraules-vibration-v1";
@@ -70,20 +69,6 @@ export function getOrCreateAnonIdentity(): AnonIdentity {
 	};
 	window.localStorage.setItem(ANON_IDENTITY_KEY, JSON.stringify(identity));
 	return { deviceId: identity.deviceId, name: identity.name };
-}
-
-export function getLeaderboardOptOut(): boolean {
-	if (typeof window === "undefined") return false;
-	return window.localStorage.getItem(ANON_OPT_OUT_KEY) === "1";
-}
-
-export function setLeaderboardOptOut(optOut: boolean): void {
-	if (typeof window === "undefined") return;
-	if (optOut) {
-		window.localStorage.setItem(ANON_OPT_OUT_KEY, "1");
-	} else {
-		window.localStorage.removeItem(ANON_OPT_OUT_KEY);
-	}
 }
 
 export function getSkipSharePreview(): boolean {

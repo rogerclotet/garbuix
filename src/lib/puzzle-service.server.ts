@@ -18,6 +18,7 @@ import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import {
 	getLeaderboard,
+	leaderboardDisplayName,
 	mergeAnonLeaderboardForUser,
 	recordProgress as recordLeaderboardProgress,
 	userParticipantId,
@@ -291,7 +292,7 @@ async function publishLeaderboardForUser(input: {
 			dateKey: input.dateKey,
 			participantId: userParticipantId(input.userId),
 			kind: "user",
-			name: profile.name,
+			name: leaderboardDisplayName(profile.name),
 			image: profile.image ?? null,
 			wordsFound: input.wordsFound,
 			totalWords: input.totalWords,
@@ -490,10 +491,8 @@ export async function syncPuzzleEventsForUser(options: {
 	userId: string;
 	deviceId: string;
 	events: PuzzleClientEvent[];
-	leaderboardOptOut?: boolean;
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
-	const leaderboardOptOut = options.leaderboardOptOut ?? false;
 	const puzzleRow = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.id, puzzleId),
 	});
@@ -625,7 +624,7 @@ export async function syncPuzzleEventsForUser(options: {
 		nextProgress.guessedWordIds.length > previousWordsFound ||
 		(Boolean(nextCompletedAt) && !previousCompletedAt);
 
-	if (hasProgressDelta && !leaderboardOptOut) {
+	if (hasProgressDelta) {
 		void publishLeaderboardForUser({
 			dateKey: puzzleRow.dateKey,
 			userId,
@@ -914,6 +913,14 @@ export async function importAnonymousProgressForUser(options: {
 	const { payload, userId, deviceId } = options;
 	const importedDates: string[] = [];
 	const skippedLegacyDates: string[] = [];
+	const importedForLeaderboard: Array<{
+		dateKey: string;
+		wordsFound: number;
+		totalWords: number;
+		freeCluesUsed: number;
+		tryCount: number;
+		completedAt: string | null;
+	}> = [];
 
 	for (const historyEntry of payload.historyEntries) {
 		const activeProgress = payload.activeProgressByDate[historyEntry.dateKey];
@@ -1017,6 +1024,14 @@ export async function importAnonymousProgressForUser(options: {
 			});
 
 		importedDates.push(historyEntry.dateKey);
+		importedForLeaderboard.push({
+			dateKey: historyEntry.dateKey,
+			wordsFound: merged.guessedWordIds.length,
+			totalWords: puzzle.privateSnapshotJson.wordSlots.length,
+			freeCluesUsed: merged.hintsUsed,
+			tryCount: merged.guessCount,
+			completedAt: merged.completedAt,
+		});
 	}
 
 	const dateKeysForLeaderboardMerge = [
@@ -1045,6 +1060,27 @@ export async function importAnonymousProgressForUser(options: {
 		}
 	} catch (error) {
 		console.warn("[leaderboard] merge anon on import failed", error);
+	}
+
+	for (const imported of importedForLeaderboard) {
+		if (imported.wordsFound === 0 && !imported.completedAt) {
+			continue;
+		}
+		try {
+			await publishLeaderboardForUser({
+				dateKey: imported.dateKey,
+				userId,
+				wordsFound: imported.wordsFound,
+				totalWords: imported.totalWords,
+				freeCluesUsed: imported.freeCluesUsed,
+				tryCount: imported.tryCount,
+				completedAt: imported.completedAt,
+				previousWordsFound: 0,
+				previousCompletedAt: null,
+			});
+		} catch (error) {
+			console.warn("[leaderboard] publish on import failed", error);
+		}
 	}
 
 	captureServerEvent({

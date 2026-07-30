@@ -143,7 +143,6 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 			puzzleId: z.string(),
 			deviceId: z.string(),
 			events: z.custom<PuzzleClientEvent[]>(),
-			leaderboardOptOut: z.boolean().optional(),
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -160,7 +159,6 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 					userId: session.user.id,
 					deviceId: data.deviceId,
 					events: data.events,
-					leaderboardOptOut: data.leaderboardOptOut ?? false,
 				});
 			},
 			{

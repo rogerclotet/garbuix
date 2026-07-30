@@ -83,7 +83,6 @@ const anonSchema = z.object({
 	completedAt: z.string().datetime().nullable().optional(),
 	previousWordsFound: z.number().int().min(0).max(200).optional(),
 	previousCompletedAt: z.string().datetime().nullable().optional(),
-	optOut: z.boolean().optional(),
 });
 
 async function handlePost(request: Request) {
@@ -105,9 +104,6 @@ async function handlePost(request: Request) {
 			return new Response("Invalid body", { status: 400 });
 		}
 		const payload = result.data;
-		if (payload.optOut) {
-			return Response.json({ recorded: false });
-		}
 		const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
 		const completedAt =
 			wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;

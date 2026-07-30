@@ -2,7 +2,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-	getLeaderboardOptOut,
 	getOrCreateAnonIdentity,
 	getReportedAnonProgress,
 	setReportedAnonProgress,
@@ -403,7 +402,6 @@ export function useDailyProgress({
 				puzzleId: puzzle.id,
 				deviceId,
 				events: pendingEvents,
-				leaderboardOptOut: getLeaderboardOptOut(),
 			},
 		})
 			.then((result) => {
@@ -516,7 +514,6 @@ export function useDailyProgress({
 					puzzleId: cache.puzzleId,
 					deviceId,
 					events: cache.queuedEvents ?? [],
-					leaderboardOptOut: getLeaderboardOptOut(),
 				},
 			})
 				.then((result) => {
@@ -555,7 +552,6 @@ export function useDailyProgress({
 			return;
 		}
 		if (typeof window === "undefined") return;
-		if (getLeaderboardOptOut()) return;
 
 		if (lastReportedAnonRef.current.dateKey !== puzzle.dateKey) {
 			const stored = getReportedAnonProgress(puzzle.dateKey);

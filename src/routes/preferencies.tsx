@@ -11,13 +11,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
 	getBonusCluesEnabled,
-	getLeaderboardOptOut,
 	getLetterLayout,
 	getSkipSharePreview,
 	isVibrationEnabled,
 	type LetterLayout,
 	setBonusCluesEnabled,
-	setLeaderboardOptOut,
 	setLetterLayout,
 	setSkipSharePreview,
 	setVibrationPreference,
@@ -90,14 +88,12 @@ export const Route = createFileRoute("/preferencies")({
 
 function PreferencesPage() {
 	const { captureEvent } = useObservability();
-	const leaderboardToggleId = useId();
 	const sharePreviewToggleId = useId();
 	const vibrationToggleId = useId();
 	const letterLayoutGroupId = useId();
 	const bonusCluesToggleId = useId();
 	const themeSelectId = useId();
 	const { theme, setTheme } = useTheme();
-	const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
 	const [showSharePreview, setShowSharePreview] = useState(true);
 	const [vibrationEnabled, setVibrationEnabled] = useState(true);
 	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>("circle");
@@ -105,19 +101,12 @@ function PreferencesPage() {
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
-		setShowOnLeaderboard(!getLeaderboardOptOut());
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
 		setLetterLayoutState(getLetterLayout());
 		setBonusCluesEnabledState(getBonusCluesEnabled());
 		setMounted(true);
 	}, []);
-
-	const handleToggleLeaderboard = (next: boolean) => {
-		setShowOnLeaderboard(next);
-		setLeaderboardOptOut(!next);
-		captureEvent("leaderboard_opt_out_toggled", { opt_out: !next });
-	};
 
 	const handleToggleSharePreview = (next: boolean) => {
 		setShowSharePreview(next);
@@ -182,23 +171,6 @@ function PreferencesPage() {
 						</SelectContent>
 					</Select>
 				</div>
-				<label
-					htmlFor={leaderboardToggleId}
-					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
-				>
-					<div className="space-y-1">
-						<div className="font-medium">Mostra'm a la classificació</div>
-						<p className="text-sm text-muted-foreground font-ui">
-							Apareix al rànquing diari amb el teu nom o àlies. Si ho
-							desactives, els teus resultats no es publicaran.
-						</p>
-					</div>
-					<Switch
-						id={leaderboardToggleId}
-						checked={showOnLeaderboard}
-						onCheckedChange={handleToggleLeaderboard}
-					/>
-				</label>
 				<label
 					htmlFor={sharePreviewToggleId}
 					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
