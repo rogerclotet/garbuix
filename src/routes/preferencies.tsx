@@ -32,6 +32,7 @@ import {
 	setVibrationPreference,
 } from "@/lib/anon-identity";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
+import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 import {
@@ -525,7 +526,8 @@ function PreferencesPage() {
 					<div className="space-y-1">
 						<div className="font-medium">Pistes per paraules extra</div>
 						<p className="text-sm text-muted-foreground font-ui">
-							Cada 10 paraules vàlides que no siguin del trencaclosques, et
+							Cada {WORDS_PER_BONUS_CLUE} paraules vàlides que no siguin del
+							trencaclosques, et
 							revelem una lletra a l'atzar. Desactiva-ho per a una experiència
 							més difícil.
 						</p>

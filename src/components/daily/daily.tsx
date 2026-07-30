@@ -28,6 +28,7 @@ import {
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import { getWordClues } from "@/lib/puzzle-server-fns";
+import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
@@ -86,8 +87,6 @@ const CLUE_GRID_FADE_MS = 600;
 // Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
 const LOCATE_FLASH_MS = 1300;
 // Number of valid off-puzzle words the player must find to earn a free letter reveal.
-const WORDS_PER_BONUS_CLUE = 5;
-
 function getSubmitFeedbackDuration() {
 	if (
 		typeof window === "undefined" ||
@@ -1455,7 +1454,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 													role="progressbar"
 													aria-valuenow={bonusInCycle}
 													aria-valuemin={0}
-													aria-valuemax={10}
+													aria-valuemax={WORDS_PER_BONUS_CLUE}
 													aria-label="Paraules vàlides de fora del joc"
 												>
 													<div
