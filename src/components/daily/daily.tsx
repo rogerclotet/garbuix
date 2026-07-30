@@ -87,8 +87,6 @@ const CLUE_GRID_FADE_MS = 600;
 const LOCATE_FLASH_MS = 1300;
 // Number of valid off-puzzle words the player must find to earn a free letter reveal.
 const WORDS_PER_BONUS_CLUE = 5;
-// Matches `lg:pb-4` on the daily page shell when sizing the desktop grid row.
-const DESKTOP_PAGE_BOTTOM_PADDING_PX = 16;
 
 function getSubmitFeedbackDuration() {
 	if (
@@ -196,10 +194,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
-	const layoutRef = useRef<HTMLDivElement>(null);
-	// Desktop grid row height: at least the puzzle, or the remaining viewport when
-	// the board is shorter — keeps the word list scrolling inside the sidebar.
-	const [desktopRowHeight, setDesktopRowHeight] = useState<number | null>(null);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -1182,56 +1176,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
-	// Pin the desktop grid row to max(puzzle height, viewport fill) so the sidebar
-	// has a bounded height and the word list scrolls internally.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run once the loading state clears and the grid (gridRef) actually mounts.
-	useEffect(() => {
-		const grid = gridRef.current;
-		const layout = layoutRef.current;
-		if (!grid || !layout) return;
-
-		const desktop = window.matchMedia("(min-width: 1024px)");
-		let observer: ResizeObserver | null = null;
-		let frame = 0;
-
-		const measure = () => {
-			cancelAnimationFrame(frame);
-			frame = requestAnimationFrame(() => {
-				const puzzleHeight = grid.offsetHeight;
-				const gridTop = grid.getBoundingClientRect().top;
-				const availableHeight =
-					window.innerHeight - gridTop - DESKTOP_PAGE_BOTTOM_PADDING_PX;
-				const rowHeight = Math.max(puzzleHeight, availableHeight);
-				setDesktopRowHeight((current) =>
-					current === rowHeight ? current : rowHeight,
-				);
-			});
-		};
-
-		const sync = () => {
-			if (desktop.matches) {
-				measure();
-				observer ??= new ResizeObserver(measure);
-				observer.observe(grid);
-				observer.observe(layout);
-			} else {
-				observer?.disconnect();
-				observer = null;
-				setDesktopRowHeight(null);
-			}
-		};
-
-		sync();
-		desktop.addEventListener("change", sync);
-		window.addEventListener("resize", measure);
-		return () => {
-			cancelAnimationFrame(frame);
-			desktop.removeEventListener("change", sync);
-			window.removeEventListener("resize", measure);
-			observer?.disconnect();
-		};
-	}, [isProgressReady]);
-
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
 	// Delay the visual completion state so the submit feedback animation plays first
@@ -1410,15 +1354,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}}
 			/>
 			<div
-				className={`min-h-full px-3 sm:px-4 lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
+				className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
 						? "pb-6 sm:pb-8 lg:pb-6"
 						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-4"
 				}`}
 			>
-				<div ref={layoutRef} className="mx-auto max-w-5xl">
+				<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
 					<div
-						className={`mb-4 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+						className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
 					>
 						{displayComplete ? (
 							<div className="space-y-1">
@@ -1555,14 +1499,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						)}
 					</div>
 
-					<div
-						className="lg:grid lg:min-h-0 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]"
-						style={
-							desktopRowHeight != null
-								? { height: desktopRowHeight }
-								: undefined
-						}
-					>
+					<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
 						<div ref={gridRef} className="lg:self-start">
 							<DailyGrid
 								puzzle={puzzle}
