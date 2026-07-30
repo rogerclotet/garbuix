@@ -603,8 +603,7 @@ export function useDailyProgress({
 				name: identity.name,
 				wordsFound,
 				totalWords,
-				// Anon players can't use the friend-clue system, so their clue
-				// count is just the free clues they've spent.
+				// Self-serve hints only; peer clues don't affect the score.
 				clueCount: derivedProgress.hintsUsed,
 				tryCount: derivedProgress.guessCount,
 				completedAt,
