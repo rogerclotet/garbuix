@@ -6,6 +6,23 @@ export type PuzzleDifficulty = 1 | 2 | 3;
 
 export const PUZZLE_DIFFICULTY_LEVELS = 3;
 
+export const PUZZLE_DIFFICULTY_LABELS: Record<PuzzleDifficulty, string> = {
+	1: "Fàcil",
+	2: "Mitjana",
+	3: "Difícil",
+};
+
+export function formatDifficultyPhrase(difficulty: PuzzleDifficulty): string {
+	return `Dificultat ${PUZZLE_DIFFICULTY_LABELS[difficulty].toLowerCase()}`;
+}
+
+// Approximate Catalan copy for UI tooltips — difficulty is a rough guide, not exact.
+export const PUZZLE_DIFFICULTY_SUMMARIES: Record<PuzzleDifficulty, string> = {
+	1: "Majoria de paraules molt comunes",
+	2: "Majoritàriament paraules habituals",
+	3: "Algunes paraules més rares",
+};
+
 // Difficulty is the mean log10(corpus frequency) of the puzzle's words. The
 // generator biases word selection toward common words, so a lower mean means
 // the day's words are rarer and the puzzle is harder. The two thresholds are
