@@ -7,9 +7,9 @@ export type PuzzleDifficulty = 1 | 2 | 3;
 export const PUZZLE_DIFFICULTY_LEVELS = 3;
 
 export const PUZZLE_DIFFICULTY_LABELS: Record<PuzzleDifficulty, string> = {
-	1: "Fàcil",
+	1: "Baixa",
 	2: "Mitjana",
-	3: "Difícil",
+	3: "Alta",
 };
 
 export function formatDifficultyPhrase(difficulty: PuzzleDifficulty): string {
