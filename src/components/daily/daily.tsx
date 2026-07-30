@@ -1356,8 +1356,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			<div
 				className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
 					displayComplete
-						? "pb-6 sm:pb-8 lg:pb-6"
-						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-4"
+						? "pb-6 sm:pb-8 lg:pb-8"
+						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
 				}`}
 			>
 				<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
@@ -1500,7 +1500,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					</div>
 
 					<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div ref={gridRef} className="lg:self-start">
+						<div ref={gridRef} className="lg:pb-8 lg:self-start">
 							<DailyGrid
 								puzzle={puzzle}
 								revealedCells={revealedCells}
