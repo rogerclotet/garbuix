@@ -28,12 +28,12 @@ import {
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import { getWordClues } from "@/lib/puzzle-server-fns";
-import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
 import { formatGuess, getPlayableWordLetters } from "@/lib/puzzle-text";
+import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";

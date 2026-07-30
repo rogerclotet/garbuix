@@ -527,9 +527,8 @@ function PreferencesPage() {
 						<div className="font-medium">Pistes per paraules extra</div>
 						<p className="text-sm text-muted-foreground font-ui">
 							Cada {WORDS_PER_BONUS_CLUE} paraules vàlides que no siguin del
-							trencaclosques, et
-							revelem una lletra a l'atzar. Desactiva-ho per a una experiència
-							més difícil.
+							trencaclosques, et revelem una lletra a l'atzar. Desactiva-ho per
+							a una experiència més difícil.
 						</p>
 					</div>
 					<Switch
