@@ -18,6 +18,7 @@ import { OrientationLock } from "@/components/orientation-lock";
 import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
 	materialThemeCss,
 	materialThemeMetaColors,
@@ -104,37 +105,39 @@ function RootDocument() {
 					defaultTheme="system"
 					enableSystem
 				>
-					<ObservabilityProvider>
-						<ThemeMeta />
-						<OrientationLock />
-						<ServiceWorkerRegister />
-						<LeaderboardRoot>
-							<ClueRequestsRoot>
-								<div className="flex h-svh flex-col">
-									<Header />
-									<main className="flex-1 min-h-0 overflow-y-auto">
-										<Outlet />
-									</main>
-								</div>
-								<Toaster position="top-center" />
-								<LeaderboardToasts />
-							</ClueRequestsRoot>
-						</LeaderboardRoot>
-						{showDevtools ? (
-							<TanStackDevtools
-								config={{
-									position: "bottom-left",
-									hideUntilHover: true,
-								}}
-								plugins={[
-									{
-										name: "Tanstack Router",
-										render: <TanStackRouterDevtoolsPanel />,
-									},
-								]}
-							/>
-						) : null}
-					</ObservabilityProvider>
+					<TooltipProvider delayDuration={300}>
+						<ObservabilityProvider>
+							<ThemeMeta />
+							<OrientationLock />
+							<ServiceWorkerRegister />
+							<LeaderboardRoot>
+								<ClueRequestsRoot>
+									<div className="flex h-svh flex-col">
+										<Header />
+										<main className="flex-1 min-h-0 overflow-y-auto">
+											<Outlet />
+										</main>
+									</div>
+									<Toaster position="top-center" />
+									<LeaderboardToasts />
+								</ClueRequestsRoot>
+							</LeaderboardRoot>
+							{showDevtools ? (
+								<TanStackDevtools
+									config={{
+										position: "bottom-left",
+										hideUntilHover: true,
+									}}
+									plugins={[
+										{
+											name: "Tanstack Router",
+											render: <TanStackRouterDevtoolsPanel />,
+										},
+									]}
+								/>
+							) : null}
+						</ObservabilityProvider>
+					</TooltipProvider>
 				</ThemeProvider>
 				<Scripts />
 			</body>
