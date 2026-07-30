@@ -45,14 +45,7 @@ export function LeaderboardRow({
 				)}
 			</Avatar>
 			<div className="flex min-w-0 flex-1 flex-col">
-				<span className="truncate text-sm font-medium">
-					{entry.name}
-					{entry.kind === "anon" ? (
-						<span className="ml-1 text-muted-foreground text-xs">
-							(convidat)
-						</span>
-					) : null}
-				</span>
+				<span className="truncate text-sm font-medium">{entry.name}</span>
 				{completed ? (
 					<span className="text-muted-foreground text-xs">
 						Completat a les{" "}

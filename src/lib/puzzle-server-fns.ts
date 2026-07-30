@@ -182,14 +182,7 @@ export const getWordClues = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getWordClues",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					return {} as Record<number, string>;
-				}
-
-				return getWordCluesData(data.puzzleId, data.wordIds);
-			},
+			async () => getWordCluesData(data.puzzleId, data.wordIds),
 			{
 				properties: {
 					puzzle_id: data.puzzleId,

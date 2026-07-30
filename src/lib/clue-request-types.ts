@@ -1,6 +1,6 @@
-// Shared types and Redis key helpers for peer clue requests. A logged-in player
-// who is out of hints can ask other connected players for a clue about a
-// specific unfound word; responders get a real-time toast and reply with text.
+// Shared types and Redis key helpers for peer clue requests. A player who is out
+// of hints can ask other connected players for a clue about a specific unfound
+// word; responders get a real-time toast and reply with text.
 // The answer itself never travels in these payloads — fairness validation runs
 // server-side against the private snapshot before a response is delivered.
 

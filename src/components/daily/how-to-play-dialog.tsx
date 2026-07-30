@@ -1,8 +1,6 @@
-import { getRouteApi } from "@tanstack/react-router";
 import {
 	CornerDownLeft,
 	Delete,
-	Lightbulb,
 	Shuffle,
 	Sparkles,
 	Trophy,
@@ -16,9 +14,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useActiveSessionUser } from "@/lib/use-active-session-user";
-
-const rootRoute = getRouteApi("__root__");
 
 type HowToPlayDialogProps = {
 	open: boolean;
@@ -50,16 +45,9 @@ function ControlRow({
 }
 
 export function HowToPlayDialog({ open, onOpenChange }: HowToPlayDialogProps) {
-	const rootData = rootRoute.useLoaderData();
-	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
-	const hintDescription = activeUser
-		? "Et dona una pista descriptiva per a una paraula que encara no has trobat. Tens 3 pistes per partida."
-		: "Revela una lletra al tauler. Tens 3 pistes per partida.";
-	const hintIcon = activeUser ? (
-		<Sparkles className="size-4 text-amber-500" />
-	) : (
-		<Lightbulb className="size-4 text-amber-500" />
-	);
+	const hintDescription =
+		"Et dona una pista descriptiva per a una paraula que encara no has trobat. Tens 3 pistes per partida.";
+	const hintIcon = <Sparkles className="size-4 text-amber-500" />;
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>

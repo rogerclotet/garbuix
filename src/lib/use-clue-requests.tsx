@@ -8,11 +8,30 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
 import type {
 	ClueRequest,
 	ClueRequestStreamEvent,
 	ClueResponse,
 } from "@/lib/clue-request-types";
+
+function buildAnonAuthQuery(deviceId: string): string {
+	const params = new URLSearchParams({
+		deviceId,
+		name: getOrCreateAnonIdentity().name,
+	});
+	return `?${params.toString()}`;
+}
+
+function buildAnonAuthBody(deviceId: string): {
+	deviceId: string;
+	name: string;
+} {
+	return {
+		deviceId,
+		name: getOrCreateAnonIdentity().name,
+	};
+}
 
 type ClueRequestsStatus = "idle" | "connecting" | "open" | "error" | "closed";
 
@@ -58,15 +77,21 @@ const defaultValue: ClueRequestsContextValue = {
 const ClueRequestsContext =
 	createContext<ClueRequestsContextValue>(defaultValue);
 
+export type AnonClueCredentials = {
+	deviceId: string;
+};
+
 export type ClueRequestsProviderProps = PropsWithChildren<{
 	dateKey: string | null;
 	localUserId: string | null;
+	anonCredentials?: AnonClueCredentials | null;
 	enabled?: boolean;
 }>;
 
 export function ClueRequestsProvider({
 	dateKey,
 	localUserId,
+	anonCredentials = null,
 	enabled = true,
 	children,
 }: ClueRequestsProviderProps) {
@@ -98,6 +123,8 @@ export function ClueRequestsProvider({
 	const notifiedClueKeysRef = useRef<Set<string>>(new Set());
 
 	const active = enabled && dateKey != null && localUserId != null;
+
+	const anonDeviceId = anonCredentials?.deviceId ?? null;
 
 	// Per-user, per-day so a clue's notified-state doesn't leak across accounts on a
 	// shared browser or across days (the inbox is scoped to the day too).
@@ -181,7 +208,10 @@ export function ClueRequestsProvider({
 		}
 
 		setStatus("connecting");
-		const source = new EventSource(`/api/clue-requests/${dateKey}/stream`);
+		const streamQuery = anonDeviceId ? buildAnonAuthQuery(anonDeviceId) : "";
+		const source = new EventSource(
+			`/api/clue-requests/${dateKey}/stream${streamQuery}`,
+		);
 
 		const handleSnapshot = (event: MessageEvent) => {
 			try {
@@ -254,7 +284,7 @@ export function ClueRequestsProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [active, dateKey, localUserId, ingestResponses]);
+	}, [active, anonDeviceId, dateKey, localUserId, ingestResponses]);
 
 	// Reconcile the set of requests we could answer against the server's
 	// authoritative pending set (delivered by the snapshot and the inbox poll).
@@ -294,7 +324,10 @@ export function ClueRequestsProvider({
 
 		const pollInbox = async () => {
 			try {
-				const response = await fetch(`/api/clue-requests/${dateKey}/inbox`);
+				const inboxQuery = anonDeviceId ? buildAnonAuthQuery(anonDeviceId) : "";
+				const response = await fetch(
+					`/api/clue-requests/${dateKey}/inbox${inboxQuery}`,
+				);
 				if (!response.ok) return;
 				const data = (await response.json()) as {
 					responses?: ClueResponse[];
@@ -317,7 +350,13 @@ export function ClueRequestsProvider({
 			cancelled = true;
 			window.clearInterval(interval);
 		};
-	}, [active, dateKey, ingestResponses, reconcileIncomingRequests]);
+	}, [
+		active,
+		anonDeviceId,
+		dateKey,
+		ingestResponses,
+		reconcileIncomingRequests,
+	]);
 
 	const subscribe = useCallback(
 		(listener: (event: ClueRequestStreamEvent) => void) => {
@@ -345,7 +384,10 @@ export function ClueRequestsProvider({
 				const response = await fetch(`/api/clue-requests/${dateKey}/request`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ wordId }),
+					body: JSON.stringify({
+						wordId,
+						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+					}),
 				});
 				if (!response.ok) {
 					rollback();
@@ -369,7 +411,7 @@ export function ClueRequestsProvider({
 				return false;
 			}
 		},
-		[dateKey],
+		[anonDeviceId, dateKey],
 	);
 
 	const respondToClue = useCallback(
@@ -379,7 +421,11 @@ export function ClueRequestsProvider({
 				const response = await fetch(`/api/clue-requests/${dateKey}/respond`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ requestId, text }),
+					body: JSON.stringify({
+						requestId,
+						text,
+						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+					}),
 				});
 				if (response.ok) {
 					setRespondedRequestIds((current) =>
@@ -399,7 +445,7 @@ export function ClueRequestsProvider({
 				return { ok: false, reason: null };
 			}
 		},
-		[dateKey],
+		[anonDeviceId, dateKey],
 	);
 
 	const resolveClue = useCallback(
@@ -414,13 +460,16 @@ export function ClueRequestsProvider({
 				await fetch(`/api/clue-requests/${dateKey}/resolve`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ wordId }),
+					body: JSON.stringify({
+						wordId,
+						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+					}),
 				});
 			} catch {
 				// best-effort; the request expires on its own otherwise
 			}
 		},
-		[dateKey],
+		[anonDeviceId, dateKey],
 	);
 
 	// Stable identity unless the actual set of solved words changes, so the puzzle

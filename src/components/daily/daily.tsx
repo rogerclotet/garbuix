@@ -466,17 +466,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
 	);
 
-	const nextHintCellKey = useMemo(
-		() => getRandomHintCellKey(puzzle, revealedCells),
-		[puzzle, revealedCells],
-	);
-
-	// Logged-in players get AI text clues; anonymous players keep the
-	// single-letter reveal.
-	const useTextClue = Boolean(activeUser);
-
 	const nextClueWordId = useMemo(() => {
-		if (!useTextClue) return null;
 		const { notFoundSlots } = getSortedWordSlots(
 			puzzle.wordSlots,
 			derivedProgress.guessedWordIds,
@@ -488,7 +478,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		const choice = candidates[Math.floor(Math.random() * candidates.length)];
 		return choice?.id ?? null;
 	}, [
-		useTextClue,
 		puzzle.wordSlots,
 		derivedProgress.guessedWordIds,
 		derivedProgress.clueWordIds,
@@ -531,7 +520,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	useEffect(() => {
-		if (!useTextClue || clueWordIdsKey === "") {
+		if (clueWordIdsKey === "") {
 			setClueTextsByWordId({});
 			return;
 		}
@@ -623,7 +612,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			if (timeoutId != null) window.clearTimeout(timeoutId);
 		};
 	}, [
-		useTextClue,
 		puzzle.id,
 		puzzle.dateKey,
 		clueWordIdsKey,
@@ -647,7 +635,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// the list. No toast, no letter fallback, no grid highlight — these are just
 	// for reading after the fact. Same availability as requested clues.
 	useEffect(() => {
-		if (!useTextClue || guessedWordIdsKey === "") {
+		if (guessedWordIdsKey === "") {
 			setFoundClueTextsByWordId({});
 			return;
 		}
@@ -675,13 +663,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		useTextClue,
-		puzzle.id,
-		puzzle.dateKey,
-		guessedWordIdsKey,
-		captureException,
-	]);
+	}, [puzzle.id, puzzle.dateKey, guessedWordIdsKey, captureException]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])
@@ -1082,64 +1064,43 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleHint = useCallback(() => {
 		triggerHaptic(HAPTIC_TAP_MS);
 		if (derivedProgress.hintsUsed >= 3) return;
+		if (nextClueWordId == null) return;
 
-		if (useTextClue) {
-			if (nextClueWordId == null) return;
-			captureEvent("puzzle_text_hint_requested", {
-				date_key: puzzle.dateKey,
-				hints_used_after: derivedProgress.hintsUsed + 1,
-				puzzle_id: puzzle.id,
-				word_id: nextClueWordId,
-			});
-			applyLocalEvent(
-				createPuzzleEvent("text_hint_requested", {
-					wordId: nextClueWordId,
-				}),
-			);
-			pendingClueToastWordIdsRef.current.add(nextClueWordId);
-			// The grid ring is lit only once the clue text resolves (see the
-			// clue-fetch effect); a letter fallback adds the letter without it.
-			return;
-		}
-
-		if (!nextHintCellKey) return;
-		captureEvent("puzzle_hint_used", {
+		captureEvent("puzzle_text_hint_requested", {
 			date_key: puzzle.dateKey,
 			hints_used_after: derivedProgress.hintsUsed + 1,
 			puzzle_id: puzzle.id,
+			word_id: nextClueWordId,
 		});
 		applyLocalEvent(
-			createPuzzleEvent("hint_used", {
-				cellKey: nextHintCellKey,
+			createPuzzleEvent("text_hint_requested", {
+				wordId: nextClueWordId,
 			}),
 		);
+		pendingClueToastWordIdsRef.current.add(nextClueWordId);
+		// The grid ring is lit only once the clue text resolves (see the
+		// clue-fetch effect); a letter fallback adds the letter without it.
 	}, [
 		applyLocalEvent,
 		captureEvent,
 		derivedProgress.hintsUsed,
 		nextClueWordId,
-		nextHintCellKey,
 		puzzle.dateKey,
 		puzzle.id,
 		triggerHaptic,
-		useTextClue,
 	]);
 
 	// Self-serve hint availability: a hint remains in the budget AND there's an
-	// eligible target — an unclued missing word for text clues, or an unrevealed
-	// cell for the anonymous letter reveal.
+	// unclued missing word to target.
 	const canUseSelfHint =
-		derivedProgress.hintsUsed < 3 &&
-		(useTextClue ? nextClueWordId != null : nextHintCellKey != null);
+		derivedProgress.hintsUsed < 3 && nextClueWordId != null;
 
-	// Peer clue requests: a logged-in player can ask other connected players for
-	// a clue about an unfound word once self-serve hints can't help — either the
-	// 3-hint budget is spent, or every missing word already has a clue so a
-	// remaining hint can't be spent on a new one.
+	// Peer clue requests: ask other connected players for a clue about an unfound
+	// word once self-serve hints can't help — either the 3-hint budget is spent,
+	// or every missing word already has a clue so a remaining hint can't be spent
+	// on a new one.
 	const canRequestHelp =
-		Boolean(activeUser) &&
-		derivedProgress.guessedWordIds.length < totalWords &&
-		!canUseSelfHint;
+		derivedProgress.guessedWordIds.length < totalWords && !canUseSelfHint;
 
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
@@ -1620,7 +1581,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
 							<DailyControls
-								aiClueMode={useTextClue}
+								aiClueMode
 								circleLetters={circleLetters}
 								canUseHint={canUseSelfHint}
 								currentGuess={currentGuess}
