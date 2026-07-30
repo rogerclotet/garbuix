@@ -663,12 +663,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		puzzle.id,
-		puzzle.dateKey,
-		guessedWordIdsKey,
-		captureException,
-	]);
+	}, [puzzle.id, puzzle.dateKey, guessedWordIdsKey, captureException]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])

@@ -14,8 +14,8 @@ import {
 	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
 import {
-	resolveClueRequestParticipant,
 	type ClueRequestParticipant,
+	resolveClueRequestParticipant,
 } from "@/lib/clue-request-participant.server";
 import {
 	clueRequestsChannel,
@@ -95,9 +95,7 @@ async function handleGet(request: Request) {
 			getClueInbox(participant.id, parsed.dateKey),
 			getPendingClueRequests(parsed.dateKey),
 		]);
-		const requests = pending.filter(
-			(r) => r.requesterId !== participant.id,
-		);
+		const requests = pending.filter((r) => r.requesterId !== participant.id);
 		return Response.json(
 			{ responses, requests },
 			{ headers: { "Cache-Control": "no-store" } },
@@ -141,10 +139,13 @@ async function handlePost(request: Request) {
 		return new Response("Invalid body", { status: 400 });
 	}
 
-	const participant = await resolveClueRequestParticipant(request, raw as {
-		deviceId?: string;
-		name?: string;
-	});
+	const participant = await resolveClueRequestParticipant(
+		request,
+		raw as {
+			deviceId?: string;
+			name?: string;
+		},
+	);
 	if (!participant) {
 		return new Response("Unauthorized", { status: 401 });
 	}
