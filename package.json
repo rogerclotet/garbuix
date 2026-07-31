@@ -25,6 +25,8 @@
 		"format": "biome format",
 		"lint": "biome lint",
 		"check": "biome check",
+		"ensure-dict": "tsx scripts/download-catalan-dictionary.ts --if-missing",
+		"ci:lint": "pnpm lint && pnpm check && pnpm ensure-dict && pnpm typecheck",
 		"typecheck": "tsc --noEmit",
 		"prepare": "husky"
 	},
