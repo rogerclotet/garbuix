@@ -45,23 +45,25 @@ export function LeaderboardRow({
 				)}
 			</Avatar>
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				<span className="truncate text-sm font-medium">{entry.name}</span>
 				<div className="flex min-w-0 items-baseline justify-between gap-2">
-					<div className="min-w-0 truncate text-muted-foreground text-xs">
-						{completed ? (
-							<>
-								Completat a les{" "}
-								{timeFormatter.format(new Date(entry.completedAt ?? ""))}
-								{" · "}
-							</>
-						) : null}
-						{entry.clueCount} {entry.clueCount === 1 ? "pista" : "pistes"} ·{" "}
-						{entry.tryCount} {entry.tryCount === 1 ? "intent" : "intents"}
-					</div>
+					<span className="min-w-0 truncate text-sm font-medium">
+						{entry.name}
+					</span>
 					<div className="shrink-0 font-semibold text-sm tabular-nums">
 						{entry.wordsFound}
 						<span className="text-muted-foreground"> / {entry.totalWords}</span>
 					</div>
+				</div>
+				<div className="flex min-w-0 items-baseline justify-between gap-2 text-muted-foreground text-xs">
+					<span className="min-w-0 truncate">
+						{completed
+							? `Completat a les ${timeFormatter.format(new Date(entry.completedAt ?? ""))}`
+							: null}
+					</span>
+					<span className="shrink-0">
+						{entry.clueCount} {entry.clueCount === 1 ? "pista" : "pistes"} ·{" "}
+						{entry.tryCount} {entry.tryCount === 1 ? "intent" : "intents"}
+					</span>
 				</div>
 			</div>
 		</li>
