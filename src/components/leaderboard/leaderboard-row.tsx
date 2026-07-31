@@ -60,10 +60,7 @@ export function LeaderboardRow({
 					</div>
 					<div className="shrink-0 font-semibold text-sm tabular-nums">
 						{entry.wordsFound}
-						<span className="text-muted-foreground">
-							{" "}
-							/ {entry.totalWords}
-						</span>
+						<span className="text-muted-foreground"> / {entry.totalWords}</span>
 					</div>
 				</div>
 			</div>
