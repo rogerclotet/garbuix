@@ -23,15 +23,15 @@ export function LeaderboardRow({
 	return (
 		<li
 			className={cn(
-				"flex items-center gap-3 rounded-md border border-transparent px-3 py-2",
+				"flex gap-3 rounded-md border border-transparent px-3 py-2",
 				highlighted && "border-border bg-muted/60 text-foreground",
 			)}
 			aria-current={highlighted ? "true" : undefined}
 		>
-			<span className="w-6 shrink-0 text-right font-mono text-muted-foreground text-sm tabular-nums">
+			<span className="w-6 shrink-0 pt-0.5 text-right font-mono text-muted-foreground text-sm tabular-nums">
 				{rank}
 			</span>
-			<Avatar className="size-8 border border-border">
+			<Avatar className="size-8 shrink-0 border border-border">
 				{entry.image ? (
 					<AvatarImage
 						src={entry.image}
@@ -44,23 +44,24 @@ export function LeaderboardRow({
 					</AvatarFallback>
 				)}
 			</Avatar>
-			<div className="flex min-w-0 flex-1 flex-col">
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="truncate text-sm font-medium">{entry.name}</span>
-				{completed ? (
-					<span className="text-muted-foreground text-xs">
-						Completat a les{" "}
-						{timeFormatter.format(new Date(entry.completedAt ?? ""))}
-					</span>
-				) : null}
-			</div>
-			<div className="shrink-0 text-right">
-				<div className="font-semibold text-sm tabular-nums">
-					{entry.wordsFound}
-					<span className="text-muted-foreground"> / {entry.totalWords}</span>
-				</div>
-				<div className="text-muted-foreground text-xs tabular-nums">
-					{entry.clueCount} {entry.clueCount === 1 ? "pista" : "pistes"} ·{" "}
-					{entry.tryCount} {entry.tryCount === 1 ? "intent" : "intents"}
+				<div className="flex min-w-0 items-baseline justify-between gap-2">
+					<div className="min-w-0 truncate text-muted-foreground text-xs">
+						{completed ? (
+							<>
+								Completat a les{" "}
+								{timeFormatter.format(new Date(entry.completedAt ?? ""))}
+								{" · "}
+							</>
+						) : null}
+						{entry.clueCount} {entry.clueCount === 1 ? "pista" : "pistes"} ·{" "}
+						{entry.tryCount} {entry.tryCount === 1 ? "intent" : "intents"}
+					</div>
+					<div className="shrink-0 font-semibold text-sm tabular-nums">
+						{entry.wordsFound}
+						<span className="text-muted-foreground"> / {entry.totalWords}</span>
+					</div>
 				</div>
 			</div>
 		</li>
