@@ -13,6 +13,10 @@ export type ClueRequest = {
 	requesterId: string;
 	requesterName: string;
 	createdAt: string;
+	// Whether the asker had already unlocked the word's AI clue (self-serve hint)
+	// at request time. Shown to responders so they know copying that same AI clue
+	// into their reply wouldn't tell the asker anything new.
+	requesterHasAiClue: boolean;
 };
 
 export type ClueResponse = {
@@ -56,8 +60,8 @@ export function pendingRequestsKey(dateKey: string): string {
 // delivered to the asker's inbox even after the request stopped being advertised
 // (the asker went offline, the pending entry aged out, or a poll pruned it) —
 // without this, a clue sent a moment too late is silently lost. Keyed by request
-// id, removed on resolve so first-responder-wins and "asker found it" still stop
-// further delivery.
+// id, removed on resolve so "asker found it" stops further delivery — multiple
+// players can each answer the same request before that happens.
 export function clueRequestRecordsKey(dateKey: string): string {
 	return `clreq:${dateKey}:records`;
 }

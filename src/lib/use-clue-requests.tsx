@@ -49,7 +49,9 @@ type ClueRequestsContextValue = {
 	status: ClueRequestsStatus;
 	enabled: boolean;
 	subscribe(listener: (event: ClueRequestStreamEvent) => void): () => void;
-	requestClue(wordId: number): Promise<boolean>;
+	// hasAiClue tells responders (via the request) whether this player already
+	// unlocked the word's AI clue, so copying it back to them adds nothing.
+	requestClue(wordId: number, hasAiClue?: boolean): Promise<boolean>;
 	respondToClue(requestId: string, text: string): Promise<RespondResult>;
 	resolveClue(wordId: number): Promise<void>;
 	// The puzzle page publishes which words this user has solved. Requests for
@@ -369,7 +371,7 @@ export function ClueRequestsProvider({
 	);
 
 	const requestClue = useCallback(
-		async (wordId: number): Promise<boolean> => {
+		async (wordId: number, hasAiClue = false): Promise<boolean> => {
 			if (!dateKey) return false;
 			// Optimistic so the button flips to "waiting" immediately; rolled back
 			// below if the server couldn't register the request.
@@ -386,6 +388,7 @@ export function ClueRequestsProvider({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						wordId,
+						hasAiClue,
 						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
 					}),
 				});

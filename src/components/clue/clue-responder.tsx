@@ -39,6 +39,9 @@ export function ClueResponder({
 	// Prefilled composer text — e.g. the AI clue dropped in via the copy button.
 	initialText?: string;
 }) {
+	// The asker already unlocked the word's AI clue: nudge the responder to give a
+	// different one, since copying it back would tell the asker nothing new.
+	const showAiClueNote = request.requesterHasAiClue;
 	const [text, setText] = useState(initialText);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -76,6 +79,12 @@ export function ClueResponder({
 					</>
 				)}
 			</p>
+			{showAiClueNote ? (
+				<p className="text-xs text-muted-foreground">
+					{request.requesterName} ja té la pista de la IA — prova de donar-ne
+					una de diferent.
+				</p>
+			) : null}
 			<Textarea
 				autoFocus
 				value={text}

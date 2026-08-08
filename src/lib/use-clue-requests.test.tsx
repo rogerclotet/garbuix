@@ -174,6 +174,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 						requesterId: USER_ID,
 						requesterName: "Jo",
 						createdAt: "2026-06-11T08:00:00.000Z",
+						requesterHasAiClue: false,
 					},
 				],
 				responses: [],
@@ -212,6 +213,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 			requesterId: "user-2",
 			requesterName: "Bru",
 			createdAt: "2026-06-11T08:00:00.000Z",
+			requesterHasAiClue: false,
 		};
 		vi.stubGlobal(
 			"fetch",
@@ -246,6 +248,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 			requesterId: "user-2",
 			requesterName: "Bru",
 			createdAt: "2026-06-11T08:00:00.000Z",
+			requesterHasAiClue: false,
 		};
 		// First poll surfaces the request, second poll no longer lists it (resolved).
 		let polls = 0;
