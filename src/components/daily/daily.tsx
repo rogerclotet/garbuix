@@ -1103,15 +1103,25 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				puzzle_id: puzzle.id,
 				word_id: wordId,
 			});
+			// Tell responders whether this player already unlocked the word's AI
+			// clue, so they know copying it back into a reply wouldn't help.
+			const hasAiClue = derivedProgress.clueWordIds.includes(wordId);
 			// The provider tracks the pending state (optimistic add + rollback on
 			// failure); here we only surface the failure to the player.
-			void requestClue(wordId).then((created) => {
+			void requestClue(wordId, hasAiClue).then((created) => {
 				if (!created) {
 					toast.error("No s'ha pogut demanar ajuda");
 				}
 			});
 		},
-		[captureEvent, puzzle.dateKey, puzzle.id, requestClue, triggerHaptic],
+		[
+			captureEvent,
+			derivedProgress.clueWordIds,
+			puzzle.dateKey,
+			puzzle.id,
+			requestClue,
+			triggerHaptic,
+		],
 	);
 
 	// Toast clues as they arrive live. The clue itself is stored in the provider

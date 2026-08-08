@@ -10,7 +10,6 @@ import {
 	getPendingClueRequests,
 	hasActiveClueRequest,
 	publishClueResponse,
-	resolveClueRequest,
 	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
 import {
@@ -106,6 +105,9 @@ async function handleGet(request: Request) {
 
 const requestSchema = z.object({
 	wordId: z.number().int().min(0),
+	// Whether the asker had already unlocked this word's AI clue via a self-serve
+	// hint, so responders can be told copying that same clue back adds nothing.
+	hasAiClue: z.boolean().optional().default(false),
 	...anonAuthFields,
 });
 
@@ -174,7 +176,7 @@ async function handleCreateRequest(
 	if (!result.success) {
 		return new Response("Invalid body", { status: 400 });
 	}
-	const { wordId } = result.data;
+	const { wordId, hasAiClue } = result.data;
 
 	const puzzle = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.dateKey, dateKey),
@@ -211,6 +213,7 @@ async function handleCreateRequest(
 		wordLength: slot.length,
 		requesterId: participant.id,
 		requesterName: participant.name,
+		requesterHasAiClue: hasAiClue,
 	});
 
 	return Response.json({ created: Boolean(created) });
@@ -229,11 +232,11 @@ async function handleRespond(
 
 	const clueRequest = await getClueRequest(dateKey, requestId);
 	if (!clueRequest) {
-		// The request is gone: the asker found the word, another responder answered
-		// first (first-responder-wins resolves it), or it simply expired. In every
-		// case the asker no longer needs this clue, so accept it silently and report
-		// success — surfacing an error here only confuses a responder who did nothing
-		// wrong. Nothing is delivered since there's no one waiting.
+		// The request is gone: the asker found the word (or otherwise resolved it
+		// themselves), or it simply expired. In every case the asker no longer needs
+		// this clue, so accept it silently and report success — surfacing an error
+		// here only confuses a responder who did nothing wrong. Nothing is delivered
+		// since there's no one waiting.
 		return Response.json({ delivered: true });
 	}
 
@@ -269,9 +272,8 @@ async function handleRespond(
 		text,
 		responderName: participant.name,
 	});
-	// First responder wins: clear the request so other helpers' badges/buttons
-	// update live and the asker isn't flooded with duplicate clues.
-	await resolveClueRequest(dateKey, clueRequest);
+	// Leave the request open: several players can each send the asker a clue for
+	// the same word. Only the asker resolving it (found the word) closes it out.
 
 	return Response.json({ delivered: true });
 }

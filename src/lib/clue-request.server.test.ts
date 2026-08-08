@@ -86,6 +86,7 @@ function createInput() {
 		wordLength: 5,
 		requesterId: "asker-1",
 		requesterName: "Anna",
+		requesterHasAiClue: false,
 	};
 }
 
@@ -127,7 +128,7 @@ describe("clue request store-and-forward", () => {
 		expect(inbox[0]?.responderName).toBe("Bru");
 	});
 
-	it("stops delivering once the request is resolved (first-responder-wins)", async () => {
+	it("stops delivering once the request is resolved", async () => {
 		const request = await createClueRequest(createInput());
 		expect(request).not.toBeNull();
 		if (!request) return;

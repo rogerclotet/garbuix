@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 //   pnpm seed:clue-request --word 3        # specific word id
 //   pnpm seed:clue-request --name "Anna"   # who is asking
 //   pnpm seed:clue-request --date 2026-05-31
+//   pnpm seed:clue-request --has-ai-clue   # asker already unlocked the AI clue
 //
 // Requires Redis to be reachable (same REDIS_URL the dev server uses) and today's
 // puzzle to exist (open the game once to create it).
@@ -93,6 +94,7 @@ async function main() {
 		wordLength: slot.length,
 		requesterId,
 		requesterName,
+		requesterHasAiClue: process.argv.includes("--has-ai-clue"),
 	});
 
 	if (!request) {

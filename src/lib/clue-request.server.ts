@@ -44,6 +44,7 @@ export type CreateClueRequestInput = {
 	wordLength: number;
 	requesterId: string;
 	requesterName: string;
+	requesterHasAiClue: boolean;
 };
 
 export async function createClueRequest(
@@ -67,6 +68,7 @@ export async function createClueRequest(
 		requesterId: input.requesterId,
 		requesterName: input.requesterName,
 		createdAt: new Date(now).toISOString(),
+		requesterHasAiClue: input.requesterHasAiClue,
 	};
 
 	const stored: StoredRequest = { request, expiresAt: now + REQUEST_TTL_MS };
@@ -268,10 +270,11 @@ export async function getClueInbox(
 }
 
 // Removes a request from both the pending set (stops advertising it) and the
-// durable records (stops further delivery, so first-responder-wins and "asker
-// found it" actually close the request), and tells every connected responder to
-// drop it from their badge/list. Idempotent — broadcasts even if the entry was
-// already gone, so late subscribers converge.
+// durable records (stops further delivery, so "asker found it" actually closes
+// the request), and tells every connected responder to drop it from their
+// badge/list. Multiple players can each answer the same request — this is only
+// called when the asker themselves no longer needs help. Idempotent — broadcasts
+// even if the entry was already gone, so late subscribers converge.
 export async function resolveClueRequest(
 	dateKey: string,
 	request: Pick<ClueRequest, "id" | "wordId">,
