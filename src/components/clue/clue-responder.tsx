@@ -81,7 +81,7 @@ export function ClueResponder({
 			</p>
 			{showAiClueNote ? (
 				<p className="text-xs text-muted-foreground">
-					{request.requesterName} ja té la pista de la IA — prova de donar-ne
+					{request.requesterName} ja té la pista, prova de donar-ne
 					una de diferent.
 				</p>
 			) : null}
