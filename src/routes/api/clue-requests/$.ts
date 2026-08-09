@@ -24,6 +24,7 @@ import { db } from "@/lib/db";
 import { observeServerAction } from "@/lib/observability-server";
 import {
 	getUserPuzzleProgressData,
+	incrementCluesGivenCount,
 	publishLeaderboardForUser,
 } from "@/lib/puzzle-service.server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
@@ -278,6 +279,17 @@ async function handleRespond(
 	});
 	// Leave the request open: several players can each send the asker a clue for
 	// the same word. Only the asker resolving it (found the word) closes it out.
+
+	// Credits the responder's lifetime "clues given" profile stat. Anonymous
+	// responders (device-id only) have no user row to credit.
+	if (participant.kind === "user") {
+		incrementCluesGivenCount(participant.id).catch((error) => {
+			console.warn(
+				"[clue-request] failed to increment clues given count",
+				error,
+			);
+		});
+	}
 
 	// A delivered clue raises the asker's clue count immediately (see
 	// publishLeaderboardForUser), which can change the standings on its own even
