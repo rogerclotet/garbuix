@@ -1,7 +1,10 @@
 import {
+	type ClueHelpGiven,
 	type ClueRequest,
 	type ClueRequestStreamEvent,
 	type ClueResponse,
+	clueHelpGivenField,
+	clueHelpGivenKey,
 	clueInboxKey,
 	clueRequestRecordsKey,
 	clueRequestsChannel,
@@ -192,10 +195,67 @@ export async function getPendingClueRequests(
 	return requests;
 }
 
+export async function hasHelpedRequesterForWord(options: {
+	responderId: string;
+	dateKey: string;
+	requesterId: string;
+	wordId: number;
+}): Promise<boolean> {
+	if (!isRedisConfigured()) {
+		return false;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return false;
+	}
+
+	try {
+		const field = clueHelpGivenField(options.requesterId, options.wordId);
+		const record = await redis.hget(
+			clueHelpGivenKey(options.responderId, options.dateKey),
+			field,
+		);
+		return record != null;
+	} catch (error) {
+		console.warn("[clue-request] failed to read help-given record", error);
+		return false;
+	}
+}
+
+export async function getHelpGivenRecords(
+	responderId: string,
+	dateKey: string,
+): Promise<ClueHelpGiven[]> {
+	if (!isRedisConfigured()) {
+		return [];
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return [];
+	}
+
+	try {
+		const entries = await redis.hgetall(clueHelpGivenKey(responderId, dateKey));
+		return Object.values(entries)
+			.map((raw) => {
+				try {
+					return JSON.parse(raw) as ClueHelpGiven;
+				} catch {
+					return null;
+				}
+			})
+			.filter((record): record is ClueHelpGiven => record !== null);
+	} catch (error) {
+		console.warn("[clue-request] failed to read help-given records", error);
+		return [];
+	}
+}
+
 export async function publishClueResponse(options: {
 	request: ClueRequest;
 	text: string;
 	responderName: string;
+	responderId: string;
 }): Promise<void> {
 	if (!isRedisConfigured()) {
 		return;
@@ -217,6 +277,20 @@ export async function publishClueResponse(options: {
 		options.request.requesterId,
 		options.request.dateKey,
 	);
+	const helpKey = clueHelpGivenKey(
+		options.responderId,
+		options.request.dateKey,
+	);
+	const helpField = clueHelpGivenField(
+		options.request.requesterId,
+		options.request.wordId,
+	);
+	const helpRecord: ClueHelpGiven = {
+		requesterId: options.request.requesterId,
+		wordId: options.request.wordId,
+		requesterName: options.request.requesterName,
+		at: new Date().toISOString(),
+	};
 
 	try {
 		// Persist first so the clue survives even if the live event is missed (SSE
@@ -224,6 +298,8 @@ export async function publishClueResponse(options: {
 		const pipeline = redis.pipeline();
 		pipeline.hset(inboxKey, String(response.wordId), JSON.stringify(response));
 		pipeline.expire(inboxKey, INBOX_TTL_SECONDS);
+		pipeline.hset(helpKey, helpField, JSON.stringify(helpRecord));
+		pipeline.expire(helpKey, INBOX_TTL_SECONDS);
 		await pipeline.exec();
 
 		await redis.publish(

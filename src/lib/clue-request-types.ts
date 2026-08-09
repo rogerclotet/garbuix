@@ -27,6 +27,15 @@ export type ClueResponse = {
 	at: string;
 };
 
+// A responder can only help a given asker once per word. Stored per responder so
+// the client can hide already-answered requests after reload.
+export type ClueHelpGiven = {
+	requesterId: string;
+	wordId: number;
+	requesterName: string;
+	at: string;
+};
+
 export type ClueRequestStreamEvent =
 	| { type: "request"; request: ClueRequest }
 	| { type: "response"; response: ClueResponse }
@@ -71,6 +80,18 @@ export function clueRequestRecordsKey(dateKey: string): string {
 // relying solely on the live pub/sub event reaching them.
 export function clueInboxKey(userId: string, dateKey: string): string {
 	return `clreq:user:${userId}:${dateKey}:inbox`;
+}
+
+// Per-responder record of which asker+word pairs they've already helped today.
+export function clueHelpGivenKey(responderId: string, dateKey: string): string {
+	return `clreq:user:${responderId}:${dateKey}:helped`;
+}
+
+export function clueHelpGivenField(
+	requesterId: string,
+	wordId: number,
+): string {
+	return `${requesterId}:${wordId}`;
 }
 
 // DOM id of the word list section, so the header help badge can scroll to it.

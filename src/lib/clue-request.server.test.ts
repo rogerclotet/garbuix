@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clueInboxKey, pendingRequestsKey } from "@/lib/clue-request-types";
+import {
+	clueHelpGivenKey,
+	clueInboxKey,
+	pendingRequestsKey,
+} from "@/lib/clue-request-types";
 
 // A minimal in-memory stand-in for the Redis client: hash commands plus a
 // chainable pipeline, enough to exercise the clue-request store/load paths.
@@ -71,6 +75,8 @@ import {
 	createClueRequest,
 	getClueInbox,
 	getClueRequest,
+	getHelpGivenRecords,
+	hasHelpedRequesterForWord,
 	publishClueResponse,
 	resolveClueRequest,
 	resolveOwnClueRequestsForWord,
@@ -119,6 +125,7 @@ describe("clue request store-and-forward", () => {
 			request: loaded,
 			text: "Una peça de roba",
 			responderName: "Bru",
+			responderId: "responder-1",
 		});
 
 		const inbox = await getClueInbox(request.requesterId, DATE_KEY);
@@ -157,5 +164,48 @@ describe("clue request store-and-forward", () => {
 		expect(
 			redisRef.current?.store.get(clueInboxKey(request.requesterId, DATE_KEY)),
 		).toBeUndefined();
+	});
+
+	it("records help given and blocks duplicate help for the same asker and word", async () => {
+		const request = await createClueRequest(createInput());
+		expect(request).not.toBeNull();
+		if (!request) return;
+
+		const loaded = await getClueRequest(DATE_KEY, request.id);
+		expect(loaded).not.toBeNull();
+		if (!loaded) return;
+
+		expect(
+			await hasHelpedRequesterForWord({
+				responderId: "responder-1",
+				dateKey: DATE_KEY,
+				requesterId: request.requesterId,
+				wordId: request.wordId,
+			}),
+		).toBe(false);
+
+		await publishClueResponse({
+			request: loaded,
+			text: "Una peça de roba",
+			responderName: "Bru",
+			responderId: "responder-1",
+		});
+
+		expect(
+			await hasHelpedRequesterForWord({
+				responderId: "responder-1",
+				dateKey: DATE_KEY,
+				requesterId: request.requesterId,
+				wordId: request.wordId,
+			}),
+		).toBe(true);
+
+		const helpGiven = await getHelpGivenRecords("responder-1", DATE_KEY);
+		expect(helpGiven).toHaveLength(1);
+		expect(helpGiven[0]?.requesterName).toBe("Anna");
+
+		expect(
+			redisRef.current?.store.get(clueHelpGivenKey("responder-1", DATE_KEY)),
+		).toBeDefined();
 	});
 });
