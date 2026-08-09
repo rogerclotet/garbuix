@@ -64,10 +64,10 @@ type HistoryData = {
 const EMPTY_STATS: HistoryStats = {
 	totalDays: 0,
 	completedDays: 0,
-	completionRate: 0,
 	currentStreak: 0,
 	bestStreak: 0,
 	avgGuesses: 0,
+	cluesGiven: 0,
 };
 
 export function History({ initialData }: { initialData: HistoryData }) {
@@ -230,8 +230,8 @@ export function History({ initialData }: { initialData: HistoryData }) {
 			value: stats.completedDays,
 		},
 		{
-			label: "Percentatge completat",
-			value: `${stats.completionRate}%`,
+			label: "Pistes donades",
+			value: stats.cluesGiven,
 		},
 		{
 			label: "Ratxa actual",

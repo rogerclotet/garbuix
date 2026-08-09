@@ -197,10 +197,14 @@ export const HISTORY_PAGE_SIZE = 5;
 export type HistoryStats = {
 	totalDays: number;
 	completedDays: number;
-	completionRate: number;
 	currentStreak: number;
 	bestStreak: number;
 	avgGuesses: number;
+	// Lifetime count of peer clue requests this player answered. Not derived from
+	// entries — anonymous (localStorage-only) history has no durable record of it,
+	// so calculateHistoryStats always reports 0 there; the server-backed account
+	// stats fill in the real count separately (see getHistoryStatsForUser).
+	cluesGiven: number;
 };
 
 export type HistoryEntriesPage = {

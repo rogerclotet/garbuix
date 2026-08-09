@@ -124,9 +124,6 @@ export function calculateHistoryStats(
 		entries,
 		options,
 	);
-	const completionRate = totalDays
-		? Math.round((completedDays / totalDays) * 100)
-		: 0;
 	const totalGuesses = entries.reduce(
 		(total, entry) => total + entry.guessCount,
 		0,
@@ -136,9 +133,9 @@ export function calculateHistoryStats(
 	return {
 		totalDays,
 		completedDays,
-		completionRate,
 		currentStreak,
 		bestStreak,
 		avgGuesses,
+		cluesGiven: 0,
 	};
 }

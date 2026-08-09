@@ -161,18 +161,20 @@ export async function recordProgress(
 		return { recorded: false, entry: null, delta };
 	}
 
-	if (delta.wordsAdded > 0 || delta.justCompleted) {
-		const event: LeaderboardEvent = {
-			type: "update",
-			dateKey: input.dateKey,
-			entry,
-			delta,
-		};
-		try {
-			await redis.publish(channel(input.dateKey), JSON.stringify(event));
-		} catch (error) {
-			console.warn("[leaderboard] failed to publish event", error);
-		}
+	// Always broadcast the update, not just on new words/completion: clue and try
+	// counts affect the score too (see scoreFor), so a clue-only change still needs
+	// to reorder every connected client's live leaderboard. Toasts stay quiet for
+	// those since LeaderboardToasts filters on delta.wordsAdded/justCompleted.
+	const event: LeaderboardEvent = {
+		type: "update",
+		dateKey: input.dateKey,
+		entry,
+		delta,
+	};
+	try {
+		await redis.publish(channel(input.dateKey), JSON.stringify(event));
+	} catch (error) {
+		console.warn("[leaderboard] failed to publish event", error);
 	}
 
 	return { recorded: true, entry, delta };

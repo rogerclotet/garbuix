@@ -1,5 +1,5 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
@@ -305,7 +305,7 @@ export async function getAuthSession() {
 	});
 }
 
-async function publishLeaderboardForUser(input: {
+export async function publishLeaderboardForUser(input: {
 	dateKey: string;
 	userId: string;
 	wordsFound: number;
@@ -669,10 +669,14 @@ export async function syncPuzzleEventsForUser(options: {
 
 	const previousWordsFound = existingProgress?.guessedWordIds.length ?? 0;
 	const previousCompletedAt = existingProgress?.completedAt ?? null;
+	const previousHintsUsed = existingProgress?.hintsUsed ?? 0;
 	const nextCompletedAt = nextProgress.completedAt ?? null;
+	// Hints count against the leaderboard score too (see scoreFor), so requesting
+	// one must republish even when it doesn't also reveal a new word.
 	const hasProgressDelta =
 		nextProgress.guessedWordIds.length > previousWordsFound ||
-		(Boolean(nextCompletedAt) && !previousCompletedAt);
+		(Boolean(nextCompletedAt) && !previousCompletedAt) ||
+		nextProgress.hintsUsed > previousHintsUsed;
 
 	if (hasProgressDelta) {
 		void publishLeaderboardForUser({
@@ -861,6 +865,13 @@ export async function getHistoryEntriesPageForUser(
 export async function getHistoryStatsForUser(
 	userId: string,
 ): Promise<HistoryStats> {
+	const cluesGivenRows = await db
+		.select({ cluesGivenCount: user.cluesGivenCount })
+		.from(user)
+		.where(eq(user.id, userId))
+		.limit(1);
+	const cluesGiven = cluesGivenRows[0]?.cluesGivenCount ?? 0;
+
 	const progressRows = await db
 		.select({
 			dateKey: dailyPuzzles.dateKey,
@@ -907,7 +918,21 @@ export async function getHistoryStatsForUser(
 		});
 	}
 
-	return calculateHistoryStats(dedupeHistoryEntriesByDate(entries));
+	return {
+		...calculateHistoryStats(dedupeHistoryEntriesByDate(entries)),
+		cluesGiven,
+	};
+}
+
+// Bumps the lifetime "clues given" counter shown on the profile, called whenever
+// a signed-in player successfully answers someone else's clue request. Anonymous
+// responders have no user row to credit, so callers only invoke this for known
+// users (see handleRespond).
+export async function incrementCluesGivenCount(userId: string): Promise<void> {
+	await db
+		.update(user)
+		.set({ cluesGivenCount: sql`${user.cluesGivenCount} + 1` })
+		.where(eq(user.id, userId));
 }
 
 export type AccountHistoryPage = HistoryEntriesPage & {

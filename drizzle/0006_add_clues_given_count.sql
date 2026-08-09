@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "clues_given_count" integer DEFAULT 0 NOT NULL;

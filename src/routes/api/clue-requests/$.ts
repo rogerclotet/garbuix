@@ -22,6 +22,11 @@ import {
 } from "@/lib/clue-request-types";
 import { db } from "@/lib/db";
 import { observeServerAction } from "@/lib/observability-server";
+import {
+	getUserPuzzleProgressData,
+	incrementCluesGivenCount,
+	publishLeaderboardForUser,
+} from "@/lib/puzzle-service.server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
 
 export const Route = createFileRoute("/api/clue-requests/$")({
@@ -275,7 +280,62 @@ async function handleRespond(
 	// Leave the request open: several players can each send the asker a clue for
 	// the same word. Only the asker resolving it (found the word) closes it out.
 
+	// Credits the responder's lifetime "clues given" profile stat. Anonymous
+	// responders (device-id only) have no user row to credit.
+	if (participant.kind === "user") {
+		incrementCluesGivenCount(participant.id).catch((error) => {
+			console.warn(
+				"[clue-request] failed to increment clues given count",
+				error,
+			);
+		});
+	}
+
+	// A delivered clue raises the asker's clue count immediately (see
+	// publishLeaderboardForUser), which can change the standings on its own even
+	// though wordsFound didn't move. Republish so the leaderboard reflects it
+	// right away instead of waiting for the asker's next progress sync. Only
+	// signed-in askers have a leaderboard-tracked progress row; anon requester ids
+	// never match one, so this is a no-op for them.
+	void republishLeaderboardForClueRecipient(
+		dateKey,
+		clueRequest.puzzleId,
+		clueRequest.requesterId,
+	);
+
 	return Response.json({ delivered: true });
+}
+
+async function republishLeaderboardForClueRecipient(
+	dateKey: string,
+	puzzleId: string,
+	requesterId: string,
+): Promise<void> {
+	try {
+		const puzzle = await db.query.dailyPuzzles.findFirst({
+			where: eq(dailyPuzzles.id, puzzleId),
+			columns: { wordCount: true },
+		});
+		const progress = await getUserPuzzleProgressData(puzzleId, requesterId);
+		if (!puzzle || !progress) return;
+
+		await publishLeaderboardForUser({
+			dateKey,
+			userId: requesterId,
+			wordsFound: progress.guessedWordIds.length,
+			totalWords: puzzle.wordCount,
+			freeCluesUsed: progress.hintsUsed,
+			tryCount: progress.guessCount,
+			completedAt: progress.completedAt,
+			previousWordsFound: progress.guessedWordIds.length,
+			previousCompletedAt: progress.completedAt,
+		});
+	} catch (error) {
+		console.warn(
+			"[clue-request] failed to republish leaderboard after delivery",
+			error,
+		);
+	}
 }
 
 async function handleResolve(
