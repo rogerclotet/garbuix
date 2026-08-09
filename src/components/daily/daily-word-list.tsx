@@ -9,8 +9,12 @@ import {
 import { useRef, useState } from "react";
 import { ClueResponder } from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
-import type { ClueRequest, ClueResponse } from "@/lib/clue-request-types";
-import { wordRowId } from "@/lib/clue-request-types";
+import type {
+	ClueHelpGiven,
+	ClueRequest,
+	ClueResponse,
+} from "@/lib/clue-request-types";
+import { clueHelpGivenField, wordRowId } from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
 import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
@@ -32,6 +36,7 @@ type DailyWordListProps = {
 	onRequestHelp?: (wordId: number) => void;
 	// The other side: requests from other players this user can help with.
 	incomingRequests?: ClueRequest[];
+	helpGivenRecords?: ClueHelpGiven[];
 	onRespondToClue?: (requestId: string, text: string) => Promise<RespondResult>;
 };
 
@@ -49,6 +54,7 @@ export function DailyWordList({
 	peerCluesByWordId = {},
 	onRequestHelp,
 	incomingRequests = [],
+	helpGivenRecords = [],
 	onRespondToClue,
 }: DailyWordListProps) {
 	const { foundSlots, notFoundSlots } = getSortedWordSlots(
@@ -81,26 +87,19 @@ export function DailyWordList({
 	const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
 	const [prefillText, setPrefillText] = useState("");
 	const composerNonceRef = useRef(0);
-	// Names of askers this user has helped, kept per word so a confirmation stays
-	// on the row after the request itself is resolved and removed.
-	const [helpedNamesByWordId, setHelpedNamesByWordId] = useState<
-		Record<number, string>
-	>({});
 
-	const respondAndRecord = async (
-		request: ClueRequest,
+	const helpedKeys = new Set(
+		helpGivenRecords.map((record) =>
+			clueHelpGivenField(record.requesterId, record.wordId),
+		),
+	);
+
+	const respondAndRecord = (
 		requestId: string,
 		text: string,
 	): Promise<RespondResult> => {
-		if (!onRespondToClue) return { ok: false, reason: null };
-		const result = await onRespondToClue(requestId, text);
-		if (result.ok) {
-			setHelpedNamesByWordId((current) => ({
-				...current,
-				[request.wordId]: request.requesterName,
-			}));
-		}
-		return result;
+		if (!onRespondToClue) return Promise.resolve({ ok: false, reason: null });
+		return onRespondToClue(requestId, text);
 	};
 
 	const openComposer = (requestId: string, initial: string) => {
@@ -140,14 +139,27 @@ export function DailyWordList({
 
 		return (
 			<div className="flex flex-col gap-2 pl-7">
-				{requests.map((request) =>
-					activeRequestId === request.id ? (
+				{requests.map((request) => {
+					const helpedKey = clueHelpGivenField(
+						request.requesterId,
+						request.wordId,
+					);
+					if (helpedKeys.has(helpedKey)) {
+						return (
+							<span
+								key={helpedKey}
+								className="flex items-center gap-1.5 text-sm font-ui text-primary"
+							>
+								<Check className="size-3.5 shrink-0" />
+								Has ajudat a {request.requesterName}
+							</span>
+						);
+					}
+					return activeRequestId === request.id ? (
 						<ClueResponder
 							key={`${request.id}:${composerNonceRef.current}`}
 							request={request}
-							onRespond={(requestId, text) =>
-								respondAndRecord(request, requestId, text)
-							}
+							onRespond={(requestId, text) => respondAndRecord(requestId, text)}
 							onDone={closeComposer}
 							intro={`Dóna una pista a ${request.requesterName}`}
 							initialText={prefillText}
@@ -164,20 +176,34 @@ export function DailyWordList({
 							<HelpingHand className="size-3.5" />
 							Ajuda {request.requesterName}
 						</Button>
-					),
-				)}
+					);
+				})}
 			</div>
 		);
 	};
 
 	const renderHelpedConfirmation = (wordId: number) => {
-		const name = helpedNamesByWordId[wordId];
-		if (!name) return null;
+		const helpedForWord = helpGivenRecords.filter(
+			(record) => record.wordId === wordId,
+		);
+		const requests = requestsByWordId.get(wordId) ?? [];
+		const helpedWithoutOpenRequest = helpedForWord.filter(
+			(record) =>
+				!requests.some((request) => request.requesterId === record.requesterId),
+		);
+		if (helpedWithoutOpenRequest.length === 0) return null;
 		return (
-			<span className="flex items-center gap-1.5 pl-7 text-sm font-ui text-primary">
-				<Check className="size-3.5 shrink-0" />
-				Has ajudat a {name}
-			</span>
+			<div className="flex flex-col gap-1.5 pl-7">
+				{helpedWithoutOpenRequest.map((record) => (
+					<span
+						key={clueHelpGivenField(record.requesterId, record.wordId)}
+						className="flex items-center gap-1.5 text-sm font-ui text-primary"
+					>
+						<Check className="size-3.5 shrink-0" />
+						Has ajudat a {record.requesterName}
+					</span>
+				))}
+			</div>
 		);
 	};
 

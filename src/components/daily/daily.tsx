@@ -167,6 +167,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		resolveClue,
 		incomingRequests,
 		respondToClue,
+		helpGivenRecords,
 		receivedClues,
 		requestedHelpWordIds,
 		publishSolvedWordIds,
@@ -1568,6 +1569,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									peerCluesByWordId={receivedClues}
 									onRequestHelp={handleRequestHelp}
 									incomingRequests={incomingRequests}
+									helpGivenRecords={helpGivenRecords}
 									onRespondToClue={respondToClue}
 								/>
 							</div>

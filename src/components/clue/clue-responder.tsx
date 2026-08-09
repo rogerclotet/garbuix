@@ -15,6 +15,8 @@ function reasonMessage(reason: string | null): string {
 			return "La pista és massa llarga";
 		case "empty":
 			return "Escriu alguna cosa";
+		case "already_helped":
+			return "Ja has ajudat amb aquesta paraula";
 		default:
 			return "No s'ha pogut enviar la pista";
 	}

@@ -10,10 +10,12 @@ import {
 } from "react";
 import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
 import type {
+	ClueHelpGiven,
 	ClueRequest,
 	ClueRequestStreamEvent,
 	ClueResponse,
 } from "@/lib/clue-request-types";
+import { clueHelpGivenField } from "@/lib/clue-request-types";
 
 function buildAnonAuthQuery(deviceId: string): string {
 	const params = new URLSearchParams({
@@ -42,6 +44,8 @@ type ClueRequestsContextValue = {
 	incomingRequests: ClueRequest[];
 	// Clues delivered to this user, keyed by word id (live + replayed snapshot).
 	receivedClues: Record<number, ClueResponse>;
+	// Asker+word pairs this user has already helped (for confirmations after resolve).
+	helpGivenRecords: ClueHelpGiven[];
 	// Words this user has asked other players for help with (awaiting a reply).
 	// Seeded from the snapshot's own-requests replay so a reload keeps showing
 	// the "waiting for help" state while the request is still pending server-side.
@@ -66,6 +70,7 @@ const defaultValue: ClueRequestsContextValue = {
 	dateKey: null,
 	incomingRequests: [],
 	receivedClues: {},
+	helpGivenRecords: [],
 	requestedHelpWordIds: [],
 	status: "idle",
 	enabled: false,
@@ -106,9 +111,10 @@ export function ClueRequestsProvider({
 	const [requestedHelpWordIds, setRequestedHelpWordIds] = useState<number[]>(
 		[],
 	);
-	// Requests this user has already answered, hidden from the badge/list so the
-	// count reflects only outstanding requests they could still help with.
-	const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
+	// Asker+word pairs this user has already helped, seeded from the snapshot so
+	// a reload keeps requests hidden and confirmations visible.
+	const [helpGivenRecords, setHelpGivenRecords] = useState<ClueHelpGiven[]>([]);
+	const helpGivenKeysRef = useRef<Set<string>>(new Set());
 	// Words this user has solved, published by the puzzle page. Used to hide
 	// requests for words still unsolved on their own board.
 	const [solvedWordIds, setSolvedWordIds] = useState<number[]>([]);
@@ -204,6 +210,26 @@ export function ClueRequestsProvider({
 		[notifiedStorageKey],
 	);
 
+	const ingestHelpGiven = useCallback((records: ClueHelpGiven[]) => {
+		if (records.length === 0) {
+			return;
+		}
+		setHelpGivenRecords((current) => {
+			let changed = false;
+			const next = [...current];
+			for (const record of records) {
+				const key = clueHelpGivenField(record.requesterId, record.wordId);
+				if (helpGivenKeysRef.current.has(key)) {
+					continue;
+				}
+				helpGivenKeysRef.current.add(key);
+				next.push(record);
+				changed = true;
+			}
+			return changed ? next : current;
+		});
+	}, []);
+
 	useEffect(() => {
 		if (!active || typeof window === "undefined") {
 			return;
@@ -221,6 +247,7 @@ export function ClueRequestsProvider({
 					requests?: ClueRequest[];
 					ownRequests?: ClueRequest[];
 					responses?: ClueResponse[];
+					helpGiven?: ClueHelpGiven[];
 				};
 				setIncomingRequests(snapshot.requests ?? []);
 				// Restore this user's own still-pending requests so a reload keeps
@@ -237,6 +264,7 @@ export function ClueRequestsProvider({
 				// live event) notifies of clues left while away. ingestResponses
 				// dedupes, so a reconnect within the session won't re-notify.
 				ingestResponses(snapshot.responses ?? []);
+				ingestHelpGiven(snapshot.helpGiven ?? []);
 				setStatus("open");
 			} catch {
 				// ignore
@@ -286,7 +314,14 @@ export function ClueRequestsProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [active, anonDeviceId, dateKey, localUserId, ingestResponses]);
+	}, [
+		active,
+		anonDeviceId,
+		dateKey,
+		localUserId,
+		ingestResponses,
+		ingestHelpGiven,
+	]);
 
 	// Reconcile the set of requests we could answer against the server's
 	// authoritative pending set (delivered by the snapshot and the inbox poll).
@@ -334,6 +369,7 @@ export function ClueRequestsProvider({
 				const data = (await response.json()) as {
 					responses?: ClueResponse[];
 					requests?: ClueRequest[];
+					helpGiven?: ClueHelpGiven[];
 				};
 				if (cancelled) return;
 				if (data.requests) {
@@ -341,6 +377,9 @@ export function ClueRequestsProvider({
 				}
 				if (data.responses && data.responses.length > 0) {
 					ingestResponses(data.responses);
+				}
+				if (data.helpGiven && data.helpGiven.length > 0) {
+					ingestHelpGiven(data.helpGiven);
 				}
 			} catch {
 				// best-effort; the SSE path or the next poll will recover
@@ -357,6 +396,7 @@ export function ClueRequestsProvider({
 		anonDeviceId,
 		dateKey,
 		ingestResponses,
+		ingestHelpGiven,
 		reconcileIncomingRequests,
 	]);
 
@@ -420,6 +460,7 @@ export function ClueRequestsProvider({
 	const respondToClue = useCallback(
 		async (requestId: string, text: string): Promise<RespondResult> => {
 			if (!dateKey) return { ok: false, reason: null };
+			const request = incomingRequests.find((r) => r.id === requestId);
 			try {
 				const response = await fetch(`/api/clue-requests/${dateKey}/respond`, {
 					method: "POST",
@@ -431,9 +472,16 @@ export function ClueRequestsProvider({
 					}),
 				});
 				if (response.ok) {
-					setRespondedRequestIds((current) =>
-						current.includes(requestId) ? current : [...current, requestId],
-					);
+					if (request) {
+						ingestHelpGiven([
+							{
+								requesterId: request.requesterId,
+								wordId: request.wordId,
+								requesterName: request.requesterName,
+								at: new Date().toISOString(),
+							},
+						]);
+					}
 					return { ok: true };
 				}
 				let reason: string | null = null;
@@ -443,12 +491,22 @@ export function ClueRequestsProvider({
 				} catch {
 					reason = null;
 				}
+				if (reason === "already_helped" && request) {
+					ingestHelpGiven([
+						{
+							requesterId: request.requesterId,
+							wordId: request.wordId,
+							requesterName: request.requesterName,
+							at: new Date().toISOString(),
+						},
+					]);
+				}
 				return { ok: false, reason };
 			} catch {
 				return { ok: false, reason: null };
 			}
 		},
-		[anonDeviceId, dateKey],
+		[anonDeviceId, dateKey, incomingRequests, ingestHelpGiven],
 	);
 
 	const resolveClue = useCallback(
@@ -492,16 +550,24 @@ export function ClueRequestsProvider({
 
 	const visibleRequests = useMemo(() => {
 		const solved = new Set(solvedWordIds);
-		return incomingRequests.filter(
-			(r) => !respondedRequestIds.includes(r.id) && solved.has(r.wordId),
+		const helped = new Set(
+			helpGivenRecords.map((record) =>
+				clueHelpGivenField(record.requesterId, record.wordId),
+			),
 		);
-	}, [incomingRequests, respondedRequestIds, solvedWordIds]);
+		return incomingRequests.filter(
+			(r) =>
+				solved.has(r.wordId) &&
+				!helped.has(clueHelpGivenField(r.requesterId, r.wordId)),
+		);
+	}, [incomingRequests, helpGivenRecords, solvedWordIds]);
 
 	const value = useMemo<ClueRequestsContextValue>(
 		() => ({
 			dateKey,
 			incomingRequests: visibleRequests,
 			receivedClues,
+			helpGivenRecords,
 			requestedHelpWordIds,
 			status,
 			enabled: active,
@@ -515,6 +581,7 @@ export function ClueRequestsProvider({
 			dateKey,
 			visibleRequests,
 			receivedClues,
+			helpGivenRecords,
 			requestedHelpWordIds,
 			status,
 			active,

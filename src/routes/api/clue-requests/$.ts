@@ -7,8 +7,10 @@ import {
 	createClueRequest,
 	getClueInbox,
 	getClueRequest,
+	getHelpGivenRecords,
 	getPendingClueRequests,
 	hasActiveClueRequest,
+	hasHelpedRequesterForWord,
 	publishClueResponse,
 	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
@@ -95,13 +97,14 @@ async function handleGet(request: Request) {
 	// exclude the viewer's own — same shape the SSE snapshot ships — so the client
 	// can reconcile them and recover a missed "request" (or "resolved") event.
 	if (parsed.kind === "inbox") {
-		const [responses, pending] = await Promise.all([
+		const [responses, pending, helpGiven] = await Promise.all([
 			getClueInbox(participant.id, parsed.dateKey),
 			getPendingClueRequests(parsed.dateKey),
+			getHelpGivenRecords(participant.id, parsed.dateKey),
 		]);
 		const requests = pending.filter((r) => r.requesterId !== participant.id);
 		return Response.json(
-			{ responses, requests },
+			{ responses, requests, helpGiven },
 			{ headers: { "Cache-Control": "no-store" } },
 		);
 	}
@@ -250,6 +253,20 @@ async function handleRespond(
 		return new Response("Cannot answer own request", { status: 400 });
 	}
 
+	if (
+		await hasHelpedRequesterForWord({
+			responderId: participant.id,
+			dateKey,
+			requesterId: clueRequest.requesterId,
+			wordId: clueRequest.wordId,
+		})
+	) {
+		return Response.json(
+			{ delivered: false, reason: "already_helped" },
+			{ status: 409 },
+		);
+	}
+
 	const puzzle = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.id, clueRequest.puzzleId),
 	});
@@ -276,8 +293,9 @@ async function handleRespond(
 		request: clueRequest,
 		text,
 		responderName: participant.name,
+		responderId: participant.id,
 	});
-	// Leave the request open: several players can each send the asker a clue for
+	// Leave the request open: other players can still send the asker a clue for
 	// the same word. Only the asker resolving it (found the word) closes it out.
 
 	// Credits the responder's lifetime "clues given" profile stat. Anonymous
@@ -392,9 +410,10 @@ function openSseStream(dateKey: string, userId: string): Response {
 			};
 
 			try {
-				const [pending, responses] = await Promise.all([
+				const [pending, responses, helpGiven] = await Promise.all([
 					getPendingClueRequests(dateKey),
 					getClueInbox(userId, dateKey),
+					getHelpGivenRecords(userId, dateKey),
 				]);
 				// Don't echo the viewer's own open requests back as actionable; ship
 				// them separately so a reload restores the "waiting for help" state.
@@ -402,7 +421,7 @@ function openSseStream(dateKey: string, userId: string): Response {
 				const requests = pending.filter((r) => r.requesterId !== userId);
 				const ownRequests = pending.filter((r) => r.requesterId === userId);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses, helpGiven })}\n\n`,
 				);
 			} catch (error) {
 				console.warn("[clue-request:sse] initial snapshot failed", error);
