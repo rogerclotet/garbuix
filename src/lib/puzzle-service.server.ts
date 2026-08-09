@@ -305,7 +305,7 @@ export async function getAuthSession() {
 	});
 }
 
-async function publishLeaderboardForUser(input: {
+export async function publishLeaderboardForUser(input: {
 	dateKey: string;
 	userId: string;
 	wordsFound: number;
@@ -669,10 +669,14 @@ export async function syncPuzzleEventsForUser(options: {
 
 	const previousWordsFound = existingProgress?.guessedWordIds.length ?? 0;
 	const previousCompletedAt = existingProgress?.completedAt ?? null;
+	const previousHintsUsed = existingProgress?.hintsUsed ?? 0;
 	const nextCompletedAt = nextProgress.completedAt ?? null;
+	// Hints count against the leaderboard score too (see scoreFor), so requesting
+	// one must republish even when it doesn't also reveal a new word.
 	const hasProgressDelta =
 		nextProgress.guessedWordIds.length > previousWordsFound ||
-		(Boolean(nextCompletedAt) && !previousCompletedAt);
+		(Boolean(nextCompletedAt) && !previousCompletedAt) ||
+		nextProgress.hintsUsed > previousHintsUsed;
 
 	if (hasProgressDelta) {
 		void publishLeaderboardForUser({
