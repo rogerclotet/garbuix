@@ -109,3 +109,14 @@ export function isWithinPregenerationWindow(
 export function getMadridTimeZone() {
 	return MADRID_TIME_ZONE;
 }
+
+const madridTimeFormatter = new Intl.DateTimeFormat("ca-ES", {
+	hour: "2-digit",
+	minute: "2-digit",
+	timeZone: MADRID_TIME_ZONE,
+});
+
+export function formatMadridTime(date: Date | string) {
+	const value = typeof date === "string" ? new Date(date) : date;
+	return madridTimeFormatter.format(value);
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	addDaysToDateKey,
 	dateKeyToSeed,
+	formatMadridTime,
 	getDateKeyForDate,
 	getNextPregenerationAt,
 	getNextRolloverAt,
@@ -13,6 +14,10 @@ import {
 describe("puzzle-dates", () => {
 	it("round trips seeds and date keys", () => {
 		expect(seedToDateKey(dateKeyToSeed("2026-03-10"))).toBe("2026-03-10");
+	});
+
+	it("formats completion times in Europe/Madrid", () => {
+		expect(formatMadridTime("2026-08-10T06:10:00.000Z")).toBe("08:10");
 	});
 
 	it("formats Europe/Madrid dates across DST-sensitive days", () => {
