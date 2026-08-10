@@ -10,11 +10,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-
-const timeFormatter = new Intl.DateTimeFormat("ca-ES", {
-	hour: "2-digit",
-	minute: "2-digit",
-});
+import { formatMadridTime } from "@/lib/puzzle-dates";
 
 type WinDialogProps = {
 	open: boolean;
@@ -52,9 +48,7 @@ export function WinDialog({
 	onShare,
 	onSignIn,
 }: WinDialogProps) {
-	const formattedTime = completedAt
-		? timeFormatter.format(new Date(completedAt))
-		: null;
+	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
 	const showStreak = currentStreak >= 3;
 
 	return (

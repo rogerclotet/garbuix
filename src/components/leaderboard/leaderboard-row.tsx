@@ -1,12 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
+import { formatMadridTime } from "@/lib/puzzle-dates";
 import { initialsFromName } from "@/lib/user-profile";
 import { cn } from "@/lib/utils";
-
-const timeFormatter = new Intl.DateTimeFormat("ca-ES", {
-	hour: "2-digit",
-	minute: "2-digit",
-});
 
 type LeaderboardRowProps = {
 	rank: number;
@@ -57,7 +53,7 @@ export function LeaderboardRow({
 				<div className="flex min-w-0 items-baseline justify-between gap-2 text-muted-foreground text-xs">
 					<span className="min-w-0 truncate">
 						{completed
-							? `Completat a les ${timeFormatter.format(new Date(entry.completedAt ?? ""))}`
+							? `Completat a les ${formatMadridTime(entry.completedAt ?? "")}`
 							: null}
 					</span>
 					<span className="shrink-0">

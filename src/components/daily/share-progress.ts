@@ -1,3 +1,4 @@
+import { formatMadridTime } from "@/lib/puzzle-dates";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
 const CELL_SIZE = 48;
@@ -19,11 +20,6 @@ export type ShareCompletionStats = {
 	completedAt: string | null;
 	currentStreak: number;
 };
-
-const timeFormatter =
-	typeof Intl !== "undefined"
-		? new Intl.DateTimeFormat("ca-ES", { hour: "2-digit", minute: "2-digit" })
-		: null;
 
 function formatShareDate(dateKey: string): string {
 	const [year, month, day] = dateKey.split("-");
@@ -49,11 +45,11 @@ function buildStatItems(stats: ShareCompletionStats): StatItem[] {
 		},
 	];
 
-	if (stats.completedAt && timeFormatter) {
+	if (stats.completedAt) {
 		const completedDate = new Date(stats.completedAt);
 		if (!Number.isNaN(completedDate.getTime())) {
 			items.push({
-				value: timeFormatter.format(completedDate),
+				value: formatMadridTime(completedDate),
 				label: "Acabat",
 			});
 		}
