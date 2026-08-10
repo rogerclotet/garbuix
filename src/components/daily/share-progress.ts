@@ -1,5 +1,5 @@
-import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import { formatMadridTime } from "@/lib/puzzle-dates";
+import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
 const CELL_SIZE = 48;
 const CELL_GAP = 4;
