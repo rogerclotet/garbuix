@@ -367,6 +367,24 @@ export async function checkDailyPuzzleExists(
 	return existing != null;
 }
 
+// Lightweight lookup for UI that only needs today's rating (leaderboard header).
+// Does not generate a puzzle: if today's row isn't there yet, callers omit the
+// indicator. The column is authoritative; the snapshot covers older rows.
+export async function getDailyPuzzleDifficulty(
+	dateKey = getTodayDateKey(),
+): Promise<PuzzleDifficulty | null> {
+	const existing = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.dateKey, dateKey),
+		columns: { difficulty: true, publicSnapshotJson: true },
+	});
+	if (!existing) {
+		return null;
+	}
+	return toPuzzleDifficulty(
+		existing.difficulty ?? existing.publicSnapshotJson.difficulty,
+	);
+}
+
 export function triggerDailyPuzzleGeneration(
 	dateKey = getTodayDateKey(),
 ): void {
