@@ -1475,15 +1475,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				{streakStats.currentStreak >= 3 ? (
 					<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
 				) : null}
-				<Button
-					variant="ghost"
-					size="sm"
-					className="gap-1.5 h-7 px-2 ml-auto"
-					onClick={() => void handleShare()}
-				>
-					<Share2 className="w-3.5 h-3.5" />
-					Compartir
-				</Button>
+				{isRedesign ? null : (
+					<Button
+						variant="ghost"
+						size="sm"
+						className="gap-1.5 h-7 px-2 ml-auto"
+						onClick={() => void handleShare()}
+					>
+						<Share2 className="w-3.5 h-3.5" />
+						Compartir
+					</Button>
+				)}
 			</div>
 		</div>
 	);
@@ -1509,7 +1511,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					{/* The header owns the progress ring now; on completion this is where
 					    the summary lands. */}
 					{displayComplete ? (
-						<div className="shrink-0 px-3 pt-1 pb-2">{completionSummary}</div>
+						<div className="shrink-0 px-3 pt-4 pb-2">{completionSummary}</div>
 					) : null}
 
 					{/* Barely any horizontal padding: on a width-bound puzzle every pixel
