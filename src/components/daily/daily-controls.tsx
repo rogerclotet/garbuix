@@ -20,6 +20,9 @@ const CIRCLE_RADIUS_REM = 4.25;
 type DailyControlsProps = {
 	aiClueMode: boolean;
 	circleLetters: boolean;
+	// Redesigned layout: one row of keys instead of the wheel, and the panel sits
+	// in the page flow rather than pinned to the bottom of the viewport.
+	railLetters?: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
 	hintsUsed: number;
@@ -44,6 +47,7 @@ type DailyControlsProps = {
 export function DailyControls({
 	aiClueMode,
 	circleLetters,
+	railLetters = false,
 	canUseHint,
 	currentGuess,
 	hintsUsed,
@@ -125,8 +129,15 @@ export function DailyControls({
 			variant="outline"
 			size="lg"
 			className={cn(
-				"daily-pressable daily-pressable-key w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 text-xl font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
-				circleLetters ? "rounded-full" : "rounded-lg sm:rounded-xl",
+				"daily-pressable daily-pressable-key text-xl font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
+				railLetters
+					? "size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+					: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16",
+				railLetters
+					? null
+					: circleLetters
+						? "rounded-full"
+						: "rounded-lg sm:rounded-xl",
 			)}
 			onPointerDown={(event) =>
 				runPressAction(event, () => onLetterClick(letter))
@@ -147,8 +158,15 @@ export function DailyControls({
 			onClick={(event) => runClickAction(event, onSubmitGuess)}
 			size="icon"
 			className={cn(
-				"daily-pressable daily-pressable-submit w-14 h-14 sm:w-16 sm:h-16 touch-manipulation",
-				circleLetters ? "rounded-full" : "rounded-lg sm:rounded-xl",
+				"daily-pressable daily-pressable-submit touch-manipulation",
+				railLetters
+					? "ml-1 size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+					: "w-14 h-14 sm:w-16 sm:h-16",
+				railLetters
+					? null
+					: circleLetters
+						? "rounded-full"
+						: "rounded-lg sm:rounded-xl",
 			)}
 			disabled={currentGuess.length < 4}
 			aria-label="Comprovar"
@@ -246,6 +264,16 @@ export function DailyControls({
 		</>
 	);
 
+	const railLayout = (
+		<div className="flex w-full flex-col gap-2">
+			<div className="flex items-center justify-center gap-1.5">
+				{shuffledLetters.map((letter) => renderLetterButton(letter))}
+				{submitButton}
+			</div>
+			<div className="flex justify-center gap-2 font-ui">{actionButtons}</div>
+		</div>
+	);
+
 	const submitFeedbackToneClass =
 		submitFeedback?.kind === "new_word"
 			? "text-primary"
@@ -257,9 +285,23 @@ export function DailyControls({
 					: "text-foreground";
 
 	return (
-		<div className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto">
-			<div className="rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto">
-				<div className="hidden lg:block lg:text-left">
+		<div
+			className={cn(
+				railLetters
+					? "shrink-0 select-none"
+					: "fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto",
+			)}
+		>
+			<div
+				className={cn(
+					railLetters
+						? "pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+						: "rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto",
+				)}
+			>
+				<div
+					className={cn("hidden lg:text-left", railLetters ? null : "lg:block")}
+				>
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
@@ -268,9 +310,21 @@ export function DailyControls({
 						espai.
 					</p>
 				</div>
-				<div className="p-2 lg:px-0 lg:pt-2">
-					<div className="flex flex-col items-center gap-3 lg:gap-6">
-						<div className="relative h-9 sm:h-12 w-full overflow-hidden border-b-2 border-primary/60">
+				<div className={cn(railLetters ? "px-2" : "p-2 lg:px-0 lg:pt-2")}>
+					<div
+						className={cn(
+							"flex flex-col items-center",
+							railLetters ? "gap-2" : "gap-3 lg:gap-6",
+						)}
+					>
+						<div
+							className={cn(
+								"relative w-full overflow-hidden",
+								railLetters
+									? "h-11"
+									: "h-9 sm:h-12 border-b-2 border-primary/60",
+							)}
+						>
 							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
 								<span data-slot="current-guess">{currentGuess}</span>
 								{submitFeedback ? (
@@ -294,7 +348,9 @@ export function DailyControls({
 							</div>
 						</div>
 
-						{circleLetters ? (
+						{railLetters ? (
+							railLayout
+						) : circleLetters ? (
 							<div className="flex w-full items-center justify-center gap-4 overflow-visible sm:gap-6">
 								<div className="flex flex-col-reverse gap-2 font-ui">
 									{actionButtons}

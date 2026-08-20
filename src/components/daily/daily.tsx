@@ -37,6 +37,7 @@ import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
+import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
@@ -50,6 +51,7 @@ import {
 	HIGHLIGHT_AFTER_LAND_MS,
 } from "./daily-flying-letters";
 import { DailyGrid } from "./daily-grid";
+import { setDailyHeaderSummary } from "./daily-header-store";
 import {
 	buildCellLetters,
 	buildHistoryEntry,
@@ -63,6 +65,7 @@ import {
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
+import { DailyWordRail } from "./daily-word-rail";
 import { openHowToPlay } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
@@ -73,6 +76,10 @@ import { WinDialog } from "./win-dialog";
 const POINTER_CLICK_DEDUP_MS = 350;
 const SUBMIT_FEEDBACK_DURATION_MS = 520;
 const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
+// PostHog flag for the redesigned board: off keeps today's layout.
+const REDESIGN_FLAG = "mobile-redesign";
+// How long the ring's bonus arc stays pulsed after a free letter is earned.
+const BONUS_PULSE_MS = 2200;
 const HAPTIC_TAP_MS = 14;
 const HAPTIC_SUBMIT_MS = 18;
 const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
@@ -114,6 +121,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function Daily({ initialData }: { initialData: DailyData }) {
+	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
 	const { activeUser } = useActiveSessionUser(initialData.sessionUser);
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
@@ -208,6 +216,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
 	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
+	// Redesigned layout: the word whose panel is open, marked on the board for as
+	// long as it stays open.
+	const [openWordId, setOpenWordId] = useState<number | null>(null);
+	const [justEarnedBonus, setJustEarnedBonus] = useState(false);
+	const bonusPulseTimerRef = useRef<number | null>(null);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
@@ -215,6 +228,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const { captureEvent, captureException } = useObservability();
 	const captureExceptionRef = useRef(captureException);
 	captureExceptionRef.current = captureException;
+	// Lets the header's share button reach the latest handler without making the
+	// published summary churn on every render.
+	const handleShareRef = useRef<() => Promise<void>>(async () => {});
 	const { applyLocalEvent, derivedProgress, isProgressReady } =
 		useDailyProgress({
 			activeUser,
@@ -280,6 +296,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 			if (locateClearTimerRef.current != null) {
 				window.clearTimeout(locateClearTimerRef.current);
+			}
+			if (bonusPulseTimerRef.current != null) {
+				window.clearTimeout(bonusPulseTimerRef.current);
 			}
 			for (const timer of bounceClearTimersRef.current.values()) {
 				window.clearTimeout(timer);
@@ -982,6 +1001,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					toast.success("Pista desbloquejada!", {
 						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
+					setJustEarnedBonus(true);
+					if (bonusPulseTimerRef.current != null) {
+						window.clearTimeout(bonusPulseTimerRef.current);
+					}
+					bonusPulseTimerRef.current = window.setTimeout(() => {
+						setJustEarnedBonus(false);
+						bonusPulseTimerRef.current = null;
+					}, BONUS_PULSE_MS);
 				}
 			}
 		}
@@ -1186,6 +1213,25 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
+	// Redesigned layout: cells of the word whose panel is open.
+	const selectedCells = useMemo(() => {
+		if (openWordId == null) return new Set<string>();
+		const slot = puzzle.wordSlots.find((item) => item.id === openWordId);
+		return slot ? getWordCellKeys(slot) : new Set<string>();
+	}, [openWordId, puzzle.wordSlots]);
+
+	// Solving the open word closes its panel.
+	useEffect(() => {
+		if (openWordId == null) return;
+		if (derivedProgress.guessedWordIds.includes(openWordId)) {
+			setOpenWordId(null);
+		}
+	}, [derivedProgress.guessedWordIds, openWordId]);
+
+	const handleOpenWordChange = useCallback((wordId: number | null) => {
+		setOpenWordId(wordId);
+	}, []);
+
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
 	// Delay the visual completion state so the submit feedback animation plays first
@@ -1255,6 +1301,14 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		totalWords,
 	]);
 
+	const openShare = useCallback(() => {
+		if (getSkipSharePreview()) {
+			void handleShareRef.current();
+			return;
+		}
+		setSharePreviewOpen(true);
+	}, []);
+
 	const handleShare = useCallback(async () => {
 		try {
 			const result = await shareProgress(
@@ -1277,6 +1331,29 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.guessedWordIds.length,
 		totalWords,
 	]);
+
+	// The redesigned header (rendered above this route) shows the progress ring
+	// and the counters, so the board can own everything below it.
+	useEffect(() => {
+		setDailyHeaderSummary({
+			found: derivedProgress.guessedWordIds.length,
+			total: totalWords,
+			bonusInCycle: derivedProgress.bonusWordsFound % WORDS_PER_BONUS_CLUE,
+			bonusTarget: WORDS_PER_BONUS_CLUE,
+			showBonus: bonusCluesEnabled,
+			justEarnedBonus,
+			onShare: openShare,
+		});
+	}, [
+		bonusCluesEnabled,
+		derivedProgress.bonusWordsFound,
+		derivedProgress.guessedWordIds.length,
+		justEarnedBonus,
+		openShare,
+		totalWords,
+	]);
+
+	useEffect(() => () => setDailyHeaderSummary(null), []);
 
 	useEffect(() => {
 		if (typeof window === "undefined" || isComplete) {
@@ -1349,6 +1426,40 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return <DailyProgressLoadingState />;
 	}
 
+	const completionSummary = (
+		<div className="space-y-1">
+			<p className="text-sm font-medium text-muted-foreground font-ui">
+				Felicitats!
+			</p>
+			<h2 className="text-xl font-semibold tracking-tight">
+				Has completat el joc
+			</h2>
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
+				<span>
+					{derivedProgress.guessCount} intent
+					{derivedProgress.guessCount === 1 ? "" : "s"}
+				</span>
+				<span>
+					{derivedProgress.hintsUsed === 1
+						? `${derivedProgress.hintsUsed} pista`
+						: `${derivedProgress.hintsUsed} pistes`}
+				</span>
+				{streakStats.currentStreak >= 3 ? (
+					<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
+				) : null}
+				<Button
+					variant="ghost"
+					size="sm"
+					className="gap-1.5 h-7 px-2 ml-auto"
+					onClick={() => void handleShare()}
+				>
+					<Share2 className="w-3.5 h-3.5" />
+					Compartir
+				</Button>
+			</div>
+		</div>
+	);
+
 	return (
 		<>
 			<DailyConfetti fire={shouldFireConfetti} />
@@ -1363,220 +1474,266 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					finishFlyingLettersCleanup();
 				}}
 			/>
-			<div
-				className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
-					displayComplete
-						? "pb-6 sm:pb-8 lg:pb-8"
-						: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
-				}`}
-			>
-				<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
-					<div
-						className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
-					>
-						{displayComplete ? (
-							<div className="space-y-1">
-								<p className="text-sm font-medium text-muted-foreground font-ui">
-									Felicitats!
-								</p>
-								<h2 className="text-xl font-semibold tracking-tight">
-									Has completat el joc
-								</h2>
-								<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
-									<span>
-										{derivedProgress.guessCount} intent
-										{derivedProgress.guessCount === 1 ? "" : "s"}
-									</span>
-									<span>
-										{derivedProgress.hintsUsed === 1
-											? `${derivedProgress.hintsUsed} pista`
-											: `${derivedProgress.hintsUsed} pistes`}
-									</span>
-									{streakStats.currentStreak >= 3 ? (
-										<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
-									) : null}
-									<Button
-										variant="ghost"
-										size="sm"
-										className="gap-1.5 h-7 px-2 ml-auto"
-										onClick={() => void handleShare()}
-									>
-										<Share2 className="w-3.5 h-3.5" />
-										Compartir
-									</Button>
-								</div>
-							</div>
-						) : (
-							(() => {
-								const percent = Math.min(
-									100,
-									Math.max(
-										0,
-										(derivedProgress.guessedWordIds.length / totalWords) * 100,
-									),
-								);
-								// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
-								// clue and resets each time one is earned; the label keeps the total.
-								const bonusCount = derivedProgress.bonusWordsFound;
-								const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
-								const bonusPercent =
-									(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
-								const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
-								const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
-								return (
-									<div className="flex items-center gap-1.5">
-										<div className="flex flex-1 flex-col gap-1">
-											<div
-												className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
-												role="progressbar"
-												aria-valuenow={derivedProgress.guessedWordIds.length}
-												aria-valuemin={0}
-												aria-valuemax={totalWords}
-												aria-label="Paraules trobades"
-											>
-												<div
-													className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
-													style={{ width: `${percent}%` }}
-												/>
-												<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-													<span className="flex items-baseline gap-1">
-														<span className="text-foreground tabular-nums text-xs">
-															{derivedProgress.guessedWordIds.length}
-														</span>
-														<span className="text-muted-foreground/50">/</span>
-														<span className="text-muted-foreground tabular-nums">
-															{totalWords}
-														</span>
-														<span className="ml-1 hidden text-muted-foreground sm:inline">
-															paraules
-														</span>
-													</span>
-													<span className="text-muted-foreground tabular-nums">
-														{derivedProgress.guessCount}{" "}
-														{derivedProgress.guessCount === 1
-															? "intent"
-															: "intents"}
-													</span>
-												</div>
-											</div>
-											{bonusCluesEnabled ? (
-												<div
-													className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
-													role="progressbar"
-													aria-valuenow={bonusInCycle}
-													aria-valuemin={0}
-													aria-valuemax={WORDS_PER_BONUS_CLUE}
-													aria-label="Paraules vàlides de fora del joc"
-												>
-													<div
-														className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
-														style={{ width: `${bonusPercent}%` }}
-													/>
-													<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-														<span className="flex items-baseline gap-1">
-															<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
-																{bonusCount}
-															</span>
-															<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
-																paraules extra
-															</span>
-														</span>
-														<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
-															{wordsToNextClue} per a una pista
-														</span>
-													</div>
-												</div>
-											) : null}
-										</div>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="size-8 shrink-0 rounded-full border border-border/50 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
-											onClick={() => {
-												if (getSkipSharePreview()) {
-													void handleShare();
-												} else {
-													setSharePreviewOpen(true);
-												}
-											}}
-											aria-label="Compartir progrés"
-										>
-											<Share2 className="size-3.5" />
-										</Button>
-									</div>
-								);
-							})()
-						)}
+			{isRedesign ? (
+				// Same single column at every width: the board takes the space the
+				// chrome doesn't need, capped so it stays composed on a desktop.
+				<div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col">
+					{/* The header owns the progress ring now; on completion this is where
+					    the summary lands. */}
+					{displayComplete ? (
+						<div className="shrink-0 px-3 pt-1 pb-2">{completionSummary}</div>
+					) : null}
+
+					{/* Barely any horizontal padding: on a width-bound puzzle every pixel
+					    here comes straight off the cell size. */}
+					<div ref={gridRef} className="flex min-h-0 flex-1 flex-col px-1 py-1">
+						<DailyGrid
+							fitted
+							puzzle={puzzle}
+							revealedCells={revealedCells}
+							cellLetters={cellLetters}
+							highlightedWordId={highlightedWordId}
+							animatingWordId={animatingWordId}
+							animatingPreExistingLetters={animatingPreExistingLetters}
+							landedAnimatingCells={landedAnimatingCells}
+							bounceCells={bounceCells}
+							clueCells={clueGridCells}
+							clueCellsFading={clueGridFading}
+							locateCells={locateCells}
+							selectedCells={selectedCells}
+						/>
 					</div>
 
-					<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-						<div ref={gridRef} className="lg:pb-8 lg:self-start">
-							<DailyGrid
-								puzzle={puzzle}
-								revealedCells={revealedCells}
-								cellLetters={cellLetters}
-								highlightedWordId={highlightedWordId}
-								animatingWordId={animatingWordId}
-								animatingPreExistingLetters={animatingPreExistingLetters}
-								landedAnimatingCells={landedAnimatingCells}
-								bounceCells={bounceCells}
-								clueCells={clueGridCells}
-								clueCellsFading={clueGridFading}
-								locateCells={locateCells}
-							/>
+					<div id={WORD_LIST_SECTION_ID} className="shrink-0">
+						<DailyWordRail
+							puzzle={puzzle}
+							guessedWordIds={derivedProgress.guessedWordIds}
+							revealedAnswers={revealedAnswers}
+							cellLetters={cellLetters}
+							clueTextsByWordId={clueTextsByWordId}
+							foundClueTextsByWordId={foundClueTextsByWordId}
+							canRequestHelp={canRequestHelp}
+							requestedHelpWordIds={requestedHelpWordIds}
+							peerCluesByWordId={receivedClues}
+							onRequestHelp={handleRequestHelp}
+							incomingRequests={incomingRequests}
+							helpGivenRecords={helpGivenRecords}
+							onRespondToClue={respondToClue}
+							openWordId={openWordId}
+							onOpenWordChange={handleOpenWordChange}
+						/>
+					</div>
+
+					<DailyControls
+						aiClueMode
+						railLetters
+						circleLetters={circleLetters}
+						canUseHint={canUseSelfHint}
+						currentGuess={currentGuess}
+						hintsUsed={derivedProgress.hintsUsed}
+						isComplete={displayComplete}
+						shuffledLetters={derivedProgress.shuffledLetters}
+						onBackspace={handleBackspace}
+						onHint={handleHint}
+						onLetterClick={handleLetterClick}
+						onShuffle={handleShuffle}
+						onSubmitGuess={() => {
+							void handleGuess();
+						}}
+						submitFeedback={submitFeedback}
+						runClickAction={runClickAction}
+						runPressAction={runPressAction}
+					/>
+				</div>
+			) : (
+				<div
+					className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
+						displayComplete
+							? "pb-6 sm:pb-8 lg:pb-8"
+							: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
+					}`}
+				>
+					<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
+						<div
+							className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+						>
+							{displayComplete
+								? completionSummary
+								: (() => {
+										const percent = Math.min(
+											100,
+											Math.max(
+												0,
+												(derivedProgress.guessedWordIds.length / totalWords) *
+													100,
+											),
+										);
+										// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+										// clue and resets each time one is earned; the label keeps the total.
+										const bonusCount = derivedProgress.bonusWordsFound;
+										const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+										const bonusPercent =
+											(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+										const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
+										const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
+										return (
+											<div className="flex items-center gap-1.5">
+												<div className="flex flex-1 flex-col gap-1">
+													<div
+														className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
+														role="progressbar"
+														aria-valuenow={
+															derivedProgress.guessedWordIds.length
+														}
+														aria-valuemin={0}
+														aria-valuemax={totalWords}
+														aria-label="Paraules trobades"
+													>
+														<div
+															className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
+															style={{ width: `${percent}%` }}
+														/>
+														<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+															<span className="flex items-baseline gap-1">
+																<span className="text-foreground tabular-nums text-xs">
+																	{derivedProgress.guessedWordIds.length}
+																</span>
+																<span className="text-muted-foreground/50">
+																	/
+																</span>
+																<span className="text-muted-foreground tabular-nums">
+																	{totalWords}
+																</span>
+																<span className="ml-1 hidden text-muted-foreground sm:inline">
+																	paraules
+																</span>
+															</span>
+															<span className="text-muted-foreground tabular-nums">
+																{derivedProgress.guessCount}{" "}
+																{derivedProgress.guessCount === 1
+																	? "intent"
+																	: "intents"}
+															</span>
+														</div>
+													</div>
+													{bonusCluesEnabled ? (
+														<div
+															className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
+															role="progressbar"
+															aria-valuenow={bonusInCycle}
+															aria-valuemin={0}
+															aria-valuemax={WORDS_PER_BONUS_CLUE}
+															aria-label="Paraules vàlides de fora del joc"
+														>
+															<div
+																className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
+																style={{ width: `${bonusPercent}%` }}
+															/>
+															<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+																<span className="flex items-baseline gap-1">
+																	<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
+																		{bonusCount}
+																	</span>
+																	<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
+																		paraules extra
+																	</span>
+																</span>
+																<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
+																	{wordsToNextClue} per a una pista
+																</span>
+															</div>
+														</div>
+													) : null}
+												</div>
+												<Button
+													variant="ghost"
+													size="icon"
+													className="size-8 shrink-0 rounded-full border border-border/50 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+													onClick={() => {
+														if (getSkipSharePreview()) {
+															void handleShare();
+														} else {
+															setSharePreviewOpen(true);
+														}
+													}}
+													aria-label="Compartir progrés"
+												>
+													<Share2 className="size-3.5" />
+												</Button>
+											</div>
+										);
+									})()}
 						</div>
 
-						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
-							<DailyControls
-								aiClueMode
-								circleLetters={circleLetters}
-								canUseHint={canUseSelfHint}
-								currentGuess={currentGuess}
-								hintsUsed={derivedProgress.hintsUsed}
-								isComplete={displayComplete}
-								shuffledLetters={derivedProgress.shuffledLetters}
-								onBackspace={handleBackspace}
-								onHint={handleHint}
-								onLetterClick={handleLetterClick}
-								onShuffle={handleShuffle}
-								onSubmitGuess={() => {
-									void handleGuess();
-								}}
-								submitFeedback={submitFeedback}
-								runClickAction={runClickAction}
-								runPressAction={runPressAction}
-							/>
-
-							<div
-								id={WORD_LIST_SECTION_ID}
-								className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
-							>
-								<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
-									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
-									)
-								</h3>
-								<DailyWordList
+						<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
+							<div ref={gridRef} className="lg:pb-8 lg:self-start">
+								<DailyGrid
 									puzzle={puzzle}
-									guessedWordIds={derivedProgress.guessedWordIds}
-									revealedAnswers={revealedAnswers}
+									revealedCells={revealedCells}
 									cellLetters={cellLetters}
-									clueTextsByWordId={clueTextsByWordId}
-									clueWordIds={derivedProgress.clueWordIds}
-									foundClueTextsByWordId={foundClueTextsByWordId}
-									onWordTap={handleLocateWord}
-									canRequestHelp={canRequestHelp}
-									requestedHelpWordIds={requestedHelpWordIds}
-									peerCluesByWordId={receivedClues}
-									onRequestHelp={handleRequestHelp}
-									incomingRequests={incomingRequests}
-									helpGivenRecords={helpGivenRecords}
-									onRespondToClue={respondToClue}
+									highlightedWordId={highlightedWordId}
+									animatingWordId={animatingWordId}
+									animatingPreExistingLetters={animatingPreExistingLetters}
+									landedAnimatingCells={landedAnimatingCells}
+									bounceCells={bounceCells}
+									clueCells={clueGridCells}
+									clueCellsFading={clueGridFading}
+									locateCells={locateCells}
 								/>
+							</div>
+
+							<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
+								<DailyControls
+									aiClueMode
+									circleLetters={circleLetters}
+									canUseHint={canUseSelfHint}
+									currentGuess={currentGuess}
+									hintsUsed={derivedProgress.hintsUsed}
+									isComplete={displayComplete}
+									shuffledLetters={derivedProgress.shuffledLetters}
+									onBackspace={handleBackspace}
+									onHint={handleHint}
+									onLetterClick={handleLetterClick}
+									onShuffle={handleShuffle}
+									onSubmitGuess={() => {
+										void handleGuess();
+									}}
+									submitFeedback={submitFeedback}
+									runClickAction={runClickAction}
+									runPressAction={runPressAction}
+								/>
+
+								<div
+									id={WORD_LIST_SECTION_ID}
+									className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
+								>
+									<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
+										Paraules ({derivedProgress.guessedWordIds.length}/
+										{totalWords})
+									</h3>
+									<DailyWordList
+										puzzle={puzzle}
+										guessedWordIds={derivedProgress.guessedWordIds}
+										revealedAnswers={revealedAnswers}
+										cellLetters={cellLetters}
+										clueTextsByWordId={clueTextsByWordId}
+										clueWordIds={derivedProgress.clueWordIds}
+										foundClueTextsByWordId={foundClueTextsByWordId}
+										onWordTap={handleLocateWord}
+										canRequestHelp={canRequestHelp}
+										requestedHelpWordIds={requestedHelpWordIds}
+										peerCluesByWordId={receivedClues}
+										onRequestHelp={handleRequestHelp}
+										incomingRequests={incomingRequests}
+										helpGivenRecords={helpGivenRecords}
+										onRespondToClue={respondToClue}
+									/>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
-			</div>
+			)}
 			<WelcomeDialog
 				open={welcomeOpen}
 				onOpenChange={handleWelcomeOpenChange}
