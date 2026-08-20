@@ -28,14 +28,14 @@ const appScheme = {
 		"chart-5": "#c4443a",
 		// Game surfaces and semantic accents used by the redesigned board (behind
 		// the mobile-redesign flag): an empty cell and its selected shade, plus
-		// pista / paraules extra / ajuda. Deliberately outside the orange end of
-		// the palette, which reads as a warning next to the destructive red.
+		// pista / paraules extra / ajuda. Pista shares the extra-word pink so it
+		// doesn't sit in the orange/warning end of the palette next to destructive.
 		"game-cell": "#e7e0d4",
 		"game-cell-border": "#d9d0c1",
 		"game-cell-active": "#d6cab4",
 		"game-cell-active-border": "#c2b49a",
-		"game-clue": "#cf9236",
-		"game-clue-strong": "#8a5a12",
+		"game-clue": "#b0568a",
+		"game-clue-strong": "#8d3f6b",
 		"game-extra": "#b0568a",
 		"game-extra-strong": "#8d3f6b",
 		"game-social": "#5566bb",
@@ -78,8 +78,8 @@ const appScheme = {
 		"game-cell-border": "#393228",
 		"game-cell-active": "#3d3629",
 		"game-cell-active-border": "#524839",
-		"game-clue": "#e0ae5b",
-		"game-clue-strong": "#f0c887",
+		"game-clue": "#dd8fb6",
+		"game-clue-strong": "#eeb0cd",
 		"game-extra": "#dd8fb6",
 		"game-extra-strong": "#eeb0cd",
 		"game-social": "#8f97e0",
