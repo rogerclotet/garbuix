@@ -5,9 +5,12 @@ import {
 	LogIn,
 	LogOut,
 	Menu,
+	Moon,
 	Settings,
+	Sun,
 } from "lucide-react";
-import { useState } from "react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,12 +22,45 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 import { initialsFromName } from "@/lib/user-profile";
 
 const rootRoute = getRouteApi("__root__");
+
+function ThemeMenuToggle() {
+	const { resolvedTheme, setTheme } = useTheme();
+	const { captureEvent } = useObservability();
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	const isDark = mounted && resolvedTheme === "dark";
+
+	return (
+		<DropdownMenuItem
+			onSelect={(event) => {
+				event.preventDefault();
+				const next = isDark ? "light" : "dark";
+				setTheme(next);
+				captureEvent("theme_preference_changed", { theme: next });
+			}}
+		>
+			{isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+			<span>Mode fosc</span>
+			<Switch
+				checked={isDark}
+				aria-hidden
+				tabIndex={-1}
+				className="pointer-events-none ml-auto"
+			/>
+		</DropdownMenuItem>
+	);
+}
 
 export function UserMenu() {
 	const rootData = rootRoute.useLoaderData();
@@ -122,6 +158,7 @@ export function UserMenu() {
 						<span>Preferències</span>
 					</Link>
 				</DropdownMenuItem>
+				<ThemeMenuToggle />
 				<DropdownMenuSeparator />
 				{session.isPending ? (
 					<DropdownMenuItem disabled>
