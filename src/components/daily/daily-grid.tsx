@@ -262,7 +262,9 @@ export function DailyGrid({
 								: ""
 						} ${
 							isRevealed
-								? "bg-primary/12 border-primary/40 text-foreground"
+								? isSelectedCell
+									? "bg-primary/20 border-primary text-foreground"
+									: "bg-primary/12 border-primary/40 text-foreground"
 								: isSelectedCell
 									? "bg-game-cell-active border-game-cell-active-border"
 									: cellSize == null

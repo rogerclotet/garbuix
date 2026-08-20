@@ -208,6 +208,12 @@ function injectMiddleDots(word: string, middleDotAfterIndices: number[] = []) {
 	return decoratedWord;
 }
 
+// Optimot (Generalitat) lookup for a revealed Catalan word. Same destination
+// the live word list uses when a found word is tapped.
+export function getOptimotDefinitionUrl(word: string) {
+	return `https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(word)}&tipusCerca=cerca.queSignifica`;
+}
+
 export function getDisplayedSlotWord(
 	slot: DailyPuzzleWordSlot,
 	cellLetters: Map<string, string>,
