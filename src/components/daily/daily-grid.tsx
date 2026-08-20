@@ -6,7 +6,7 @@ import {
 	useState,
 } from "react";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
-import { getSlotCellKey } from "./daily-helpers";
+import { getSlotCellKey, type WordTone } from "./daily-helpers";
 
 // Redesigned board sizing: the cell is derived from the box the grid lives in,
 // on both axes at once, so a tall puzzle and a wide one both fill the space they
@@ -17,6 +17,16 @@ const FITTED_MAX_CELL = 52;
 // is the binding constraint: a board too wide for the screen has to shrink,
 // because scrolling a crossword sideways is worse than smaller letters.
 const FITTED_MIN_CELL = 21;
+
+// How the still-empty cells of the open word are highlighted. A revealed cell
+// keeps its solved shade whatever word is open, so only the blanks carry the
+// word's own colour — the same one its pill and panel use.
+const SELECTED_EMPTY_CELL_CLASSES: Record<WordTone, string> = {
+	found: "bg-game-cell-active border-game-cell-active-border",
+	plain: "bg-game-cell-active border-game-cell-active-border",
+	clue: "bg-game-clue/18 border-game-clue/55",
+	social: "bg-game-social/18 border-game-social/55",
+};
 
 type FittedSize = { cell: number; needsScroll: boolean };
 
@@ -78,8 +88,10 @@ type DailyGridProps = {
 	clueCells?: Set<string>;
 	clueCellsFading?: boolean;
 	locateCells?: Set<string>;
-	// Cells of the word whose panel is open, marked for as long as it stays open.
+	// Cells of the word whose panel is open, marked for as long as it stays open,
+	// tinted with that word's own colour so the board echoes its pill.
 	selectedCells?: Set<string>;
+	selectedTone?: WordTone;
 	// Size the board from its container instead of from the page width.
 	fitted?: boolean;
 };
@@ -97,6 +109,7 @@ export function DailyGrid({
 	clueCellsFading = false,
 	locateCells,
 	selectedCells,
+	selectedTone = "plain",
 	fitted = false,
 }: DailyGridProps) {
 	const [fitRef, { cell: fittedCell, needsScroll }] = useFittedCell(
@@ -266,7 +279,7 @@ export function DailyGrid({
 									? "bg-primary/20 border-primary text-foreground"
 									: "bg-primary/12 border-primary/40 text-foreground"
 								: isSelectedCell
-									? "bg-game-cell-active border-game-cell-active-border"
+									? SELECTED_EMPTY_CELL_CLASSES[selectedTone]
 									: cellSize == null
 										? "bg-muted border-border/50"
 										: "bg-game-cell border-game-cell-border"

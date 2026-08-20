@@ -62,6 +62,7 @@ import {
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	getWordCellKeys,
+	getWordTone,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -1213,12 +1214,27 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
-	// Redesigned layout: cells of the word whose panel is open.
+	// Redesigned layout: cells of the word whose panel is open, plus the colour
+	// that word carries in the rail so the board highlights it in the same shade.
 	const selectedCells = useMemo(() => {
 		if (openWordId == null) return new Set<string>();
 		const slot = puzzle.wordSlots.find((item) => item.id === openWordId);
 		return slot ? getWordCellKeys(slot) : new Set<string>();
 	}, [openWordId, puzzle.wordSlots]);
+
+	const selectedTone = useMemo(() => {
+		if (openWordId == null) return "plain" as const;
+		return getWordTone({
+			isFound: derivedProgress.guessedWordIds.includes(openWordId),
+			hasPeerHelp: Boolean(receivedClues[openWordId]),
+			hasClue: Boolean(clueTextsByWordId[openWordId]),
+		});
+	}, [
+		clueTextsByWordId,
+		derivedProgress.guessedWordIds,
+		openWordId,
+		receivedClues,
+	]);
 
 	// Solving the open word closes its panel so the unfound-word UI doesn't linger
 	// after a guess. Tapping a word that's already found must still be able to
@@ -1339,6 +1355,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		derivedProgress.guessedWordIds.length,
 		totalWords,
 	]);
+
+	// Kept current every render: the header's share button reaches the handler
+	// through this ref, and openShare is published to the header only once.
+	handleShareRef.current = handleShare;
 
 	// The redesigned header (rendered above this route) shows the progress ring
 	// and the counters, so the board can own everything below it.
@@ -1509,10 +1529,20 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							clueCellsFading={clueGridFading}
 							locateCells={locateCells}
 							selectedCells={selectedCells}
+							selectedTone={selectedTone}
 						/>
 					</div>
 
-					<div id={WORD_LIST_SECTION_ID} className="shrink-0">
+					{/* Finishing the puzzle unmounts the keyboard below, so the rail
+					    would otherwise sit flush against the bottom edge. */}
+					<div
+						id={WORD_LIST_SECTION_ID}
+						className={`shrink-0 ${
+							displayComplete
+								? "pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+								: ""
+						}`}
+					>
 						<DailyWordRail
 							puzzle={puzzle}
 							guessedWordIds={derivedProgress.guessedWordIds}

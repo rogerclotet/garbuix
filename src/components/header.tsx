@@ -178,6 +178,9 @@ export default function Header() {
 	// chrome, so the board owns everything below the header.
 	if (showDailyHeader && dailySummary) {
 		const remaining = dailySummary.total - dailySummary.found;
+		// A finished puzzle can't earn more extra words, so the inner ring and its
+		// counter drop out rather than sitting there frozen.
+		const showBonus = dailySummary.showBonus && remaining > 0;
 
 		return (
 			<header className="bg-background transition-colors duration-300">
@@ -187,7 +190,7 @@ export default function Header() {
 						total={dailySummary.total}
 						bonusInCycle={dailySummary.bonusInCycle}
 						bonusTarget={dailySummary.bonusTarget}
-						showBonus={dailySummary.showBonus}
+						showBonus={showBonus}
 						pulse={dailySummary.justEarnedBonus}
 					/>
 					<div className="min-w-0 flex-1">
@@ -199,7 +202,7 @@ export default function Header() {
 						</Link>
 						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
 							{remaining === 0 ? "Completat" : `${remaining} per trobar`}
-							{dailySummary.showBonus ? (
+							{showBonus ? (
 								<>
 									<span className="text-muted-foreground/50"> · </span>
 									<span className="font-semibold text-game-extra-strong">
