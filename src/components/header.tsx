@@ -4,9 +4,11 @@ import {
 	useRouter,
 	useRouterState,
 } from "@tanstack/react-router";
-import { ChevronLeft, HelpingHand, Trophy } from "lucide-react";
+import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import { useDailyDifficulty } from "@/components/daily/daily-difficulty-store";
+import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
+import { DailyProgressRing } from "@/components/daily/daily-progress-ring";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
 	setHowToPlayOpen,
@@ -23,6 +25,11 @@ import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
+import { useFeatureFlag } from "@/lib/use-feature-flag";
+import { cn } from "@/lib/utils";
+
+// Keep in sync with the flag read in daily.tsx.
+const REDESIGN_FLAG = "mobile-redesign";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -47,6 +54,11 @@ export default function Header() {
 	const howToPlayOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const dailyDifficulty = useDailyDifficulty();
+	const dailySummary = useDailyHeaderSummary();
+	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
+	// The redesigned header only takes over on the daily board, and only once the
+	// game has published its progress — every other route keeps the usual row.
+	const showDailyHeader = isRedesign && !innerTitle && dailySummary != null;
 	const navigate = useNavigate();
 	const router = useRouter();
 	const { incomingRequests } = useClueRequests();
@@ -92,6 +104,120 @@ export default function Header() {
 		void navigate({ to: "/", replace: true });
 	};
 
+	// Trophy / help badge / avatar, shared by both header layouts. The redesigned
+	// row also has a ring and two lines of text to fit, so its buttons are a size
+	// smaller and it carries the share action the progress meters used to own.
+	const actionButtons = (compact: boolean) => (
+		<div className={cn("flex items-center", compact ? "gap-0.5" : "gap-2")}>
+			{compact ? (
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={dailySummary?.onShare}
+					className="size-9 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+					aria-label="Compartir progrés"
+				>
+					<Share2 className="size-[18px]" />
+				</Button>
+			) : null}
+			{pathname !== "/classificacio" ? (
+				<Button
+					variant="ghost"
+					size={compact ? "icon" : "icon-lg"}
+					asChild
+					className={cn(
+						"rounded-full hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20",
+						compact
+							? "size-9 text-muted-foreground"
+							: "size-11 text-foreground sm:size-9",
+					)}
+				>
+					<Link to="/classificacio" aria-label="Classificació">
+						<Trophy className={compact ? "size-[18px]" : "size-6 sm:size-5"} />
+					</Link>
+				</Button>
+			) : null}
+			{helpRequestCount > 0 ? (
+				<Button
+					variant="ghost"
+					size={compact ? "icon" : "icon-lg"}
+					onClick={goToWordList}
+					className={cn(
+						"relative rounded-full text-foreground hover:bg-muted",
+						compact ? "size-9" : "size-11 sm:size-9",
+					)}
+					aria-label={`${helpRequestCount} ${
+						helpRequestCount === 1
+							? "jugador demana ajuda"
+							: "jugadors demanen ajuda"
+					}`}
+				>
+					<HelpingHand
+						className={compact ? "size-[18px]" : "size-6 sm:size-5"}
+					/>
+					<span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums">
+						{helpRequestCount > 9 ? "9+" : helpRequestCount}
+					</span>
+				</Button>
+			) : null}
+			<UserMenu />
+		</div>
+	);
+
+	const dialogs = (
+		<>
+			<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+			<ProfilePreferencesTipDialog
+				open={profilePreferencesTipOpen}
+				onOpenChange={setProfilePreferencesTipOpen}
+			/>
+		</>
+	);
+
+	// Redesigned board: the progress ring and the counters move into the app
+	// chrome, so the board owns everything below the header.
+	if (showDailyHeader && dailySummary) {
+		const remaining = dailySummary.total - dailySummary.found;
+
+		return (
+			<header className="bg-background transition-colors duration-300">
+				<div className="mx-auto flex max-w-2xl items-center gap-3 px-3 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-2 sm:px-4">
+					<DailyProgressRing
+						found={dailySummary.found}
+						total={dailySummary.total}
+						bonusInCycle={dailySummary.bonusInCycle}
+						bonusTarget={dailySummary.bonusTarget}
+						showBonus={dailySummary.showBonus}
+						pulse={dailySummary.justEarnedBonus}
+					/>
+					<div className="min-w-0 flex-1">
+						<Link
+							to="/"
+							className="block truncate text-[15px] font-bold tracking-tight text-primary transition-opacity hover:opacity-80"
+						>
+							Garbuix!
+						</Link>
+						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
+							{remaining === 0 ? "Completat" : `${remaining} per trobar`}
+							{dailySummary.showBonus ? (
+								<>
+									<span className="text-muted-foreground/50"> · </span>
+									<span className="font-semibold text-game-extra-strong">
+										{dailySummary.justEarnedBonus
+											? "pista desbloquejada!"
+											: `${dailySummary.bonusInCycle}/${dailySummary.bonusTarget} extres`}
+									</span>
+								</>
+							) : null}
+						</p>
+					</div>
+					{actionButtons(true)}
+				</div>
+				{dialogs}
+			</header>
+		);
+	}
+
 	return (
 		<header className="bg-background transition-colors duration-300">
 			<div className="max-w-5xl mx-auto px-3 sm:px-4 pb-1 sm:pb-1.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:pt-[calc(env(safe-area-inset-top)+1rem)]">
@@ -125,46 +251,10 @@ export default function Header() {
 					{!innerTitle ? (
 						<DifficultyBars difficulty={dailyDifficulty} showLabel />
 					) : null}
-					<div className="flex items-center gap-2">
-						{pathname !== "/classificacio" ? (
-							<Button
-								variant="ghost"
-								size="icon-lg"
-								asChild
-								className="size-11 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
-							>
-								<Link to="/classificacio" aria-label="Classificació">
-									<Trophy className="size-6 sm:size-5" />
-								</Link>
-							</Button>
-						) : null}
-						{helpRequestCount > 0 ? (
-							<Button
-								variant="ghost"
-								size="icon-lg"
-								onClick={goToWordList}
-								className="relative size-11 rounded-full text-foreground hover:bg-muted sm:size-9"
-								aria-label={`${helpRequestCount} ${
-									helpRequestCount === 1
-										? "jugador demana ajuda"
-										: "jugadors demanen ajuda"
-								}`}
-							>
-								<HelpingHand className="size-6 sm:size-5" />
-								<span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums">
-									{helpRequestCount > 9 ? "9+" : helpRequestCount}
-								</span>
-							</Button>
-						) : null}
-						<UserMenu />
-					</div>
+					{actionButtons(false)}
 				</div>
 			</div>
-			<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
-			<ProfilePreferencesTipDialog
-				open={profilePreferencesTipOpen}
-				onOpenChange={setProfilePreferencesTipOpen}
-			/>
+			{dialogs}
 		</header>
 	);
 }

@@ -76,6 +76,16 @@ code {
 	--color-chart-3: var(--chart-3);
 	--color-chart-4: var(--chart-4);
 	--color-chart-5: var(--chart-5);
+	--color-game-cell: var(--game-cell);
+	--color-game-cell-border: var(--game-cell-border);
+	--color-game-cell-active: var(--game-cell-active);
+	--color-game-cell-active-border: var(--game-cell-active-border);
+	--color-game-clue: var(--game-clue);
+	--color-game-clue-strong: var(--game-clue-strong);
+	--color-game-extra: var(--game-extra);
+	--color-game-extra-strong: var(--game-extra-strong);
+	--color-game-social: var(--game-social);
+	--color-game-social-strong: var(--game-social-strong);
 	--color-sidebar: var(--sidebar);
 	--color-sidebar-foreground: var(--sidebar-foreground);
 	--color-sidebar-primary: var(--sidebar-primary);
