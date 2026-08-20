@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { getLeaderboardSnapshot } from "@/lib/leaderboard-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { getDailyPuzzleDifficulty } from "@/lib/puzzle-server-fns";
 import { useLeaderboard } from "@/lib/use-leaderboard";
 
 const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
@@ -15,8 +17,11 @@ const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
 export const Route = createFileRoute("/classificacio")({
 	loader: async () => {
 		const dateKey = getTodayDateKey();
-		const snapshot = await getLeaderboardSnapshot({ data: { dateKey } });
-		return { dateKey, snapshot };
+		const [snapshot, difficulty] = await Promise.all([
+			getLeaderboardSnapshot({ data: { dateKey } }),
+			getDailyPuzzleDifficulty({ data: { dateKey } }),
+		]);
+		return { dateKey, snapshot, difficulty };
 	},
 	// Always fetch a fresh snapshot when the page is opened: drop any cached
 	// match data on unmount and skip intent-preload caching so navigation can't
@@ -39,7 +44,7 @@ function LeaderboardPending() {
 }
 
 function LeaderboardPage() {
-	const { dateKey, snapshot } = Route.useLoaderData();
+	const { dateKey, snapshot, difficulty } = Route.useLoaderData();
 	const live = useLeaderboard();
 
 	// Force the (long-lived, root-level) stream to reconnect when the page opens
@@ -60,9 +65,7 @@ function LeaderboardPage() {
 				<p className="text-muted-foreground text-sm">
 					Puzzle del {dateFormatter.format(new Date(`${dateKey}T00:00:00`))}
 				</p>
-				{live.status === "open" ? (
-					<span className="text-muted-foreground text-xs">En directe</span>
-				) : null}
+				<DifficultyBars difficulty={difficulty} showLabel />
 			</header>
 			<LeaderboardList
 				entries={entries}

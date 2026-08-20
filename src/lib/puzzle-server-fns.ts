@@ -5,6 +5,7 @@ import { getTodayDateKey } from "@/lib/puzzle-dates";
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
+	getDailyPuzzleDifficulty as getDailyPuzzleDifficultyData,
 	getDailyPuzzlePublicData,
 	getHistoryEntriesPageForUser,
 	getHistoryPageDataForUser,
@@ -35,6 +36,26 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 		return observeServerAction(
 			"getDailyPuzzlePublic",
 			() => getDailyPuzzlePublicData(data?.dateKey),
+			{
+				properties: {
+					date_key: data?.dateKey,
+				},
+			},
+		);
+	});
+
+export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
+	.inputValidator(
+		z
+			.object({
+				dateKey: z.string().optional(),
+			})
+			.optional(),
+	)
+	.handler(async ({ data }) => {
+		return observeServerAction(
+			"getDailyPuzzleDifficulty",
+			() => getDailyPuzzleDifficultyData(data?.dateKey),
 			{
 				properties: {
 					date_key: data?.dateKey,
