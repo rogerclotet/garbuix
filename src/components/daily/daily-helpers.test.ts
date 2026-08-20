@@ -3,6 +3,7 @@ import {
 	buildCellLetters,
 	getDisplayedSlotWord,
 	getGuessKeyboardAction,
+	getOptimotDefinitionUrl,
 	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
@@ -282,5 +283,13 @@ describe("getSortedWordSlots", () => {
 
 		expect(getDisplayedSlotWord(slot, cellLetters)).toBe("CAMIÓ");
 		expect(cellLetters.get("0,4")).toBe("ó");
+	});
+});
+
+describe("getOptimotDefinitionUrl", () => {
+	it("builds the Generalitat Optimot lookup for the revealed word", () => {
+		expect(getOptimotDefinitionUrl("camió")).toBe(
+			"https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=cami%C3%B3&tipusCerca=cerca.queSignifica",
+		);
 	});
 });

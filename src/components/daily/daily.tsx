@@ -1220,10 +1220,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return slot ? getWordCellKeys(slot) : new Set<string>();
 	}, [openWordId, puzzle.wordSlots]);
 
-	// Solving the open word closes its panel.
+	// Solving the open word closes its panel so the unfound-word UI doesn't linger
+	// after a guess. Tapping a word that's already found must still be able to
+	// reopen it (clue + Optimot), so only a newly found id closes the panel.
+	const previousGuessedWordIdsRef = useRef(derivedProgress.guessedWordIds);
 	useEffect(() => {
+		const previousGuessedWordIds = previousGuessedWordIdsRef.current;
+		previousGuessedWordIdsRef.current = derivedProgress.guessedWordIds;
 		if (openWordId == null) return;
-		if (derivedProgress.guessedWordIds.includes(openWordId)) {
+		const justFound =
+			derivedProgress.guessedWordIds.includes(openWordId) &&
+			!previousGuessedWordIds.includes(openWordId);
+		if (justFound) {
 			setOpenWordId(null);
 		}
 	}, [derivedProgress.guessedWordIds, openWordId]);

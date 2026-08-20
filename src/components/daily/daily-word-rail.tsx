@@ -1,6 +1,7 @@
 import {
 	Check,
 	ClipboardCopy,
+	ExternalLink,
 	HelpingHand,
 	Loader2,
 	Sparkles,
@@ -21,7 +22,11 @@ import type {
 } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
 import { cn } from "@/lib/utils";
-import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
+import {
+	getDisplayedSlotWord,
+	getOptimotDefinitionUrl,
+	getSortedWordSlots,
+} from "./daily-helpers";
 
 // Redesigned word list: a horizontal rail of pills, one per word, plus a panel
 // that opens above it for the selected word. A pill can hold a pattern and a
@@ -337,6 +342,8 @@ function WordPanel({
 			: hasClue
 				? "bg-game-clue/22"
 				: "bg-muted";
+	const optimotUrl =
+		isFound && revealedAnswer ? getOptimotDefinitionUrl(revealedAnswer) : null;
 
 	return (
 		<div
@@ -354,7 +361,7 @@ function WordPanel({
 						open ? "opacity-100" : "opacity-0",
 						// A clue can run to three lines, so its row hangs from the top; the
 						// single-line state centres instead of floating above the space.
-						hasClue || requests.length > 0
+						hasClue || requests.length > 0 || isFound
 							? "items-start"
 							: "min-h-11 items-center",
 						accentClass,
@@ -362,37 +369,22 @@ function WordPanel({
 				>
 					{slot ? (
 						<>
-							<span
-								className={cn(
-									"flex h-6 shrink-0 items-center gap-1 rounded-full bg-background/70 px-1.5",
+							<WordChip
+								isFound={isFound}
+								isPeer={isPeer}
+								hasClue={hasClue}
+								label={
 									isFound
-										? "text-primary"
-										: isPeer
-											? "text-game-social-strong"
-											: hasClue
-												? "text-game-clue-strong"
-												: null,
-								)}
-							>
-								{isFound ? <Check className="size-3" /> : null}
-								{!isFound && hasClue ? (
-									isPeer ? (
-										<HelpingHand className="size-3" />
-									) : (
-										<Sparkles className="size-3" />
-									)
-								) : null}
-								<span
-									className={cn(
-										"text-[11px]",
-										isFound
-											? "font-semibold tracking-[0.12em]"
-											: "font-mono tracking-[0.16em]",
-									)}
-								>
-									{isFound ? revealedAnswer?.toUpperCase() : displayedWord}
-								</span>
-							</span>
+										? (revealedAnswer?.toUpperCase() ?? "")
+										: displayedWord
+								}
+								optimotUrl={optimotUrl}
+								optimotLabel={
+									revealedAnswer
+										? `Definició de ${revealedAnswer} a Optimot`
+										: undefined
+								}
+							/>
 
 							<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 								{hasClue ? (
@@ -424,6 +416,18 @@ function WordPanel({
 											) : null}
 										</p>
 									</div>
+								) : null}
+
+								{optimotUrl ? (
+									<a
+										href={optimotUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="inline-flex w-fit items-center gap-1 text-[12px] font-bold text-primary font-ui hover:underline"
+									>
+										<ExternalLink className="size-3" />
+										Veure definició a Optimot
+									</a>
 								) : null}
 
 								{!isFound && !hasClue ? (
@@ -546,4 +550,69 @@ function WordPanel({
 			</div>
 		</div>
 	);
+}
+
+function WordChip({
+	isFound,
+	isPeer,
+	hasClue,
+	label,
+	optimotUrl,
+	optimotLabel,
+}: {
+	isFound: boolean;
+	isPeer: boolean;
+	hasClue: boolean;
+	label: string;
+	optimotUrl: string | null;
+	optimotLabel?: string;
+}) {
+	const className = cn(
+		"flex h-6 shrink-0 items-center gap-1 rounded-full bg-background/70 px-1.5",
+		isFound
+			? "text-primary hover:underline"
+			: isPeer
+				? "text-game-social-strong"
+				: hasClue
+					? "text-game-clue-strong"
+					: null,
+	);
+	const inner = (
+		<>
+			{isFound ? <Check className="size-3" /> : null}
+			{!isFound && hasClue ? (
+				isPeer ? (
+					<HelpingHand className="size-3" />
+				) : (
+					<Sparkles className="size-3" />
+				)
+			) : null}
+			<span
+				className={cn(
+					"text-[11px]",
+					isFound
+						? "font-semibold tracking-[0.12em]"
+						: "font-mono tracking-[0.16em]",
+				)}
+			>
+				{label}
+			</span>
+		</>
+	);
+
+	if (optimotUrl) {
+		return (
+			<a
+				href={optimotUrl}
+				target="_blank"
+				rel="noopener noreferrer"
+				aria-label={optimotLabel}
+				className={className}
+			>
+				{inner}
+			</a>
+		);
+	}
+
+	return <span className={className}>{inner}</span>;
 }

@@ -17,7 +17,11 @@ import type {
 import { clueHelpGivenField, wordRowId } from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
-import { getDisplayedSlotWord, getSortedWordSlots } from "./daily-helpers";
+import {
+	getDisplayedSlotWord,
+	getOptimotDefinitionUrl,
+	getSortedWordSlots,
+} from "./daily-helpers";
 
 type DailyWordListProps = {
 	puzzle: DailyPuzzlePublic;
@@ -318,7 +322,7 @@ export function DailyWordList({
 						<div className="flex items-center gap-2">
 							<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
 							<a
-								href={`https://aplicacions.llengua.gencat.cat/llc/AppJava/index.html?action=Principal&method=cerca_generica&input_cercar=${encodeURIComponent(revealedAnswers[slot.id] ?? "")}&tipusCerca=cerca.queSignifica`}
+								href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
 								target="_blank"
 								rel="noopener noreferrer"
 								className="font-medium text-foreground tracking-widest hover:underline"
