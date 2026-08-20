@@ -26,12 +26,57 @@ import {
 	getDisplayedSlotWord,
 	getOptimotDefinitionUrl,
 	getSortedWordSlots,
+	getWordTone,
+	type WordTone,
 } from "./daily-helpers";
 
 // Redesigned word list: a horizontal rail of pills, one per word, plus a panel
 // that opens above it for the selected word. A pill can hold a pattern and a
 // length; it cannot hold a sentence, so clues — and the peer-help exchange —
 // live in the panel, which hands its height back to the board when closed.
+
+// Every surface a word owns — closed pill, selected pill, panel — is a shade of
+// the one colour its tone picks, so selecting a word never swaps its identity
+// for a generic highlight.
+const PILL_CLASSES: Record<WordTone, { open: string; closed: string }> = {
+	found: {
+		open: "bg-primary/25 text-foreground",
+		closed: "bg-primary/12 text-primary",
+	},
+	social: {
+		open: "bg-game-social/32 text-game-social-strong",
+		closed: "bg-game-social/14 text-game-social-strong",
+	},
+	clue: {
+		open: "bg-game-clue/32 text-game-clue-strong",
+		closed: "bg-game-clue/14 text-game-clue-strong",
+	},
+	plain: {
+		open: "bg-secondary text-foreground",
+		closed: "bg-muted/70 text-muted-foreground",
+	},
+};
+
+const PANEL_ACCENT_CLASSES: Record<WordTone, string> = {
+	found: "bg-primary/12",
+	social: "bg-game-social/18",
+	clue: "bg-game-clue/22",
+	plain: "bg-muted",
+};
+
+const PANEL_TEXT_CLASSES: Record<WordTone, string> = {
+	found: "text-muted-foreground",
+	social: "text-game-social-strong",
+	clue: "text-game-clue-strong",
+	plain: "text-muted-foreground",
+};
+
+const PANEL_CHIP_CLASSES: Record<WordTone, string> = {
+	found: "text-primary",
+	social: "text-game-social-strong",
+	clue: "text-game-clue-strong",
+	plain: "text-muted-foreground",
+};
 
 type DailyWordRailProps = {
 	puzzle: DailyPuzzlePublic;
@@ -160,6 +205,11 @@ export function DailyWordRail({
 		const peerClue = peerCluesByWordId[slot.id];
 		const hasIncoming = requestsByWordId.has(slot.id);
 		const isOpen = slot.id === openWordId;
+		const tone = getWordTone({
+			isFound,
+			hasPeerHelp: hasIncoming || Boolean(peerClue),
+			hasClue: Boolean(clueText),
+		});
 
 		return (
 			<button
@@ -173,21 +223,7 @@ export function DailyWordRail({
 				onClick={() => togglePill(slot.id)}
 				className={cn(
 					"flex h-8 shrink-0 scroll-mx-3 items-center gap-1.5 rounded-full pr-2 pl-2.5 transition-colors duration-200 motion-reduce:transition-none",
-					isFound
-						? isOpen
-							? "bg-primary/25 text-foreground"
-							: "bg-primary/12 text-primary"
-						: hasIncoming || peerClue
-							? isOpen
-								? "bg-game-social/32 text-game-social-strong"
-								: "bg-game-social/14 text-game-social-strong"
-							: clueText
-								? isOpen
-									? "bg-game-clue/32 text-game-clue-strong"
-									: "bg-game-clue/14 text-game-clue-strong"
-								: isOpen
-									? "bg-secondary text-foreground"
-									: "bg-muted/70 text-muted-foreground",
+					isOpen ? PILL_CLASSES[tone].open : PILL_CLASSES[tone].closed,
 				)}
 			>
 				{isFound ? <Check className="size-3" /> : null}
@@ -216,24 +252,35 @@ export function DailyWordRail({
 		);
 	};
 
+	const openIsFound = openSlot != null && foundWordIds.has(openSlot.id);
+	const openRequests = openSlot
+		? (requestsByWordId.get(openSlot.id) ?? [])
+		: [];
+	const openPeerClue = openSlot ? peerCluesByWordId[openSlot.id] : undefined;
+	const openClueText = openSlot
+		? (clueTextsByWordId[openSlot.id] ?? foundClueTextsByWordId[openSlot.id])
+		: undefined;
+	// Derived exactly like the pill's, so opening a word never recolours it.
+	const openTone = getWordTone({
+		isFound: openIsFound,
+		hasPeerHelp: openRequests.length > 0 || Boolean(openPeerClue),
+		hasClue: Boolean(openClueText),
+	});
+
 	return (
 		<div className="shrink-0">
 			<WordPanel
 				slot={openSlot}
-				isFound={openSlot != null && foundWordIds.has(openSlot.id)}
+				tone={openTone}
+				isFound={openIsFound}
 				displayedWord={
 					openSlot
 						? getDisplayedSlotWord(openSlot, cellLetters).replaceAll("_", "·")
 						: ""
 				}
 				revealedAnswer={openSlot ? revealedAnswers[openSlot.id] : undefined}
-				clueText={
-					openSlot
-						? (clueTextsByWordId[openSlot.id] ??
-							foundClueTextsByWordId[openSlot.id])
-						: undefined
-				}
-				peerClue={openSlot ? peerCluesByWordId[openSlot.id] : undefined}
+				clueText={openClueText}
+				peerClue={openPeerClue}
 				canRequestHelp={canRequestHelp}
 				isWaitingForHelp={
 					openSlot != null &&
@@ -241,7 +288,7 @@ export function DailyWordRail({
 					!peerCluesByWordId[openSlot.id]
 				}
 				onRequestHelp={onRequestHelp}
-				requests={openSlot ? (requestsByWordId.get(openSlot.id) ?? []) : []}
+				requests={openRequests}
 				helpedKeys={helpedKeys}
 				helpGivenRecords={helpGivenRecords}
 				activeRequestId={activeRequestId}
@@ -266,6 +313,7 @@ export function DailyWordRail({
 
 function WordPanel({
 	slot,
+	tone,
 	isFound,
 	displayedWord,
 	revealedAnswer,
@@ -286,6 +334,7 @@ function WordPanel({
 	onClose,
 }: {
 	slot: DailyPuzzleWordSlot | null;
+	tone: WordTone;
 	isFound: boolean;
 	displayedWord: string;
 	revealedAnswer: string | undefined;
@@ -335,13 +384,6 @@ function WordPanel({
 			)
 		: [];
 
-	const accentClass = isFound
-		? "bg-primary/12"
-		: isPeer || requests.length > 0
-			? "bg-game-social/18"
-			: hasClue
-				? "bg-game-clue/22"
-				: "bg-muted";
 	const optimotUrl =
 		isFound && revealedAnswer ? getOptimotDefinitionUrl(revealedAnswer) : null;
 
@@ -364,15 +406,14 @@ function WordPanel({
 						hasClue || requests.length > 0 || isFound
 							? "items-start"
 							: "min-h-11 items-center",
-						accentClass,
+						PANEL_ACCENT_CLASSES[tone],
 					)}
 				>
 					{slot ? (
 						<>
 							<WordChip
+								tone={tone}
 								isFound={isFound}
-								isPeer={isPeer}
-								hasClue={hasClue}
 								label={
 									isFound
 										? (revealedAnswer?.toUpperCase() ?? "")
@@ -401,11 +442,7 @@ function WordPanel({
 										<p
 											className={cn(
 												"text-[13px] italic leading-5 font-ui",
-												isPeer
-													? "text-game-social-strong"
-													: isFound
-														? "text-muted-foreground"
-														: "text-game-clue-strong",
+												PANEL_TEXT_CLASSES[tone],
 											)}
 										>
 											{text}
@@ -552,52 +589,37 @@ function WordPanel({
 	);
 }
 
+// Just the word: the pill right below already carries this word's icon, so
+// repeating it here only crowds the panel.
 function WordChip({
+	tone,
 	isFound,
-	isPeer,
-	hasClue,
 	label,
 	optimotUrl,
 	optimotLabel,
 }: {
+	tone: WordTone;
 	isFound: boolean;
-	isPeer: boolean;
-	hasClue: boolean;
 	label: string;
 	optimotUrl: string | null;
 	optimotLabel?: string;
 }) {
 	const className = cn(
-		"flex h-6 shrink-0 items-center gap-1 rounded-full bg-background/70 px-1.5",
-		isFound
-			? "text-primary hover:underline"
-			: isPeer
-				? "text-game-social-strong"
-				: hasClue
-					? "text-game-clue-strong"
-					: null,
+		"flex h-6 shrink-0 items-center rounded-full bg-background/70 px-2",
+		PANEL_CHIP_CLASSES[tone],
+		isFound ? "hover:underline" : null,
 	);
 	const inner = (
-		<>
-			{isFound ? <Check className="size-3" /> : null}
-			{!isFound && hasClue ? (
-				isPeer ? (
-					<HelpingHand className="size-3" />
-				) : (
-					<Sparkles className="size-3" />
-				)
-			) : null}
-			<span
-				className={cn(
-					"text-[11px]",
-					isFound
-						? "font-semibold tracking-[0.12em]"
-						: "font-mono tracking-[0.16em]",
-				)}
-			>
-				{label}
-			</span>
-		</>
+		<span
+			className={cn(
+				"text-[11px]",
+				isFound
+					? "font-semibold tracking-[0.12em]"
+					: "font-mono tracking-[0.16em]",
+			)}
+		>
+			{label}
+		</span>
 	);
 
 	if (optimotUrl) {
