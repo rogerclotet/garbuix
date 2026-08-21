@@ -23,7 +23,17 @@ export function useObservability() {
 				);
 			},
 			identifyUser(user: ObservabilityUser) {
-				posthog.identify(user.id, buildUserProperties(user));
+				const properties = buildUserProperties(user);
+				posthog.identify(user.id, properties);
+
+				// Flags targeted by person property (e.g. "enabled for these emails")
+				// are evaluated server-side against the person record, which is
+				// updated asynchronously after identify() ingests. Without this, the
+				// very next flag check can race that ingestion and see a person who
+				// doesn't have the property yet, so the flag reads as off on some
+				// devices/browsers until the property eventually lands. Overriding it
+				// locally makes the property available for evaluation immediately.
+				posthog.setPersonPropertiesForFlags(properties);
 			},
 			resetUser() {
 				posthog.reset();
