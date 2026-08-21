@@ -152,10 +152,6 @@ export function useDailyProgress({
 	// Flipped once this device's stored progress has been read, which only
 	// happens in the browser: during SSR there is no localStorage to read.
 	const [hasLoadedLocalState, setHasLoadedLocalState] = useState(false);
-	// The server only knows a signed-in player's progress, so an anonymous
-	// player has nothing to render until the local read below lands.
-	const isProgressReady =
-		hasLoadedLocalState || activeUser != null || initialData.progress != null;
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
@@ -674,6 +670,5 @@ export function useDailyProgress({
 	return {
 		applyLocalEvent,
 		derivedProgress,
-		isProgressReady,
 	};
 }

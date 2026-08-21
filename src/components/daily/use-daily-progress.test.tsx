@@ -122,26 +122,20 @@ function createMemoryStorage(): Storage {
 }
 
 function Probe({ activeUser }: { activeUser: SessionUser }) {
-	const { derivedProgress, isProgressReady } = useDailyProgress({
+	const { derivedProgress } = useDailyProgress({
 		activeUser,
 		deviceId: "device-1",
 		initialData: INITIAL_DATA,
 	});
 
-	return (
-		<span>
-			{isProgressReady
-				? `words:${derivedProgress.guessedWordIds.join(",")}`
-				: "loading"}
-		</span>
-	);
+	return <span>{`words:${derivedProgress.guessedWordIds.join(",")}`}</span>;
 }
 
 type ActEnvironment = { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // Renders outside act() so only the work React guarantees before the browser
-// paints — the commit and its layout effects — has run when we assert. Anything
-// left to a passive effect shows up as "loading" here, which is exactly the
+// paints — the commit and its layout effects — has run when we assert. Progress
+// left to a passive effect shows up here as an empty board, which is exactly the
 // flash the hook is meant to avoid.
 function renderBeforePaint(activeUser: SessionUser) {
 	const container = document.createElement("div");
