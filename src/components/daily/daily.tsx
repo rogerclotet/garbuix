@@ -8,6 +8,7 @@ import {
 	getLetterLayout,
 	getSkipSharePreview,
 	isVibrationEnabled,
+	type LetterLayout,
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
@@ -63,6 +64,7 @@ import {
 	getSortedWordSlots,
 	getWordCellKeys,
 	getWordTone,
+	REDESIGN_FLAG,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -77,8 +79,6 @@ import { WinDialog } from "./win-dialog";
 const POINTER_CLICK_DEDUP_MS = 350;
 const SUBMIT_FEEDBACK_DURATION_MS = 520;
 const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
-// PostHog flag for the redesigned board: off keeps today's layout.
-const REDESIGN_FLAG = "mobile-redesign";
 // How long the ring's bonus arc stays pulsed after a free letter is earned.
 const BONUS_PULSE_MS = 2200;
 const HAPTIC_TAP_MS = 14;
@@ -163,13 +163,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
-	// Circle is the default; a player can opt back into the grid via
-	// /preferencies. Initialise to the default so SSR markup is deterministic,
-	// then read the stored choice after mount.
-	const [circleLetters, setCircleLetters] = useState(true);
+	// Circle is the classic board's default and line is the redesigned board's
+	// default; a player can opt into any of the three via /preferencies.
+	// Initialise to the classic default so SSR markup is deterministic (SSR
+	// always renders the classic branch), then read the stored choice — or the
+	// design-appropriate default — after mount.
+	const [letterLayout, setLetterLayout] = useState<LetterLayout>("circle");
 	useEffect(() => {
-		setCircleLetters(getLetterLayout() === "circle");
-	}, []);
+		setLetterLayout(getLetterLayout(isRedesign ? "line" : "circle"));
+	}, [isRedesign]);
+	const circleLetters = letterLayout === "circle";
+	const railLetters = letterLayout === "line";
 	const {
 		subscribe: subscribeClueRequests,
 		requestClue,
@@ -1566,7 +1570,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 					<DailyControls
 						aiClueMode
-						railLetters
+						railLetters={railLetters}
 						circleLetters={circleLetters}
 						canUseHint={canUseSelfHint}
 						currentGuess={currentGuess}

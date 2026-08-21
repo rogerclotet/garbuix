@@ -6,6 +6,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { useTheme } from "next-themes";
 import { useEffect, useId, useState } from "react";
+import { REDESIGN_FLAG } from "@/components/daily/daily-helpers";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ import {
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
 import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import {
 	DISPLAY_NAME_MAX_LENGTH,
@@ -56,11 +58,25 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 const LETTER_LAYOUT_OPTIONS: { value: LetterLayout; label: string }[] = [
 	{ value: "circle", label: "Cercle" },
 	{ value: "grid", label: "Graella" },
+	{ value: "line", label: "Línia" },
 ];
 
 const PREVIEW_SLOTS = ["n", "ne", "se", "s", "sw", "nw"] as const;
 
 function LetterLayoutPreview({ layout }: { layout: LetterLayout }) {
+	if (layout === "line") {
+		return (
+			<div className="flex gap-1">
+				{PREVIEW_SLOTS.map((slot) => (
+					<div
+						key={slot}
+						className="h-3.5 w-3.5 rounded-sm border border-border bg-background"
+					/>
+				))}
+			</div>
+		);
+	}
+
 	if (layout === "grid") {
 		return (
 			<div className="grid grid-cols-3 gap-1">
@@ -147,6 +163,7 @@ function PreferencesPage() {
 	const rootData = rootRoute.useLoaderData();
 	const router = useRouter();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
+	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
 	const { captureEvent } = useObservability();
 	const saveProfile = useServerFn(updateUserProfile);
 	const fetchSessionUser = useServerFn(getSessionUser);
@@ -173,10 +190,10 @@ function PreferencesPage() {
 	useEffect(() => {
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
-		setLetterLayoutState(getLetterLayout());
+		setLetterLayoutState(getLetterLayout(isRedesign ? "line" : "circle"));
 		setBonusCluesEnabledState(getBonusCluesEnabled());
 		setMounted(true);
-	}, []);
+	}, [isRedesign]);
 
 	useEffect(() => {
 		if (!mounted) {
@@ -481,7 +498,8 @@ function PreferencesPage() {
 						</div>
 						<p className="text-sm text-muted-foreground font-ui">
 							Tria com es col·loquen les lletres per escriure: en cercle al
-							voltant del botó d'enviar o en una graella de tres columnes.
+							voltant del botó d'enviar, en una graella de tres columnes o en
+							una línia.
 						</p>
 					</div>
 					<fieldset

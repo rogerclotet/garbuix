@@ -5,6 +5,9 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 
+// PostHog flag for the redesigned board: off keeps today's layout.
+export const REDESIGN_FLAG = "mobile-redesign";
+
 export function buildHistoryEntry(
 	puzzle: DailyPuzzlePublic,
 	progress: PuzzleProgressState,
