@@ -1,3 +1,7 @@
+// The `v` this worker is registered under tracks the worker and its precache,
+// not the app release, so cache names now survive ordinary deploys instead of
+// rotating on each one. See RUNTIME_CACHE_MAX_ENTRIES for the eviction that
+// replaces that rotation.
 const CACHE_VERSION =
 	new URL(self.location.href).searchParams.get("v") ?? "dev";
 const STATIC_CACHE = `paraules-static-${CACHE_VERSION}`;
@@ -26,6 +30,27 @@ const CACHEABLE_DESTINATIONS = new Set([
 // same-origin through that proxy, its script-tag requests would otherwise land
 // in the asset cache below.
 const POSTHOG_PROXY_PREFIX = "/ph/";
+
+// Without per-release cache rotation the runtime cache would keep every hashed
+// bundle ever shipped. Cache.keys() yields insertion order and a re-put moves an
+// entry to the end, so dropping from the front evicts the least recently written.
+const RUNTIME_CACHE_MAX_ENTRIES = 200;
+
+async function trimRuntimeCache(cache) {
+	const keys = await cache.keys();
+	const overflow = keys.length - RUNTIME_CACHE_MAX_ENTRIES;
+
+	if (overflow <= 0) {
+		return;
+	}
+
+	await Promise.all(keys.slice(0, overflow).map((key) => cache.delete(key)));
+}
+
+async function putInRuntimeCache(cache, request, response) {
+	await cache.put(request, response);
+	await trimRuntimeCache(cache);
+}
 
 function isCacheableAssetRequest(request, url) {
 	if (CACHEABLE_DESTINATIONS.has(request.destination)) {
@@ -58,7 +83,7 @@ async function staleWhileRevalidate(event, request) {
 		if (shouldCacheResponse(response)) {
 			const copy = response.clone();
 			// A failed write (quota, eviction) must not fail the request itself.
-			event.waitUntil(cache.put(request, copy).catch(() => {}));
+			event.waitUntil(putInRuntimeCache(cache, request, copy).catch(() => {}));
 		}
 
 		return response;
@@ -148,7 +173,7 @@ self.addEventListener("fetch", (event) => {
 						event.waitUntil(
 							caches
 								.open(RUNTIME_CACHE)
-								.then((cache) => cache.put(request, copy)),
+								.then((cache) => putInRuntimeCache(cache, request, copy)),
 						);
 					}
 

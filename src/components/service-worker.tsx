@@ -2,20 +2,25 @@ import { RefreshCw, X } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { APP_VERSION } from "@/lib/app-version";
+import { APP_SERVICE_WORKER_VERSION } from "@/lib/app-version";
 
 const UPDATE_TOAST_ID = "app-update-available";
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 type VersionManifest = {
 	version: string;
+	serviceWorkerVersion: string;
 };
 
 function getServiceWorkerUrl(version: string) {
 	return `/sw.js?v=${encodeURIComponent(version)}`;
 }
 
-async function fetchLatestVersion() {
+// Only the service worker's own version gates the update prompt. A release that
+// leaves the worker untouched changes nothing a running client has to act on:
+// navigations are network-first and bundles are content-hashed, so the next full
+// load — the daily rollover reload, a relaunch, a manual refresh — picks it up.
+async function fetchLatestServiceWorkerVersion() {
 	const response = await fetch(`/version.json?ts=${Date.now()}`, {
 		cache: "no-store",
 	});
@@ -25,7 +30,9 @@ async function fetchLatestVersion() {
 	}
 
 	const manifest = (await response.json()) as Partial<VersionManifest>;
-	return typeof manifest.version === "string" ? manifest.version : null;
+	return typeof manifest.serviceWorkerVersion === "string"
+		? manifest.serviceWorkerVersion
+		: null;
 }
 
 function waitForWaitingWorker(registration: ServiceWorkerRegistration) {
@@ -112,7 +119,7 @@ export function ServiceWorkerRegister() {
 		let cleanupRegistrationListeners: (() => void) | null = null;
 		let shouldReloadOnControllerChange = false;
 		let isCheckingForUpdates = false;
-		let latestVersion = APP_VERSION;
+		let latestServiceWorkerVersion = APP_SERVICE_WORKER_VERSION;
 		let updateToastVisible = false;
 		let autoActivatedInitialWaiting = false;
 
@@ -269,7 +276,9 @@ export function ServiceWorkerRegister() {
 
 		const activateUpdate = async () => {
 			try {
-				const nextRegistration = await prepareUpdate(latestVersion);
+				const nextRegistration = await prepareUpdate(
+					latestServiceWorkerVersion,
+				);
 				const waitingWorker = nextRegistration.waiting;
 
 				if (waitingWorker) {
@@ -295,15 +304,15 @@ export function ServiceWorkerRegister() {
 			isCheckingForUpdates = true;
 
 			try {
-				registration ??= await registerVersion(APP_VERSION);
+				registration ??= await registerVersion(APP_SERVICE_WORKER_VERSION);
 				await registration.update();
 
-				const nextVersion = await fetchLatestVersion();
-				if (!nextVersion || nextVersion === APP_VERSION) {
+				const nextVersion = await fetchLatestServiceWorkerVersion();
+				if (!nextVersion || nextVersion === APP_SERVICE_WORKER_VERSION) {
 					return;
 				}
 
-				latestVersion = nextVersion;
+				latestServiceWorkerVersion = nextVersion;
 				showUpdateToast();
 				await prepareUpdate(nextVersion);
 			} catch (error) {

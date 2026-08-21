@@ -8,23 +8,27 @@ import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 
-function readBuildVersion() {
+function readBuildVersions() {
 	try {
 		const manifestPath = resolve(process.cwd(), "public/version.json");
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
 			version?: string;
+			serviceWorkerVersion?: string;
 		};
 
-		return manifest.version ?? "dev";
+		return {
+			version: manifest.version ?? "dev",
+			serviceWorkerVersion: manifest.serviceWorkerVersion ?? "dev",
+		};
 	} catch {
-		return "dev";
+		return { version: "dev", serviceWorkerVersion: "dev" };
 	}
 }
 
 const config = defineConfig(({ mode }) => {
 	const port = Number(process.env.PORT ?? 3000);
 	const isDockerDev = process.env.DOCKER_DEV === "true";
-	const buildVersion = readBuildVersion();
+	const buildVersions = readBuildVersions();
 	const isTest = mode === "test";
 	const plugins = isTest
 		? [viteReact()]
@@ -39,7 +43,10 @@ const config = defineConfig(({ mode }) => {
 
 	return {
 		define: {
-			__APP_VERSION__: JSON.stringify(buildVersion),
+			__APP_VERSION__: JSON.stringify(buildVersions.version),
+			__APP_SERVICE_WORKER_VERSION__: JSON.stringify(
+				buildVersions.serviceWorkerVersion,
+			),
 		},
 		plugins,
 		resolve: {
