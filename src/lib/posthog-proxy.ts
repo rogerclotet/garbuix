@@ -1,6 +1,12 @@
 export const POSTHOG_PROXY_PATH = "/ph";
 
-const POSTHOG_STATIC_PATH_PREFIX = `${POSTHOG_PROXY_PATH}/static/`;
+// PostHog serves JS SDK assets and remote config (recording conditions,
+// feature flags, sampling) from the assets origin. Match the official proxy
+// guidance: route /static/ and /array/ there; everything else to the API host.
+const POSTHOG_ASSETS_PATH_PREFIXES = [
+	`${POSTHOG_PROXY_PATH}/static/`,
+	`${POSTHOG_PROXY_PATH}/array/`,
+] as const;
 const HOP_BY_HOP_HEADERS = new Set([
 	"connection",
 	"keep-alive",
@@ -63,11 +69,17 @@ export function getPostHogProxyResponseHeaders(responseHeaders: Headers) {
 function getUpstreamBaseUrl(pathname: string, posthogHost: string) {
 	const upstreamUrl = new URL(posthogHost);
 
-	if (pathname.startsWith(POSTHOG_STATIC_PATH_PREFIX)) {
+	if (shouldUsePostHogAssetsHost(pathname)) {
 		return getPostHogAssetsUrl(upstreamUrl);
 	}
 
 	return upstreamUrl;
+}
+
+function shouldUsePostHogAssetsHost(pathname: string) {
+	return POSTHOG_ASSETS_PATH_PREFIXES.some((prefix) =>
+		pathname.startsWith(prefix),
+	);
 }
 
 function getPostHogAssetsUrl(upstreamUrl: URL) {

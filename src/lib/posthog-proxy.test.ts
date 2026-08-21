@@ -26,6 +26,17 @@ describe("posthog-proxy", () => {
 		);
 	});
 
+	it("routes remote config under /array/ to the PostHog assets host", () => {
+		const targetUrl = getPostHogProxyTarget(
+			"https://garbuix.cat/ph/array/phc_token/config?ip=1",
+			"https://eu.i.posthog.com",
+		);
+
+		expect(targetUrl.toString()).toBe(
+			"https://eu-assets.i.posthog.com/array/phc_token/config?ip=1",
+		);
+	});
+
 	it("preserves a custom base path for self-hosted PostHog", () => {
 		const targetUrl = getPostHogProxyTarget(
 			"https://garbuix.cat/ph/e/",
