@@ -1,0 +1,26 @@
+import { Loader2Icon } from "lucide-react";
+
+// Shared by the route while the puzzle is still in flight and by the board
+// until an anonymous player's stored progress has been read, which the server
+// cannot do. Rendering the same markup in both places keeps the spinner from
+// restarting or shifting as one hands over to the other.
+export function DailyLoadingPage() {
+	return (
+		<div className="relative overflow-hidden">
+			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />
+			<div className="mx-auto flex min-h-[calc(100svh-6rem)] max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+				<div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary shadow-sm">
+					<Loader2Icon className="size-8 animate-spin" />
+				</div>
+				<div className="space-y-2">
+					<h2 className="text-2xl font-semibold tracking-tight">
+						Carregant el repte d'avui
+					</h2>
+					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
+						Estem preparant les lletres i les paraules del trencaclosques.
+					</p>
+				</div>
+			</div>
+		</div>
+	);
+}

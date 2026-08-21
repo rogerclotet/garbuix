@@ -31,9 +31,11 @@ import {
 	syncUserPuzzleEvents,
 } from "@/lib/puzzle-server-fns";
 import type {
+	DailyPuzzlePublic,
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 import { useObservability } from "@/lib/use-observability";
 import { buildHistoryEntry } from "./daily-helpers";
 import type { DailyData, DailySessionUser } from "./daily-types";
@@ -69,6 +71,57 @@ function isLikelyOfflineOrNetworkError(error: unknown) {
 	);
 }
 
+// Reads everything this device already knows about the puzzle. localStorage is
+// synchronous, so the caller can apply the result before the first paint
+// instead of loading it behind a spinner. Returns the server's progress
+// untouched when there is nothing stored (and during SSR, where the reads
+// below resolve to null).
+function readLocalProgressState(options: {
+	activeUserId: string | null;
+	emptyProgress: PuzzleProgressState;
+	puzzle: DailyPuzzlePublic;
+	serverProgress: PuzzleProgressState | null;
+}) {
+	const { activeUserId, emptyProgress, puzzle, serverProgress } = options;
+	const compatibleServerProgress =
+		getCompatibleProgress(serverProgress, puzzle) ?? null;
+
+	if (!activeUserId) {
+		return {
+			baseProgress:
+				getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
+				compatibleServerProgress ??
+				emptyProgress,
+			queuedEvents: [] as PuzzleClientEvent[],
+		};
+	}
+
+	const cached = getAccountPuzzleCache(activeUserId, puzzle.dateKey);
+	if (cached?.puzzleId !== puzzle.id) {
+		return {
+			baseProgress: compatibleServerProgress ?? emptyProgress,
+			queuedEvents: [] as PuzzleClientEvent[],
+		};
+	}
+
+	const cachedQueuedEvents = cached.queuedEvents ?? [];
+	const cachedBaseProgress =
+		getCompatibleProgress(cached.baseProgress, puzzle) ?? null;
+
+	return {
+		// With events still queued the cached base is the one they were recorded
+		// against, so it wins whenever it is the more advanced of the two.
+		baseProgress:
+			cachedQueuedEvents.length > 0
+				? (pickPreferredProgressState(
+						compatibleServerProgress,
+						cachedBaseProgress,
+					) ?? emptyProgress)
+				: (compatibleServerProgress ?? cachedBaseProgress ?? emptyProgress),
+		queuedEvents: cachedQueuedEvents,
+	};
+}
+
 type UseDailyProgressOptions = {
 	activeUser: DailySessionUser;
 	deviceId: string;
@@ -95,10 +148,14 @@ export function useDailyProgress({
 	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(
 		() => getCompatibleProgress(initialData.progress, puzzle) ?? emptyProgress,
 	);
-	const [isProgressReady, setIsProgressReady] = useState(
-		() => activeUser != null || initialData.progress != null,
-	);
 	const [queuedEvents, setQueuedEvents] = useState<PuzzleClientEvent[]>([]);
+	// Flipped once this device's stored progress has been read, which only
+	// happens in the browser: during SSR there is no localStorage to read.
+	const [hasLoadedLocalState, setHasLoadedLocalState] = useState(false);
+	// The server only knows a signed-in player's progress, so an anonymous
+	// player has nothing to render until the local read below lands.
+	const isProgressReady =
+		hasLoadedLocalState || activeUser != null || initialData.progress != null;
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
@@ -166,120 +223,89 @@ export function useDailyProgress({
 		}
 	}, [fetchLatestProgress]);
 
+	// Applying the stored progress from a layout effect keeps it in the same
+	// frame as the first paint, so the player lands straight on their board
+	// instead of watching a loading state that only exists because the read was
+	// deferred. Anything the server may know better is reconciled right after,
+	// in the background, by the effect below.
+	useIsomorphicLayoutEffect(() => {
+		const localState = readLocalProgressState({
+			activeUserId,
+			emptyProgress,
+			puzzle,
+			serverProgress: initialData.progress,
+		});
+
+		setBaseProgress((current) =>
+			isSameProgressState(current, localState.baseProgress)
+				? current
+				: localState.baseProgress,
+		);
+		setQueuedEvents((current) =>
+			current.length === 0 && localState.queuedEvents.length === 0
+				? current
+				: localState.queuedEvents,
+		);
+		setHasLoadedLocalState(true);
+	}, [activeUserId, emptyProgress, initialData.progress, puzzle]);
+
+	// Reconciles the optimistically applied local state with the account's
+	// server-side progress, which another device may have moved on since.
 	useEffect(() => {
+		if (!activeUserId) {
+			return;
+		}
+
 		let cancelled = false;
 
-		const loadProgress = async () => {
-			if (activeUserId) {
-				if (!cancelled) {
-					setIsProgressReady(true);
-				}
+		const syncWithServer = async () => {
+			if (!cancelled) {
+				await refreshProgressFromServer();
+			}
 
-				const cached = getAccountPuzzleCache(activeUserId, puzzle.dateKey);
-				if (cached?.puzzleId === puzzle.id) {
-					const cachedQueuedEvents = cached.queuedEvents ?? [];
-					const cachedBaseProgress =
-						getCompatibleProgress(cached.baseProgress, puzzle) ?? null;
-					const serverBaseProgress =
-						getCompatibleProgress(initialData.progress, puzzle) ?? null;
-					const preferredCachedBase =
-						cachedQueuedEvents.length > 0
-							? (pickPreferredProgressState(
-									serverBaseProgress,
-									cachedBaseProgress,
-								) ?? emptyProgress)
-							: (serverBaseProgress ?? cachedBaseProgress ?? emptyProgress);
+			if (
+				!hasImportedAnonymousData(activeUserId) &&
+				importAttemptedRef.current !== activeUserId
+			) {
+				importAttemptedRef.current = activeUserId;
+				const payload = buildAnonymousImportPayload();
+				const hasLocalProgress =
+					payload.historyEntries.length > 0 ||
+					Object.keys(payload.activeProgressByDate).length > 0;
 
-					if (!cancelled) {
-						setBaseProgress((current) =>
-							isSameProgressState(current, preferredCachedBase)
-								? current
-								: preferredCachedBase,
-						);
-						setQueuedEvents((current) =>
-							current === cachedQueuedEvents ? current : cachedQueuedEvents,
-						);
-					}
-				} else if (!cancelled) {
-					const nextBaseProgress =
-						getCompatibleProgress(initialData.progress, puzzle) ??
-						emptyProgress;
-					setBaseProgress((current) =>
-						isSameProgressState(current, nextBaseProgress)
-							? current
-							: nextBaseProgress,
-					);
-					setQueuedEvents((current) => (current.length === 0 ? current : []));
-				}
-
-				if (!cancelled) {
-					await refreshProgressFromServer();
-				}
-
-				if (
-					!hasImportedAnonymousData(activeUserId) &&
-					importAttemptedRef.current !== activeUserId
-				) {
-					importAttemptedRef.current = activeUserId;
-					const payload = buildAnonymousImportPayload();
-					const hasLocalProgress =
-						payload.historyEntries.length > 0 ||
-						Object.keys(payload.activeProgressByDate).length > 0;
-
-					try {
-						const result = await importProgress({
-							data: {
-								deviceId,
-								payload,
-							},
+				try {
+					const result = await importProgress({
+						data: {
+							deviceId,
+							payload,
+						},
+					});
+					markAnonymousDataImported(activeUserId);
+					if (hasLocalProgress) {
+						captureEvent("anonymous_progress_imported", {
+							active_progress_count: Object.keys(payload.activeProgressByDate)
+								.length,
+							imported_dates: result.importedDates.length,
+							legacy_dates: result.skippedLegacyDates.length,
 						});
-						markAnonymousDataImported(activeUserId);
-						if (hasLocalProgress) {
-							captureEvent("anonymous_progress_imported", {
-								active_progress_count: Object.keys(payload.activeProgressByDate)
-									.length,
-								imported_dates: result.importedDates.length,
-								legacy_dates: result.skippedLegacyDates.length,
-							});
-							if (!cancelled) {
-								await refreshProgressFromServer();
-							}
-							toast.success("S'han sincronitzat els resultats locals");
+						if (!cancelled) {
+							await refreshProgressFromServer();
 						}
-					} catch (error) {
-						console.error("Failed to import anonymous progress", error);
-						if (!isLikelyOfflineOrNetworkError(error)) {
-							captureException(error, {
-								puzzle_date: puzzle.dateKey,
-								scope: "anonymous_progress_import",
-							});
-						}
+						toast.success("S'han sincronitzat els resultats locals");
+					}
+				} catch (error) {
+					console.error("Failed to import anonymous progress", error);
+					if (!isLikelyOfflineOrNetworkError(error)) {
+						captureException(error, {
+							puzzle_date: puzzle.dateKey,
+							scope: "anonymous_progress_import",
+						});
 					}
 				}
-
-				return;
-			}
-
-			if (!cancelled) {
-				setIsProgressReady(false);
-			}
-
-			if (!cancelled) {
-				setQueuedEvents((current) => (current.length === 0 ? current : []));
-				const nextBaseProgress =
-					getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
-					getCompatibleProgress(initialData.progress, puzzle) ??
-					emptyProgress;
-				setBaseProgress((current) =>
-					isSameProgressState(current, nextBaseProgress)
-						? current
-						: nextBaseProgress,
-				);
-				setIsProgressReady(true);
 			}
 		};
 
-		void loadProgress();
+		void syncWithServer();
 
 		return () => {
 			cancelled = true;
@@ -289,9 +315,7 @@ export function useDailyProgress({
 		captureEvent,
 		captureException,
 		deviceId,
-		emptyProgress,
 		importProgress,
-		initialData.progress,
 		puzzle,
 		refreshProgressFromServer,
 	]);
@@ -352,6 +376,12 @@ export function useDailyProgress({
 	}, [activeUserId, isOnline, refreshProgressFromServer]);
 
 	useEffect(() => {
+		// Writing before the local read would overwrite the stored progress with
+		// the placeholder the first render started from.
+		if (!hasLoadedLocalState) {
+			return;
+		}
+
 		if (activeUserId) {
 			saveAccountPuzzleCache(activeUserId, puzzle.dateKey, {
 				puzzleId: puzzle.id,
@@ -363,7 +393,14 @@ export function useDailyProgress({
 
 		saveAnonymousProgress(puzzle.dateKey, derivedProgress);
 		saveAnonymousHistoryEntry(buildHistoryEntry(puzzle, derivedProgress));
-	}, [activeUserId, baseProgress, derivedProgress, puzzle, queuedEvents]);
+	}, [
+		activeUserId,
+		baseProgress,
+		derivedProgress,
+		hasLoadedLocalState,
+		puzzle,
+		queuedEvents,
+	]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;

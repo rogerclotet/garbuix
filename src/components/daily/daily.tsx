@@ -66,6 +66,7 @@ import {
 	getWordTone,
 	REDESIGN_FLAG,
 } from "./daily-helpers";
+import { DailyLoadingPage } from "./daily-loading";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { DailyWordRail } from "./daily-word-rail";
@@ -1454,8 +1455,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return <DailyRolloverLoadingState />;
 	}
 
+	// Rendered during SSR, and for the one pre-paint commit that hydrates it: the
+	// browser reads its stored progress in a layout effect, so what it actually
+	// paints is the board.
 	if (!isProgressReady) {
-		return <DailyProgressLoadingState />;
+		return <DailyLoadingPage />;
 	}
 
 	const completionSummary = (
@@ -1832,34 +1836,6 @@ function DailyRolloverLoadingState() {
 					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
 						Ha començat un nou dia. Preparant el trencaclosques d'avui.
 					</p>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-function DailyProgressLoadingState() {
-	return (
-		<div className="min-h-full px-3 pt-4 pb-[calc(21rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-6 sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:px-8 lg:pt-8 lg:pb-24">
-			<div className="mx-auto max-w-5xl">
-				<div className="flex min-h-[calc(100svh-14rem)] items-center justify-center">
-					<div className="flex max-w-sm flex-col items-center gap-4 rounded-3xl border border-border/70 bg-background/90 px-6 py-8 text-center shadow-sm backdrop-blur-sm">
-						<div className="rounded-full border border-primary/20 bg-primary/10 p-3 text-primary">
-							<Loader2Icon className="size-6 animate-spin" />
-						</div>
-						<div className="space-y-1.5">
-							<p className="text-sm font-semibold tracking-[0.16em] text-primary/70 uppercase font-ui">
-								Carregant
-							</p>
-							<h2 className="text-lg font-semibold tracking-tight">
-								Recuperant el teu progrés
-							</h2>
-							<p className="text-sm text-muted-foreground">
-								Estem restaurant les paraules trobades i les pistes
-								d&apos;aquesta partida.
-							</p>
-						</div>
-					</div>
 				</div>
 			</div>
 		</div>
