@@ -175,30 +175,36 @@ export function isVibrationEnabled(): boolean {
 	return !deviceWantsReducedMotion();
 }
 
-export type LetterLayout = "circle" | "grid";
+export type LetterLayout = "circle" | "grid" | "line";
 
-// Circle is the default letter layout; we only persist an explicit "grid"
-// opt-out so the absence of a stored value cleanly means "use the new default".
-export function getLetterLayout(): LetterLayout {
-	if (typeof window === "undefined") return "circle";
+const VALID_LETTER_LAYOUTS: readonly LetterLayout[] = [
+	"circle",
+	"grid",
+	"line",
+];
+
+// No stored preference means "use the caller's default": the classic board
+// defaults to circle, the redesigned board defaults to line, so the fallback
+// is left to the call site instead of hardcoded here.
+export function getLetterLayout(
+	defaultLayout: LetterLayout = "circle",
+): LetterLayout {
+	if (typeof window === "undefined") return defaultLayout;
 	try {
-		if (window.localStorage.getItem(LETTER_LAYOUT_KEY) === "grid") {
-			return "grid";
+		const stored = window.localStorage.getItem(LETTER_LAYOUT_KEY);
+		if (stored && (VALID_LETTER_LAYOUTS as string[]).includes(stored)) {
+			return stored as LetterLayout;
 		}
 	} catch {
 		// Storage may be unavailable (private mode); fall back to the default.
 	}
-	return "circle";
+	return defaultLayout;
 }
 
 export function setLetterLayout(layout: LetterLayout): void {
 	if (typeof window === "undefined") return;
 	try {
-		if (layout === "grid") {
-			window.localStorage.setItem(LETTER_LAYOUT_KEY, "grid");
-		} else {
-			window.localStorage.removeItem(LETTER_LAYOUT_KEY);
-		}
+		window.localStorage.setItem(LETTER_LAYOUT_KEY, layout);
 	} catch {
 		// Best-effort persistence; ignore storage failures.
 	}
