@@ -107,7 +107,6 @@ vi.mock("./use-daily-progress", () => ({
 			completedAt: null,
 			lastSyncedAt: null,
 		},
-		isProgressReady: true,
 	})),
 }));
 

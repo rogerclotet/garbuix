@@ -1,4 +1,4 @@
-import { Await, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Daily } from "@/components/daily/daily";
 import { DailyLoadingPage } from "@/components/daily/daily-loading";
@@ -9,26 +9,27 @@ import {
 } from "@/lib/puzzle-server-fns";
 
 export const Route = createFileRoute("/")({
-	// Return the promise without awaiting so TanStack Router treats it as
-	// deferred data. During SSR the server streams the loading shell
-	// immediately instead of blocking until the data resolves.
-	loader: () => ({ data: getDailyPuzzlePageData() }),
+	// Awaited, so the board is part of the server-rendered document and the
+	// browser paints the puzzle itself instead of a loading screen it has to
+	// swap out once React hydrates. Deferring it used to save the wait on a
+	// missing puzzle, but the handler already returns a "generating" status
+	// without blocking on generation, so this only costs the puzzle read.
+	loader: () => getDailyPuzzlePageData(),
+	// Only reached when the read is slow enough for the router's pending delay
+	// to elapse; a normal navigation stays on the current page until the board
+	// is ready to render.
+	pendingComponent: DailyLoadingPage,
 	component: IndexPage,
 });
 
 function IndexPage() {
-	const { data } = Route.useLoaderData();
+	const data = Route.useLoaderData();
 
-	return (
-		<Await promise={data} fallback={<DailyLoadingPage />}>
-			{(resolvedData) => {
-				if (resolvedData.status === "generating") {
-					return <PuzzleGeneratingPage />;
-				}
-				return <Daily initialData={resolvedData} />;
-			}}
-		</Await>
-	);
+	if (data.status === "generating") {
+		return <PuzzleGeneratingPage />;
+	}
+
+	return <Daily initialData={data} />;
 }
 
 function PuzzleGeneratingPage() {

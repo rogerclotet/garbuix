@@ -1,9 +1,9 @@
 import { Loader2Icon } from "lucide-react";
 
-// Shared by the route while the puzzle is still in flight and by the board
-// until an anonymous player's stored progress has been read, which the server
-// cannot do. Rendering the same markup in both places keeps the spinner from
-// restarting or shifting as one hands over to the other.
+// Shown while today's puzzle is still being generated, and as the route's
+// pending state when the puzzle read is slow enough to outlast the router's
+// pending delay. An ordinary load renders the board itself, server-side, and
+// never passes through here.
 export function DailyLoadingPage() {
 	return (
 		<div className="relative overflow-hidden">

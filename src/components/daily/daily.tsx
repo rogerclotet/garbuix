@@ -66,7 +66,6 @@ import {
 	getWordTone,
 	REDESIGN_FLAG,
 } from "./daily-helpers";
-import { DailyLoadingPage } from "./daily-loading";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { DailyWordRail } from "./daily-word-rail";
@@ -237,12 +236,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// Lets the header's share button reach the latest handler without making the
 	// published summary churn on every render.
 	const handleShareRef = useRef<() => Promise<void>>(async () => {});
-	const { applyLocalEvent, derivedProgress, isProgressReady } =
-		useDailyProgress({
-			activeUser,
-			deviceId,
-			initialData,
-		});
+	const { applyLocalEvent, derivedProgress } = useDailyProgress({
+		activeUser,
+		deviceId,
+		initialData,
+	});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -1453,13 +1451,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 	if (isRollingOver) {
 		return <DailyRolloverLoadingState />;
-	}
-
-	// Rendered during SSR, and for the one pre-paint commit that hydrates it: the
-	// browser reads its stored progress in a layout effect, so what it actually
-	// paints is the board.
-	if (!isProgressReady) {
-		return <DailyLoadingPage />;
 	}
 
 	const completionSummary = (
