@@ -1,9 +1,12 @@
 import { PostHogProvider } from "@posthog/react";
 import { getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { PostHogConfig } from "posthog-js";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Metric } from "web-vitals";
-import { isObservabilityEnabled } from "@/lib/observability-shared";
+import {
+	buildUserProperties,
+	isObservabilityEnabled,
+} from "@/lib/observability-shared";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
@@ -24,6 +27,13 @@ type BeforeInstallPromptEvent = Event & {
 
 type NavigatorWithStandalone = Navigator & {
 	standalone?: boolean;
+};
+
+type IdentifiedUserSnapshot = {
+	id: string;
+	name: string;
+	email: string;
+	image?: string | null;
 };
 
 function getDisplayMode() {
@@ -54,9 +64,36 @@ function getDisplayMode() {
 	return "browser";
 }
 
+function toIdentifiedUserSnapshot(
+	user: NonNullable<ReturnType<typeof useActiveSessionUser>["activeUser"]>,
+): IdentifiedUserSnapshot {
+	return {
+		id: user.id,
+		name: user.name,
+		email: user.email,
+		image: user.image,
+	};
+}
+
+function isSameIdentifiedUser(
+	left: IdentifiedUserSnapshot | null,
+	right: IdentifiedUserSnapshot,
+) {
+	return (
+		left?.id === right.id &&
+		left.name === right.name &&
+		left.email === right.email &&
+		left.image === right.image
+	);
+}
+
 export function ObservabilityProvider({ children }: { children: ReactNode }) {
 	const rootData = rootRoute.useLoaderData();
 	const config = rootData.observability;
+	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
+	const activeUserRef = useRef(activeUser);
+	activeUserRef.current = activeUser;
+	const [isClientReady, setIsClientReady] = useState(false);
 
 	const options = useMemo<PostHogOptions | null>(() => {
 		if (!isObservabilityEnabled(config)) {
@@ -80,6 +117,15 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 			defaults: "2026-01-30",
 			person_profiles: "identified_only",
 			ui_host: config.posthogUIHost,
+			loaded(posthog) {
+				const user = activeUserRef.current;
+				if (user) {
+					const properties = buildUserProperties(user);
+					posthog.identify(user.id, properties);
+					posthog.setPersonPropertiesForFlags(properties);
+				}
+				setIsClientReady(true);
+			},
 		};
 	}, [config]);
 
@@ -89,24 +135,26 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 
 	return (
 		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
-			<ObservabilityRuntime />
+			<ObservabilityRuntime
+				activeUser={activeUser}
+				isClientReady={isClientReady}
+			/>
 			{children}
 		</PostHogProvider>
 	);
 }
 
-function ObservabilityRuntime() {
-	const rootData = rootRoute.useLoaderData();
+function ObservabilityRuntime({
+	activeUser,
+	isClientReady,
+}: {
+	activeUser: ReturnType<typeof useActiveSessionUser>["activeUser"];
+	isClientReady: boolean;
+}) {
 	const location = useRouterState({
 		select: (state) => state.location,
 	});
-	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
-	const lastIdentifiedUserRef = useRef<{
-		id: string;
-		name: string;
-		email: string;
-		image?: string | null;
-	} | null>(null);
+	const lastIdentifiedUserRef = useRef<IdentifiedUserSnapshot | null>(null);
 	const { captureEvent, identifyUser, resetUser, toWebVitalProperties } =
 		useObservability();
 
@@ -144,22 +192,16 @@ function ObservabilityRuntime() {
 	}, [captureEvent]);
 
 	useEffect(() => {
+		if (!isClientReady) {
+			return;
+		}
+
 		if (activeUser) {
-			const last = lastIdentifiedUserRef.current;
-			if (
-				last?.id === activeUser.id &&
-				last.name === activeUser.name &&
-				last.email === activeUser.email &&
-				last.image === activeUser.image
-			) {
+			const snapshot = toIdentifiedUserSnapshot(activeUser);
+			if (isSameIdentifiedUser(lastIdentifiedUserRef.current, snapshot)) {
 				return;
 			}
-			lastIdentifiedUserRef.current = {
-				id: activeUser.id,
-				name: activeUser.name,
-				email: activeUser.email,
-				image: activeUser.image,
-			};
+			lastIdentifiedUserRef.current = snapshot;
 			identifyUser(activeUser);
 			return;
 		}
@@ -168,7 +210,7 @@ function ObservabilityRuntime() {
 			lastIdentifiedUserRef.current = null;
 			resetUser();
 		}
-	}, [activeUser, identifyUser, resetUser]);
+	}, [activeUser, identifyUser, isClientReady, resetUser]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
