@@ -1371,6 +1371,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		setDailyHeaderSummary({
 			found: derivedProgress.guessedWordIds.length,
 			total: totalWords,
+			guessCount: derivedProgress.guessCount,
 			bonusInCycle: derivedProgress.bonusWordsFound % WORDS_PER_BONUS_CLUE,
 			bonusTarget: WORDS_PER_BONUS_CLUE,
 			showBonus: bonusCluesEnabled,
@@ -1380,6 +1381,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	}, [
 		bonusCluesEnabled,
 		derivedProgress.bonusWordsFound,
+		derivedProgress.guessCount,
 		derivedProgress.guessedWordIds.length,
 		justEarnedBonus,
 		openShare,
