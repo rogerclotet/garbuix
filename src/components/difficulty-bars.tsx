@@ -22,7 +22,10 @@ const BAR_POSITIONS = Array.from(
 
 type DifficultyBarsProps = {
 	difficulty: PuzzleDifficulty | null | undefined;
-	showLabel?: boolean;
+	// What the label beside the bars reads: nothing, the bare level ("Baixa")
+	// where the surrounding copy already says what it measures, or the full
+	// phrase ("Dificultat baixa") where the bars stand on their own.
+	label?: "none" | "level" | "phrase";
 	className?: string;
 };
 
@@ -63,7 +66,7 @@ function DifficultyTooltipContent({
 // or puzzles not yet backfilled) so callers can drop it in without guarding.
 export function DifficultyBars({
 	difficulty,
-	showLabel = false,
+	label = "none",
 	className,
 }: DifficultyBarsProps) {
 	const [open, setOpen] = useState(false);
@@ -73,8 +76,9 @@ export function DifficultyBars({
 		return null;
 	}
 
-	const label = PUZZLE_DIFFICULTY_LABELS[difficulty];
 	const phrase = formatDifficultyPhrase(difficulty);
+	const labelText =
+		label === "phrase" ? phrase : PUZZLE_DIFFICULTY_LABELS[difficulty];
 
 	return (
 		<Tooltip
@@ -117,9 +121,9 @@ export function DifficultyBars({
 							/>
 						))}
 					</span>
-					{showLabel ? (
-						<span className="text-xs font-medium">{label}</span>
-					) : null}
+					{label === "none" ? null : (
+						<span className="text-xs font-medium">{labelText}</span>
+					)}
 				</button>
 			</TooltipTrigger>
 			<TooltipContent

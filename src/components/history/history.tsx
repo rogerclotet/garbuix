@@ -313,7 +313,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 														{entry.difficulty ? (
 															<DifficultyBars
 																difficulty={entry.difficulty}
-																showLabel
+																label="level"
 															/>
 														) : null}
 														<span className="text-sm text-muted-foreground font-ui">
@@ -369,7 +369,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 									{initialData.yesterdayPuzzle.difficulty ? (
 										<DifficultyBars
 											difficulty={initialData.yesterdayPuzzle.difficulty}
-											showLabel
+											label="level"
 										/>
 									) : null}
 								</div>

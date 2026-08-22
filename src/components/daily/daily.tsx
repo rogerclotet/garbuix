@@ -1,4 +1,5 @@
 import { Loader2Icon, Share2 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { openProfilePreferencesTip } from "@/components/profile-preferences-tip-store";
@@ -42,7 +43,6 @@ import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
-import { setDailyDifficulty } from "./daily-difficulty-store";
 import {
 	buildFlyingLetterPaths,
 	DailyFlyingLetters,
@@ -94,6 +94,10 @@ const CLUE_GRID_HIGHLIGHT_MS = 5000;
 const CLUE_GRID_FADE_MS = 600;
 // Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
 const LOCATE_FLASH_MS = 1300;
+// Room the classic keypad claims until it has reported its real height: roughly
+// the circle arrangement, which is what the server renders. Only the first
+// paint uses it, and only the board's size depends on it.
+const CLASSIC_KEYPAD_FALLBACK_HEIGHT = "17rem";
 // Number of valid off-puzzle words the player must find to earn a free letter reveal.
 function getSubmitFeedbackDuration() {
 	if (
@@ -209,6 +213,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
+	// Height of the keypad pinned to the bottom of the classic board. Measured
+	// rather than assumed: which arrangement the letters use is a preference, and
+	// each one is a different height.
+	const [keypadHeight, setKeypadHeight] = useState<number | null>(null);
 	const lastPointerPressAtRef = useRef(0);
 	const highlightResetTimerRef = useRef<number | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -382,13 +390,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const handleWelcomeContinueAnonymous = useCallback(() => {
 		captureEvent("welcome_dismissed", { choice: "anonymous" });
 	}, [captureEvent]);
-
-	// Publish today's difficulty to the shared header (rendered above this route),
-	// and clear it when leaving the daily puzzle so other pages don't show it.
-	useEffect(() => {
-		setDailyDifficulty(puzzle.difficulty ?? null);
-		return () => setDailyDifficulty(null);
-	}, [puzzle.difficulty]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
@@ -1457,6 +1458,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return <DailyRolloverLoadingState />;
 	}
 
+	const keypadHeightCss =
+		keypadHeight == null ? CLASSIC_KEYPAD_FALLBACK_HEIGHT : `${keypadHeight}px`;
+
 	const completionSummary = (
 		<div className="space-y-1">
 			<p className="text-sm font-medium text-muted-foreground font-ui">
@@ -1590,38 +1594,44 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				</div>
 			) : (
 				<div
-					className={`min-h-full px-3 sm:px-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 ${
-						displayComplete
-							? "pb-6 sm:pb-8 lg:pb-8"
-							: "pb-[calc(21rem+env(safe-area-inset-bottom))] sm:pb-[calc(21rem+env(safe-area-inset-bottom))] lg:pb-8"
-					}`}
+					// h-full, not min-h-full: the word list below the fold overflows this
+					// box on purpose, so the board above it can be sized against the room
+					// the viewport really has.
+					className="h-full px-3 sm:px-4 lg:flex lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 lg:pb-8"
+					style={{ "--daily-keypad-h": keypadHeightCss } as CSSProperties}
 				>
-					<div className="mx-auto flex w-full max-w-5xl flex-col lg:min-h-0 lg:flex-1">
-						<div
-							className={`mb-4 shrink-0 sm:mb-6 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
-						>
-							{displayComplete
-								? completionSummary
-								: (() => {
-										const percent = Math.min(
-											100,
-											Math.max(
-												0,
-												(derivedProgress.guessedWordIds.length / totalWords) *
-													100,
-											),
-										);
-										// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
-										// clue and resets each time one is earned; the label keeps the total.
-										const bonusCount = derivedProgress.bonusWordsFound;
-										const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
-										const bonusPercent =
-											(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
-										const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
-										const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
-										return (
-											<div className="flex items-center gap-1.5">
-												<div className="flex flex-1 flex-col gap-1">
+					<div className="mx-auto h-full w-full max-w-5xl lg:grid lg:h-auto lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 xl:grid-cols-[1fr_20rem]">
+						{/* Above the fold: the meters and the board split the room left
+						    between the header and the keypad pinned to the bottom, so the
+						    board never pushes the word list around and never spills past
+						    the keypad. On a desktop this dissolves into the two-column
+						    grid, where the keypad sits in the flow of the right column. */}
+						<div className="flex h-[calc(100%_-_var(--daily-keypad-h))] flex-col lg:contents">
+							<div
+								className={`mb-4 shrink-0 sm:mb-6 lg:col-span-2 lg:row-start-1 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+							>
+								{displayComplete
+									? completionSummary
+									: (() => {
+											const percent = Math.min(
+												100,
+												Math.max(
+													0,
+													(derivedProgress.guessedWordIds.length / totalWords) *
+														100,
+												),
+											);
+											// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+											// clue and resets each time one is earned; the label keeps the total.
+											const bonusCount = derivedProgress.bonusWordsFound;
+											const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+											const bonusPercent =
+												(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+											const wordsToNextClue =
+												WORDS_PER_BONUS_CLUE - bonusInCycle;
+											const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
+											return (
+												<div className="flex flex-col gap-1">
 													<div
 														className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
 														role="progressbar"
@@ -1688,29 +1698,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 														</div>
 													) : null}
 												</div>
-												<Button
-													variant="ghost"
-													size="icon"
-													className="size-8 shrink-0 rounded-full border border-border/50 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
-													onClick={() => {
-														if (getSkipSharePreview()) {
-															void handleShare();
-														} else {
-															setSharePreviewOpen(true);
-														}
-													}}
-													aria-label="Compartir progrés"
-												>
-													<Share2 className="size-3.5" />
-												</Button>
-											</div>
-										);
-									})()}
-						</div>
+											);
+										})()}
+							</div>
 
-						<div className="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:grid-cols-[1fr_20rem]">
-							<div ref={gridRef} className="lg:pb-8 lg:self-start">
+							<div
+								ref={gridRef}
+								className="flex min-h-0 flex-1 flex-col pb-2 lg:col-start-1 lg:row-start-2 lg:pb-8"
+							>
 								<DailyGrid
+									fitHeight
 									puzzle={puzzle}
 									revealedCells={revealedCells}
 									cellLetters={cellLetters}
@@ -1724,54 +1721,61 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 									locateCells={locateCells}
 								/>
 							</div>
+						</div>
 
-							<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
-								<DailyControls
-									aiClueMode
-									layout={classicLetterLayout}
-									canUseHint={canUseSelfHint}
-									currentGuess={currentGuess}
-									hintsUsed={derivedProgress.hintsUsed}
-									isComplete={displayComplete}
-									shuffledLetters={derivedProgress.shuffledLetters}
-									onBackspace={handleBackspace}
-									onHint={handleHint}
-									onLetterClick={handleLetterClick}
-									onShuffle={handleShuffle}
-									onSubmitGuess={() => {
-										void handleGuess();
-									}}
-									submitFeedback={submitFeedback}
-									runClickAction={runClickAction}
-									runPressAction={runPressAction}
+						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
+							<DailyControls
+								aiClueMode
+								layout={classicLetterLayout}
+								canUseHint={canUseSelfHint}
+								currentGuess={currentGuess}
+								hintsUsed={derivedProgress.hintsUsed}
+								isComplete={displayComplete}
+								onHeightChange={setKeypadHeight}
+								shuffledLetters={derivedProgress.shuffledLetters}
+								onBackspace={handleBackspace}
+								onHint={handleHint}
+								onLetterClick={handleLetterClick}
+								onShuffle={handleShuffle}
+								onSubmitGuess={() => {
+									void handleGuess();
+								}}
+								submitFeedback={submitFeedback}
+								runClickAction={runClickAction}
+								runPressAction={runPressAction}
+							/>
+
+							{/* The keypad floats over the bottom of the page, so the last
+							    rows need room to clear it. */}
+							<div
+								id={WORD_LIST_SECTION_ID}
+								className={`scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:pb-0 ${
+									displayComplete
+										? "pb-6"
+										: "pb-[calc(var(--daily-keypad-h)_+_1rem)]"
+								}`}
+							>
+								<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
+									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
+									)
+								</h3>
+								<DailyWordList
+									puzzle={puzzle}
+									guessedWordIds={derivedProgress.guessedWordIds}
+									revealedAnswers={revealedAnswers}
+									cellLetters={cellLetters}
+									clueTextsByWordId={clueTextsByWordId}
+									clueWordIds={derivedProgress.clueWordIds}
+									foundClueTextsByWordId={foundClueTextsByWordId}
+									onWordTap={handleLocateWord}
+									canRequestHelp={canRequestHelp}
+									requestedHelpWordIds={requestedHelpWordIds}
+									peerCluesByWordId={receivedClues}
+									onRequestHelp={handleRequestHelp}
+									incomingRequests={incomingRequests}
+									helpGivenRecords={helpGivenRecords}
+									onRespondToClue={respondToClue}
 								/>
-
-								<div
-									id={WORD_LIST_SECTION_ID}
-									className="scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
-								>
-									<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
-										Paraules ({derivedProgress.guessedWordIds.length}/
-										{totalWords})
-									</h3>
-									<DailyWordList
-										puzzle={puzzle}
-										guessedWordIds={derivedProgress.guessedWordIds}
-										revealedAnswers={revealedAnswers}
-										cellLetters={cellLetters}
-										clueTextsByWordId={clueTextsByWordId}
-										clueWordIds={derivedProgress.clueWordIds}
-										foundClueTextsByWordId={foundClueTextsByWordId}
-										onWordTap={handleLocateWord}
-										canRequestHelp={canRequestHelp}
-										requestedHelpWordIds={requestedHelpWordIds}
-										peerCluesByWordId={receivedClues}
-										onRequestHelp={handleRequestHelp}
-										incomingRequests={incomingRequests}
-										helpGivenRecords={helpGivenRecords}
-										onRespondToClue={respondToClue}
-									/>
-								</div>
 							</div>
 						</div>
 					</div>

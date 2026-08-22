@@ -103,26 +103,7 @@ export function UserMenu() {
 					className="size-11 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
 					aria-label={triggerLabel}
 				>
-					{activeUser ? (
-						<Avatar className="size-10 border border-border sm:size-9">
-							{showUserImage ? (
-								<AvatarImage
-									src={activeUser.image ?? undefined}
-									alt={activeUser.name}
-									referrerPolicy="no-referrer"
-									onError={() => {
-										setFailedImageSrc(imageSrc);
-									}}
-								/>
-							) : (
-								<AvatarFallback className="bg-muted text-muted-foreground text-xs">
-									{avatarInitials || <Menu className="size-5 sm:size-4" />}
-								</AvatarFallback>
-							)}
-						</Avatar>
-					) : (
-						<Menu className="size-5 sm:size-4" />
-					)}
+					<Menu className="size-5 sm:size-4" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
@@ -131,9 +112,31 @@ export function UserMenu() {
 			>
 				{activeUser ? (
 					<>
-						<DropdownMenuLabel className="flex flex-col gap-0.5">
-							<span className="text-foreground text-sm">{activeUser.name}</span>
-							<span className="text-xs font-normal">{activeUser.email}</span>
+						<DropdownMenuLabel className="flex items-center gap-2">
+							<Avatar className="size-8 shrink-0 border border-border">
+								{showUserImage ? (
+									<AvatarImage
+										src={activeUser.image ?? undefined}
+										alt={activeUser.name}
+										referrerPolicy="no-referrer"
+										onError={() => {
+											setFailedImageSrc(imageSrc);
+										}}
+									/>
+								) : (
+									<AvatarFallback className="bg-muted text-muted-foreground text-xs">
+										{avatarInitials}
+									</AvatarFallback>
+								)}
+							</Avatar>
+							<div className="flex min-w-0 flex-col gap-0.5">
+								<span className="truncate text-foreground text-sm">
+									{activeUser.name}
+								</span>
+								<span className="truncate text-xs font-normal">
+									{activeUser.email}
+								</span>
+							</div>
 						</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 					</>

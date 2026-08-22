@@ -63,9 +63,9 @@ function LeaderboardPage() {
 		<div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 sm:py-10">
 			<header className="flex items-center justify-between gap-3">
 				<p className="text-muted-foreground text-sm">
-					Puzzle del {dateFormatter.format(new Date(`${dateKey}T00:00:00`))}
+					{dateFormatter.format(new Date(`${dateKey}T00:00:00`))}
 				</p>
-				<DifficultyBars difficulty={difficulty} showLabel />
+				<DifficultyBars difficulty={difficulty} label="phrase" />
 			</header>
 			<LeaderboardList
 				entries={entries}
