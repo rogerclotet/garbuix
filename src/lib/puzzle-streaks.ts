@@ -81,14 +81,10 @@ export function calculateHistoryStreaks(
 	const todayEntry = entriesByDate.get(referenceDateKey);
 	let streakCursor = referenceDateKey;
 
-	if (todayEntry) {
-		if (!todayEntry.completed) {
-			return {
-				currentStreak: 0,
-				bestStreak,
-			};
-		}
-	} else {
+	// Today doesn't count towards the streak until it's completed, but an
+	// unfinished (or not yet attempted) today shouldn't zero out a streak
+	// that's still alive as of yesterday.
+	if (!todayEntry?.completed) {
 		streakCursor = shiftDateKey(referenceDateKey, -1);
 		if (!entriesByDate.get(streakCursor)?.completed) {
 			return {

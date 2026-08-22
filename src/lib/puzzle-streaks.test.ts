@@ -34,7 +34,7 @@ describe("puzzle-streaks", () => {
 		expect(streaks.bestStreak).toBe(3);
 	});
 
-	it("breaks the current streak when the reference day exists but is incomplete", () => {
+	it("keeps the current streak alive when the reference day exists but is incomplete", () => {
 		const streaks = calculateHistoryStreaks(
 			[
 				buildEntry("2026-03-15", false),
@@ -45,8 +45,22 @@ describe("puzzle-streaks", () => {
 			{ referenceDateKey: "2026-03-15" },
 		);
 
-		expect(streaks.currentStreak).toBe(0);
+		expect(streaks.currentStreak).toBe(3);
 		expect(streaks.bestStreak).toBe(3);
+	});
+
+	it("shows a zero streak when yesterday was missed, even if today is in progress", () => {
+		const streaks = calculateHistoryStreaks(
+			[
+				buildEntry("2026-03-15", false),
+				buildEntry("2026-03-13", true),
+				buildEntry("2026-03-12", true),
+			],
+			{ referenceDateKey: "2026-03-15" },
+		);
+
+		expect(streaks.currentStreak).toBe(0);
+		expect(streaks.bestStreak).toBe(2);
 	});
 
 	it("breaks streaks across missing or incomplete days and still tracks the best run", () => {
