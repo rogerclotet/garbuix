@@ -322,6 +322,15 @@ function PreferencesPage() {
 		}
 	};
 
+	// The classic board has no single-row arrangement, so the line is only worth
+	// offering on the redesign — and a line already stored there falls back to
+	// the grid, the same way the board itself falls back.
+	const letterLayoutOptions = isRedesign
+		? LETTER_LAYOUT_OPTIONS
+		: LETTER_LAYOUT_OPTIONS.filter((option) => option.value !== "line");
+	const selectedLetterLayout: LetterLayout =
+		!isRedesign && letterLayout === "line" ? "grid" : letterLayout;
+
 	const themeValue: ThemePreference = mounted
 		? ((theme as ThemePreference | undefined) ?? "system")
 		: "system";
@@ -500,16 +509,18 @@ function PreferencesPage() {
 						</div>
 						<p className="text-sm text-muted-foreground font-ui">
 							Tria com es col·loquen les lletres per escriure: en cercle al
-							voltant del botó d'enviar, en una graella de tres columnes o en
-							una línia.
+							voltant del botó d'enviar
+							{isRedesign
+								? ", en una graella de tres columnes o en una línia."
+								: " o en una graella de tres columnes."}
 						</p>
 					</div>
 					<fieldset
 						aria-labelledby={letterLayoutGroupId}
 						className="flex gap-3 border-0 p-0 m-0"
 					>
-						{LETTER_LAYOUT_OPTIONS.map((option) => {
-							const selected = letterLayout === option.value;
+						{letterLayoutOptions.map((option) => {
+							const selected = selectedLetterLayout === option.value;
 							return (
 								<label
 									key={option.value}

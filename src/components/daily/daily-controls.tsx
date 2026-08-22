@@ -6,7 +6,7 @@ import {
 	Sparkles,
 } from "lucide-react";
 import type { MouseEvent, PointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { LetterLayout } from "@/lib/anon-identity";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,9 @@ type DailyControlsProps = {
 	inFlow?: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
+	// Reports the panel's height, which the board above it needs to know: the
+	// letters layout is a preference, so no constant covers all three.
+	onHeightChange?: (height: number) => void;
 	hintsUsed: number;
 	isComplete: boolean;
 	shuffledLetters: string[];
@@ -56,6 +59,7 @@ export function DailyControls({
 	currentGuess,
 	hintsUsed,
 	isComplete,
+	onHeightChange,
 	shuffledLetters,
 	onBackspace,
 	onHint,
@@ -69,6 +73,28 @@ export function DailyControls({
 	const [hintHoldProgress, setHintHoldProgress] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 	const hintHoldFrameRef = useRef<number | null>(null);
+	// Measures the panel for as long as it is on screen. A finished puzzle
+	// unmounts the keypad, and the cleanup hands its room back.
+	const measurePanel = useCallback(
+		(panel: HTMLDivElement | null) => {
+			if (!onHeightChange || !panel) {
+				return;
+			}
+
+			const observer = new ResizeObserver((entries) => {
+				const entry = entries[0];
+				if (!entry) return;
+				onHeightChange(entry.borderBoxSize[0]?.blockSize ?? panel.offsetHeight);
+			});
+
+			observer.observe(panel);
+			return () => {
+				observer.disconnect();
+				onHeightChange(0);
+			};
+		},
+		[onHeightChange],
+	);
 
 	useEffect(() => {
 		if (
@@ -316,6 +342,7 @@ export function DailyControls({
 
 	return (
 		<div
+			ref={measurePanel}
 			className={cn(
 				inFlow
 					? "shrink-0 select-none"

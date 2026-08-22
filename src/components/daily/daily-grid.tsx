@@ -94,6 +94,9 @@ type DailyGridProps = {
 	selectedTone?: WordTone;
 	// Size the board from its container instead of from the page width.
 	fitted?: boolean;
+	// Classic board: keep the width-driven grid, but never let it grow taller
+	// than the box it sits in.
+	fitHeight?: boolean;
 };
 
 export function DailyGrid({
@@ -111,6 +114,7 @@ export function DailyGrid({
 	selectedCells,
 	selectedTone = "plain",
 	fitted = false,
+	fitHeight = false,
 }: DailyGridProps) {
 	const [fitRef, { cell: fittedCell, needsScroll }] = useFittedCell(
 		puzzle.rows,
@@ -200,16 +204,31 @@ export function DailyGrid({
 		);
 	}
 
+	// The widest the grid can be before its square cells stack up taller than the
+	// box around it. Container query units read that box's height, so the fit
+	// stays in CSS and the server-rendered board is the right size on first
+	// paint, with no measuring pass to wait for.
+	const heightBoundWidth = `calc((100cqh - var(--grid-gap) * ${puzzle.rows - 1}) / ${puzzle.rows} * ${puzzle.cols} + var(--grid-gap) * ${puzzle.cols - 1})`;
+
 	return (
 		<div
-			className="flex items-center justify-center w-full @container"
-			style={{ "--cols": puzzle.cols } as CSSProperties}
+			className={`flex items-center justify-center w-full ${
+				fitHeight ? "min-h-0 flex-1 [container-type:size]" : ""
+			}`}
 		>
 			<div
-				className="grid gap-[3px] sm:gap-1 w-full max-w-2xl mx-auto"
-				style={{
-					gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
-				}}
+				className="grid w-full max-w-2xl mx-auto @container [--grid-gap:3px] sm:[--grid-gap:4px]"
+				style={
+					{
+						"--cols": puzzle.cols,
+						gap: "var(--grid-gap)",
+						gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
+						// 42rem is max-w-2xl, the cap the width-driven board already had.
+						...(fitHeight
+							? { maxWidth: `min(42rem, ${heightBoundWidth})` }
+							: null),
+					} as CSSProperties
+				}
 			>
 				{renderCells(null)}
 			</div>

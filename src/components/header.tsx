@@ -6,7 +6,6 @@ import {
 } from "@tanstack/react-router";
 import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
-import { useDailyDifficulty } from "@/components/daily/daily-difficulty-store";
 import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
 import { DailyProgressRing } from "@/components/daily/daily-progress-ring";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
@@ -14,7 +13,6 @@ import {
 	setHowToPlayOpen,
 	useHowToPlayOpen,
 } from "@/components/daily/how-to-play-store";
-import { DifficultyBars } from "@/components/difficulty-bars";
 import { Logo } from "@/components/logo";
 import { ProfilePreferencesTipDialog } from "@/components/profile-preferences-tip-dialog";
 import {
@@ -53,7 +51,6 @@ export default function Header() {
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
-	const dailyDifficulty = useDailyDifficulty();
 	const dailySummary = useDailyHeaderSummary();
 	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
 	// The redesigned header only takes over on the daily board, and only once the
@@ -107,49 +104,54 @@ export default function Header() {
 		void navigate({ to: "/", replace: true });
 	};
 
-	// Trophy / help badge / avatar, shared by all header layouts. The redesigned
-	// row also has a ring and two lines of text to fit, so its buttons are a size
-	// smaller and it carries the share action the progress meters used to own.
-	// Inner pages (classificació, dies anteriors, preferències) drop the share
-	// and ranking actions entirely, same as the old design did.
+	// Share / trophy / help badge / avatar, shared by all header layouts. Both
+	// designs carry the share action the progress meters used to own; the
+	// redesigned row has a ring and two lines of text to fit, so its buttons are
+	// a size smaller again. Inner pages (classificació, dies anteriors,
+	// preferències) drop the share and ranking actions entirely.
 	const actionButtons = (compact: boolean, showNav: boolean) => (
-		<div className={cn("flex items-center", compact ? "gap-0.5" : "gap-2")}>
-			{compact && showNav ? (
+		<div className={cn("flex items-center", compact ? "gap-0.5" : "gap-1")}>
+			{showNav && dailySummary ? (
 				<Button
 					variant="ghost"
 					size="icon"
-					onClick={dailySummary?.onShare}
-					className="size-9 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+					onClick={dailySummary.onShare}
+					className={cn(
+						"rounded-full hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20",
+						compact
+							? "size-9 text-muted-foreground"
+							: "size-10 text-foreground sm:size-9",
+					)}
 					aria-label="Compartir progrés"
 				>
-					<Share2 className="size-[18px]" />
+					<Share2 className={compact ? "size-[18px]" : "size-5"} />
 				</Button>
 			) : null}
 			{showNav && pathname !== "/classificacio" ? (
 				<Button
 					variant="ghost"
-					size={compact ? "icon" : "icon-lg"}
+					size="icon"
 					asChild
 					className={cn(
 						"rounded-full hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20",
 						compact
 							? "size-9 text-muted-foreground"
-							: "size-11 text-foreground sm:size-9",
+							: "size-10 text-foreground sm:size-9",
 					)}
 				>
 					<Link to="/classificacio" aria-label="Classificació">
-						<Trophy className={compact ? "size-[18px]" : "size-6 sm:size-5"} />
+						<Trophy className={compact ? "size-[18px]" : "size-5"} />
 					</Link>
 				</Button>
 			) : null}
 			{helpRequestCount > 0 ? (
 				<Button
 					variant="ghost"
-					size={compact ? "icon" : "icon-lg"}
+					size="icon"
 					onClick={goToWordList}
 					className={cn(
 						"relative rounded-full text-foreground hover:bg-muted",
-						compact ? "size-9" : "size-11 sm:size-9",
+						compact ? "size-9" : "size-10 sm:size-9",
 					)}
 					aria-label={`${helpRequestCount} ${
 						helpRequestCount === 1
@@ -157,9 +159,7 @@ export default function Header() {
 							: "jugadors demanen ajuda"
 					}`}
 				>
-					<HelpingHand
-						className={compact ? "size-[18px]" : "size-6 sm:size-5"}
-					/>
+					<HelpingHand className={compact ? "size-[18px]" : "size-5"} />
 					<span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums">
 						{helpRequestCount > 9 ? "9+" : helpRequestCount}
 					</span>
@@ -293,9 +293,6 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
-					{!innerTitle ? (
-						<DifficultyBars difficulty={dailyDifficulty} showLabel />
-					) : null}
 					{actionButtons(false, true)}
 				</div>
 			</div>

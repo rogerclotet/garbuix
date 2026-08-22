@@ -161,6 +161,20 @@ function installLocalStorageMock(initial: Record<string, string> = {}) {
 	});
 }
 
+// jsdom has no ResizeObserver, and the keypad reports its height through one so
+// the board above it can claim the room it leaves.
+function installResizeObserverMock() {
+	Object.defineProperty(window, "ResizeObserver", {
+		configurable: true,
+		writable: true,
+		value: class {
+			observe() {}
+			unobserve() {}
+			disconnect() {}
+		},
+	});
+}
+
 function installVibrateMock() {
 	Object.defineProperty(window.navigator, "vibrate", {
 		configurable: true,
@@ -259,6 +273,7 @@ describe("Daily submit feedback", () => {
 		openHowToPlayMock.mockReset();
 		openProfilePreferencesTipMock.mockReset();
 		installMatchMediaMock(false);
+		installResizeObserverMock();
 	});
 
 	afterEach(() => {
