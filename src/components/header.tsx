@@ -293,7 +293,7 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
-					{actionButtons(false, true)}
+					{actionButtons(false, !innerTitle)}
 				</div>
 			</div>
 			{dialogs}
