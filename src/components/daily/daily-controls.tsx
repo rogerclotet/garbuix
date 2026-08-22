@@ -8,6 +8,7 @@ import {
 import type { MouseEvent, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { LetterLayout } from "@/lib/anon-identity";
 import { cn } from "@/lib/utils";
 import type { DailySubmitFeedback } from "./daily-types";
 
@@ -19,10 +20,13 @@ const CIRCLE_RADIUS_REM = 4.25;
 
 type DailyControlsProps = {
 	aiClueMode: boolean;
-	circleLetters: boolean;
-	// Redesigned layout: one row of keys instead of the wheel, and the panel sits
-	// in the page flow rather than pinned to the bottom of the viewport.
-	railLetters?: boolean;
+	// How the letters are arranged: around the submit button, in a three-column
+	// grid, or in a single row. Independent of where the panel sits.
+	layout: LetterLayout;
+	// Redesigned board: the panel sits in the page flow under the word rail
+	// instead of being pinned to the bottom of the viewport, so it carries none
+	// of the sheet chrome and stays as short as the layout allows.
+	inFlow?: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
 	hintsUsed: number;
@@ -46,8 +50,8 @@ type DailyControlsProps = {
 
 export function DailyControls({
 	aiClueMode,
-	circleLetters,
-	railLetters = false,
+	layout,
+	inFlow = false,
 	canUseHint,
 	currentGuess,
 	hintsUsed,
@@ -123,6 +127,23 @@ export function DailyControls({
 		return null;
 	}
 
+	const isRow = layout === "line";
+	const isCircle = layout === "circle";
+	// The row packs seven keys across, so it uses its own smaller square; the
+	// other two arrangements have room for the full-size key on any board.
+	const keySizeClass = isRow
+		? "size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+		: cn(
+				"w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16",
+				isCircle ? "rounded-full" : "rounded-lg sm:rounded-xl",
+			);
+	const submitSizeClass = isRow
+		? "ml-1 size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+		: cn(
+				"w-14 h-14 sm:w-16 sm:h-16",
+				isCircle ? "rounded-full" : "rounded-lg sm:rounded-xl",
+			);
+
 	const renderLetterButton = (letter: string) => (
 		<Button
 			key={`letter-${letter}`}
@@ -130,14 +151,7 @@ export function DailyControls({
 			size="lg"
 			className={cn(
 				"daily-pressable daily-pressable-key text-xl font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
-				railLetters
-					? "size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
-					: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16",
-				railLetters
-					? null
-					: circleLetters
-						? "rounded-full"
-						: "rounded-lg sm:rounded-xl",
+				keySizeClass,
 			)}
 			onPointerDown={(event) =>
 				runPressAction(event, () => onLetterClick(letter))
@@ -159,51 +173,13 @@ export function DailyControls({
 			size="icon"
 			className={cn(
 				"daily-pressable daily-pressable-submit touch-manipulation",
-				railLetters
-					? "ml-1 size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
-					: "w-14 h-14 sm:w-16 sm:h-16",
-				railLetters
-					? null
-					: circleLetters
-						? "rounded-full"
-						: "rounded-lg sm:rounded-xl",
+				submitSizeClass,
 			)}
 			disabled={currentGuess.length < 4}
 			aria-label="Comprovar"
 		>
 			<CornerDownLeft className="h-5 w-5" />
 		</Button>
-	);
-
-	const lettersLayout = circleLetters ? (
-		<div className="relative h-[12rem] w-[12rem] shrink-0 overflow-visible sm:h-[13rem] sm:w-[13rem]">
-			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-				{submitButton}
-			</div>
-			{shuffledLetters.map((letter, index) => {
-				const angle =
-					(index / shuffledLetters.length) * 2 * Math.PI - Math.PI / 2;
-				const x = Math.cos(angle) * CIRCLE_RADIUS_REM;
-				const y = Math.sin(angle) * CIRCLE_RADIUS_REM;
-				return (
-					<div
-						key={`letter-${letter}`}
-						className="absolute"
-						style={{
-							left: "50%",
-							top: "50%",
-							transform: `translate(calc(-50% + ${x}rem), calc(-50% + ${y}rem))`,
-						}}
-					>
-						{renderLetterButton(letter)}
-					</div>
-				);
-			})}
-		</div>
-	) : (
-		<div className="grid grid-cols-3 gap-2 sm:gap-3">
-			{shuffledLetters.map((letter) => renderLetterButton(letter))}
-		</div>
 	);
 
 	const actionButtons = (
@@ -264,14 +240,68 @@ export function DailyControls({
 		</>
 	);
 
-	const railLayout = (
-		<div className="flex w-full flex-col gap-2">
-			<div className="flex items-center justify-center gap-1.5">
-				{shuffledLetters.map((letter) => renderLetterButton(letter))}
+	// The keys themselves, without the surrounding actions: a wheel around the
+	// submit button, a three-column grid, or one row that ends in the submit.
+	const lettersLayout = isCircle ? (
+		<div className="relative h-[12rem] w-[12rem] shrink-0 overflow-visible sm:h-[13rem] sm:w-[13rem]">
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
 				{submitButton}
 			</div>
+			{shuffledLetters.map((letter, index) => {
+				const angle =
+					(index / shuffledLetters.length) * 2 * Math.PI - Math.PI / 2;
+				const x = Math.cos(angle) * CIRCLE_RADIUS_REM;
+				const y = Math.sin(angle) * CIRCLE_RADIUS_REM;
+				return (
+					<div
+						key={`letter-${letter}`}
+						className="absolute"
+						style={{
+							left: "50%",
+							top: "50%",
+							transform: `translate(calc(-50% + ${x}rem), calc(-50% + ${y}rem))`,
+						}}
+					>
+						{renderLetterButton(letter)}
+					</div>
+				);
+			})}
+		</div>
+	) : isRow ? (
+		<div className="flex items-center justify-center gap-1.5">
+			{shuffledLetters.map((letter) => renderLetterButton(letter))}
+			{submitButton}
+		</div>
+	) : (
+		<div className="grid grid-cols-3 gap-2 sm:gap-3">
+			{shuffledLetters.map((letter) => renderLetterButton(letter))}
+		</div>
+	);
+
+	// The keys plus the actions. The row stacks them, the wheel puts the actions
+	// alongside it, and the grid keeps the submit beside the keys with the
+	// actions spread underneath.
+	const keypad = isRow ? (
+		<div className="flex w-full flex-col gap-2">
+			{lettersLayout}
 			<div className="flex justify-center gap-2 font-ui">{actionButtons}</div>
 		</div>
+	) : isCircle ? (
+		<div className="flex w-full items-center justify-center gap-4 overflow-visible sm:gap-6">
+			<div className="flex flex-col-reverse gap-2 font-ui">{actionButtons}</div>
+			{lettersLayout}
+		</div>
+	) : (
+		<>
+			<div className="flex items-center w-full gap-4 sm:gap-6 justify-evenly">
+				{lettersLayout}
+				{submitButton}
+			</div>
+
+			<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full font-ui">
+				{actionButtons}
+			</div>
+		</>
 	);
 
 	const submitFeedbackToneClass =
@@ -287,21 +317,19 @@ export function DailyControls({
 	return (
 		<div
 			className={cn(
-				railLetters
+				inFlow
 					? "shrink-0 select-none"
 					: "fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto",
 			)}
 		>
 			<div
 				className={cn(
-					railLetters
+					inFlow
 						? "pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
 						: "rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto",
 				)}
 			>
-				<div
-					className={cn("hidden lg:text-left", railLetters ? null : "lg:block")}
-				>
+				<div className={cn("hidden lg:text-left", inFlow ? null : "lg:block")}>
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
@@ -310,19 +338,17 @@ export function DailyControls({
 						espai.
 					</p>
 				</div>
-				<div className={cn(railLetters ? "px-2" : "p-2 lg:px-0 lg:pt-2")}>
+				<div className={cn(inFlow ? "px-2" : "p-2 lg:px-0 lg:pt-2")}>
 					<div
 						className={cn(
 							"flex flex-col items-center",
-							railLetters ? "gap-2" : "gap-3 lg:gap-6",
+							inFlow ? "gap-2" : "gap-3 lg:gap-6",
 						)}
 					>
 						<div
 							className={cn(
 								"relative w-full overflow-hidden",
-								railLetters
-									? "h-11"
-									: "h-9 sm:h-12 border-b-2 border-primary/60",
+								inFlow ? "h-11" : "h-9 sm:h-12 border-b-2 border-primary/60",
 							)}
 						>
 							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
@@ -348,27 +374,7 @@ export function DailyControls({
 							</div>
 						</div>
 
-						{railLetters ? (
-							railLayout
-						) : circleLetters ? (
-							<div className="flex w-full items-center justify-center gap-4 overflow-visible sm:gap-6">
-								<div className="flex flex-col-reverse gap-2 font-ui">
-									{actionButtons}
-								</div>
-								{lettersLayout}
-							</div>
-						) : (
-							<>
-								<div className="flex items-center w-full gap-4 sm:gap-6 justify-evenly">
-									{lettersLayout}
-									{submitButton}
-								</div>
-
-								<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full font-ui">
-									{actionButtons}
-								</div>
-							</>
-						)}
+						{keypad}
 					</div>
 				</div>
 			</div>

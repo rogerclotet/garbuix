@@ -114,7 +114,13 @@ function RootDocument() {
 								<ClueRequestsRoot>
 									<div className="flex h-svh flex-col">
 										<Header />
-										<main className="flex-1 min-h-0 overflow-y-auto">
+										{/* Positioned as well as scrollable: an absolutely
+										    positioned descendant with no closer containing block
+										    would otherwise be measured against the document, so a
+										    visually hidden input far down a long page stretches
+										    the page past the viewport and lets the browser scroll
+										    the whole shell, header included, out of view. */}
+										<main className="relative flex-1 min-h-0 overflow-y-auto">
 											<Outlet />
 										</main>
 									</div>

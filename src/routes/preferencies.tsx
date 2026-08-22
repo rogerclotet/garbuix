@@ -397,7 +397,9 @@ function PreferencesPage() {
 										<label
 											key={option.value}
 											className={cn(
-												"flex flex-1 flex-col items-center gap-2 rounded-lg border p-3 transition-colors cursor-pointer",
+												// Positioned so the visually hidden radio lands inside
+												// this label rather than against the document.
+												"relative flex flex-1 flex-col items-center gap-2 rounded-lg border p-3 transition-colors cursor-pointer",
 												selected
 													? "border-primary ring-2 ring-primary bg-background"
 													: "border-border bg-background hover:border-primary/50",
@@ -512,7 +514,9 @@ function PreferencesPage() {
 								<label
 									key={option.value}
 									className={cn(
-										"flex flex-1 flex-col items-center gap-2 rounded-lg border p-3 transition-colors cursor-pointer",
+										// Positioned so the visually hidden radio lands inside
+										// this label rather than against the document.
+										"relative flex flex-1 flex-col items-center gap-2 rounded-lg border p-3 transition-colors cursor-pointer",
 										selected
 											? "border-primary ring-2 ring-primary bg-background"
 											: "border-border bg-background hover:border-primary/50",
