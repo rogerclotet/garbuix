@@ -7,7 +7,6 @@ import {
 import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
-import { DailyProgressRing } from "@/components/daily/daily-progress-ring";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
 	setHowToPlayOpen,
@@ -23,11 +22,6 @@ import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
-import { useFeatureFlag } from "@/lib/use-feature-flag";
-import { cn } from "@/lib/utils";
-
-// Keep in sync with the flag read in daily.tsx.
-const REDESIGN_FLAG = "mobile-redesign";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -52,13 +46,6 @@ export default function Header() {
 	const howToPlayOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const dailySummary = useDailyHeaderSummary();
-	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
-	// The redesigned header only takes over on the daily board, and only once the
-	// game has published its progress — every other route keeps the usual row.
-	const showDailyHeader = isRedesign && !innerTitle && dailySummary != null;
-	// Inner pages get the same narrow app bar, but with a back arrow and the
-	// section title standing in for the ring and try count.
-	const showInnerRedesignHeader = isRedesign && !!innerTitle;
 	const navigate = useNavigate();
 	const router = useRouter();
 	const { incomingRequests } = useClueRequests();
@@ -104,27 +91,20 @@ export default function Header() {
 		void navigate({ to: "/", replace: true });
 	};
 
-	// Share / trophy / help badge / avatar, shared by all header layouts. Both
-	// designs carry the share action the progress meters used to own; the
-	// redesigned row has a ring and two lines of text to fit, so its buttons are
-	// a size smaller again. Inner pages (classificació, dies anteriors,
+	// Share / trophy / help badge / avatar. The share action is the one the
+	// progress meters used to own. Inner pages (classificació, dies anteriors,
 	// preferències) drop the share and ranking actions entirely.
-	const actionButtons = (compact: boolean, showNav: boolean) => (
-		<div className={cn("flex items-center", compact ? "gap-0.5" : "gap-1")}>
+	const actionButtons = (showNav: boolean) => (
+		<div className="flex items-center gap-1">
 			{showNav && dailySummary ? (
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={dailySummary.onShare}
-					className={cn(
-						"rounded-full hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20",
-						compact
-							? "size-9 text-muted-foreground"
-							: "size-10 text-foreground sm:size-9",
-					)}
+					className="rounded-full size-10 text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
 					aria-label="Compartir progrés"
 				>
-					<Share2 className={compact ? "size-[18px]" : "size-5"} />
+					<Share2 className="size-5" />
 				</Button>
 			) : null}
 			{showNav && pathname !== "/classificacio" ? (
@@ -132,15 +112,10 @@ export default function Header() {
 					variant="ghost"
 					size="icon"
 					asChild
-					className={cn(
-						"rounded-full hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20",
-						compact
-							? "size-9 text-muted-foreground"
-							: "size-10 text-foreground sm:size-9",
-					)}
+					className="rounded-full size-10 text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
 				>
 					<Link to="/classificacio" aria-label="Classificació">
-						<Trophy className={compact ? "size-[18px]" : "size-5"} />
+						<Trophy className="size-5" />
 					</Link>
 				</Button>
 			) : null}
@@ -149,17 +124,14 @@ export default function Header() {
 					variant="ghost"
 					size="icon"
 					onClick={goToWordList}
-					className={cn(
-						"relative rounded-full text-foreground hover:bg-muted",
-						compact ? "size-9" : "size-10 sm:size-9",
-					)}
+					className="relative rounded-full size-10 text-foreground hover:bg-muted sm:size-9"
 					aria-label={`${helpRequestCount} ${
 						helpRequestCount === 1
 							? "jugador demana ajuda"
 							: "jugadors demanen ajuda"
 					}`}
 				>
-					<HelpingHand className={compact ? "size-[18px]" : "size-5"} />
+					<HelpingHand className="size-5" />
 					<span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground tabular-nums">
 						{helpRequestCount > 9 ? "9+" : helpRequestCount}
 					</span>
@@ -178,90 +150,6 @@ export default function Header() {
 			/>
 		</>
 	);
-
-	// Redesigned board: the progress ring and the counters move into the app
-	// chrome, so the board owns everything below the header.
-	if (showDailyHeader && dailySummary) {
-		const remaining = dailySummary.total - dailySummary.found;
-		// A finished puzzle can't earn more extra words, so the inner ring and its
-		// counter drop out rather than sitting there frozen.
-		const showBonus = dailySummary.showBonus && remaining > 0;
-
-		return (
-			<header className="bg-background transition-colors duration-300">
-				<div className="mx-auto flex max-w-2xl items-center gap-3 px-3 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-2 sm:px-4">
-					<DailyProgressRing
-						found={dailySummary.found}
-						total={dailySummary.total}
-						bonusInCycle={dailySummary.bonusInCycle}
-						bonusTarget={dailySummary.bonusTarget}
-						showBonus={showBonus}
-						pulse={dailySummary.justEarnedBonus}
-					/>
-					<div className="min-w-0 flex-1">
-						<Link
-							to="/"
-							className="block truncate text-[15px] font-bold tracking-tight text-primary transition-opacity hover:opacity-80"
-						>
-							Garbuix!
-						</Link>
-						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
-							{remaining === 0
-								? "Completat"
-								: `${dailySummary.guessCount} ${
-										dailySummary.guessCount === 1 ? "intent" : "intents"
-									}`}
-							{showBonus ? (
-								<>
-									<span className="text-muted-foreground/50"> · </span>
-									<span className="font-semibold text-game-extra-strong">
-										{dailySummary.justEarnedBonus
-											? "pista desbloquejada!"
-											: `${dailySummary.bonusInCycle}/${dailySummary.bonusTarget} extres`}
-									</span>
-								</>
-							) : null}
-						</p>
-					</div>
-					{actionButtons(true, true)}
-				</div>
-				{dialogs}
-			</header>
-		);
-	}
-
-	// Inner pages: same narrow app bar as the daily board, but the ring becomes
-	// a back arrow and the try count becomes the section title.
-	if (showInnerRedesignHeader) {
-		return (
-			<header className="bg-background transition-colors duration-300">
-				<div className="mx-auto flex max-w-2xl items-center gap-3 px-3 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-2 sm:px-4">
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={goHome}
-						className="size-9 -ml-1 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-						aria-label="Tornar"
-					>
-						<ChevronLeft className="size-5" />
-					</Button>
-					<div className="min-w-0 flex-1">
-						<Link
-							to="/"
-							className="block truncate text-[15px] font-bold tracking-tight text-primary transition-opacity hover:opacity-80"
-						>
-							Garbuix!
-						</Link>
-						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
-							{innerTitle}
-						</p>
-					</div>
-					{actionButtons(true, false)}
-				</div>
-				{dialogs}
-			</header>
-		);
-	}
 
 	return (
 		<header className="bg-background transition-colors duration-300">
@@ -293,7 +181,7 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
-					{actionButtons(false, !innerTitle)}
+					{actionButtons(!innerTitle)}
 				</div>
 			</div>
 			{dialogs}

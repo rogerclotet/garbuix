@@ -38,7 +38,6 @@ import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
-import { useFeatureFlag } from "@/lib/use-feature-flag";
 import { useObservability } from "@/lib/use-observability";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
@@ -63,11 +62,9 @@ import {
 	getSortedWordSlots,
 	getWordCellKeys,
 	getWordTone,
-	REDESIGN_FLAG,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
-import { DailyWordRail } from "./daily-word-rail";
 import { openHowToPlay } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
@@ -78,8 +75,6 @@ import { WinDialog } from "./win-dialog";
 const POINTER_CLICK_DEDUP_MS = 350;
 const SUBMIT_FEEDBACK_DURATION_MS = 520;
 const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
-// How long the ring's bonus arc stays pulsed after a free letter is earned.
-const BONUS_PULSE_MS = 2200;
 const HAPTIC_TAP_MS = 14;
 const HAPTIC_SUBMIT_MS = 18;
 const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
@@ -111,6 +106,32 @@ function getSubmitFeedbackDuration() {
 		: SUBMIT_FEEDBACK_DURATION_MS;
 }
 
+// The width at which the board switches to its two-column desktop layout,
+// where the keypad lives in a narrow side column. Matches the `lg:` breakpoint
+// the classic layout is built on.
+const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
+
+// Starts false so the server and the first client render agree; the real value
+// lands right after mount, before anything the player can act on.
+function useIsDesktopLayout(): boolean {
+	const [isDesktop, setIsDesktop] = useState(false);
+
+	useEffect(() => {
+		if (typeof window.matchMedia !== "function") {
+			return;
+		}
+
+		const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+		const update = () => setIsDesktop(mediaQuery.matches);
+
+		update();
+		mediaQuery.addEventListener("change", update);
+		return () => mediaQuery.removeEventListener("change", update);
+	}, []);
+
+	return isDesktop;
+}
+
 function isEditableTarget(target: EventTarget | null) {
 	if (!(target instanceof HTMLElement)) {
 		return false;
@@ -125,7 +146,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function Daily({ initialData }: { initialData: DailyData }) {
-	const isRedesign = useFeatureFlag(REDESIGN_FLAG);
+	const isDesktopLayout = useIsDesktopLayout();
 	const { activeUser } = useActiveSessionUser(initialData.sessionUser);
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
@@ -166,19 +187,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
 	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
-	// Circle is the classic board's default and line is the redesigned board's
-	// default; a player can opt into any of the three via /preferencies.
-	// Initialise to the classic default so SSR markup is deterministic (SSR
-	// always renders the classic branch), then read the stored choice — or the
-	// design-appropriate default — after mount.
+	// A player can opt into any of the three arrangements via /preferencies.
+	// Initialise to the default so SSR markup is deterministic, then read the
+	// stored choice after mount.
 	const [letterLayout, setLetterLayout] = useState<LetterLayout>("circle");
 	useEffect(() => {
-		setLetterLayout(getLetterLayout(isRedesign ? "line" : "circle"));
-	}, [isRedesign]);
-	// The classic board has no single-row arrangement, so a player who picked
-	// the line while on the redesign falls back to its grid there.
-	const classicLetterLayout: LetterLayout =
-		letterLayout === "line" ? "grid" : letterLayout;
+		setLetterLayout(getLetterLayout());
+	}, []);
+	// The line only fits the phone keypad; on a desktop the keys live in a narrow
+	// side column, so a seven-across row falls back to the grid.
+	const effectiveLetterLayout: LetterLayout =
+		letterLayout === "line" && isDesktopLayout ? "grid" : letterLayout;
 	const {
 		subscribe: subscribeClueRequests,
 		requestClue,
@@ -230,11 +249,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
 	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
-	// Redesigned layout: the word whose panel is open, marked on the board for as
-	// long as it stays open.
-	const [openWordId, setOpenWordId] = useState<number | null>(null);
-	const [justEarnedBonus, setJustEarnedBonus] = useState(false);
-	const bonusPulseTimerRef = useRef<number | null>(null);
+	// The word tapped in the list, tinted on the board until it is tapped again,
+	// another word is tapped, or it is solved.
+	const [selectedWordId, setSelectedWordId] = useState<number | null>(null);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
@@ -309,9 +326,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 			if (locateClearTimerRef.current != null) {
 				window.clearTimeout(locateClearTimerRef.current);
-			}
-			if (bonusPulseTimerRef.current != null) {
-				window.clearTimeout(bonusPulseTimerRef.current);
 			}
 			for (const timer of bounceClearTimersRef.current.values()) {
 				window.clearTimeout(timer);
@@ -1007,14 +1021,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					toast.success("Pista desbloquejada!", {
 						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
-					setJustEarnedBonus(true);
-					if (bonusPulseTimerRef.current != null) {
-						window.clearTimeout(bonusPulseTimerRef.current);
-					}
-					bonusPulseTimerRef.current = window.setTimeout(() => {
-						setJustEarnedBonus(false);
-						bonusPulseTimerRef.current = null;
-					}, BONUS_PULSE_MS);
 				}
 			}
 		}
@@ -1207,6 +1213,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}, LOCATE_FLASH_MS);
 			});
 
+			// The flash fades, so the tap also selects the word: its cells stay
+			// tinted until it is tapped again, another word is tapped, or it is
+			// solved.
+			setSelectedWordId((current) => (current === wordId ? null : wordId));
+
 			const grid = gridRef.current;
 			if (grid && window.matchMedia("(max-width: 1023px)").matches) {
 				const rect = grid.getBoundingClientRect();
@@ -1219,47 +1230,36 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		[puzzle.wordSlots],
 	);
 
-	// Redesigned layout: cells of the word whose panel is open, plus the colour
-	// that word carries in the rail so the board highlights it in the same shade.
+	// Cells of the selected word, plus the colour that word's state gives it, so
+	// the board marks it in the same shade its list row carries.
 	const selectedCells = useMemo(() => {
-		if (openWordId == null) return new Set<string>();
-		const slot = puzzle.wordSlots.find((item) => item.id === openWordId);
+		if (selectedWordId == null) return new Set<string>();
+		const slot = puzzle.wordSlots.find((item) => item.id === selectedWordId);
 		return slot ? getWordCellKeys(slot) : new Set<string>();
-	}, [openWordId, puzzle.wordSlots]);
+	}, [selectedWordId, puzzle.wordSlots]);
 
 	const selectedTone = useMemo(() => {
-		if (openWordId == null) return "plain" as const;
+		if (selectedWordId == null) return "plain" as const;
 		return getWordTone({
-			isFound: derivedProgress.guessedWordIds.includes(openWordId),
-			hasPeerHelp: Boolean(receivedClues[openWordId]),
-			hasClue: Boolean(clueTextsByWordId[openWordId]),
+			isFound: derivedProgress.guessedWordIds.includes(selectedWordId),
+			hasPeerHelp: Boolean(receivedClues[selectedWordId]),
+			hasClue: Boolean(clueTextsByWordId[selectedWordId]),
 		});
 	}, [
 		clueTextsByWordId,
 		derivedProgress.guessedWordIds,
-		openWordId,
+		selectedWordId,
 		receivedClues,
 	]);
 
-	// Solving the open word closes its panel so the unfound-word UI doesn't linger
-	// after a guess. Tapping a word that's already found must still be able to
-	// reopen it (clue + Optimot), so only a newly found id closes the panel.
-	const previousGuessedWordIdsRef = useRef(derivedProgress.guessedWordIds);
+	// Solving the selected word drops the tint: the guess animation already
+	// marks those cells, and a solved word needs no locating.
 	useEffect(() => {
-		const previousGuessedWordIds = previousGuessedWordIdsRef.current;
-		previousGuessedWordIdsRef.current = derivedProgress.guessedWordIds;
-		if (openWordId == null) return;
-		const justFound =
-			derivedProgress.guessedWordIds.includes(openWordId) &&
-			!previousGuessedWordIds.includes(openWordId);
-		if (justFound) {
-			setOpenWordId(null);
+		if (selectedWordId == null) return;
+		if (derivedProgress.guessedWordIds.includes(selectedWordId)) {
+			setSelectedWordId(null);
 		}
-	}, [derivedProgress.guessedWordIds, openWordId]);
-
-	const handleOpenWordChange = useCallback((wordId: number | null) => {
-		setOpenWordId(wordId);
-	}, []);
+	}, [derivedProgress.guessedWordIds, selectedWordId]);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
@@ -1365,28 +1365,11 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// through this ref, and openShare is published to the header only once.
 	handleShareRef.current = handleShare;
 
-	// The redesigned header (rendered above this route) shows the progress ring
-	// and the counters, so the board can own everything below it.
+	// The header (rendered above this route) owns the share button, so it needs
+	// a way to reach the board's share handler.
 	useEffect(() => {
-		setDailyHeaderSummary({
-			found: derivedProgress.guessedWordIds.length,
-			total: totalWords,
-			guessCount: derivedProgress.guessCount,
-			bonusInCycle: derivedProgress.bonusWordsFound % WORDS_PER_BONUS_CLUE,
-			bonusTarget: WORDS_PER_BONUS_CLUE,
-			showBonus: bonusCluesEnabled,
-			justEarnedBonus,
-			onShare: openShare,
-		});
-	}, [
-		bonusCluesEnabled,
-		derivedProgress.bonusWordsFound,
-		derivedProgress.guessCount,
-		derivedProgress.guessedWordIds.length,
-		justEarnedBonus,
-		openShare,
-		totalWords,
-	]);
+		setDailyHeaderSummary({ onShare: openShare });
+	}, [openShare]);
 
 	useEffect(() => () => setDailyHeaderSummary(null), []);
 
@@ -1499,276 +1482,191 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					finishFlyingLettersCleanup();
 				}}
 			/>
-			{isRedesign ? (
-				// Same single column at every width: the board takes the space the
-				// chrome doesn't need, capped so it stays composed on a desktop.
-				<div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col">
-					{/* The header owns the progress ring now; on completion this is where
-					    the summary lands. */}
-					{displayComplete ? (
-						<div className="shrink-0 px-3 pt-4 pb-2">{completionSummary}</div>
-					) : null}
-
-					{/* Barely any horizontal padding: on a width-bound puzzle every pixel
-					    here comes straight off the cell size. */}
-					<div ref={gridRef} className="flex min-h-0 flex-1 flex-col px-1 py-1">
-						<DailyGrid
-							fitted
-							puzzle={puzzle}
-							revealedCells={revealedCells}
-							cellLetters={cellLetters}
-							highlightedWordId={highlightedWordId}
-							animatingWordId={animatingWordId}
-							animatingPreExistingLetters={animatingPreExistingLetters}
-							landedAnimatingCells={landedAnimatingCells}
-							bounceCells={bounceCells}
-							clueCells={clueGridCells}
-							clueCellsFading={clueGridFading}
-							locateCells={locateCells}
-							selectedCells={selectedCells}
-							selectedTone={selectedTone}
-						/>
-					</div>
-
-					{/* Finishing the puzzle unmounts the keyboard below, so the rail
-					    would otherwise sit flush against the bottom edge. */}
-					<div
-						id={WORD_LIST_SECTION_ID}
-						className={`shrink-0 ${
-							displayComplete
-								? "pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-								: ""
-						}`}
-					>
-						<DailyWordRail
-							puzzle={puzzle}
-							guessedWordIds={derivedProgress.guessedWordIds}
-							revealedAnswers={revealedAnswers}
-							cellLetters={cellLetters}
-							clueTextsByWordId={clueTextsByWordId}
-							foundClueTextsByWordId={foundClueTextsByWordId}
-							canRequestHelp={canRequestHelp}
-							requestedHelpWordIds={requestedHelpWordIds}
-							peerCluesByWordId={receivedClues}
-							onRequestHelp={handleRequestHelp}
-							incomingRequests={incomingRequests}
-							helpGivenRecords={helpGivenRecords}
-							onRespondToClue={respondToClue}
-							openWordId={openWordId}
-							onOpenWordChange={handleOpenWordChange}
-						/>
-					</div>
-
-					<DailyControls
-						aiClueMode
-						inFlow
-						layout={letterLayout}
-						canUseHint={canUseSelfHint}
-						currentGuess={currentGuess}
-						hintsUsed={derivedProgress.hintsUsed}
-						isComplete={displayComplete}
-						shuffledLetters={derivedProgress.shuffledLetters}
-						onBackspace={handleBackspace}
-						onHint={handleHint}
-						onLetterClick={handleLetterClick}
-						onShuffle={handleShuffle}
-						onSubmitGuess={() => {
-							void handleGuess();
-						}}
-						submitFeedback={submitFeedback}
-						runClickAction={runClickAction}
-						runPressAction={runPressAction}
-					/>
-				</div>
-			) : (
-				<div
-					// h-full, not min-h-full: the word list below the fold overflows this
-					// box on purpose, so the board above it can be sized against the room
-					// the viewport really has.
-					className="h-full px-3 sm:px-4 lg:flex lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 lg:pb-8"
-					style={{ "--daily-keypad-h": keypadHeightCss } as CSSProperties}
-				>
-					<div className="mx-auto h-full w-full max-w-5xl lg:grid lg:h-auto lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 xl:grid-cols-[1fr_20rem]">
-						{/* Above the fold: the meters and the board split the room left
-						    between the header and the keypad pinned to the bottom, so the
-						    board never pushes the word list around and never spills past
-						    the keypad. On a desktop this dissolves into the two-column
-						    grid, where the keypad sits in the flow of the right column. */}
-						<div className="flex h-[calc(100%_-_var(--daily-keypad-h))] flex-col lg:contents">
-							<div
-								className={`mb-4 shrink-0 sm:mb-6 lg:col-span-2 lg:row-start-1 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
-							>
-								{displayComplete
-									? completionSummary
-									: (() => {
-											const percent = Math.min(
-												100,
-												Math.max(
-													0,
-													(derivedProgress.guessedWordIds.length / totalWords) *
-														100,
-												),
-											);
-											// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
-											// clue and resets each time one is earned; the label keeps the total.
-											const bonusCount = derivedProgress.bonusWordsFound;
-											const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
-											const bonusPercent =
-												(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
-											const wordsToNextClue =
-												WORDS_PER_BONUS_CLUE - bonusInCycle;
-											const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
-											return (
-												<div className="flex flex-col gap-1">
+			<div
+				// h-full, not min-h-full: the word list below the fold overflows this
+				// box on purpose, so the board above it can be sized against the room
+				// the viewport really has.
+				className="h-full px-3 sm:px-4 lg:flex lg:min-h-0 lg:flex-col lg:px-8 pt-2 sm:pt-3 lg:pt-4 lg:pb-8"
+				style={{ "--daily-keypad-h": keypadHeightCss } as CSSProperties}
+			>
+				<div className="mx-auto h-full w-full max-w-5xl lg:grid lg:h-auto lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_18rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 xl:grid-cols-[1fr_20rem]">
+					{/* Above the fold: the meters and the board split the room left
+					    between the header and the keypad pinned to the bottom, so the
+					    board never pushes the word list around and never spills past
+					    the keypad. On a desktop this dissolves into the two-column
+					    grid, where the keypad sits in the flow of the right column. */}
+					<div className="flex h-[calc(100%_-_var(--daily-keypad-h))] flex-col lg:contents">
+						<div
+							className={`mb-4 shrink-0 sm:mb-6 lg:col-span-2 lg:row-start-1 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
+						>
+							{displayComplete
+								? completionSummary
+								: (() => {
+										const percent = Math.min(
+											100,
+											Math.max(
+												0,
+												(derivedProgress.guessedWordIds.length / totalWords) *
+													100,
+											),
+										);
+										// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
+										// clue and resets each time one is earned; the label keeps the total.
+										const bonusCount = derivedProgress.bonusWordsFound;
+										const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
+										const bonusPercent =
+											(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
+										const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
+										const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
+										return (
+											<div className="flex flex-col gap-1">
+												<div
+													className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
+													role="progressbar"
+													aria-valuenow={derivedProgress.guessedWordIds.length}
+													aria-valuemin={0}
+													aria-valuemax={totalWords}
+													aria-label="Paraules trobades"
+												>
 													<div
-														className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
+														className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
+														style={{ width: `${percent}%` }}
+													/>
+													<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+														<span className="flex items-baseline gap-1">
+															<span className="text-foreground tabular-nums text-xs">
+																{derivedProgress.guessedWordIds.length}
+															</span>
+															<span className="text-muted-foreground/50">
+																/
+															</span>
+															<span className="text-muted-foreground tabular-nums">
+																{totalWords}
+															</span>
+															<span className="ml-1 hidden text-muted-foreground sm:inline">
+																paraules
+															</span>
+														</span>
+														<span className="text-muted-foreground tabular-nums">
+															{derivedProgress.guessCount}{" "}
+															{derivedProgress.guessCount === 1
+																? "intent"
+																: "intents"}
+														</span>
+													</div>
+												</div>
+												{bonusCluesEnabled ? (
+													<div
+														className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
 														role="progressbar"
-														aria-valuenow={
-															derivedProgress.guessedWordIds.length
-														}
+														aria-valuenow={bonusInCycle}
 														aria-valuemin={0}
-														aria-valuemax={totalWords}
-														aria-label="Paraules trobades"
+														aria-valuemax={WORDS_PER_BONUS_CLUE}
+														aria-label="Paraules vàlides de fora del joc"
 													>
 														<div
-															className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
-															style={{ width: `${percent}%` }}
+															className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
+															style={{ width: `${bonusPercent}%` }}
 														/>
 														<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
 															<span className="flex items-baseline gap-1">
-																<span className="text-foreground tabular-nums text-xs">
-																	{derivedProgress.guessedWordIds.length}
+																<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
+																	{bonusCount}
 																</span>
-																<span className="text-muted-foreground/50">
-																	/
-																</span>
-																<span className="text-muted-foreground tabular-nums">
-																	{totalWords}
-																</span>
-																<span className="ml-1 hidden text-muted-foreground sm:inline">
-																	paraules
+																<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
+																	paraules extra
 																</span>
 															</span>
-															<span className="text-muted-foreground tabular-nums">
-																{derivedProgress.guessCount}{" "}
-																{derivedProgress.guessCount === 1
-																	? "intent"
-																	: "intents"}
+															<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
+																{wordsToNextClue} per a una pista
 															</span>
 														</div>
 													</div>
-													{bonusCluesEnabled ? (
-														<div
-															className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
-															role="progressbar"
-															aria-valuenow={bonusInCycle}
-															aria-valuemin={0}
-															aria-valuemax={WORDS_PER_BONUS_CLUE}
-															aria-label="Paraules vàlides de fora del joc"
-														>
-															<div
-																className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
-																style={{ width: `${bonusPercent}%` }}
-															/>
-															<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-																<span className="flex items-baseline gap-1">
-																	<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
-																		{bonusCount}
-																	</span>
-																	<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
-																		paraules extra
-																	</span>
-																</span>
-																<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
-																	{wordsToNextClue} per a una pista
-																</span>
-															</div>
-														</div>
-													) : null}
-												</div>
-											);
-										})()}
-							</div>
-
-							<div
-								ref={gridRef}
-								className="flex min-h-0 flex-1 flex-col pb-2 lg:col-start-1 lg:row-start-2 lg:pb-8"
-							>
-								<DailyGrid
-									fitHeight
-									puzzle={puzzle}
-									revealedCells={revealedCells}
-									cellLetters={cellLetters}
-									highlightedWordId={highlightedWordId}
-									animatingWordId={animatingWordId}
-									animatingPreExistingLetters={animatingPreExistingLetters}
-									landedAnimatingCells={landedAnimatingCells}
-									bounceCells={bounceCells}
-									clueCells={clueGridCells}
-									clueCellsFading={clueGridFading}
-									locateCells={locateCells}
-								/>
-							</div>
+												) : null}
+											</div>
+										);
+									})()}
 						</div>
 
-						<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
-							<DailyControls
-								aiClueMode
-								layout={classicLetterLayout}
-								canUseHint={canUseSelfHint}
-								currentGuess={currentGuess}
-								hintsUsed={derivedProgress.hintsUsed}
-								isComplete={displayComplete}
-								onHeightChange={setKeypadHeight}
-								shuffledLetters={derivedProgress.shuffledLetters}
-								onBackspace={handleBackspace}
-								onHint={handleHint}
-								onLetterClick={handleLetterClick}
-								onShuffle={handleShuffle}
-								onSubmitGuess={() => {
-									void handleGuess();
-								}}
-								submitFeedback={submitFeedback}
-								runClickAction={runClickAction}
-								runPressAction={runPressAction}
+						<div
+							ref={gridRef}
+							className="flex min-h-0 flex-1 flex-col pb-2 lg:col-start-1 lg:row-start-2 lg:pb-8"
+						>
+							<DailyGrid
+								fitHeight
+								puzzle={puzzle}
+								revealedCells={revealedCells}
+								cellLetters={cellLetters}
+								highlightedWordId={highlightedWordId}
+								animatingWordId={animatingWordId}
+								animatingPreExistingLetters={animatingPreExistingLetters}
+								landedAnimatingCells={landedAnimatingCells}
+								bounceCells={bounceCells}
+								clueCells={clueGridCells}
+								clueCellsFading={clueGridFading}
+								locateCells={locateCells}
+								selectedCells={selectedCells}
+								selectedTone={selectedTone}
 							/>
+						</div>
+					</div>
 
-							{/* The keypad floats over the bottom of the page, so the last
-							    rows need room to clear it. */}
-							<div
-								id={WORD_LIST_SECTION_ID}
-								className={`scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:pb-0 ${
-									displayComplete
-										? "pb-6"
-										: "pb-[calc(var(--daily-keypad-h)_+_1rem)]"
-								}`}
-							>
-								<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
-									Paraules ({derivedProgress.guessedWordIds.length}/{totalWords}
-									)
-								</h3>
-								<DailyWordList
-									puzzle={puzzle}
-									guessedWordIds={derivedProgress.guessedWordIds}
-									revealedAnswers={revealedAnswers}
-									cellLetters={cellLetters}
-									clueTextsByWordId={clueTextsByWordId}
-									clueWordIds={derivedProgress.clueWordIds}
-									foundClueTextsByWordId={foundClueTextsByWordId}
-									onWordTap={handleLocateWord}
-									canRequestHelp={canRequestHelp}
-									requestedHelpWordIds={requestedHelpWordIds}
-									peerCluesByWordId={receivedClues}
-									onRequestHelp={handleRequestHelp}
-									incomingRequests={incomingRequests}
-									helpGivenRecords={helpGivenRecords}
-									onRespondToClue={respondToClue}
-								/>
-							</div>
+					<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
+						<DailyControls
+							aiClueMode
+							layout={effectiveLetterLayout}
+							canUseHint={canUseSelfHint}
+							currentGuess={currentGuess}
+							hintsUsed={derivedProgress.hintsUsed}
+							isComplete={displayComplete}
+							onHeightChange={setKeypadHeight}
+							shuffledLetters={derivedProgress.shuffledLetters}
+							onBackspace={handleBackspace}
+							onHint={handleHint}
+							onLetterClick={handleLetterClick}
+							onShuffle={handleShuffle}
+							onSubmitGuess={() => {
+								void handleGuess();
+							}}
+							submitFeedback={submitFeedback}
+							runClickAction={runClickAction}
+							runPressAction={runPressAction}
+						/>
+
+						{/* The keypad floats over the bottom of the page, so the last
+						    rows need room to clear it. */}
+						<div
+							id={WORD_LIST_SECTION_ID}
+							className={`scroll-mt-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:pb-0 ${
+								displayComplete
+									? "pb-6"
+									: "pb-[calc(var(--daily-keypad-h)_+_1rem)]"
+							}`}
+						>
+							<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
+								Paraules ({derivedProgress.guessedWordIds.length}/{totalWords})
+							</h3>
+							<DailyWordList
+								puzzle={puzzle}
+								guessedWordIds={derivedProgress.guessedWordIds}
+								revealedAnswers={revealedAnswers}
+								cellLetters={cellLetters}
+								clueTextsByWordId={clueTextsByWordId}
+								clueWordIds={derivedProgress.clueWordIds}
+								foundClueTextsByWordId={foundClueTextsByWordId}
+								onWordTap={handleLocateWord}
+								canRequestHelp={canRequestHelp}
+								requestedHelpWordIds={requestedHelpWordIds}
+								peerCluesByWordId={receivedClues}
+								onRequestHelp={handleRequestHelp}
+								incomingRequests={incomingRequests}
+								helpGivenRecords={helpGivenRecords}
+								onRespondToClue={respondToClue}
+							/>
 						</div>
 					</div>
 				</div>
-			)}
+			</div>
 			<WelcomeDialog
 				open={welcomeOpen}
 				onOpenChange={handleWelcomeOpenChange}

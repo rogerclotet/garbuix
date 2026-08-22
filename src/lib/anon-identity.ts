@@ -183,13 +183,12 @@ const VALID_LETTER_LAYOUTS: readonly LetterLayout[] = [
 	"line",
 ];
 
-// No stored preference means "use the caller's default": the classic board
-// defaults to circle, the redesigned board defaults to line, so the fallback
-// is left to the call site instead of hardcoded here.
-export function getLetterLayout(
-	defaultLayout: LetterLayout = "circle",
-): LetterLayout {
-	if (typeof window === "undefined") return defaultLayout;
+// The board starts on the circle; a player can pick the grid or the line in
+// /preferencies.
+const DEFAULT_LETTER_LAYOUT: LetterLayout = "circle";
+
+export function getLetterLayout(): LetterLayout {
+	if (typeof window === "undefined") return DEFAULT_LETTER_LAYOUT;
 	try {
 		const stored = window.localStorage.getItem(LETTER_LAYOUT_KEY);
 		if (stored && (VALID_LETTER_LAYOUTS as string[]).includes(stored)) {
@@ -198,7 +197,7 @@ export function getLetterLayout(
 	} catch {
 		// Storage may be unavailable (private mode); fall back to the default.
 	}
-	return defaultLayout;
+	return DEFAULT_LETTER_LAYOUT;
 }
 
 export function setLetterLayout(layout: LetterLayout): void {

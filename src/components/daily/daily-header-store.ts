@@ -1,22 +1,12 @@
 import { useSyncExternalStore } from "react";
 
-// Today's progress, published by the Daily page and read by the shared header.
-// The redesigned header folds the progress ring and the counters into the app
-// chrome, so the board gets the whole screen below it — but the header lives
-// above the route outlet and can't reach into the game's state, hence this tiny
-// store. null whenever the daily puzzle isn't mounted (other routes, SSR,
-// generation), so the header falls back to its usual row.
+// The share action for today's board, published by the Daily page and read by
+// the shared header. The header lives above the route outlet and can't reach
+// into the game's state, hence this tiny store. null whenever the daily puzzle
+// isn't mounted (other routes, SSR, generation), which is also how the header
+// knows to hide the share button.
 
 export type DailyHeaderSummary = {
-	found: number;
-	total: number;
-	guessCount: number;
-	// Progress inside the current cycle toward the free letter that off-puzzle
-	// words earn, and whether that meter is enabled at all.
-	bonusInCycle: number;
-	bonusTarget: number;
-	showBonus: boolean;
-	justEarnedBonus: boolean;
 	onShare: () => void;
 };
 
