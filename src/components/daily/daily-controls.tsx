@@ -25,15 +25,26 @@ const CIRCLE_KEY_SIZE = "clamp(3.25rem, 2.5rem + 3vw, 4rem)";
 // margin whatever size the wheel ends up at.
 const CIRCLE_RADIUS_FACTOR = 1.2;
 
+// Row layout: every key plus the submit has to fit on one line at any width,
+// so the key is sized from the width the row is actually given (--row-key, see
+// rowStyle below) rather than from a fixed value. The cap is the size the keys
+// used to have, so a wide phone still gets a keyboard rather than a handful of
+// oversized buttons.
+const ROW_MAX_KEY_REM = 3.25;
+// Floor for the same clamp. Today's puzzles are always six letters, which fits
+// down to the narrowest phone; the floor only keeps the width a valid length if
+// a future puzzle carries enough keys to drive the division to zero.
+const ROW_MIN_KEY_REM = 1.5;
+const ROW_GAP_REM = 0.375;
+// The submit sits a little apart from the letters; counted into the fit so the
+// row still lands inside the panel.
+const ROW_SUBMIT_GAP_REM = 0.25;
+
 type DailyControlsProps = {
 	aiClueMode: boolean;
 	// How the letters are arranged: around the submit button, in a three-column
 	// grid, or in a single row. Independent of where the panel sits.
 	layout: LetterLayout;
-	// Redesigned board: the panel sits in the page flow under the word rail
-	// instead of being pinned to the bottom of the viewport, so it carries none
-	// of the sheet chrome and stays as short as the layout allows.
-	inFlow?: boolean;
 	canUseHint: boolean;
 	currentGuess: string;
 	// Reports the panel's height, which the board above it needs to know: the
@@ -61,7 +72,6 @@ type DailyControlsProps = {
 export function DailyControls({
 	aiClueMode,
 	layout,
-	inFlow = false,
 	canUseHint,
 	currentGuess,
 	hintsUsed,
@@ -162,32 +172,51 @@ export function DailyControls({
 
 	const isRow = layout === "line";
 	const isCircle = layout === "circle";
-	// The row packs seven keys across, so it uses its own smaller square; the
-	// grid has room for the full-size key on any board. The circle's keys are
-	// sized from --circle-key instead (see circleKeyStyle below).
+	// The grid has room for the full-size key on any board. The circle and the
+	// row size their keys from a custom property instead (--circle-key and
+	// --row-key, see the styles below).
 	const keySizeClass = isRow
-		? "size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+		? "shrink-0"
 		: isCircle
 			? "rounded-full"
 			: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg sm:rounded-xl";
 	const submitSizeClass = isRow
-		? "ml-1 size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
+		? "ml-1 shrink-0"
 		: isCircle
 			? "rounded-full"
 			: "w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl";
-	const circleKeyStyle: CSSProperties | undefined = isCircle
+	// Every letter plus the submit, and everything the row has to fit around
+	// them: the gaps between the keys and the submit's extra breathing room.
+	const rowKeyCount = shuffledLetters.length + 1;
+	const rowReservedRem = (rowKeyCount - 1) * ROW_GAP_REM + ROW_SUBMIT_GAP_REM;
+	const rowStyle: CSSProperties | undefined = isRow
+		? ({
+				gap: `${ROW_GAP_REM}rem`,
+				"--row-key": `clamp(${ROW_MIN_KEY_REM}rem, calc((100cqi - ${rowReservedRem}rem) / ${rowKeyCount}), ${ROW_MAX_KEY_REM}rem)`,
+			} as CSSProperties)
+		: undefined;
+	const rowSquareStyle: CSSProperties | undefined = isRow
+		? {
+				width: "var(--row-key)",
+				height: "var(--row-key)",
+				borderRadius: "calc(var(--row-key) * 0.31)",
+			}
+		: undefined;
+	const keyStyle: CSSProperties | undefined = isCircle
 		? {
 				width: "var(--circle-key)",
 				height: "var(--circle-key)",
 				fontSize: "calc(var(--circle-key) * 0.4)",
 			}
-		: undefined;
-	const circleSubmitStyle: CSSProperties | undefined = isCircle
+		: isRow
+			? { ...rowSquareStyle, fontSize: "calc(var(--row-key) * 0.42)" }
+			: undefined;
+	const submitStyle: CSSProperties | undefined = isCircle
 		? {
 				width: "calc(var(--circle-key) + 0.5rem)",
 				height: "calc(var(--circle-key) + 0.5rem)",
 			}
-		: undefined;
+		: rowSquareStyle;
 
 	const renderLetterButton = (letter: string) => (
 		<Button
@@ -196,10 +225,10 @@ export function DailyControls({
 			size="lg"
 			className={cn(
 				"daily-pressable daily-pressable-key font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
-				isCircle ? "" : "text-xl",
+				isCircle || isRow ? "" : "text-xl",
 				keySizeClass,
 			)}
-			style={circleKeyStyle}
+			style={keyStyle}
 			onPointerDown={(event) =>
 				runPressAction(event, () => onLetterClick(letter))
 			}
@@ -222,11 +251,21 @@ export function DailyControls({
 				"daily-pressable daily-pressable-submit touch-manipulation",
 				submitSizeClass,
 			)}
-			style={circleSubmitStyle}
+			style={submitStyle}
 			disabled={currentGuess.length < 4}
 			aria-label="Comprovar"
 		>
-			<CornerDownLeft className="h-5 w-5" />
+			<CornerDownLeft
+				className={isRow ? "" : "h-5 w-5"}
+				style={
+					isRow
+						? {
+								width: "calc(var(--row-key) * 0.44)",
+								height: "calc(var(--row-key) * 0.44)",
+							}
+						: undefined
+				}
+			/>
 		</Button>
 	);
 
@@ -325,9 +364,13 @@ export function DailyControls({
 			})}
 		</div>
 	) : isRow ? (
-		<div className="flex items-center justify-center gap-1.5">
-			{shuffledLetters.map((letter) => renderLetterButton(letter))}
-			{submitButton}
+		// The outer box is the container --row-key measures against; an element
+		// can't query its own size, so the row itself has to be the child.
+		<div className="w-full [container-type:inline-size]">
+			<div className="flex items-center justify-center" style={rowStyle}>
+				{shuffledLetters.map((letter) => renderLetterButton(letter))}
+				{submitButton}
+			</div>
 		</div>
 	) : (
 		<div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -374,20 +417,10 @@ export function DailyControls({
 	return (
 		<div
 			ref={measurePanel}
-			className={cn(
-				inFlow
-					? "shrink-0 select-none"
-					: "fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto",
-			)}
+			className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto"
 		>
-			<div
-				className={cn(
-					inFlow
-						? "pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
-						: "rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto",
-				)}
-			>
-				<div className={cn("hidden lg:text-left", inFlow ? null : "lg:block")}>
+			<div className="rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto">
+				<div className="hidden lg:block lg:text-left">
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
@@ -396,19 +429,9 @@ export function DailyControls({
 						espai.
 					</p>
 				</div>
-				<div className={cn(inFlow ? "px-2" : "p-2 lg:px-0 lg:pt-2")}>
-					<div
-						className={cn(
-							"flex flex-col items-center",
-							inFlow ? "gap-2" : "gap-3 lg:gap-6",
-						)}
-					>
-						<div
-							className={cn(
-								"relative w-full overflow-hidden",
-								inFlow ? "h-11" : "h-9 sm:h-12 border-b-2 border-primary/60",
-							)}
-						>
+				<div className="p-2 lg:px-0 lg:pt-2">
+					<div className="flex flex-col items-center gap-3 lg:gap-6">
+						<div className="relative w-full overflow-hidden h-9 sm:h-12 border-b-2 border-primary/60">
 							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
 								<span data-slot="current-guess">{currentGuess}</span>
 								{submitFeedback ? (

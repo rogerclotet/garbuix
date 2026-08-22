@@ -5,9 +5,6 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 
-// PostHog flag for the redesigned board: off keeps today's layout.
-export const REDESIGN_FLAG = "mobile-redesign";
-
 export function buildHistoryEntry(
 	puzzle: DailyPuzzlePublic,
 	progress: PuzzleProgressState,
@@ -243,10 +240,9 @@ function countDisplayedSlotLetters(
 	return revealedLetterCount;
 }
 
-// The colour a word carries across the redesigned board: its pill, the panel
-// that opens above the rail, and the cells it highlights on the grid. Peer help
-// wins over an AI clue so a word someone answered for you reads as social even
-// if you also spent a hint on it.
+// The colour a selected word carries on the grid. Peer help wins over an AI
+// clue so a word someone answered for you reads as social even if you also
+// spent a hint on it.
 export type WordTone = "found" | "social" | "clue" | "plain";
 
 export function getWordTone(state: {
