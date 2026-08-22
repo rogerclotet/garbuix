@@ -59,6 +59,9 @@ export default function Header() {
 	// The redesigned header only takes over on the daily board, and only once the
 	// game has published its progress — every other route keeps the usual row.
 	const showDailyHeader = isRedesign && !innerTitle && dailySummary != null;
+	// Inner pages get the same narrow app bar, but with a back arrow and the
+	// section title standing in for the ring and try count.
+	const showInnerRedesignHeader = isRedesign && !!innerTitle;
 	const navigate = useNavigate();
 	const router = useRouter();
 	const { incomingRequests } = useClueRequests();
@@ -104,12 +107,14 @@ export default function Header() {
 		void navigate({ to: "/", replace: true });
 	};
 
-	// Trophy / help badge / avatar, shared by both header layouts. The redesigned
+	// Trophy / help badge / avatar, shared by all header layouts. The redesigned
 	// row also has a ring and two lines of text to fit, so its buttons are a size
 	// smaller and it carries the share action the progress meters used to own.
-	const actionButtons = (compact: boolean) => (
+	// Inner pages (classificació, dies anteriors, preferències) drop the share
+	// and ranking actions entirely, same as the old design did.
+	const actionButtons = (compact: boolean, showNav: boolean) => (
 		<div className={cn("flex items-center", compact ? "gap-0.5" : "gap-2")}>
-			{compact ? (
+			{compact && showNav ? (
 				<Button
 					variant="ghost"
 					size="icon"
@@ -120,7 +125,7 @@ export default function Header() {
 					<Share2 className="size-[18px]" />
 				</Button>
 			) : null}
-			{pathname !== "/classificacio" ? (
+			{showNav && pathname !== "/classificacio" ? (
 				<Button
 					variant="ghost"
 					size={compact ? "icon" : "icon-lg"}
@@ -218,7 +223,40 @@ export default function Header() {
 							) : null}
 						</p>
 					</div>
-					{actionButtons(true)}
+					{actionButtons(true, true)}
+				</div>
+				{dialogs}
+			</header>
+		);
+	}
+
+	// Inner pages: same narrow app bar as the daily board, but the ring becomes
+	// a back arrow and the try count becomes the section title.
+	if (showInnerRedesignHeader) {
+		return (
+			<header className="bg-background transition-colors duration-300">
+				<div className="mx-auto flex max-w-2xl items-center gap-3 px-3 pt-[calc(env(safe-area-inset-top)+0.625rem)] pb-2 sm:px-4">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={goHome}
+						className="size-9 -ml-1 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+						aria-label="Tornar"
+					>
+						<ChevronLeft className="size-5" />
+					</Button>
+					<div className="min-w-0 flex-1">
+						<Link
+							to="/"
+							className="block truncate text-[15px] font-bold tracking-tight text-primary transition-opacity hover:opacity-80"
+						>
+							Garbuix!
+						</Link>
+						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
+							{innerTitle}
+						</p>
+					</div>
+					{actionButtons(true, false)}
 				</div>
 				{dialogs}
 			</header>
@@ -258,7 +296,7 @@ export default function Header() {
 					{!innerTitle ? (
 						<DifficultyBars difficulty={dailyDifficulty} showLabel />
 					) : null}
-					{actionButtons(false)}
+					{actionButtons(false, true)}
 				</div>
 			</div>
 			{dialogs}
