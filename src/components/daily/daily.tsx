@@ -1808,10 +1808,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				completedAt={derivedProgress.completedAt}
 				currentStreak={streakStats.currentStreak}
 				isAnonymous={!activeUser}
-				onShare={() => {
-					setWinDialogOpen(false);
-					void handleShare();
-				}}
 				onSignIn={() => {
 					void signInWithGoogle("win_dialog");
 				}}
