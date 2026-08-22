@@ -172,8 +172,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	useEffect(() => {
 		setLetterLayout(getLetterLayout(isRedesign ? "line" : "circle"));
 	}, [isRedesign]);
-	const circleLetters = letterLayout === "circle";
-	const railLetters = letterLayout === "line";
+	// The classic board has no single-row arrangement, so a player who picked
+	// the line while on the redesign falls back to its grid there.
+	const classicLetterLayout: LetterLayout =
+		letterLayout === "line" ? "grid" : letterLayout;
 	const {
 		subscribe: subscribeClueRequests,
 		requestClue,
@@ -1565,8 +1567,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 					<DailyControls
 						aiClueMode
-						railLetters={railLetters}
-						circleLetters={circleLetters}
+						inFlow
+						layout={letterLayout}
 						canUseHint={canUseSelfHint}
 						currentGuess={currentGuess}
 						hintsUsed={derivedProgress.hintsUsed}
@@ -1724,7 +1726,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 							<div className="mt-6 flex min-h-0 flex-col gap-6 lg:mt-0 lg:h-full lg:min-h-0">
 								<DailyControls
 									aiClueMode
-									circleLetters={circleLetters}
+									layout={classicLetterLayout}
 									canUseHint={canUseSelfHint}
 									currentGuess={currentGuess}
 									hintsUsed={derivedProgress.hintsUsed}
