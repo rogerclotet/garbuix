@@ -1,9 +1,8 @@
-import { Loader2Icon, Share2 } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { openProfilePreferencesTip } from "@/components/profile-preferences-tip-store";
-import { Button } from "@/components/ui/button";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -1482,17 +1481,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				{streakStats.currentStreak >= 3 ? (
 					<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
 				) : null}
-				{isRedesign ? null : (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="gap-1.5 h-7 px-2 ml-auto"
-						onClick={() => void handleShare()}
-					>
-						<Share2 className="w-3.5 h-3.5" />
-						Compartir
-					</Button>
-				)}
 			</div>
 		</div>
 	);
