@@ -1,7 +1,6 @@
-import { LogIn, Share2 } from "lucide-react";
+import { LogIn } from "lucide-react";
 import {
 	AlertDialog,
-	AlertDialogAction,
 	AlertDialogCancel,
 	AlertDialogContent,
 	AlertDialogDescription,
@@ -20,7 +19,6 @@ type WinDialogProps = {
 	completedAt: string | null;
 	currentStreak: number;
 	isAnonymous: boolean;
-	onShare: () => void;
 	onSignIn: () => void;
 };
 
@@ -45,7 +43,6 @@ export function WinDialog({
 	completedAt,
 	currentStreak,
 	isAnonymous,
-	onShare,
 	onSignIn,
 }: WinDialogProps) {
 	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
@@ -107,14 +104,6 @@ export function WinDialog({
 
 				<AlertDialogFooter>
 					<AlertDialogCancel>Tancar</AlertDialogCancel>
-					<AlertDialogAction
-						onClick={() => {
-							onShare();
-						}}
-					>
-						<Share2 className="size-4" />
-						Compartir resultat
-					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
