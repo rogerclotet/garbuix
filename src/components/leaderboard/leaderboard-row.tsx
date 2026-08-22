@@ -19,7 +19,7 @@ export function LeaderboardRow({
 	return (
 		<li
 			className={cn(
-				"flex gap-3 rounded-md border border-transparent px-3 py-2",
+				"flex gap-3 rounded-md border border-transparent py-2 pr-3 pl-2",
 				highlighted && "border-border bg-muted/60 text-foreground",
 			)}
 			aria-current={highlighted ? "true" : undefined}
