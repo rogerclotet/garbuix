@@ -201,7 +201,11 @@ export default function Header() {
 							Garbuix!
 						</Link>
 						<p className="truncate text-xs font-medium text-muted-foreground font-ui">
-							{remaining === 0 ? "Completat" : `${remaining} per trobar`}
+							{remaining === 0
+								? "Completat"
+								: `${dailySummary.guessCount} ${
+										dailySummary.guessCount === 1 ? "intent" : "intents"
+									}`}
 							{showBonus ? (
 								<>
 									<span className="text-muted-foreground/50"> · </span>

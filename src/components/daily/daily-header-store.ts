@@ -10,6 +10,7 @@ import { useSyncExternalStore } from "react";
 export type DailyHeaderSummary = {
 	found: number;
 	total: number;
+	guessCount: number;
 	// Progress inside the current cycle toward the free letter that off-puzzle
 	// words earn, and whether that meter is enabled at all.
 	bonusInCycle: number;
