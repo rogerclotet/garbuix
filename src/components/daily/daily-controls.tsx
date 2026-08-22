@@ -5,7 +5,7 @@ import {
 	Shuffle,
 	Sparkles,
 } from "lucide-react";
-import type { MouseEvent, PointerEvent } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { LetterLayout } from "@/lib/anon-identity";
@@ -14,9 +14,16 @@ import type { DailySubmitFeedback } from "./daily-types";
 
 const HINT_HOLD_MS = 600;
 
-// Distance in rem from the circle's center to each letter button. Sized so the
-// six letters clear each other and the container stays compact on mobile.
-const CIRCLE_RADIUS_REM = 4.25;
+// Circle layout: every size below is derived from this one clamp, set as the
+// --circle-key custom property on the wheel, so the keys, the submit button,
+// the wheel itself, and the letters' font size all scale together and in
+// proportion at any screen width instead of jumping between fixed sizes at
+// the sm/md breakpoints.
+const CIRCLE_KEY_SIZE = "clamp(3.25rem, 2.5rem + 3vw, 4rem)";
+// Multiplier from key size to the distance between the wheel's center and
+// each letter button, tuned so the six letters clear each other by the same
+// margin whatever size the wheel ends up at.
+const CIRCLE_RADIUS_FACTOR = 1.2;
 
 type DailyControlsProps = {
 	aiClueMode: boolean;
@@ -156,19 +163,31 @@ export function DailyControls({
 	const isRow = layout === "line";
 	const isCircle = layout === "circle";
 	// The row packs seven keys across, so it uses its own smaller square; the
-	// other two arrangements have room for the full-size key on any board.
+	// grid has room for the full-size key on any board. The circle's keys are
+	// sized from --circle-key instead (see circleKeyStyle below).
 	const keySizeClass = isRow
 		? "size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
-		: cn(
-				"w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16",
-				isCircle ? "rounded-full" : "rounded-lg sm:rounded-xl",
-			);
+		: isCircle
+			? "rounded-full"
+			: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg sm:rounded-xl";
 	const submitSizeClass = isRow
 		? "ml-1 size-[2.875rem] shrink-0 rounded-[0.9rem] sm:size-13"
-		: cn(
-				"w-14 h-14 sm:w-16 sm:h-16",
-				isCircle ? "rounded-full" : "rounded-lg sm:rounded-xl",
-			);
+		: isCircle
+			? "rounded-full"
+			: "w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl";
+	const circleKeyStyle: CSSProperties | undefined = isCircle
+		? {
+				width: "var(--circle-key)",
+				height: "var(--circle-key)",
+				fontSize: "calc(var(--circle-key) * 0.4)",
+			}
+		: undefined;
+	const circleSubmitStyle: CSSProperties | undefined = isCircle
+		? {
+				width: "calc(var(--circle-key) + 0.5rem)",
+				height: "calc(var(--circle-key) + 0.5rem)",
+			}
+		: undefined;
 
 	const renderLetterButton = (letter: string) => (
 		<Button
@@ -176,9 +195,11 @@ export function DailyControls({
 			variant="outline"
 			size="lg"
 			className={cn(
-				"daily-pressable daily-pressable-key text-xl font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
+				"daily-pressable daily-pressable-key font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
+				isCircle ? "" : "text-xl",
 				keySizeClass,
 			)}
+			style={circleKeyStyle}
 			onPointerDown={(event) =>
 				runPressAction(event, () => onLetterClick(letter))
 			}
@@ -201,6 +222,7 @@ export function DailyControls({
 				"daily-pressable daily-pressable-submit touch-manipulation",
 				submitSizeClass,
 			)}
+			style={circleSubmitStyle}
 			disabled={currentGuess.length < 4}
 			aria-label="Comprovar"
 		>
@@ -269,15 +291,24 @@ export function DailyControls({
 	// The keys themselves, without the surrounding actions: a wheel around the
 	// submit button, a three-column grid, or one row that ends in the submit.
 	const lettersLayout = isCircle ? (
-		<div className="relative h-[12rem] w-[12rem] shrink-0 overflow-visible sm:h-[13rem] sm:w-[13rem]">
+		<div
+			className="relative shrink-0 overflow-visible"
+			style={
+				{
+					"--circle-key": CIRCLE_KEY_SIZE,
+					width: "calc(var(--circle-key) * 3.4)",
+					height: "calc(var(--circle-key) * 3.4)",
+				} as CSSProperties
+			}
+		>
 			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
 				{submitButton}
 			</div>
 			{shuffledLetters.map((letter, index) => {
 				const angle =
 					(index / shuffledLetters.length) * 2 * Math.PI - Math.PI / 2;
-				const x = Math.cos(angle) * CIRCLE_RADIUS_REM;
-				const y = Math.sin(angle) * CIRCLE_RADIUS_REM;
+				const x = (CIRCLE_RADIUS_FACTOR * Math.cos(angle)).toFixed(4);
+				const y = (CIRCLE_RADIUS_FACTOR * Math.sin(angle)).toFixed(4);
 				return (
 					<div
 						key={`letter-${letter}`}
@@ -285,7 +316,7 @@ export function DailyControls({
 						style={{
 							left: "50%",
 							top: "50%",
-							transform: `translate(calc(-50% + ${x}rem), calc(-50% + ${y}rem))`,
+							transform: `translate(calc(-50% + var(--circle-key) * ${x}), calc(-50% + var(--circle-key) * ${y}))`,
 						}}
 					>
 						{renderLetterButton(letter)}
