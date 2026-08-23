@@ -61,7 +61,6 @@ import {
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	getWordCellKeys,
-	getWordTone,
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -249,9 +248,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
 	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
-	// The word tapped in the list, tinted on the board until it is tapped again,
-	// another word is tapped, or it is solved.
-	const [selectedWordId, setSelectedWordId] = useState<number | null>(null);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
@@ -1213,11 +1209,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}, LOCATE_FLASH_MS);
 			});
 
-			// The flash fades, so the tap also selects the word: its cells stay
-			// tinted until it is tapped again, another word is tapped, or it is
-			// solved.
-			setSelectedWordId((current) => (current === wordId ? null : wordId));
-
 			const grid = gridRef.current;
 			if (grid && window.matchMedia("(max-width: 1023px)").matches) {
 				const rect = grid.getBoundingClientRect();
@@ -1229,37 +1220,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		},
 		[puzzle.wordSlots],
 	);
-
-	// Cells of the selected word, plus the colour that word's state gives it, so
-	// the board marks it in the same shade its list row carries.
-	const selectedCells = useMemo(() => {
-		if (selectedWordId == null) return new Set<string>();
-		const slot = puzzle.wordSlots.find((item) => item.id === selectedWordId);
-		return slot ? getWordCellKeys(slot) : new Set<string>();
-	}, [selectedWordId, puzzle.wordSlots]);
-
-	const selectedTone = useMemo(() => {
-		if (selectedWordId == null) return "plain" as const;
-		return getWordTone({
-			isFound: derivedProgress.guessedWordIds.includes(selectedWordId),
-			hasPeerHelp: Boolean(receivedClues[selectedWordId]),
-			hasClue: Boolean(clueTextsByWordId[selectedWordId]),
-		});
-	}, [
-		clueTextsByWordId,
-		derivedProgress.guessedWordIds,
-		selectedWordId,
-		receivedClues,
-	]);
-
-	// Solving the selected word drops the tint: the guess animation already
-	// marks those cells, and a solved word needs no locating.
-	useEffect(() => {
-		if (selectedWordId == null) return;
-		if (derivedProgress.guessedWordIds.includes(selectedWordId)) {
-			setSelectedWordId(null);
-		}
-	}, [derivedProgress.guessedWordIds, selectedWordId]);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
 
@@ -1605,8 +1565,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								clueCells={clueGridCells}
 								clueCellsFading={clueGridFading}
 								locateCells={locateCells}
-								selectedCells={selectedCells}
-								selectedTone={selectedTone}
 							/>
 						</div>
 					</div>

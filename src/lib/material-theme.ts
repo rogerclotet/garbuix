@@ -26,14 +26,6 @@ const appScheme = {
 		"chart-3": "#a89e93",
 		"chart-4": "#d4a853",
 		"chart-5": "#c4443a",
-		// Shades for the cells of the word selected on the board: a neutral
-		// default, plus pista and ajuda accents so a word carrying an AI clue or
-		// peer help reads as such. Pista sits in the pink rather than the
-		// orange/warning end of the palette, away from destructive.
-		"game-cell-active": "#d6cab4",
-		"game-cell-active-border": "#c2b49a",
-		"game-clue": "#b0568a",
-		"game-social": "#5566bb",
 		sidebar: "#faf8f5",
 		"sidebar-foreground": "#2c2825",
 		"sidebar-primary": "#2a7d6e",
@@ -68,10 +60,6 @@ const appScheme = {
 		"chart-3": "#a89e93",
 		"chart-4": "#d4a853",
 		"chart-5": "#f0918a",
-		"game-cell-active": "#3d3629",
-		"game-cell-active-border": "#524839",
-		"game-clue": "#dd8fb6",
-		"game-social": "#8f97e0",
 		sidebar: "#1c1a17",
 		"sidebar-foreground": "#e5e0d8",
 		"sidebar-primary": "#5ec4b0",
