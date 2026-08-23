@@ -1,16 +1,6 @@
 import { type CSSProperties, useMemo } from "react";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
-import { getSlotCellKey, type WordTone } from "./daily-helpers";
-
-// How the still-empty cells of the selected word are highlighted. A revealed
-// cell keeps its solved shade whatever word is selected, so only the blanks
-// carry the word's own colour — the same one its row carries in the list.
-const SELECTED_EMPTY_CELL_CLASSES: Record<WordTone, string> = {
-	found: "bg-game-cell-active border-game-cell-active-border",
-	plain: "bg-game-cell-active border-game-cell-active-border",
-	clue: "bg-game-clue/18 border-game-clue/55",
-	social: "bg-game-social/18 border-game-social/55",
-};
+import { getSlotCellKey } from "./daily-helpers";
 
 type DailyGridProps = {
 	puzzle: DailyPuzzlePublic;
@@ -24,10 +14,6 @@ type DailyGridProps = {
 	clueCells?: Set<string>;
 	clueCellsFading?: boolean;
 	locateCells?: Set<string>;
-	// Cells of the selected word, marked for as long as it stays selected and
-	// tinted with the colour that word carries in the list.
-	selectedCells?: Set<string>;
-	selectedTone?: WordTone;
 	// Classic board: keep the width-driven grid, but never let it grow taller
 	// than the box it sits in.
 	fitHeight?: boolean;
@@ -45,8 +31,6 @@ export function DailyGrid({
 	clueCells,
 	clueCellsFading = false,
 	locateCells,
-	selectedCells,
-	selectedTone = "plain",
 	fitHeight = false,
 }: DailyGridProps) {
 	const animatingCellKeys = useMemo(() => {
@@ -154,7 +138,6 @@ export function DailyGrid({
 				const isJustGuessed = isJustLanded || highlightedLetterIndex != null;
 				const isClueCell = clueCells?.has(key) ?? false;
 				const isLocateCell = locateCells?.has(key) ?? false;
-				const isSelectedCell = selectedCells?.has(key) ?? false;
 				const middleDotMarker = middleDotMarkers.get(key);
 
 				if (!cell) {
@@ -176,12 +159,8 @@ export function DailyGrid({
 						}
 						className={`relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square rounded-[0.4rem] sm:rounded-[0.6rem] text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
 							isRevealed
-								? isSelectedCell
-									? "bg-primary/20 border-primary text-foreground"
-									: "bg-primary/12 border-primary/40 text-foreground"
-								: isSelectedCell
-									? SELECTED_EMPTY_CELL_CLASSES[selectedTone]
-									: "bg-muted border-border/50"
+								? "bg-primary/12 border-primary/40 text-foreground"
+								: "bg-muted border-border/50"
 						} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 					>
 						{showLetter ? (

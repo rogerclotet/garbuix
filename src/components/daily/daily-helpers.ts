@@ -240,22 +240,6 @@ function countDisplayedSlotLetters(
 	return revealedLetterCount;
 }
 
-// The colour a selected word carries on the grid. Peer help wins over an AI
-// clue so a word someone answered for you reads as social even if you also
-// spent a hint on it.
-export type WordTone = "found" | "social" | "clue" | "plain";
-
-export function getWordTone(state: {
-	isFound: boolean;
-	hasPeerHelp: boolean;
-	hasClue: boolean;
-}): WordTone {
-	if (state.isFound) return "found";
-	if (state.hasPeerHelp) return "social";
-	if (state.hasClue) return "clue";
-	return "plain";
-}
-
 export function getSortedWordSlots(
 	wordSlots: DailyPuzzleWordSlot[],
 	guessedWordIds: number[],
