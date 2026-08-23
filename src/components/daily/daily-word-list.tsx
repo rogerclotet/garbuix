@@ -1,8 +1,8 @@
 import {
 	Check,
-	CheckCircle2,
 	ClipboardCopy,
 	HelpingHand,
+	Info,
 	Loader2,
 	Users,
 } from "lucide-react";
@@ -320,14 +320,19 @@ export function DailyWordList({
 						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3 scroll-mt-4"
 					>
 						<div className="flex items-center gap-2">
-							<CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />
+							<Check className="w-5 h-5 shrink-0 text-primary" />
+							<span className="font-medium text-foreground tracking-widest">
+								{revealedAnswers[slot.id]?.toUpperCase()}
+							</span>
 							<a
 								href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="font-medium text-foreground tracking-widest hover:underline"
+								className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+								aria-label={`Consulta la definició de ${revealedAnswers[slot.id]?.toUpperCase() ?? ""} a l'Optimot`}
+								title="Consulta la definició a l'Optimot"
 							>
-								{revealedAnswers[slot.id]?.toUpperCase()}
+								<Info className="size-4" />
 							</a>
 							<span className="text-xs text-muted-foreground ml-auto font-ui">
 								{slot.length} lletres
