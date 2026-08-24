@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const iconsDir = path.join(__dirname, "..", "public", "icons");
 
 const TEAL = "#2a7d6e";
-const TEAL_TILE = "#a9d1c8";
+const TEAL_BRIGHT = "#5ec4b0";
 const DARK_BG = "#1c1a17";
 
 
@@ -83,10 +83,10 @@ function faviconSvg(size: number): string {
 
 	return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
 		<g transform="translate(${offsetX}, ${offsetY}) scale(${scale})">
-		<g fill="${TEAL_TILE}">
+		<g fill="${DARK_BG}">
 		${renderTilePaths()}
 		</g>
-		<g fill="${TEAL}">
+		<g fill="${TEAL_BRIGHT}">
 		${renderLogoPaths()}
 		</g>
 		</g>
@@ -104,7 +104,7 @@ async function generateIcon(svg: string, outputPath: string, size: number) {
 async function main() {
 	console.log("Generating app icons with teal theme...\n");
 
-	// Favicon 196 — teal logo on soft-teal rounded tiles, transparent background
+	// Favicon 196 — bright teal logo on dark rounded tiles, transparent background
 	const favicon196Svg = faviconSvg(196);
 	await generateIcon(favicon196Svg, path.join(iconsDir, "favicon-196.png"), 196);
 
