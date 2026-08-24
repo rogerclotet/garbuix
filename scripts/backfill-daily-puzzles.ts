@@ -1,6 +1,6 @@
-import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-service.server";
 import { sql } from "@/lib/db";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-service.server";
 
 function getArg(flag: string) {
 	const index = process.argv.indexOf(flag);
@@ -15,11 +15,13 @@ function addOneDay(dateKey: string) {
 
 async function main() {
 	const today = getTodayDateKey();
-	const from = getArg("--from") ?? (() => {
-		const date = new Date(`${today}T12:00:00.000Z`);
-		date.setUTCDate(date.getUTCDate() - 365);
-		return date.toISOString().slice(0, 10);
-	})();
+	const from =
+		getArg("--from") ??
+		(() => {
+			const date = new Date(`${today}T12:00:00.000Z`);
+			date.setUTCDate(date.getUTCDate() - 365);
+			return date.toISOString().slice(0, 10);
+		})();
 	const to = getArg("--to") ?? today;
 
 	let current = from;

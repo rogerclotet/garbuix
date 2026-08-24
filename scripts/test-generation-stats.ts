@@ -18,25 +18,25 @@ type DayAnalysis = {
 	letterSetKey: string;
 	eligibleCount: number;
 	selectedWords: string[];
-}
+};
 
 type ParsedArgs = {
 	from: string;
 	days: number;
 	top: number;
-}
+};
 
 type LetterSetEntry = {
 	letters: string[];
 	count: number;
 	dates: string[];
-}
+};
 
 type WordEntry = {
 	displayName: string;
 	eligibleDays: number;
 	selectedDays: number;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -192,7 +192,9 @@ function printOverview(
 	const to = addDays(from, days - 1);
 	console.log("=== Section 1: Overview ===");
 	console.log(`Range: ${from} to ${to} (${days} days)`);
-	console.log(`Total viable letter sets in dictionary: ${totalViableLetterSets}`);
+	console.log(
+		`Total viable letter sets in dictionary: ${totalViableLetterSets}`,
+	);
 	console.log("");
 }
 
@@ -202,9 +204,7 @@ function printLetterSetDiversity(
 ) {
 	const uniqueSets = letterSetStats.size;
 	const ratio = uniqueSets / days;
-	const sorted = [...letterSetStats.values()].sort(
-		(a, b) => b.count - a.count,
-	);
+	const sorted = [...letterSetStats.values()].sort((a, b) => b.count - a.count);
 	const maxRepeatEntry = sorted[0];
 	const singleUseSets = sorted.filter((e) => e.count === 1).length;
 
@@ -270,8 +270,12 @@ function printConsecutiveDaySimilarity(daily: DayAnalysis[]) {
 	console.log(
 		`Max letters shared with previous day: ${Math.max(...overlaps, 0)}`,
 	);
-	console.log(`Days with 5+ shared letters (near-duplicate): ${nearDuplicates}`);
-	console.log(`Days with 6 shared letters (exact duplicate): ${exactDuplicates}`);
+	console.log(
+		`Days with 5+ shared letters (near-duplicate): ${nearDuplicates}`,
+	);
+	console.log(
+		`Days with 6 shared letters (exact duplicate): ${exactDuplicates}`,
+	);
 	console.log("");
 }
 

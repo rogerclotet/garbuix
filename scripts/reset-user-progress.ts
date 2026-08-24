@@ -129,7 +129,9 @@ async function main(): Promise<void> {
 	const [progressCount, eventCount, legacyCount] = await Promise.all([
 		countRows(userPuzzleProgress, progressWhere),
 		countRows(userPuzzleEvents, eventsWhere),
-		includeLegacy ? countRows(legacyImportedResults, legacyWhere) : Promise.resolve(0),
+		includeLegacy
+			? countRows(legacyImportedResults, legacyWhere)
+			: Promise.resolve(0),
 	]);
 
 	console.log(`User: ${account.email} (${account.id})`);

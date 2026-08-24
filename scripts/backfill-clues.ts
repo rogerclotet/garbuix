@@ -46,7 +46,10 @@ function resolveRange(): { from: string; to: string } {
 		return { from: date, to: date };
 	}
 
-	const from = assertValidDateKey(getArg("--from") ?? getTodayDateKey(), "--from");
+	const from = assertValidDateKey(
+		getArg("--from") ?? getTodayDateKey(),
+		"--from",
+	);
 	const to = assertValidDateKey(getArg("--to") ?? from, "--to");
 	if (to < from) {
 		throw new Error(`--to (${to}) must not be before --from (${from}).`);
