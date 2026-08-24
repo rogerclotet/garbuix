@@ -64,7 +64,8 @@ async function main() {
 
 	const dateKey = getArg("--date") ?? getTodayDateKey();
 	const requesterName = getArg("--name") ?? "Jugador de prova";
-	const requesterId = getArg("--user") ?? `seed-${crypto.randomUUID().slice(0, 8)}`;
+	const requesterId =
+		getArg("--user") ?? `seed-${crypto.randomUUID().slice(0, 8)}`;
 
 	const puzzle = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.dateKey, dateKey),

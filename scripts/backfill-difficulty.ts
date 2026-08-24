@@ -3,11 +3,11 @@ import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { dailyPuzzles } from "@/db/schema";
 import { db, sql } from "@/lib/db";
+import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import {
 	buildWordFrequencyLookup,
 	computeDifficultyForNormalizedWords,
 } from "@/lib/puzzle-difficulty";
-import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 
 // Recompute and persist the 1-3 star difficulty for stored puzzles. Difficulty
 // is derived from the puzzle's word frequencies, which the public snapshot

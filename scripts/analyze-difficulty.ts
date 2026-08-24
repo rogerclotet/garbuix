@@ -2,15 +2,15 @@ import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import {
-	difficultyFromMeanLogFrequency,
-	meanLogFrequency,
-	type PuzzleDifficulty,
-} from "@/lib/puzzle-difficulty";
-import {
 	addDaysToDateKey,
 	dateKeyToSeed,
 	getTodayDateKey,
 } from "@/lib/puzzle-dates";
+import {
+	difficultyFromMeanLogFrequency,
+	meanLogFrequency,
+	type PuzzleDifficulty,
+} from "@/lib/puzzle-difficulty";
 
 // Simulates daily puzzle generation over a window and reports the resulting
 // difficulty distribution, so we can confirm the 1-3 star split stays roughly
@@ -50,8 +50,11 @@ function main() {
 	const cache = new Map();
 	const means: number[] = [];
 	const counts: Record<PuzzleDifficulty, number> = { 1: 0, 2: 0, 3: 0 };
-	const recent: Array<{ dateKey: string; mean: number; stars: PuzzleDifficulty }> =
-		[];
+	const recent: Array<{
+		dateKey: string;
+		mean: number;
+		stars: PuzzleDifficulty;
+	}> = [];
 
 	for (let offset = 0; offset < days; offset++) {
 		const dateKey = addDaysToDateKey(from, offset);

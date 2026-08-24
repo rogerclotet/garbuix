@@ -2,10 +2,7 @@ import { eq } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import { dailyPuzzles, userPuzzleProgress } from "@/db/schema";
 import { db, sql } from "@/lib/db";
-import {
-	recordProgress,
-	userParticipantId,
-} from "@/lib/leaderboard.server";
+import { recordProgress, userParticipantId } from "@/lib/leaderboard.server";
 import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import { getRedis, isRedisConfigured } from "@/lib/redis.server";
 
@@ -85,7 +82,9 @@ async function main() {
 	for (const dateKey of dateKeys) {
 		total += await backfillDay(dateKey);
 	}
-	console.log(`[backfill] done, ${total} entries seeded across ${dateKeys.length} day(s)`);
+	console.log(
+		`[backfill] done, ${total} entries seeded across ${dateKeys.length} day(s)`,
+	);
 }
 
 main()

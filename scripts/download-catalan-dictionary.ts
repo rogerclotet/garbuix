@@ -1,6 +1,6 @@
-import type { Word } from "@/data/types";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Word } from "@/data/types";
 
 const MIN_LENGTH = 4;
 const MAX_LENGTH = 12;
@@ -56,7 +56,11 @@ type WordAccumulator = {
 };
 
 async function main() {
-	if (ONLY_IF_MISSING && existsSync(OUTPUT_FILE) && existsSync(GUESS_OUTPUT_FILE)) {
+	if (
+		ONLY_IF_MISSING &&
+		existsSync(OUTPUT_FILE) &&
+		existsSync(GUESS_OUTPUT_FILE)
+	) {
 		console.log(`📚 Using existing dictionaries at ${DATA_DIR}`);
 		return;
 	}
@@ -106,15 +110,14 @@ async function main() {
 
 	const entries = Array.from(words.values())
 		.map(
-				(entry): WordEntry => ({
-					name: entry.name,
-					areatematica: formatLabels(entry.labels),
-					frequency: entry.frequency,
-				}),
-			)
+			(entry): WordEntry => ({
+				name: entry.name,
+				areatematica: formatLabels(entry.labels),
+				frequency: entry.frequency,
+			}),
+		)
 		.sort(
-			(a, b) =>
-				b.frequency - a.frequency || a.name.localeCompare(b.name, "ca"),
+			(a, b) => b.frequency - a.frequency || a.name.localeCompare(b.name, "ca"),
 		);
 
 	const generationWords = entries.filter(

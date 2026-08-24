@@ -215,7 +215,9 @@ function generateBestCrosswordForLetterSet(letters: string[], seed: number) {
 				continue;
 			}
 
-			const selectedWords = result.words.map((placement) => placement.word.name);
+			const selectedWords = result.words.map(
+				(placement) => placement.word.name,
+			);
 			const score = scoreWordLengthProfile(getWordLengthProfile(selectedWords));
 			if (score > bestScore) {
 				bestScore = score;
@@ -501,7 +503,9 @@ function printMonteCarloSummary(
 
 		const eligibleWords = filterWordsByLetters(words, candidate.letters);
 		const topWords = [...appearanceCounts.entries()]
-			.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+			.sort(
+				(left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+			)
 			.slice(0, top)
 			.map(([word, count]) => `${word} (${percent(count / successCount)})`);
 
