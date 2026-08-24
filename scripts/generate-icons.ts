@@ -6,11 +6,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const iconsDir = path.join(__dirname, "..", "public", "icons");
 
 const TEAL = "#2a7d6e";
+const TEAL_TILE = "#a9d1c8";
 const DARK_BG = "#1c1a17";
 
 
 const LOGO_W = 64;
 const LOGO_H = 108;
+const CELL_SIZE = 20;
 const SQUIRCLE_PATH =
 	"M 10 0 C 18 0 20 2 20 10 C 20 18 18 20 10 20 C 2 20 0 18 0 10 C 0 2 2 0 10 0 Z";
 const POSITIONS: ReadonlyArray<readonly [number, number]> = [
@@ -25,6 +27,19 @@ function renderLogoPaths(): string {
 	return POSITIONS.map(
 		([x, y]) =>
 			`<path d="${SQUIRCLE_PATH}" transform="translate(${x}, ${y})" />`,
+	).join("\n\t\t");
+}
+
+// Oversized rounded squares centred on each logo cell. At 28px on a 22px grid
+// they overlap, so the tiles fuse into a single G-shaped backdrop.
+const TILE_SIZE = 28;
+const TILE_RADIUS = 9;
+
+function renderTilePaths(): string {
+	const offset = (CELL_SIZE - TILE_SIZE) / 2;
+	return POSITIONS.map(
+		([x, y]) =>
+			`<rect x="${x + offset}" y="${y + offset}" width="${TILE_SIZE}" height="${TILE_SIZE}" rx="${TILE_RADIUS}" ry="${TILE_RADIUS}" />`,
 	).join("\n\t\t");
 }
 
@@ -57,13 +72,23 @@ function maskableLogoSvg(
 }
 
 function faviconSvg(size: number): string {
-	const { scale, offsetX, offsetY } = fitLogo(size, 0.18);
-	const cornerRadius = size * 0.2;
+	// The tiles bleed past the logo box by half their overhang on each side.
+	const overhang = TILE_SIZE - CELL_SIZE;
+	const boxW = LOGO_W + overhang;
+	const boxH = LOGO_H + overhang;
+	const inner = size - size * 0.06 * 2;
+	const scale = Math.min(inner / boxW, inner / boxH);
+	const offsetX = (size - boxW * scale) / 2 + (overhang / 2) * scale;
+	const offsetY = (size - boxH * scale) / 2 + (overhang / 2) * scale;
 
 	return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-		<rect width="${size}" height="${size}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${DARK_BG}" />
-		<g fill="#ffffff" transform="translate(${offsetX}, ${offsetY}) scale(${scale})">
+		<g transform="translate(${offsetX}, ${offsetY}) scale(${scale})">
+		<g fill="${TEAL_TILE}">
+		${renderTilePaths()}
+		</g>
+		<g fill="${TEAL}">
 		${renderLogoPaths()}
+		</g>
 		</g>
 	</svg>`;
 }
@@ -79,7 +104,7 @@ async function generateIcon(svg: string, outputPath: string, size: number) {
 async function main() {
 	console.log("Generating app icons with teal theme...\n");
 
-	// Favicon 196 — dark rounded square bg with white logo
+	// Favicon 196 — teal logo on soft-teal rounded tiles, transparent background
 	const favicon196Svg = faviconSvg(196);
 	await generateIcon(favicon196Svg, path.join(iconsDir, "favicon-196.png"), 196);
 
