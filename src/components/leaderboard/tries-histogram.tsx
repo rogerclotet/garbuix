@@ -8,6 +8,10 @@ type TriesHistogramProps = {
 	// in full primary and named in the caption, so the mark never rests on color
 	// alone.
 	highlightTries?: number | null;
+	// Who the local player is on the leaderboard, so their own result is only
+	// counted once: from the highlight until the stream echoes their finish
+	// back, from their entry after that.
+	selfParticipantId?: string | null;
 	className?: string;
 };
 
@@ -26,13 +30,14 @@ function describeBucket(label: string, count: number): string {
 export function TriesHistogram({
 	entries,
 	highlightTries,
+	selfParticipantId,
 	className,
 }: TriesHistogramProps) {
 	const { buckets, totalFinishers, maxCount, highlightIndex } =
-		buildTriesHistogram(entries, { highlightTries });
+		buildTriesHistogram(entries, { highlightTries, selfParticipantId });
 
-	// Nothing to show before the first player finishes (or when the leaderboard
-	// isn't available at all).
+	// Nothing to show before the first player finishes. A local player who has
+	// just finished is always counted, so this only holds while nobody has.
 	if (totalFinishers === 0) {
 		return null;
 	}

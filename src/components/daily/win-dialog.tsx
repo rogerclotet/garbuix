@@ -49,7 +49,7 @@ export function WinDialog({
 }: WinDialogProps) {
 	// Read here rather than in Daily: the leaderboard stream ticks on every
 	// player's progress, and the board above shouldn't re-render for it.
-	const { entries } = useLeaderboard();
+	const { entries, localParticipantId } = useLeaderboard();
 	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
 	const showStreak = currentStreak >= 3;
 
@@ -84,7 +84,11 @@ export function WinDialog({
 					) : null}
 				</div>
 
-				<TriesHistogram entries={entries} highlightTries={guessCount} />
+				<TriesHistogram
+					entries={entries}
+					highlightTries={guessCount}
+					selfParticipantId={localParticipantId}
+				/>
 
 				{isAnonymous ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">

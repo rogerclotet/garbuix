@@ -75,7 +75,11 @@ function LeaderboardPage() {
 				</p>
 				<DifficultyBars difficulty={difficulty} label="phrase" />
 			</header>
-			<TriesHistogram entries={entries} highlightTries={localTries} />
+			<TriesHistogram
+				entries={entries}
+				highlightTries={localTries}
+				selfParticipantId={live.localParticipantId}
+			/>
 			<LeaderboardList
 				entries={entries}
 				localParticipantId={live.localParticipantId}

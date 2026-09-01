@@ -71,6 +71,26 @@ describe("tries-histogram", () => {
 		expect(histogram.buckets[0]?.count).toBe(1);
 	});
 
+	it("counts the local player until their own entry reaches the stream", () => {
+		const histogram = buildTriesHistogram([buildEntry("other", 18)], {
+			highlightTries: 26,
+			selfParticipantId: "me",
+		});
+
+		expect(histogram.totalFinishers).toBe(2);
+		expect(histogram.buckets[1]?.count).toBe(1);
+	});
+
+	it("stops counting the local player once their entry arrives", () => {
+		const histogram = buildTriesHistogram(
+			[buildEntry("other", 18), buildEntry("me", 26)],
+			{ highlightTries: 26, selfParticipantId: "me" },
+		);
+
+		expect(histogram.totalFinishers).toBe(2);
+		expect(histogram.buckets[1]?.count).toBe(1);
+	});
+
 	it("points the highlight at the local player's bucket", () => {
 		expect(
 			buildTriesHistogram([buildEntry("a", 17)], { highlightTries: 41 })

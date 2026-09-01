@@ -52,6 +52,19 @@ describe("TriesHistogram", () => {
 		expect(screen.getByTitle("0 jugadors amb 95+ intents")).toBeDefined();
 	});
 
+	it("shows the player's own result before the leaderboard echoes it back", () => {
+		render(
+			<TriesHistogram
+				entries={[buildEntry("other", 18)]}
+				highlightTries={26}
+				selfParticipantId="me"
+			/>,
+		);
+
+		expect(screen.getByText("2 han acabat")).toBeDefined();
+		expect(screen.getByTitle("1 jugador amb 25-34 intents")).toBeDefined();
+	});
+
 	it("names the player's own bucket instead of relying on color", () => {
 		render(
 			<TriesHistogram

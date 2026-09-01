@@ -68,16 +68,28 @@ function hasFinished(entry: LeaderboardEntry): boolean {
 
 export function buildTriesHistogram(
 	entries: LeaderboardEntry[],
-	options?: { highlightTries?: number | null },
+	options?: {
+		// The local player's own try count, once they've finished.
+		highlightTries?: number | null;
+		// Who the local player is on the leaderboard. Their finish reaches the
+		// stream a moment after the puzzle ends, so until their entry shows up
+		// their result is counted here from the highlight: it is certain to
+		// arrive, and a chart that leaves the player out of it reads as wrong.
+		selfParticipantId?: string | null;
+	},
 ): TriesHistogram {
 	const buckets = emptyBuckets();
 	let totalFinishers = 0;
+	let selfCounted = false;
 
 	for (const entry of entries) {
 		if (!hasFinished(entry)) {
 			continue;
 		}
 		totalFinishers += 1;
+		if (entry.participantId === options?.selfParticipantId) {
+			selfCounted = true;
+		}
 		const bucket = buckets[triesBucketIndex(entry.tryCount)];
 		if (bucket) {
 			bucket.count += 1;
@@ -85,10 +97,17 @@ export function buildTriesHistogram(
 	}
 
 	const highlightTries = options?.highlightTries;
-	const highlightIndex =
-		highlightTries != null && Number.isFinite(highlightTries)
-			? triesBucketIndex(highlightTries)
-			: null;
+	const hasHighlight =
+		highlightTries != null && Number.isFinite(highlightTries);
+	const highlightIndex = hasHighlight ? triesBucketIndex(highlightTries) : null;
+
+	if (hasHighlight && !selfCounted && highlightIndex != null) {
+		totalFinishers += 1;
+		const bucket = buckets[highlightIndex];
+		if (bucket) {
+			bucket.count += 1;
+		}
+	}
 
 	return {
 		buckets,
