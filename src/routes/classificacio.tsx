@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
+import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
 import { getLeaderboardSnapshot } from "@/lib/leaderboard-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getDailyPuzzleDifficulty } from "@/lib/puzzle-server-fns";
@@ -59,6 +60,13 @@ function LeaderboardPage() {
 			? live.entries
 			: snapshot.entries;
 
+	// Only mark the reader's own bucket once they've finished today's puzzle.
+	const localEntry = entries.find(
+		(entry) => entry.participantId === live.localParticipantId,
+	);
+	const localTries =
+		localEntry?.completedAt != null ? localEntry.tryCount : null;
+
 	return (
 		<div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 sm:py-10">
 			<header className="flex items-center justify-between gap-3">
@@ -67,6 +75,7 @@ function LeaderboardPage() {
 				</p>
 				<DifficultyBars difficulty={difficulty} label="phrase" />
 			</header>
+			<TriesHistogram entries={entries} highlightTries={localTries} />
 			<LeaderboardList
 				entries={entries}
 				localParticipantId={live.localParticipantId}

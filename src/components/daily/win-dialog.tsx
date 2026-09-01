@@ -1,4 +1,5 @@
 import { LogIn } from "lucide-react";
+import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { formatMadridTime } from "@/lib/puzzle-dates";
+import { useLeaderboard } from "@/lib/use-leaderboard";
 
 type WinDialogProps = {
 	open: boolean;
@@ -45,6 +47,9 @@ export function WinDialog({
 	isAnonymous,
 	onSignIn,
 }: WinDialogProps) {
+	// Read here rather than in Daily: the leaderboard stream ticks on every
+	// player's progress, and the board above shouldn't re-render for it.
+	const { entries } = useLeaderboard();
 	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
 	const showStreak = currentStreak >= 3;
 
@@ -78,6 +83,8 @@ export function WinDialog({
 						<Stat value={`${currentStreak} 🔥`} label="Ratxa (dies)" />
 					) : null}
 				</div>
+
+				<TriesHistogram entries={entries} highlightTries={guessCount} />
 
 				{isAnonymous ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
