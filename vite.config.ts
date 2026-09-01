@@ -7,6 +7,7 @@ import babel from "@rolldown/plugin-babel";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
+import { getSecurityHeaders } from "./src/lib/security-headers";
 
 function readBuildVersions() {
 	try {
@@ -42,6 +43,11 @@ const config = defineConfig(({ mode }) => {
 			];
 
 	return {
+		nitro: {
+			routeRules: {
+				"/**": { headers: getSecurityHeaders(mode === "production") },
+			},
+		},
 		define: {
 			__APP_VERSION__: JSON.stringify(buildVersions.version),
 			__APP_SERVICE_WORKER_VERSION__: JSON.stringify(
