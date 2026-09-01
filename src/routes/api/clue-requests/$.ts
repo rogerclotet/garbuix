@@ -25,6 +25,7 @@ import {
 } from "@/lib/clue-request-types";
 import { db } from "@/lib/db";
 import { observeServerAction } from "@/lib/observability-server";
+import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	getUserPuzzleProgressData,
 	incrementCluesGivenCount,
@@ -73,10 +74,8 @@ function parsePath(pathname: string): ParsedPath {
 	return { kind: "unknown" };
 }
 
-const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
-
 function isValidDateKey(dateKey: string): boolean {
-	return dateKeyPattern.test(dateKey);
+	return isPlayableDateKey(dateKey);
 }
 
 // Only the display name is client-set; identity comes from the signed guest
