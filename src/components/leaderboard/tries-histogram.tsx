@@ -59,24 +59,6 @@ export function TriesHistogram({
 			</figcaption>
 
 			<div role="img" aria-label={`Intents de qui ha acabat: ${summary}`}>
-				{/* Selective labels: the tallest bucket and the player's own, so the
-				    scale is readable without a number over every bar. */}
-				<div className="flex items-end gap-1" aria-hidden>
-					{buckets.map((bucket, index) => {
-						const labelled =
-							bucket.count > 0 &&
-							(bucket.count === maxCount || index === highlightIndex);
-						return (
-							<span
-								key={bucket.start}
-								className="min-w-0 flex-1 text-center font-ui text-[10px] leading-4 text-muted-foreground tabular-nums"
-							>
-								{labelled ? bucket.count : ""}
-							</span>
-						);
-					})}
-				</div>
-
 				<div className="flex h-14 items-end gap-1 border-b border-border/60 sm:h-16">
 					{buckets.map((bucket, index) => (
 						<div
