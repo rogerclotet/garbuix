@@ -5,6 +5,10 @@ import { readAnonDeviceId } from "@/lib/anon-session.server";
 import { observeServerAction } from "@/lib/observability-server";
 import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
+	anonymousImportPayloadSchema,
+	puzzleClientEventsSchema,
+} from "@/lib/puzzle-event-schemas";
+import {
 	checkDailyPuzzleExists,
 	getAuthSession,
 	getDailyPuzzleDifficulty as getDailyPuzzleDifficultyData,
@@ -19,12 +23,7 @@ import {
 	triggerDailyPuzzleGeneration,
 	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
-import {
-	type AnonymousImportPayload,
-	HISTORY_PAGE_SIZE,
-	type HistoryEntriesPage,
-	type PuzzleClientEvent,
-} from "@/lib/puzzle-types";
+import { HISTORY_PAGE_SIZE, type HistoryEntriesPage } from "@/lib/puzzle-types";
 
 // Every date key that reaches a server function comes from the client, so it is
 // validated at the boundary: well-formed, a real calendar date, and never in the
@@ -162,9 +161,9 @@ export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
-			puzzleId: z.string(),
-			deviceId: z.string(),
-			events: z.custom<PuzzleClientEvent[]>(),
+			puzzleId: z.string().min(1).max(64),
+			deviceId: z.string().min(1).max(128),
+			events: puzzleClientEventsSchema,
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -261,8 +260,8 @@ export const getMoreHistoryEntries = createServerFn({ method: "POST" })
 export const importAnonymousProgress = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
-			deviceId: z.string(),
-			payload: z.custom<AnonymousImportPayload>(),
+			deviceId: z.string().min(1).max(128),
+			payload: anonymousImportPayloadSchema,
 		}),
 	)
 	.handler(async ({ data }) => {
