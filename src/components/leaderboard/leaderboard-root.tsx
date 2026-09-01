@@ -1,7 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { type PropsWithChildren, useEffect, useState } from "react";
-import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
-import { anonParticipantId, userParticipantId } from "@/lib/leaderboard-types";
+import { useAnonParticipantId } from "@/lib/anon-participant-store";
+import { userParticipantId } from "@/lib/leaderboard-types";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { LeaderboardProvider } from "@/lib/use-leaderboard";
 
@@ -15,15 +15,17 @@ export function LeaderboardRoot({ children }: PropsWithChildren) {
 		null,
 	);
 
+	// A guest's participant id is minted by the server and learned from the
+	// first response that carries it, so it can arrive after mount — before that
+	// they have no row on the board to highlight.
+	const anonParticipantId = useAnonParticipantId();
+
 	useEffect(() => {
 		setDateKey(getTodayDateKey());
-		if (sessionUser?.id) {
-			setLocalParticipantId(userParticipantId(sessionUser.id));
-			return;
-		}
-		const identity = getOrCreateAnonIdentity();
-		setLocalParticipantId(anonParticipantId(identity.deviceId));
-	}, [sessionUser?.id]);
+		setLocalParticipantId(
+			sessionUser?.id ? userParticipantId(sessionUser.id) : anonParticipantId,
+		);
+	}, [sessionUser?.id, anonParticipantId]);
 
 	return (
 		<LeaderboardProvider

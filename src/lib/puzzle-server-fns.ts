@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { readAnonDeviceId } from "@/lib/anon-session.server";
 import { observeServerAction } from "@/lib/observability-server";
 import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
@@ -274,7 +276,14 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 
 				return importAnonymousProgressForUser({
 					userId: session.user.id,
-					deviceId: data.deviceId,
+					// Leaderboard entries are keyed by the identity the server minted
+					// for this browser, not by the id the client sends, so the merge
+					// reads it from the signed cookie.
+					anonDeviceId: readAnonDeviceId(
+						new Request("http://localhost", {
+							headers: new Headers(getRequestHeaders()),
+						}),
+					),
 					payload: data.payload,
 				});
 			},

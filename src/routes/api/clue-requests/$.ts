@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { dailyPuzzles, userPuzzleProgress } from "@/db/schema";
+import { withAnonCookie } from "@/lib/anon-session.server";
 import { validateClueText } from "@/lib/clue-fairness";
 import {
 	createClueRequest,
@@ -29,6 +30,11 @@ import {
 	incrementCluesGivenCount,
 	publishLeaderboardForUser,
 } from "@/lib/puzzle-service.server";
+import {
+	consumeRateLimit,
+	getClientAddress,
+	tooManyRequests,
+} from "@/lib/rate-limit.server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
 
 export const Route = createFileRoute("/api/clue-requests/$")({
@@ -73,8 +79,9 @@ function isValidDateKey(dateKey: string): boolean {
 	return dateKeyPattern.test(dateKey);
 }
 
+// Only the display name is client-set; identity comes from the signed guest
+// cookie (see resolveClueRequestParticipant).
 const anonAuthFields = {
-	deviceId: z.string().min(1).max(128).optional(),
 	name: z.string().min(1).max(48).optional(),
 };
 
@@ -103,12 +110,18 @@ async function handleGet(request: Request) {
 			getHelpGivenRecords(participant.id, parsed.dateKey),
 		]);
 		const requests = pending.filter((r) => r.requesterId !== participant.id);
-		return Response.json(
-			{ responses, requests, helpGiven },
-			{ headers: { "Cache-Control": "no-store" } },
+		return withAnonCookie(
+			Response.json(
+				{ responses, requests, helpGiven, participantId: participant.id },
+				{ headers: { "Cache-Control": "no-store" } },
+			),
+			participant.setCookie ?? null,
 		);
 	}
-	return openSseStream(parsed.dateKey, participant.id);
+	return withAnonCookie(
+		openSseStream(parsed.dateKey, participant.id),
+		participant.setCookie ?? null,
+	);
 }
 
 const requestSchema = z.object({
@@ -152,7 +165,6 @@ async function handlePost(request: Request) {
 	const participant = await resolveClueRequestParticipant(
 		request,
 		raw as {
-			deviceId?: string;
 			name?: string;
 		},
 	);
@@ -160,19 +172,65 @@ async function handlePost(request: Request) {
 		return new Response("Unauthorized", { status: 401 });
 	}
 
-	if (parsed.kind === "request") {
-		return observeServerAction("clue_request_create", () =>
-			handleCreateRequest(parsed.dateKey, participant, raw),
-		);
-	}
-	if (parsed.kind === "resolve") {
-		return observeServerAction("clue_request_resolve", () =>
-			handleResolve(parsed.dateKey, participant, raw),
-		);
-	}
-	return observeServerAction("clue_request_respond", () =>
-		handleRespond(parsed.dateKey, participant, raw),
+	// Asking for and answering clues are deliberate, occasional actions, so the
+	// hourly budgets sit far above real play while capping how much text one
+	// player can push into other players' games. The address bucket catches a
+	// caller cycling guest cookies for a fresh budget.
+	const rateLimit = await enforceClueRateLimit(
+		request,
+		participant,
+		parsed.kind,
 	);
+	if (rateLimit) {
+		return rateLimit;
+	}
+
+	const response =
+		parsed.kind === "request"
+			? await observeServerAction("clue_request_create", () =>
+					handleCreateRequest(parsed.dateKey, participant, raw),
+				)
+			: parsed.kind === "resolve"
+				? await observeServerAction("clue_request_resolve", () =>
+						handleResolve(parsed.dateKey, participant, raw),
+					)
+				: await observeServerAction("clue_request_respond", () =>
+						handleRespond(parsed.dateKey, participant, raw),
+					);
+
+	return withAnonCookie(response, participant.setCookie ?? null);
+}
+
+const CLUE_RATE_LIMITS: Record<
+	"request" | "respond" | "resolve",
+	{ limit: number; windowSeconds: number }
+> = {
+	request: { limit: 30, windowSeconds: 60 * 60 },
+	respond: { limit: 40, windowSeconds: 60 * 60 },
+	resolve: { limit: 200, windowSeconds: 60 * 60 },
+};
+
+async function enforceClueRateLimit(
+	request: Request,
+	participant: ClueRequestParticipant,
+	kind: "request" | "respond" | "resolve",
+): Promise<Response | null> {
+	const { limit, windowSeconds } = CLUE_RATE_LIMITS[kind];
+	const results = await Promise.all([
+		consumeRateLimit({
+			key: `clue:${kind}:${participant.id}`,
+			limit,
+			windowSeconds,
+		}),
+		consumeRateLimit({
+			key: `clue:${kind}:ip:${getClientAddress(request)}`,
+			limit: limit * 5,
+			windowSeconds,
+		}),
+	]);
+
+	const exceeded = results.find((result) => !result.allowed);
+	return exceeded ? tooManyRequests(exceeded) : null;
 }
 
 async function handleCreateRequest(
@@ -421,7 +479,7 @@ function openSseStream(dateKey: string, userId: string): Response {
 				const requests = pending.filter((r) => r.requesterId !== userId);
 				const ownRequests = pending.filter((r) => r.requesterId === userId);
 				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses, helpGiven })}\n\n`,
+					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses, helpGiven, participantId: userId })}\n\n`,
 				);
 			} catch (error) {
 				console.warn("[clue-request:sse] initial snapshot failed", error);

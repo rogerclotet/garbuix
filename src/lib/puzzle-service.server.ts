@@ -1051,10 +1051,13 @@ export async function getHistoryPageDataForUser(
 
 export async function importAnonymousProgressForUser(options: {
 	userId: string;
-	deviceId: string;
+	// The guest's server-issued leaderboard identity, read from the signed
+	// cookie. Null when this browser never played as a guest, in which case
+	// there is no anonymous board entry to merge in.
+	anonDeviceId: string | null;
 	payload: AnonymousImportPayload;
 }) {
-	const { payload, userId, deviceId } = options;
+	const { anonDeviceId, payload, userId } = options;
 	const importedDates: string[] = [];
 	const skippedLegacyDates: string[] = [];
 	const importedForLeaderboard: Array<{
@@ -1205,9 +1208,9 @@ export async function importAnonymousProgressForUser(options: {
 			.where(eq(user.id, userId))
 			.limit(1);
 		const profile = profiles[0];
-		if (profile) {
+		if (profile && anonDeviceId) {
 			await mergeAnonLeaderboardForUser({
-				deviceId,
+				deviceId: anonDeviceId,
 				userId,
 				name: resolveDisplayName(profile),
 				image: resolveAvatarImage(profile),

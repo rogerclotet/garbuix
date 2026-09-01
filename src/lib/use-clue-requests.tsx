@@ -9,6 +9,7 @@ import {
 	useState,
 } from "react";
 import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
+import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
 import type {
 	ClueHelpGiven,
 	ClueRequest,
@@ -17,22 +18,11 @@ import type {
 } from "@/lib/clue-request-types";
 import { clueHelpGivenField } from "@/lib/clue-request-types";
 
-function buildAnonAuthQuery(deviceId: string): string {
-	const params = new URLSearchParams({
-		deviceId,
-		name: getOrCreateAnonIdentity().name,
-	});
-	return `?${params.toString()}`;
-}
-
-function buildAnonAuthBody(deviceId: string): {
-	deviceId: string;
-	name: string;
-} {
-	return {
-		deviceId,
-		name: getOrCreateAnonIdentity().name,
-	};
+// A guest's identity is the signed cookie the server issued, which the browser
+// attaches on its own. All the client still supplies is the display name it
+// wants shown next to a request or a delivered clue.
+function buildAnonNameBody(): { name: string } {
+	return { name: getOrCreateAnonIdentity().name };
 }
 
 type ClueRequestsStatus = "idle" | "connecting" | "open" | "error" | "closed";
@@ -84,8 +74,10 @@ const defaultValue: ClueRequestsContextValue = {
 const ClueRequestsContext =
 	createContext<ClueRequestsContextValue>(defaultValue);
 
+// Marks the player as a guest. Identity itself lives in the signed cookie the
+// server issued, so there is nothing credential-like to pass here.
 export type AnonClueCredentials = {
-	deviceId: string;
+	isGuest: true;
 };
 
 export type ClueRequestsProviderProps = PropsWithChildren<{
@@ -130,9 +122,13 @@ export function ClueRequestsProvider({
 	// would re-toast clues already seen.
 	const notifiedClueKeysRef = useRef<Set<string>>(new Set());
 
-	const active = enabled && dateKey != null && localUserId != null;
+	// Guests supply a name with each write; signed-in players don't.
+	const isAnon = anonCredentials != null;
 
-	const anonDeviceId = anonCredentials?.deviceId ?? null;
+	// A guest's id is minted server-side and arrives on the stream's snapshot, so
+	// the connection can't wait for it — only signed-in players are gated on
+	// having one.
+	const active = enabled && dateKey != null && (isAnon || localUserId != null);
 
 	// Per-user, per-day so a clue's notified-state doesn't leak across accounts on a
 	// shared browser or across days (the inbox is scoped to the day too).
@@ -236,10 +232,7 @@ export function ClueRequestsProvider({
 		}
 
 		setStatus("connecting");
-		const streamQuery = anonDeviceId ? buildAnonAuthQuery(anonDeviceId) : "";
-		const source = new EventSource(
-			`/api/clue-requests/${dateKey}/stream${streamQuery}`,
-		);
+		const source = new EventSource(`/api/clue-requests/${dateKey}/stream`);
 
 		const handleSnapshot = (event: MessageEvent) => {
 			try {
@@ -248,7 +241,13 @@ export function ClueRequestsProvider({
 					ownRequests?: ClueRequest[];
 					responses?: ClueResponse[];
 					helpGiven?: ClueHelpGiven[];
+					participantId?: string;
 				};
+				// First message on the stream, so a guest who has never written
+				// learns the id the server minted for them right after connecting.
+				if (isAnon) {
+					rememberAnonParticipantId(snapshot.participantId);
+				}
 				setIncomingRequests(snapshot.requests ?? []);
 				// Restore this user's own still-pending requests so a reload keeps
 				// the "waiting for help" state. Merged (not replaced) so a reconnect
@@ -314,14 +313,7 @@ export function ClueRequestsProvider({
 			source.close();
 			setStatus("closed");
 		};
-	}, [
-		active,
-		anonDeviceId,
-		dateKey,
-		localUserId,
-		ingestResponses,
-		ingestHelpGiven,
-	]);
+	}, [active, dateKey, isAnon, localUserId, ingestResponses, ingestHelpGiven]);
 
 	// Reconcile the set of requests we could answer against the server's
 	// authoritative pending set (delivered by the snapshot and the inbox poll).
@@ -361,17 +353,18 @@ export function ClueRequestsProvider({
 
 		const pollInbox = async () => {
 			try {
-				const inboxQuery = anonDeviceId ? buildAnonAuthQuery(anonDeviceId) : "";
-				const response = await fetch(
-					`/api/clue-requests/${dateKey}/inbox${inboxQuery}`,
-				);
+				const response = await fetch(`/api/clue-requests/${dateKey}/inbox`);
 				if (!response.ok) return;
 				const data = (await response.json()) as {
 					responses?: ClueResponse[];
 					requests?: ClueRequest[];
 					helpGiven?: ClueHelpGiven[];
+					participantId?: string;
 				};
 				if (cancelled) return;
+				if (isAnon) {
+					rememberAnonParticipantId(data.participantId);
+				}
 				if (data.requests) {
 					reconcileIncomingRequests(data.requests);
 				}
@@ -393,8 +386,8 @@ export function ClueRequestsProvider({
 		};
 	}, [
 		active,
-		anonDeviceId,
 		dateKey,
+		isAnon,
 		ingestResponses,
 		ingestHelpGiven,
 		reconcileIncomingRequests,
@@ -429,7 +422,7 @@ export function ClueRequestsProvider({
 					body: JSON.stringify({
 						wordId,
 						hasAiClue,
-						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+						...(isAnon ? buildAnonNameBody() : {}),
 					}),
 				});
 				if (!response.ok) {
@@ -454,7 +447,7 @@ export function ClueRequestsProvider({
 				return false;
 			}
 		},
-		[anonDeviceId, dateKey],
+		[isAnon, dateKey],
 	);
 
 	const respondToClue = useCallback(
@@ -468,7 +461,7 @@ export function ClueRequestsProvider({
 					body: JSON.stringify({
 						requestId,
 						text,
-						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+						...(isAnon ? buildAnonNameBody() : {}),
 					}),
 				});
 				if (response.ok) {
@@ -506,7 +499,7 @@ export function ClueRequestsProvider({
 				return { ok: false, reason: null };
 			}
 		},
-		[anonDeviceId, dateKey, incomingRequests, ingestHelpGiven],
+		[isAnon, dateKey, incomingRequests, ingestHelpGiven],
 	);
 
 	const resolveClue = useCallback(
@@ -523,14 +516,14 @@ export function ClueRequestsProvider({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						wordId,
-						...(anonDeviceId ? buildAnonAuthBody(anonDeviceId) : {}),
+						...(isAnon ? buildAnonNameBody() : {}),
 					}),
 				});
 			} catch {
 				// best-effort; the request expires on its own otherwise
 			}
 		},
-		[anonDeviceId, dateKey],
+		[isAnon, dateKey],
 	);
 
 	// Stable identity unless the actual set of solved words changes, so the puzzle

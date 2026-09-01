@@ -114,15 +114,11 @@ export async function refreshAnonLeaderboardName(name: string): Promise<void> {
 	) {
 		return;
 	}
-	const identity = getOrCreateAnonIdentity();
 	try {
 		await fetch(`/api/leaderboard/${dateKey}/anon/profile`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				deviceId: identity.deviceId,
-				name,
-			}),
+			body: JSON.stringify({ name }),
 		});
 	} catch {
 		// non-fatal: leaderboard profile refresh can quietly fail
