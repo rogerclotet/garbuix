@@ -7,6 +7,8 @@ import type {
 
 type EventTypeCounts = Record<PuzzleClientEvent["type"], number>;
 
+const MAX_HINTS = 3;
+
 export type PuzzleSyncDiagnostics = {
 	acceptedByType: EventTypeCounts;
 	acceptedCount: number;
@@ -16,6 +18,13 @@ export type PuzzleSyncDiagnostics = {
 	receivedCount: number;
 	sanitizedInvalidUnlockTokenCount: number;
 	sanitizedMissingWordCount: number;
+	sanitizedInvalidHintCount: number;
+};
+
+type HintValidationState = {
+	hintsUsed: number;
+	hintedCells: Set<string>;
+	clueWordIds: Set<number>;
 };
 
 function createEmptyEventTypeCounts(): EventTypeCounts {
@@ -30,15 +39,122 @@ function createEmptyEventTypeCounts(): EventTypeCounts {
 	};
 }
 
+function buildValidCellKeys(privateSnapshot: DailyPuzzlePrivate): Set<string> {
+	const keys = new Set<string>();
+	for (let row = 0; row < privateSnapshot.gridLetters.length; row += 1) {
+		for (let col = 0; col < privateSnapshot.gridLetters[row].length; col += 1) {
+			if (privateSnapshot.gridLetters[row][col]) {
+				keys.add(`${row},${col}`);
+			}
+		}
+	}
+	return keys;
+}
+
+function buildValidWordIds(publicSnapshot: DailyPuzzlePublic): Set<number> {
+	return new Set(publicSnapshot.wordSlots.map((slot) => slot.id));
+}
+
+function createHintValidationState(options?: {
+	hintsUsed?: number;
+	hintedCells?: string[];
+	clueWordIds?: number[];
+}): HintValidationState {
+	return {
+		hintsUsed: options?.hintsUsed ?? 0,
+		hintedCells: new Set(options?.hintedCells ?? []),
+		clueWordIds: new Set(options?.clueWordIds ?? []),
+	};
+}
+
+function isHintEventAccepted(
+	event: PuzzleClientEvent,
+	state: HintValidationState,
+	validCellKeys: Set<string>,
+	validWordIds: Set<number>,
+): boolean {
+	switch (event.type) {
+		case "hint_used": {
+			const { cellKey } = event.payload;
+			if (
+				!validCellKeys.has(cellKey) ||
+				state.hintsUsed >= MAX_HINTS ||
+				state.hintedCells.has(cellKey)
+			) {
+				return false;
+			}
+			state.hintedCells.add(cellKey);
+			state.hintsUsed += 1;
+			return true;
+		}
+		case "text_hint_requested": {
+			const { wordId } = event.payload;
+			if (
+				!validWordIds.has(wordId) ||
+				state.hintsUsed >= MAX_HINTS ||
+				state.clueWordIds.has(wordId)
+			) {
+				return false;
+			}
+			state.clueWordIds.add(wordId);
+			state.hintsUsed += 1;
+			return true;
+		}
+		case "text_hint_fallback": {
+			const { cellKey, wordId } = event.payload;
+			if (
+				!validWordIds.has(wordId) ||
+				!validCellKeys.has(cellKey) ||
+				!state.clueWordIds.has(wordId) ||
+				state.hintedCells.has(cellKey)
+			) {
+				return false;
+			}
+			state.hintedCells.add(cellKey);
+			return true;
+		}
+		case "bonus_clue_revealed": {
+			const { cellKey } = event.payload;
+			if (!validCellKeys.has(cellKey) || state.hintedCells.has(cellKey)) {
+				return false;
+			}
+			state.hintedCells.add(cellKey);
+			return true;
+		}
+		case "progress_reset": {
+			state.hintsUsed = 0;
+			state.hintedCells.clear();
+			state.clueWordIds.clear();
+			return true;
+		}
+		default:
+			return true;
+	}
+}
+
 export async function filterSyncablePuzzleEvents(options: {
 	events: PuzzleClientEvent[];
 	existingEventIds: Set<string>;
 	publicSnapshot: DailyPuzzlePublic;
 	privateSnapshot: DailyPuzzlePrivate;
+	existingHintState?: {
+		hintsUsed: number;
+		hintedCells: string[];
+		clueWordIds: number[];
+	};
 }) {
-	const { events, existingEventIds, privateSnapshot, publicSnapshot } = options;
+	const {
+		events,
+		existingEventIds,
+		existingHintState,
+		privateSnapshot,
+		publicSnapshot,
+	} = options;
 	const filteredEvents: PuzzleClientEvent[] = [];
 	const seenEventIds = new Set<string>();
+	const validCellKeys = buildValidCellKeys(privateSnapshot);
+	const validWordIds = buildValidWordIds(publicSnapshot);
+	const hintState = createHintValidationState(existingHintState);
 	const diagnostics: PuzzleSyncDiagnostics = {
 		acceptedByType: createEmptyEventTypeCounts(),
 		acceptedCount: 0,
@@ -48,6 +164,7 @@ export async function filterSyncablePuzzleEvents(options: {
 		receivedCount: events.length,
 		sanitizedInvalidUnlockTokenCount: 0,
 		sanitizedMissingWordCount: 0,
+		sanitizedInvalidHintCount: 0,
 	};
 
 	for (const event of events) {
@@ -99,6 +216,26 @@ export async function filterSyncablePuzzleEvents(options: {
 						},
 					};
 				}
+			}
+		}
+
+		if (
+			event.type === "hint_used" ||
+			event.type === "text_hint_requested" ||
+			event.type === "text_hint_fallback" ||
+			event.type === "bonus_clue_revealed" ||
+			event.type === "progress_reset"
+		) {
+			if (
+				!isHintEventAccepted(
+					acceptedEvent,
+					hintState,
+					validCellKeys,
+					validWordIds,
+				)
+			) {
+				diagnostics.sanitizedInvalidHintCount += 1;
+				continue;
 			}
 		}
 

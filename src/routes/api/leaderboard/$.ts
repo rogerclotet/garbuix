@@ -9,6 +9,7 @@ import {
 	updateLeaderboardProfile,
 } from "@/lib/leaderboard.server";
 import { observeServerAction } from "@/lib/observability-server";
+import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	consumeRateLimit,
 	getClientAddress,
@@ -59,10 +60,8 @@ function parsePath(pathname: string): ParsedPath {
 	return { kind: "unknown" };
 }
 
-const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
-
 function isValidDateKey(dateKey: string): boolean {
-	return dateKeyPattern.test(dateKey);
+	return isPlayableDateKey(dateKey);
 }
 
 async function handleGet(request: Request) {

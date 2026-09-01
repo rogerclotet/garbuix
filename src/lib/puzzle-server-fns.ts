@@ -24,6 +24,7 @@ import {
 	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
 import { HISTORY_PAGE_SIZE, type HistoryEntriesPage } from "@/lib/puzzle-types";
+import { consumeRateLimit, getClientAddress } from "@/lib/rate-limit.server";
 
 // Every date key that reaches a server function comes from the client, so it is
 // validated at the boundary: well-formed, a real calendar date, and never in the
@@ -195,14 +196,54 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 export const getWordClues = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
-			puzzleId: z.string(),
-			wordIds: z.array(z.number()),
+			puzzleId: z.string().min(1).max(64),
+			wordIds: z.array(z.number().int().min(0).max(10_000)).max(20),
 		}),
 	)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getWordClues",
-			async () => getWordCluesData(data.puzzleId, data.wordIds),
+			async () => {
+				const request = new Request("http://localhost", {
+					headers: new Headers(getRequestHeaders()),
+				});
+				const clientAddress = getClientAddress(request);
+				const session = await getAuthSession();
+				const anonDeviceId = readAnonDeviceId(request);
+
+				const rateLimits = await Promise.all([
+					consumeRateLimit({
+						key: `clues:ip:${clientAddress}`,
+						limit: session ? 120 : 40,
+						windowSeconds: 60 * 60,
+					}),
+					session
+						? consumeRateLimit({
+								key: `clues:user:${session.user.id}`,
+								limit: 60,
+								windowSeconds: 60 * 60,
+							})
+						: anonDeviceId
+							? consumeRateLimit({
+									key: `clues:anon:${anonDeviceId}`,
+									limit: 30,
+									windowSeconds: 60 * 60,
+								})
+							: null,
+				]);
+				const exceeded = rateLimits.find(
+					(limit) => limit != null && !limit.allowed,
+				);
+				if (exceeded) {
+					throw new Error("Too many clue requests. Try again later.");
+				}
+
+				return getWordCluesData({
+					puzzleId: data.puzzleId,
+					wordIds: data.wordIds,
+					userId: session?.user.id ?? null,
+				});
+			},
 			{
 				properties: {
 					puzzle_id: data.puzzleId,
