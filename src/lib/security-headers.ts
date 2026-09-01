@@ -5,8 +5,7 @@
 // Applied in two places, because neither covers everything: Nitro route rules
 // (see vite.config.ts) reach static assets from public/, and the Start request
 // middleware (see src/start.ts) reaches SSR documents, server functions and the
-// API routes. Nothing in server/plugins/ is picked up by this build, so a
-// response hook there would be silently dead.
+// API routes.
 
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
