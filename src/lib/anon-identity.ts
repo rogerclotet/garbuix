@@ -11,14 +11,22 @@ const VIBRATION_KEY = "paraules-vibration-v1";
 const LETTER_LAYOUT_KEY = "paraules-letter-layout-v1";
 const BONUS_CLUES_KEY = "paraules-bonus-clues-v1";
 
+// What was last reported to the leaderboard for this device, so a reload
+// doesn't replay it. Carries every field the score is built from, not just the
+// words: tries and clues break ties, so they have to be reported as they move.
 export type AnonReportedProgress = {
 	wordsFound: number;
+	tryCount: number;
+	clueCount: number;
 	completedAt: string | null;
 };
 
 type StoredReportedProgress = {
 	dateKey: string;
 	wordsFound: number;
+	// Absent in payloads written before tries and clues were reported.
+	tryCount?: number;
+	clueCount?: number;
 	completedAt: string | null;
 };
 
@@ -97,7 +105,13 @@ export async function refreshAnonLeaderboardName(name: string): Promise<void> {
 	}
 	const dateKey = getTodayDateKey();
 	const reported = getReportedAnonProgress(dateKey);
-	if (reported.wordsFound === 0 && !reported.completedAt) {
+	// A player who has only made wrong guesses is on the board too, so their
+	// tries are reason enough to push the new name.
+	if (
+		reported.wordsFound === 0 &&
+		reported.tryCount === 0 &&
+		!reported.completedAt
+	) {
 		return;
 	}
 	const identity = getOrCreateAnonIdentity();
@@ -234,20 +248,31 @@ export function setBonusCluesEnabled(enabled: boolean): void {
 	}
 }
 
+function readCount(value: number | undefined): number {
+	return Number.isFinite(value) ? Math.max(0, Math.trunc(value as number)) : 0;
+}
+
 export function getReportedAnonProgress(dateKey: string): AnonReportedProgress {
-	const empty: AnonReportedProgress = { wordsFound: 0, completedAt: null };
+	const empty: AnonReportedProgress = {
+		wordsFound: 0,
+		tryCount: 0,
+		clueCount: 0,
+		completedAt: null,
+	};
 	if (typeof window === "undefined") return empty;
 	const raw = window.localStorage.getItem(ANON_LB_REPORTED_KEY);
 	if (!raw) return empty;
 	try {
 		const parsed = JSON.parse(raw) as StoredReportedProgress;
 		if (parsed.dateKey !== dateKey) return empty;
-		const wordsFound = Number.isFinite(parsed.wordsFound)
-			? Math.max(0, Math.trunc(parsed.wordsFound))
-			: 0;
 		const completedAt =
 			typeof parsed.completedAt === "string" ? parsed.completedAt : null;
-		return { wordsFound, completedAt };
+		return {
+			wordsFound: readCount(parsed.wordsFound),
+			tryCount: readCount(parsed.tryCount),
+			clueCount: readCount(parsed.clueCount),
+			completedAt,
+		};
 	} catch {
 		return empty;
 	}
@@ -261,6 +286,8 @@ export function setReportedAnonProgress(
 	const payload: StoredReportedProgress = {
 		dateKey,
 		wordsFound: progress.wordsFound,
+		tryCount: progress.tryCount,
+		clueCount: progress.clueCount,
 		completedAt: progress.completedAt,
 	};
 	window.localStorage.setItem(ANON_LB_REPORTED_KEY, JSON.stringify(payload));

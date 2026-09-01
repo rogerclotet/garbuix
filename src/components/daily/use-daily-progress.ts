@@ -588,14 +588,24 @@ export function useDailyProgress({
 	const lastReportedAnonRef = useRef<{
 		dateKey: string | null;
 		wordsFound: number;
+		tryCount: number;
+		clueCount: number;
 		completedAt: string | null;
-	}>({ dateKey: null, wordsFound: 0, completedAt: null });
+	}>({
+		dateKey: null,
+		wordsFound: 0,
+		tryCount: 0,
+		clueCount: 0,
+		completedAt: null,
+	});
 
 	useEffect(() => {
 		if (activeUserId) {
 			lastReportedAnonRef.current = {
 				dateKey: null,
 				wordsFound: 0,
+				tryCount: 0,
+				clueCount: 0,
 				completedAt: null,
 			};
 			return;
@@ -607,14 +617,27 @@ export function useDailyProgress({
 			lastReportedAnonRef.current = {
 				dateKey: puzzle.dateKey,
 				wordsFound: stored.wordsFound,
+				tryCount: stored.tryCount,
+				clueCount: stored.clueCount,
 				completedAt: stored.completedAt,
 			};
 		}
 
 		const wordsFound = derivedProgress.guessedWordIds.length;
 		const completedAt = derivedProgress.completedAt ?? null;
+		// Self-serve hints only; peer clues don't affect the score.
+		const clueCount = derivedProgress.hintsUsed;
+		const tryCount = derivedProgress.guessCount;
 		const prev = lastReportedAnonRef.current;
-		if (wordsFound <= prev.wordsFound && completedAt === prev.completedAt) {
+		// Words, clues and tries all feed the score (see scoreFor), so a guess
+		// that matches nothing still has to be reported: it moves the player down
+		// the tie-break even though the board hasn't changed.
+		if (
+			wordsFound === prev.wordsFound &&
+			tryCount === prev.tryCount &&
+			clueCount === prev.clueCount &&
+			completedAt === prev.completedAt
+		) {
 			return;
 		}
 
@@ -624,9 +647,16 @@ export function useDailyProgress({
 		lastReportedAnonRef.current = {
 			dateKey: puzzle.dateKey,
 			wordsFound,
+			tryCount,
+			clueCount,
 			completedAt,
 		};
-		setReportedAnonProgress(puzzle.dateKey, { wordsFound, completedAt });
+		setReportedAnonProgress(puzzle.dateKey, {
+			wordsFound,
+			tryCount,
+			clueCount,
+			completedAt,
+		});
 
 		void fetch(`/api/leaderboard/${puzzle.dateKey}/anon`, {
 			method: "POST",
@@ -636,9 +666,8 @@ export function useDailyProgress({
 				name: identity.name,
 				wordsFound,
 				totalWords,
-				// Self-serve hints only; peer clues don't affect the score.
-				clueCount: derivedProgress.hintsUsed,
-				tryCount: derivedProgress.guessCount,
+				clueCount,
+				tryCount,
 				completedAt,
 				previousWordsFound,
 				previousCompletedAt,

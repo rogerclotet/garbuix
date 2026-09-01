@@ -3,6 +3,7 @@ import { createUnlockToken } from "@/lib/puzzle-crypto";
 import {
 	collectAckedEventIds,
 	filterSyncablePuzzleEvents,
+	hasLeaderboardScoreDelta,
 } from "@/lib/puzzle-sync";
 
 describe("puzzle-sync", () => {
@@ -145,5 +146,47 @@ describe("puzzle-sync", () => {
 		});
 
 		expect(ackedEventIds).toEqual(["existing-1", "existing-2", "new-1"]);
+	});
+});
+
+describe("hasLeaderboardScoreDelta", () => {
+	const state = {
+		wordsFound: 3,
+		hintsUsed: 1,
+		guessCount: 12,
+		completed: false,
+	};
+
+	it("republishes a guess that matched nothing", () => {
+		expect(hasLeaderboardScoreDelta(state, { ...state, guessCount: 13 })).toBe(
+			true,
+		);
+	});
+
+	it("republishes new words, clues and the finish", () => {
+		expect(hasLeaderboardScoreDelta(state, { ...state, wordsFound: 4 })).toBe(
+			true,
+		);
+		expect(hasLeaderboardScoreDelta(state, { ...state, hintsUsed: 2 })).toBe(
+			true,
+		);
+		expect(hasLeaderboardScoreDelta(state, { ...state, completed: true })).toBe(
+			true,
+		);
+	});
+
+	it("republishes a reset, which lowers the counts", () => {
+		expect(
+			hasLeaderboardScoreDelta(state, {
+				wordsFound: 0,
+				hintsUsed: 0,
+				guessCount: 0,
+				completed: false,
+			}),
+		).toBe(true);
+	});
+
+	it("stays quiet when nothing the score reads has moved", () => {
+		expect(hasLeaderboardScoreDelta(state, { ...state })).toBe(false);
 	});
 });

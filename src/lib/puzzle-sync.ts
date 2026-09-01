@@ -125,3 +125,29 @@ export function collectAckedEventIds(options: {
 		]),
 	);
 }
+
+// Everything the leaderboard score is built from (see scoreFor in
+// leaderboard.server): words found, then clues, then tries, then whether the
+// player has finished.
+export type LeaderboardScoreState = {
+	wordsFound: number;
+	hintsUsed: number;
+	guessCount: number;
+	completed: boolean;
+};
+
+// A guess that matches nothing still moves the player: tries break ties between
+// equal clue counts, so the board is wrong until the new count reaches it. Any
+// difference republishes, in either direction — a reset lowers the counts and
+// has to reach the board just the same.
+export function hasLeaderboardScoreDelta(
+	previous: LeaderboardScoreState,
+	next: LeaderboardScoreState,
+): boolean {
+	return (
+		previous.wordsFound !== next.wordsFound ||
+		previous.hintsUsed !== next.hintsUsed ||
+		previous.guessCount !== next.guessCount ||
+		previous.completed !== next.completed
+	);
+}

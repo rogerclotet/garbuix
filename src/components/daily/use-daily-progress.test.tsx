@@ -43,7 +43,12 @@ vi.mock("@/lib/use-observability", () => ({
 
 vi.mock("@/lib/anon-identity", () => ({
 	getOrCreateAnonIdentity: () => ({ deviceId: "device-1", name: "Convidat" }),
-	getReportedAnonProgress: () => ({ wordsFound: 0, completedAt: null }),
+	getReportedAnonProgress: () => ({
+		wordsFound: 0,
+		tryCount: 0,
+		clueCount: 0,
+		completedAt: null,
+	}),
 	setReportedAnonProgress: vi.fn(),
 }));
 
@@ -200,6 +205,28 @@ describe("useDailyProgress local state", () => {
 		expect(rendered.paintedText).toBe("words:1");
 
 		await rendered.settle();
+		rendered.unmount();
+	});
+
+	it("reports an anonymous player's tries even with no word found", async () => {
+		saveAnonymousProgress(
+			DATE_KEY,
+			progressWith({ guessedWordIds: [], guessCount: 3 }),
+		);
+
+		const rendered = renderBeforePaint(null);
+		await rendered.settle();
+
+		const fetchMock = window.fetch as unknown as ReturnType<typeof vi.fn>;
+		const call = fetchMock.mock.calls.find(([url]) =>
+			String(url).includes(`/api/leaderboard/${DATE_KEY}/anon`),
+		);
+		expect(call).toBeDefined();
+		expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
+			wordsFound: 0,
+			tryCount: 3,
+		});
+
 		rendered.unmount();
 	});
 
