@@ -65,6 +65,41 @@ describe("posthog-proxy", () => {
 		expect(headers.get("origin")).toBe("https://garbuix.cat");
 	});
 
+	it("never forwards credentials to PostHog", () => {
+		const headers = getPostHogProxyHeaders(
+			new Headers({
+				authorization: "Bearer secret-token",
+				cookie: "better-auth.session_token=live-session-token",
+				"content-type": "application/json",
+				host: "garbuix.cat",
+				"x-internal-trace": "should-not-leak",
+			}),
+			new URL("https://eu.i.posthog.com/e/"),
+		);
+
+		expect(headers.get("cookie")).toBeNull();
+		expect(headers.get("authorization")).toBeNull();
+		// Anything not explicitly allowed is dropped, so a header added later
+		// can't start leaking without someone opting it in.
+		expect(headers.get("x-internal-trace")).toBeNull();
+		expect(headers.get("content-type")).toBe("application/json");
+	});
+
+	it("keeps the headers PostHog needs to attribute an event", () => {
+		const headers = getPostHogProxyHeaders(
+			new Headers({
+				"accept-language": "ca-ES,ca;q=0.9",
+				"user-agent": "Mozilla/5.0 (iPhone)",
+				"x-forwarded-for": "203.0.113.7",
+			}),
+			new URL("https://eu.i.posthog.com/e/"),
+		);
+
+		expect(headers.get("user-agent")).toBe("Mozilla/5.0 (iPhone)");
+		expect(headers.get("accept-language")).toBe("ca-ES,ca;q=0.9");
+		expect(headers.get("x-forwarded-for")).toBe("203.0.113.7");
+	});
+
 	it("strips stale encoding headers from the proxied response", () => {
 		const headers = getPostHogProxyResponseHeaders(
 			new Headers({
