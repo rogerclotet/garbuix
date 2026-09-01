@@ -43,6 +43,35 @@ export function getYesterdayDateKey(timeZone = MADRID_TIME_ZONE) {
 	return addDaysToDateKey(getTodayDateKey(timeZone), -1);
 }
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+// A date key is only well-formed if it round-trips: the pattern alone accepts
+// impossible dates like 2026-02-31, which Date silently rolls forward.
+export function isValidDateKey(value: string): boolean {
+	if (!DATE_KEY_PATTERN.test(value)) {
+		return false;
+	}
+
+	const parsed = new Date(`${value}T12:00:00.000Z`);
+	if (Number.isNaN(parsed.getTime())) {
+		return false;
+	}
+
+	return getDateKeyForDate(parsed, "UTC") === value;
+}
+
+// Tomorrow's puzzle is pre-generated an hour before rollover, so it exists in
+// the database well before anyone may play it. Requests must never reach a date
+// past today, or a player could pull an unplayed board and solve it in advance.
+export function isFutureDateKey(value: string, timeZone = MADRID_TIME_ZONE) {
+	return value > getTodayDateKey(timeZone);
+}
+
+// The only date keys a request is allowed to name.
+export function isPlayableDateKey(value: string, timeZone = MADRID_TIME_ZONE) {
+	return isValidDateKey(value) && !isFutureDateKey(value, timeZone);
+}
+
 export function dateKeyToSeed(dateKey: string) {
 	const [year, month, day] = dateKey.split("-").map((part) => Number(part));
 	return (year - 2000) * 10000 + month * 100 + day;

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { observeServerAction } from "@/lib/observability-server";
-import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
@@ -24,14 +24,24 @@ import {
 	type PuzzleClientEvent,
 } from "@/lib/puzzle-types";
 
-export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
+// Every date key that reaches a server function comes from the client, so it is
+// validated at the boundary: well-formed, a real calendar date, and never in the
+// future. Without this a caller could name tomorrow and pull an unplayed board
+// (answer capsules included) before rollover. Generation itself is guarded
+// separately in triggerDailyPuzzleGeneration.
+const dateKeyInput = z
+	.object({
+		dateKey: z
+			.string()
+			.refine(isPlayableDateKey, {
+				error: "dateKey must be a past or current date (YYYY-MM-DD)",
 			})
 			.optional(),
-	)
+	})
+	.optional();
+
+export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzlePublic",
@@ -45,13 +55,7 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 	});
 
 export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzleDifficulty",
@@ -65,13 +69,7 @@ export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
 	});
 
 export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzlePageData",
@@ -214,13 +212,7 @@ export const getWordClues = createServerFn({ method: "POST" })
 	});
 
 export const getHistoryPageData = createServerFn({ method: "POST" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getHistoryPageData",

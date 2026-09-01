@@ -53,11 +53,14 @@ type AccountHistoryPage = {
 
 type HistoryData = {
 	accountHistory: AccountHistoryPage | null;
+	// Null when the previous day has no stored puzzle: the server reads puzzles
+	// rather than generating them for a date named in a request, so a day nobody
+	// played simply has no panel to show.
 	yesterdayPuzzle: {
 		dateKey: string;
 		preview: DailyPuzzlePreview;
 		difficulty?: PuzzleDifficulty | null;
-	};
+	} | null;
 	yesterdayLeaderboard?: LeaderboardSnapshot;
 };
 
@@ -71,6 +74,7 @@ const EMPTY_STATS: HistoryStats = {
 };
 
 export function History({ initialData }: { initialData: HistoryData }) {
+	const yesterdayPuzzle = initialData.yesterdayPuzzle;
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
 	const fetchHistory = useServerFn(getHistoryPageData);
@@ -356,65 +360,66 @@ export function History({ initialData }: { initialData: HistoryData }) {
 
 					<div className="order-1 lg:order-2">
 						<div className="rounded-xl bg-muted/30 p-4 sm:p-5 space-y-4">
-							<div className="space-y-1.5">
-								<h3 className="text-base font-semibold">Resultat d'ahir</h3>
-								<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-									<span className="text-sm text-muted-foreground font-ui">
-										{dateFormatter.format(
-											new Date(
-												`${initialData.yesterdayPuzzle.dateKey}T12:00:00.000Z`,
-											),
-										)}
-									</span>
-									{initialData.yesterdayPuzzle.difficulty ? (
-										<DifficultyBars
-											difficulty={initialData.yesterdayPuzzle.difficulty}
-											label="level"
-										/>
-									) : null}
-								</div>
-							</div>
+							{yesterdayPuzzle ? (
+								<>
+									<div className="space-y-1.5">
+										<h3 className="text-base font-semibold">Resultat d'ahir</h3>
+										<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+											<span className="text-sm text-muted-foreground font-ui">
+												{dateFormatter.format(
+													new Date(`${yesterdayPuzzle.dateKey}T12:00:00.000Z`),
+												)}
+											</span>
+											{yesterdayPuzzle.difficulty ? (
+												<DifficultyBars
+													difficulty={yesterdayPuzzle.difficulty}
+													label="level"
+												/>
+											) : null}
+										</div>
+									</div>
 
-							<div
-								className="flex items-center justify-center w-full @container"
-								style={
-									{
-										"--cols": initialData.yesterdayPuzzle.preview.cols,
-									} as CSSProperties
-								}
-							>
-								<div
-									className="grid gap-[3px] sm:gap-1 w-full max-w-sm mx-auto"
-									style={{
-										gridTemplateColumns: `repeat(${initialData.yesterdayPuzzle.preview.cols}, 1fr)`,
-									}}
-								>
-									{initialData.yesterdayPuzzle.preview.gridLetters.map(
-										(row, rowIdx) =>
-											row.map((cell, colIdx) => {
-												const key = `${rowIdx},${colIdx}`;
+									<div
+										className="flex items-center justify-center w-full @container"
+										style={
+											{
+												"--cols": yesterdayPuzzle.preview.cols,
+											} as CSSProperties
+										}
+									>
+										<div
+											className="grid gap-[3px] sm:gap-1 w-full max-w-sm mx-auto"
+											style={{
+												gridTemplateColumns: `repeat(${yesterdayPuzzle.preview.cols}, 1fr)`,
+											}}
+										>
+											{yesterdayPuzzle.preview.gridLetters.map((row, rowIdx) =>
+												row.map((cell, colIdx) => {
+													const key = `${rowIdx},${colIdx}`;
 
-												if (!cell) {
+													if (!cell) {
+														return (
+															<div
+																key={key}
+																className="aspect-square bg-transparent"
+															/>
+														);
+													}
+
 													return (
 														<div
 															key={key}
-															className="aspect-square bg-transparent"
-														/>
+															className="aspect-square border rounded-[18%] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
+														>
+															{cell.toUpperCase()}
+														</div>
 													);
-												}
-
-												return (
-													<div
-														key={key}
-														className="aspect-square border rounded-[18%] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
-													>
-														{cell.toUpperCase()}
-													</div>
-												);
-											}),
-									)}
-								</div>
-							</div>
+												}),
+											)}
+										</div>
+									</div>
+								</>
+							) : null}
 
 							{initialData.yesterdayLeaderboard ? (
 								<div className="space-y-3 border-t border-border/50 pt-4">

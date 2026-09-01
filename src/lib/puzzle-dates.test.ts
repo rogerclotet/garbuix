@@ -6,7 +6,12 @@ import {
 	getDateKeyForDate,
 	getNextPregenerationAt,
 	getNextRolloverAt,
+	getTodayDateKey,
 	getTomorrowDateKey,
+	getYesterdayDateKey,
+	isFutureDateKey,
+	isPlayableDateKey,
+	isValidDateKey,
 	isWithinPregenerationWindow,
 	seedToDateKey,
 } from "@/lib/puzzle-dates";
@@ -71,5 +76,34 @@ describe("puzzle-dates", () => {
 		expect(nextPregenerationAt.getTime()).toBeGreaterThan(
 			nextRollover.getTime(),
 		);
+	});
+	it("accepts well-formed date keys", () => {
+		expect(isValidDateKey("2026-03-10")).toBe(true);
+		expect(isValidDateKey("2024-02-29")).toBe(true);
+	});
+
+	it("rejects malformed and impossible date keys", () => {
+		expect(isValidDateKey("2026-3-10")).toBe(false);
+		expect(isValidDateKey("2026-02-31")).toBe(false);
+		expect(isValidDateKey("2023-02-29")).toBe(false);
+		expect(isValidDateKey("2026-13-01")).toBe(false);
+		expect(isValidDateKey("not-a-date")).toBe(false);
+		expect(isValidDateKey("")).toBe(false);
+	});
+
+	it("treats any date after today as in the future", () => {
+		expect(isFutureDateKey(getTomorrowDateKey())).toBe(true);
+		expect(isFutureDateKey(getTodayDateKey())).toBe(false);
+		expect(isFutureDateKey(getYesterdayDateKey())).toBe(false);
+	});
+
+	it("only lets requests name a real, non-future date", () => {
+		expect(isPlayableDateKey(getTodayDateKey())).toBe(true);
+		expect(isPlayableDateKey(getYesterdayDateKey())).toBe(true);
+		// Tomorrow's puzzle is pre-generated before rollover, so it exists in the
+		// database — the guard is what keeps a request from reaching it.
+		expect(isPlayableDateKey(getTomorrowDateKey())).toBe(false);
+		expect(isPlayableDateKey("2099-01-01")).toBe(false);
+		expect(isPlayableDateKey("2026-02-31")).toBe(false);
 	});
 });
