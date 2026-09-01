@@ -1,7 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { readAnonDeviceId } from "@/lib/anon-session.server";
 import { observeServerAction } from "@/lib/observability-server";
-import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
+import {
+	anonymousImportPayloadSchema,
+	puzzleClientEventsSchema,
+} from "@/lib/puzzle-event-schemas";
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
@@ -17,21 +23,26 @@ import {
 	triggerDailyPuzzleGeneration,
 	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
-import {
-	type AnonymousImportPayload,
-	HISTORY_PAGE_SIZE,
-	type HistoryEntriesPage,
-	type PuzzleClientEvent,
-} from "@/lib/puzzle-types";
+import { HISTORY_PAGE_SIZE, type HistoryEntriesPage } from "@/lib/puzzle-types";
 
-export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
+// Every date key that reaches a server function comes from the client, so it is
+// validated at the boundary: well-formed, a real calendar date, and never in the
+// future. Without this a caller could name tomorrow and pull an unplayed board
+// (answer capsules included) before rollover. Generation itself is guarded
+// separately in triggerDailyPuzzleGeneration.
+const dateKeyInput = z
+	.object({
+		dateKey: z
+			.string()
+			.refine(isPlayableDateKey, {
+				error: "dateKey must be a past or current date (YYYY-MM-DD)",
 			})
 			.optional(),
-	)
+	})
+	.optional();
+
+export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzlePublic",
@@ -45,13 +56,7 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 	});
 
 export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzleDifficulty",
@@ -65,13 +70,7 @@ export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
 	});
 
 export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getDailyPuzzlePageData",
@@ -162,9 +161,9 @@ export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
-			puzzleId: z.string(),
-			deviceId: z.string(),
-			events: z.custom<PuzzleClientEvent[]>(),
+			puzzleId: z.string().min(1).max(64),
+			deviceId: z.string().min(1).max(128),
+			events: puzzleClientEventsSchema,
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -214,13 +213,7 @@ export const getWordClues = createServerFn({ method: "POST" })
 	});
 
 export const getHistoryPageData = createServerFn({ method: "POST" })
-	.inputValidator(
-		z
-			.object({
-				dateKey: z.string().optional(),
-			})
-			.optional(),
-	)
+	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return observeServerAction(
 			"getHistoryPageData",
@@ -267,8 +260,8 @@ export const getMoreHistoryEntries = createServerFn({ method: "POST" })
 export const importAnonymousProgress = createServerFn({ method: "POST" })
 	.inputValidator(
 		z.object({
-			deviceId: z.string(),
-			payload: z.custom<AnonymousImportPayload>(),
+			deviceId: z.string().min(1).max(128),
+			payload: anonymousImportPayloadSchema,
 		}),
 	)
 	.handler(async ({ data }) => {
@@ -282,7 +275,14 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 
 				return importAnonymousProgressForUser({
 					userId: session.user.id,
-					deviceId: data.deviceId,
+					// Leaderboard entries are keyed by the identity the server minted
+					// for this browser, not by the id the client sends, so the merge
+					// reads it from the signed cookie.
+					anonDeviceId: readAnonDeviceId(
+						new Request("http://localhost", {
+							headers: new Headers(getRequestHeaders()),
+						}),
+					),
 					payload: data.payload,
 				});
 			},

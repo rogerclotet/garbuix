@@ -1,7 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { type PropsWithChildren, useEffect, useState } from "react";
-import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
-import { anonParticipantId } from "@/lib/leaderboard-types";
+import { useAnonParticipantId } from "@/lib/anon-participant-store";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import {
 	type AnonClueCredentials,
@@ -22,24 +21,21 @@ export function ClueRequestsRoot({ children }: PropsWithChildren) {
 	}, []);
 
 	useEffect(() => {
-		if (sessionUser?.id) {
-			setAnonCredentials(null);
-			return;
-		}
-		const identity = getOrCreateAnonIdentity();
-		setAnonCredentials({ deviceId: identity.deviceId });
+		setAnonCredentials(sessionUser?.id ? null : { isGuest: true });
 	}, [sessionUser?.id]);
 
-	const localUserId =
-		sessionUser?.id ??
-		(anonCredentials ? anonParticipantId(anonCredentials.deviceId) : null);
+	// Null for a guest until the server's first response reports the id it
+	// minted for them; the provider opens the stream regardless, which is one of
+	// the ways that id arrives.
+	const anonParticipantId = useAnonParticipantId();
+	const localUserId = sessionUser?.id ?? anonParticipantId;
 
 	return (
 		<ClueRequestsProvider
 			dateKey={dateKey}
 			localUserId={localUserId}
 			anonCredentials={sessionUser?.id ? null : anonCredentials}
-			enabled={localUserId != null}
+			enabled={dateKey != null}
 		>
 			{children}
 		</ClueRequestsProvider>

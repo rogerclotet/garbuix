@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
+import { resolveAnonSession } from "@/lib/anon-session.server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { anonParticipantId } from "@/lib/leaderboard-types";
@@ -12,6 +13,9 @@ export type ClueRequestParticipant = {
 	id: string;
 	name: string;
 	kind: "user" | "anon";
+	// Set only when this request minted a guest identity; the route must return
+	// it as a Set-Cookie header so the next request carries the same id.
+	setCookie?: string | null;
 };
 
 function resolveAnonName(rawName: string | null | undefined): string {
@@ -21,24 +25,18 @@ function resolveAnonName(rawName: string | null | undefined): string {
 	return normalizeDisplayNameInput(rawName) ?? "Convidat";
 }
 
-function readDeviceId(
-	request: Request,
-	body?: { deviceId?: string },
-): string | null {
-	const url = new URL(request.url);
-	const deviceId = body?.deviceId ?? url.searchParams.get("deviceId");
-	if (!deviceId || deviceId.length > 128) {
-		return null;
-	}
-	return deviceId;
-}
-
 // Resolves the player making a clue-request API call. Google sessions win when
-// present; otherwise a stable browser device id identifies anonymous players
-// (same scheme as the anon leaderboard).
+// present; otherwise the signed guest cookie identifies anonymous players (same
+// scheme as the anon leaderboard).
+//
+// The device id used to be read from the request body or the query string,
+// which meant naming a stranger's id was enough to subscribe to their private
+// clue-response channel. It now comes only from a cookie this server signed;
+// `setCookie` is non-null when this request minted one, and the caller must put
+// it on the response.
 export async function resolveClueRequestParticipant(
 	request: Request,
-	body?: { deviceId?: string; name?: string },
+	body?: { name?: string },
 ): Promise<ClueRequestParticipant | null> {
 	const session = await auth.api.getSession({ headers: request.headers });
 	if (session?.user?.id) {
@@ -60,17 +58,14 @@ export async function resolveClueRequestParticipant(
 		};
 	}
 
-	const deviceId = readDeviceId(request, body);
-	if (!deviceId) {
-		return null;
-	}
-
+	const anonSession = resolveAnonSession(request);
 	const url = new URL(request.url);
 	const rawName = body?.name ?? url.searchParams.get("name");
 
 	return {
-		id: anonParticipantId(deviceId),
+		id: anonParticipantId(anonSession.deviceId),
 		name: resolveAnonName(rawName),
 		kind: "anon",
+		setCookie: anonSession.setCookie,
 	};
 }

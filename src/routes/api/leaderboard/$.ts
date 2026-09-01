@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { resolveAnonSession, withAnonCookie } from "@/lib/anon-session.server";
 import {
 	anonParticipantId,
 	getLeaderboard,
@@ -8,6 +9,11 @@ import {
 	updateLeaderboardProfile,
 } from "@/lib/leaderboard.server";
 import { observeServerAction } from "@/lib/observability-server";
+import {
+	consumeRateLimit,
+	getClientAddress,
+	tooManyRequests,
+} from "@/lib/rate-limit.server";
 import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
 import { normalizeDisplayNameInput } from "@/lib/user-profile";
 
@@ -79,8 +85,9 @@ async function handleGet(request: Request) {
 	return new Response("Method Not Allowed", { status: 405 });
 }
 
+// No deviceId: the participant is whoever holds the signed guest cookie, not
+// whoever names an id in the body.
 const anonSchema = z.object({
-	deviceId: z.string().min(1).max(128),
 	name: z.string().min(1).max(48),
 	wordsFound: z.number().int().min(0).max(200),
 	totalWords: z.number().int().min(1).max(200),
@@ -92,7 +99,6 @@ const anonSchema = z.object({
 });
 
 const anonProfileSchema = z.object({
-	deviceId: z.string().min(1).max(128),
 	name: z.string().min(1).max(48),
 });
 
@@ -111,6 +117,29 @@ async function handlePost(request: Request) {
 	}
 
 	return observeServerAction("leaderboard_anon", async () => {
+		const session = resolveAnonSession(request);
+		const participantId = anonParticipantId(session.deviceId);
+
+		// Two buckets: one per guest, and one per address so discarding the cookie
+		// to get a fresh identity doesn't reset the budget. A player reports after
+		// every guess, so the per-guest limit sits well above real play.
+		const limits = await Promise.all([
+			consumeRateLimit({
+				key: `lb:anon:${participantId}`,
+				limit: 120,
+				windowSeconds: 60,
+			}),
+			consumeRateLimit({
+				key: `lb:anon:ip:${getClientAddress(request)}`,
+				limit: 600,
+				windowSeconds: 60,
+			}),
+		]);
+		const exceeded = limits.find((limit) => !limit.allowed);
+		if (exceeded) {
+			return tooManyRequests(exceeded);
+		}
+
 		let raw: unknown;
 		try {
 			raw = await request.json();
@@ -131,7 +160,7 @@ async function handlePost(request: Request) {
 			wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;
 		await recordProgress({
 			dateKey: parsed.dateKey,
-			participantId: anonParticipantId(payload.deviceId),
+			participantId,
 			kind: "anon",
 			name: normalizedName,
 			image: null,
@@ -143,12 +172,30 @@ async function handlePost(request: Request) {
 			previousWordsFound: payload.previousWordsFound,
 			previousCompletedAt: payload.previousCompletedAt ?? null,
 		});
-		return Response.json({ recorded: true });
+		// The id is public (it labels the guest's row on every viewer's board);
+		// only the cookie's signature proves ownership of it. Returning it lets
+		// the client highlight its own row without ever holding the credential.
+		return withAnonCookie(
+			Response.json({ recorded: true, participantId }),
+			session.setCookie,
+		);
 	});
 }
 
 async function handleAnonProfilePost(request: Request, dateKey: string) {
 	return observeServerAction("leaderboard_anon_profile", async () => {
+		const session = resolveAnonSession(request);
+		const participantId = anonParticipantId(session.deviceId);
+
+		const rateLimit = await consumeRateLimit({
+			key: `lb:anon-profile:${participantId}`,
+			limit: 20,
+			windowSeconds: 60,
+		});
+		if (!rateLimit.allowed) {
+			return tooManyRequests(rateLimit);
+		}
+
 		let raw: unknown;
 		try {
 			raw = await request.json();
@@ -166,11 +213,14 @@ async function handleAnonProfilePost(request: Request, dateKey: string) {
 		}
 		await updateLeaderboardProfile({
 			dateKey,
-			participantId: anonParticipantId(payload.deviceId),
+			participantId,
 			name: normalizedName,
 			image: null,
 		});
-		return Response.json({ updated: true });
+		return withAnonCookie(
+			Response.json({ updated: true, participantId }),
+			session.setCookie,
+		);
 	});
 }
 

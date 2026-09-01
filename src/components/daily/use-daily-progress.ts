@@ -6,6 +6,7 @@ import {
 	getReportedAnonProgress,
 	setReportedAnonProgress,
 } from "@/lib/anon-identity";
+import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
 import {
 	buildAnonymousImportPayload,
 	getAccountPuzzleCache,
@@ -662,7 +663,6 @@ export function useDailyProgress({
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				deviceId: identity.deviceId,
 				name: identity.name,
 				wordsFound,
 				totalWords,
@@ -672,9 +672,17 @@ export function useDailyProgress({
 				previousWordsFound,
 				previousCompletedAt,
 			}),
-		}).catch(() => {
-			// non-fatal: leaderboard reporting can quietly fail
-		});
+		})
+			.then(async (response) => {
+				if (!response.ok) return;
+				// The server owns the guest identity now, so this is how the client
+				// learns which row on the board is its own.
+				const body = (await response.json()) as { participantId?: string };
+				rememberAnonParticipantId(body.participantId);
+			})
+			.catch(() => {
+				// non-fatal: leaderboard reporting can quietly fail
+			});
 	}, [
 		activeUserId,
 		derivedProgress.guessedWordIds.length,

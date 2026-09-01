@@ -18,6 +18,24 @@ const HOP_BY_HOP_HEADERS = new Set([
 	"upgrade",
 ]);
 
+// Requests to /ph/* are same-origin, so the browser attaches this app's session
+// cookie to every analytics call. Forwarding the incoming headers wholesale
+// would hand that cookie — a live session token — to PostHog. Only headers
+// PostHog actually needs are forwarded, so anything sensitive added later
+// (cookies, auth headers, a future internal header) is dropped by default
+// rather than requiring someone to remember to deny it.
+const FORWARDED_REQUEST_HEADERS = [
+	"accept",
+	"accept-language",
+	"content-type",
+	"origin",
+	"user-agent",
+	// Preserve the caller's IP so PostHog's geo-IP resolution still works; the
+	// app itself sits behind a proxy that sets these.
+	"x-forwarded-for",
+	"x-real-ip",
+] as const;
+
 export function getPostHogProxyTarget(requestUrl: string, posthogHost: string) {
 	const incomingUrl = new URL(requestUrl);
 	const upstreamUrl = getUpstreamBaseUrl(incomingUrl.pathname, posthogHost);
@@ -36,13 +54,17 @@ export function getPostHogProxyHeaders(
 	requestHeaders: Headers,
 	targetUrl: URL,
 ) {
-	const headers = new Headers(requestHeaders);
+	const headers = new Headers();
 
-	for (const header of HOP_BY_HOP_HEADERS) {
-		headers.delete(header);
+	for (const header of FORWARDED_REQUEST_HEADERS) {
+		const value = requestHeaders.get(header);
+		if (value !== null) {
+			headers.set(header, value);
+		}
 	}
 
-	headers.delete("content-length");
+	// content-length is deliberately absent: the body is re-sent as an
+	// ArrayBuffer, so the runtime sets the real length.
 	headers.set("host", targetUrl.host);
 
 	return headers;
