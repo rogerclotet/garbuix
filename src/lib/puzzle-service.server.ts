@@ -60,6 +60,7 @@ import { calculateHistoryStats } from "@/lib/puzzle-streaks";
 import {
 	collectAckedEventIds,
 	filterSyncablePuzzleEvents,
+	hasLeaderboardScoreDelta,
 } from "@/lib/puzzle-sync";
 import {
 	type AnonymousImportPayload,
@@ -687,14 +688,21 @@ export async function syncPuzzleEventsForUser(options: {
 
 	const previousWordsFound = existingProgress?.guessedWordIds.length ?? 0;
 	const previousCompletedAt = existingProgress?.completedAt ?? null;
-	const previousHintsUsed = existingProgress?.hintsUsed ?? 0;
 	const nextCompletedAt = nextProgress.completedAt ?? null;
-	// Hints count against the leaderboard score too (see scoreFor), so requesting
-	// one must republish even when it doesn't also reveal a new word.
-	const hasProgressDelta =
-		nextProgress.guessedWordIds.length > previousWordsFound ||
-		(Boolean(nextCompletedAt) && !previousCompletedAt) ||
-		nextProgress.hintsUsed > previousHintsUsed;
+	const hasProgressDelta = hasLeaderboardScoreDelta(
+		{
+			wordsFound: previousWordsFound,
+			hintsUsed: existingProgress?.hintsUsed ?? 0,
+			guessCount: existingProgress?.guessCount ?? 0,
+			completed: Boolean(previousCompletedAt),
+		},
+		{
+			wordsFound: nextProgress.guessedWordIds.length,
+			hintsUsed: nextProgress.hintsUsed,
+			guessCount: nextProgress.guessCount,
+			completed: Boolean(nextCompletedAt),
+		},
+	);
 
 	if (hasProgressDelta) {
 		void publishLeaderboardForUser({
