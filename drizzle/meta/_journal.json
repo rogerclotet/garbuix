@@ -50,6 +50,13 @@
       "when": 1786307081289,
       "tag": "0006_add_clues_given_count",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786400000000,
+      "tag": "0007_better_auth_account_issuer",
+      "breakpoints": true
     }
   ]
 }

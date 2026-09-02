@@ -707,5 +707,6 @@ export function useDailyProgress({
 	return {
 		applyLocalEvent,
 		derivedProgress,
+		pendingEventCount: queuedEvents.length,
 	};
 }
