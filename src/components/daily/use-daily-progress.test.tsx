@@ -136,6 +136,30 @@ function Probe({ activeUser }: { activeUser: SessionUser }) {
 	return <span>{`words:${derivedProgress.guessedWordIds.join(",")}`}</span>;
 }
 
+function SwitchableProbe({ activeUser }: { activeUser: SessionUser | null }) {
+	const { derivedProgress } = useDailyProgress({
+		activeUser,
+		deviceId: "device-1",
+		initialData: {
+			...INITIAL_DATA,
+			progress: activeUser
+				? progressWith({
+						guessedWordIds: [1, 2],
+						guessCount: 7,
+						completedAt: "2026-06-11T12:00:00.000Z",
+					})
+				: null,
+			sessionUser: activeUser,
+		},
+	});
+
+	return (
+		<span>
+			{`words:${derivedProgress.guessedWordIds.join(",")};completed:${derivedProgress.completedAt ?? "none"}`}
+		</span>
+	);
+}
+
 type ActEnvironment = { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // Renders outside act() so only the work React guarantees before the browser
@@ -275,5 +299,63 @@ describe("useDailyProgress local state", () => {
 		expect(rendered.container.textContent).toBe("words:1,2");
 
 		rendered.unmount();
+	});
+
+	it("resets puzzle progress and skips anonymous leaderboard reporting on logout", async () => {
+		const completedProgress = progressWith({
+			guessedWordIds: [1, 2],
+			guessCount: 7,
+			completedAt: "2026-06-11T12:00:00.000Z",
+		});
+		saveAccountPuzzleCache(USER_ID, DATE_KEY, {
+			puzzleId: PUZZLE.id,
+			baseProgress: completedProgress,
+			queuedEvents: [],
+		});
+		fetchUserProgressMock.mockResolvedValue(completedProgress);
+
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		const signedInUser = {
+			id: USER_ID,
+			name: "Roger",
+			email: "roger@example.com",
+		};
+
+		await act(async () => {
+			root.render(<SwitchableProbe activeUser={signedInUser} />);
+		});
+		expect(container.textContent).toContain("words:1,2");
+		expect(container.textContent).toContain(
+			"completed:2026-06-11T12:00:00.000Z",
+		);
+
+		const fetchMock = window.fetch as unknown as ReturnType<typeof vi.fn>;
+		fetchMock.mockClear();
+
+		await act(async () => {
+			root.render(<SwitchableProbe activeUser={null} />);
+		});
+		expect(container.textContent).toBe("words:;completed:none");
+
+		const anonLeaderboardCalls = fetchMock.mock.calls.filter(([url]) =>
+			String(url).includes(`/api/leaderboard/${DATE_KEY}/anon`),
+		);
+		expect(anonLeaderboardCalls).toHaveLength(0);
+		const storedAnonProgress = window.localStorage.getItem(
+			`paraules-anon-progress-v2:${DATE_KEY}`,
+		);
+		expect(storedAnonProgress).not.toBeNull();
+		expect(JSON.parse(String(storedAnonProgress))).toMatchObject({
+			guessedWordIds: [],
+			guessCount: 0,
+			completedAt: null,
+		});
+
+		act(() => {
+			root.unmount();
+		});
+		container.remove();
 	});
 });

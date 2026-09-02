@@ -9,6 +9,7 @@ import {
 import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
 import {
 	buildAnonymousImportPayload,
+	clearAnonymousProgress,
 	getAccountPuzzleCache,
 	getAnonymousProgress,
 	getStaleAccountCachesWithEvents,
@@ -45,6 +46,14 @@ const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
 const SYNC_INITIAL_RETRY_DELAY_MS = 2_000;
 const SYNC_MAX_RETRY_DELAY_MS = 30_000;
 const PROGRESS_REVALIDATION_DELAYS_MS = [3_000, 10_000, 30_000];
+
+function hasMeaningfulProgress(progress: PuzzleProgressState) {
+	return (
+		progress.guessedWordIds.length > 0 ||
+		progress.guessCount > 0 ||
+		Boolean(progress.completedAt)
+	);
+}
 
 function isLikelyOfflineOrNetworkError(error: unknown) {
 	if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -91,7 +100,6 @@ function readLocalProgressState(options: {
 		return {
 			baseProgress:
 				getCompatibleProgress(getAnonymousProgress(puzzle.dateKey), puzzle) ??
-				compatibleServerProgress ??
 				emptyProgress,
 			queuedEvents: [] as PuzzleClientEvent[],
 		};
@@ -158,10 +166,25 @@ export function useDailyProgress({
 	);
 	const [nextSyncRetryAt, setNextSyncRetryAt] = useState<number | null>(null);
 	const importAttemptedRef = useRef<string | null>(null);
+	const previousActiveUserIdRef = useRef<string | null>(activeUserId);
+	const logoutTransitionRef = useRef(false);
 	const syncFailureCountRef = useRef(0);
 	const hasActiveSyncFailureToastRef = useRef(false);
 	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
 	const isSyncingRef = useRef(false);
+	const lastReportedAnonRef = useRef<{
+		dateKey: string | null;
+		wordsFound: number;
+		tryCount: number;
+		clueCount: number;
+		completedAt: string | null;
+	}>({
+		dateKey: null,
+		wordsFound: 0,
+		tryCount: 0,
+		clueCount: 0,
+		completedAt: null,
+	});
 
 	const derivedProgress = useMemo(
 		() =>
@@ -226,6 +249,32 @@ export function useDailyProgress({
 	// deferred. Anything the server may know better is reconciled right after,
 	// in the background, by the effect below.
 	useIsomorphicLayoutEffect(() => {
+		const previousActiveUserId = previousActiveUserIdRef.current;
+		previousActiveUserIdRef.current = activeUserId;
+		const loggedOut = previousActiveUserId !== null && activeUserId === null;
+
+		if (loggedOut) {
+			logoutTransitionRef.current = true;
+			clearAnonymousProgress(puzzle.dateKey);
+			lastReportedAnonRef.current = {
+				dateKey: puzzle.dateKey,
+				wordsFound: 0,
+				tryCount: 0,
+				clueCount: 0,
+				completedAt: null,
+			};
+			setReportedAnonProgress(puzzle.dateKey, {
+				wordsFound: 0,
+				tryCount: 0,
+				clueCount: 0,
+				completedAt: null,
+			});
+			setBaseProgress(emptyProgress);
+			setQueuedEvents([]);
+			setHasLoadedLocalState(true);
+			return;
+		}
+
 		const localState = readLocalProgressState({
 			activeUserId,
 			emptyProgress,
@@ -386,6 +435,13 @@ export function useDailyProgress({
 				queuedEvents,
 			});
 			return;
+		}
+
+		if (logoutTransitionRef.current) {
+			if (hasMeaningfulProgress(derivedProgress)) {
+				return;
+			}
+			logoutTransitionRef.current = false;
 		}
 
 		saveAnonymousProgress(puzzle.dateKey, derivedProgress);
@@ -586,20 +642,6 @@ export function useDailyProgress({
 		}
 	}, [activeUserId, deviceId, isOnline, puzzle.dateKey, syncEvents]);
 
-	const lastReportedAnonRef = useRef<{
-		dateKey: string | null;
-		wordsFound: number;
-		tryCount: number;
-		clueCount: number;
-		completedAt: string | null;
-	}>({
-		dateKey: null,
-		wordsFound: 0,
-		tryCount: 0,
-		clueCount: 0,
-		completedAt: null,
-	});
-
 	useEffect(() => {
 		if (activeUserId) {
 			lastReportedAnonRef.current = {
@@ -612,6 +654,17 @@ export function useDailyProgress({
 			return;
 		}
 		if (typeof window === "undefined") return;
+
+		if (logoutTransitionRef.current) {
+			if (
+				derivedProgress.guessedWordIds.length > 0 ||
+				derivedProgress.guessCount > 0 ||
+				derivedProgress.completedAt
+			) {
+				return;
+			}
+			logoutTransitionRef.current = false;
+		}
 
 		if (lastReportedAnonRef.current.dateKey !== puzzle.dateKey) {
 			const stored = getReportedAnonProgress(puzzle.dateKey);
