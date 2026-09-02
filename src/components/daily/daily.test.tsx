@@ -381,7 +381,7 @@ describe("Daily submit feedback", () => {
 	});
 
 	it("opens the how-to-play dialog on first visit and marks it seen", async () => {
-		hasSeenHowToPlayMock.mockReturnValueOnce(false);
+		hasSeenHowToPlayMock.mockReturnValue(false);
 
 		renderDaily();
 
@@ -426,7 +426,7 @@ describe("Daily submit feedback", () => {
 	});
 
 	it("does not auto-open the profile preferences tip on first visit before how-to-play", async () => {
-		hasSeenHowToPlayMock.mockReturnValueOnce(false);
+		hasSeenHowToPlayMock.mockReturnValue(false);
 
 		renderDaily();
 

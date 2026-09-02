@@ -80,7 +80,11 @@ const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
 const HAPTIC_ERROR_PATTERN = [24, 32, 16];
 // If an AI clue can't be loaded within this window, degrade to a silent
 // single-letter reveal so the hint button never feels broken.
-const CLUE_FETCH_TIMEOUT_MS = 8000;
+const CLUE_FETCH_LETTER_FALLBACK_MS = 8000;
+const CLUE_FETCH_POLL_INTERVAL_MS = 2000;
+// Keep polling after the letter fallback so late syncs or slow generation can
+// still surface the AI clue without a page refresh.
+const CLUE_FETCH_MAX_MS = 45_000;
 // How long a freshly requested clue's grid ring stays lit before fading out, and
 // the fade duration itself (kept in sync with the CSS opacity transition).
 const CLUE_GRID_HIGHLIGHT_MS = 5000;
@@ -258,11 +262,12 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// Lets the header's share button reach the latest handler without making the
 	// published summary churn on every render.
 	const handleShareRef = useRef<() => Promise<void>>(async () => {});
-	const { applyLocalEvent, derivedProgress } = useDailyProgress({
-		activeUser,
-		deviceId,
-		initialData,
-	});
+	const { applyLocalEvent, derivedProgress, pendingEventCount } =
+		useDailyProgress({
+			activeUser,
+			deviceId,
+			initialData,
+		});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -517,6 +522,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// effect refires only when the set actually changes (not on every render that
 	// produces a fresh array reference).
 	const clueWordIdsKey = derivedProgress.clueWordIds.join(",");
+	// Include pending sync count so clue fetches retry after hint events reach the server.
+	const clueFetchKey = `${clueWordIdsKey}:${pendingEventCount}`;
 
 	// Light a clue word's grid ring for a few seconds, then fade it back to the
 	// regular cell colors so it reads as a transient cue, not a permanent mark.
@@ -549,14 +556,19 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	useEffect(() => {
-		if (clueWordIdsKey === "") {
+		const separatorIndex = clueFetchKey.lastIndexOf(":");
+		const wordIdsKey =
+			separatorIndex >= 0
+				? clueFetchKey.slice(0, separatorIndex)
+				: clueFetchKey;
+		if (wordIdsKey === "") {
 			setClueTextsByWordId({});
 			return;
 		}
 
-		const wordIds = clueWordIdsKey.split(",").map(Number);
+		const wordIds = wordIdsKey.split(",").map(Number);
 		let cancelled = false;
-		let timeoutId: number | null = null;
+		const startedAt = Date.now();
 
 		// For every requested word that has no clue text, silently reveal one of
 		// its letters instead. Idempotent: words that already have a revealed cell
@@ -588,31 +600,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}
 		};
 
-		const timeoutPromise = new Promise<"timeout">((resolve) => {
-			timeoutId = window.setTimeout(
-				() => resolve("timeout"),
-				CLUE_FETCH_TIMEOUT_MS,
-			);
-		});
-
 		void (async () => {
-			try {
-				const result = await Promise.race([
-					getWordClues({ data: { puzzleId: puzzle.id, wordIds } }),
-					timeoutPromise,
-				]);
-				if (cancelled) return;
+			const sleep = (ms: number) =>
+				new Promise<void>((resolve) => {
+					window.setTimeout(resolve, ms);
+				});
 
-				if (result === "timeout") {
-					revealFallbackLetters({});
-					return;
-				}
+			const applyClueResults = (result: Record<number, string>) => {
+				if (cancelled || Object.keys(result).length === 0) return;
 
-				setClueTextsByWordId(result);
+				setClueTextsByWordId((current) => ({ ...current, ...result }));
 
-				// Toast freshly requested clues so the player notices them even if
-				// they miss the word list update; reloads add nothing to the pending
-				// set, so they don't re-toast old clues.
 				const pendingToasts = pendingClueToastWordIdsRef.current;
 				for (const wordId of Array.from(pendingToasts)) {
 					const clue = result[wordId];
@@ -621,8 +619,49 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					lightClueWordRing(wordId);
 					pendingToasts.delete(wordId);
 				}
+			};
 
-				revealFallbackLetters(result);
+			let fetchedClues: Record<number, string> = {};
+			let fallbackApplied = false;
+			const deadline = startedAt + CLUE_FETCH_MAX_MS;
+
+			const maybeApplyLetterFallback = () => {
+				if (fallbackApplied || cancelled) return;
+				fallbackApplied = true;
+				revealFallbackLetters(fetchedClues);
+			};
+
+			try {
+				while (Date.now() < deadline && !cancelled) {
+					const result = await getWordClues({
+						data: { puzzleId: puzzle.id, wordIds },
+					});
+					if (cancelled) return;
+
+					fetchedClues = { ...fetchedClues, ...result };
+					applyClueResults(result);
+
+					if (wordIds.every((wordId) => fetchedClues[wordId])) {
+						return;
+					}
+
+					if (
+						!fallbackApplied &&
+						Date.now() - startedAt >= CLUE_FETCH_LETTER_FALLBACK_MS
+					) {
+						maybeApplyLetterFallback();
+					}
+
+					if (Date.now() + CLUE_FETCH_POLL_INTERVAL_MS >= deadline) {
+						break;
+					}
+
+					await sleep(CLUE_FETCH_POLL_INTERVAL_MS);
+				}
+
+				if (!cancelled) {
+					maybeApplyLetterFallback();
+				}
 			} catch (error) {
 				if (cancelled) return;
 				console.error("Failed to load word clues", error);
@@ -630,20 +669,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 					puzzle_date: puzzle.dateKey,
 					scope: "load_word_clues",
 				});
-				revealFallbackLetters({});
-			} finally {
-				if (timeoutId != null) window.clearTimeout(timeoutId);
+				maybeApplyLetterFallback();
 			}
 		})();
 
 		return () => {
 			cancelled = true;
-			if (timeoutId != null) window.clearTimeout(timeoutId);
 		};
 	}, [
 		puzzle.id,
 		puzzle.dateKey,
-		clueWordIdsKey,
+		clueFetchKey,
 		captureException,
 		lightClueWordRing,
 	]);

@@ -78,6 +78,7 @@ const config = defineConfig(({ mode }) => {
 			noExternal: ["@posthog/react", "posthog-js"],
 		},
 		test: {
+			setupFiles: ["./src/test/setup.ts"],
 			environmentMatchGlobs: [["src/components/**/*.test.tsx", "jsdom"]],
 			server: {
 				deps: {
