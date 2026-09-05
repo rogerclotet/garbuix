@@ -360,6 +360,15 @@ code {
 	animation: grid-locate-flash 1300ms ease-out both;
 }
 
+/* Tutorial targets stay visible until the player moves to another word. */
+.tutorial-puzzle .grid-locate-cell {
+	animation: none;
+	background-color: var(--primary);
+	color: var(--primary-foreground);
+	border-color: var(--primary-foreground);
+	box-shadow: inset 0 0 0 1px var(--primary-foreground);
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.clue-gradient-border {
 		animation: none;
