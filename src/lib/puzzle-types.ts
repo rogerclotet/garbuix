@@ -16,13 +16,16 @@ export type PuzzleGridMaskCell = {
 	wordIds: number[];
 };
 
-export type DailyPuzzleWordSlot = {
+export type PuzzleWordSlot = {
 	id: number;
 	startRow: number;
 	startCol: number;
 	direction: PuzzleDirection;
 	length: number;
 	middleDotAfterIndices?: number[];
+};
+
+export type DailyPuzzleWordSlot = PuzzleWordSlot & {
 	slotSalt: string;
 	answerHash: string;
 	answerCapsule: string;

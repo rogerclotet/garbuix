@@ -24,7 +24,6 @@ import {
 	hasSeenHowToPlay,
 	hasSeenProfilePreferencesTip,
 	hasSeenWelcome,
-	markHowToPlaySeen,
 	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
@@ -64,7 +63,7 @@ import {
 } from "./daily-helpers";
 import type { DailyData, DailySubmitFeedback } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
-import { openHowToPlay } from "./how-to-play-store";
+import { openHowToPlay, useHowToPlayOpen } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
@@ -253,6 +252,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
+	const tutorialOpen = useHowToPlayOpen();
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
 	const winDialogTimerRef = useRef<number | null>(null);
@@ -350,7 +350,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
-		markHowToPlaySeen();
 		openHowToPlay();
 		captureEvent("how_to_play_shown", { trigger: "first_visit" });
 	}, [captureEvent]);
@@ -367,15 +366,15 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		if (firstVisitChecked.current) return;
 		firstVisitChecked.current = true;
 
+		if (!hasSeenHowToPlay()) {
+			openHowToPlayIfFirstVisit();
+			return;
+		}
+
 		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
 		if (shouldShowWelcome) {
 			setWelcomeOpen(true);
 			captureEvent("welcome_shown", { trigger: "first_visit" });
-			return;
-		}
-
-		if (!hasSeenHowToPlay()) {
-			openHowToPlayIfFirstVisit();
 			return;
 		}
 
@@ -1370,7 +1369,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	useEffect(() => () => setDailyHeaderSummary(null), []);
 
 	useEffect(() => {
-		if (typeof window === "undefined" || isComplete) {
+		if (typeof window === "undefined" || isComplete || tutorialOpen) {
 			return;
 		}
 
@@ -1430,6 +1429,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		handleGuess,
 		handleLetterClick,
 		isComplete,
+		tutorialOpen,
 	]);
 
 	if (isRollingOver) {
