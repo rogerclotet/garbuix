@@ -175,7 +175,7 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 			role="application"
 			aria-label="Tauler del tutorial"
 			tabIndex={-1}
-			className="flex h-full flex-col outline-none"
+			className="tutorial-puzzle flex h-full flex-col outline-none"
 			onKeyDown={handleKeyDown}
 		>
 			<div className="mx-auto flex w-full max-w-5xl shrink-0 items-center justify-between gap-3 border-b border-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8">
