@@ -3,6 +3,7 @@ import type {
 	DailyPuzzlePublic,
 	DailyPuzzleWordSlot,
 	PuzzleProgressState,
+	PuzzleWordSlot,
 } from "@/lib/puzzle-types";
 
 export function buildHistoryEntry(
@@ -21,7 +22,10 @@ export function buildHistoryEntry(
 	};
 }
 
-export function getSlotCellKey(slot: DailyPuzzleWordSlot, index: number) {
+export function getSlotCellKey(
+	slot: Pick<DailyPuzzleWordSlot, "direction" | "startRow" | "startCol">,
+	index: number,
+) {
 	const row =
 		slot.direction === "horizontal" ? slot.startRow : slot.startRow + index;
 	const col =
@@ -215,7 +219,7 @@ export function getOptimotDefinitionUrl(word: string) {
 }
 
 export function getDisplayedSlotWord(
-	slot: DailyPuzzleWordSlot,
+	slot: PuzzleWordSlot,
 	cellLetters: Map<string, string>,
 ) {
 	const letters = Array.from({ length: slot.length }, (_, index) => {
@@ -226,7 +230,7 @@ export function getDisplayedSlotWord(
 }
 
 function countDisplayedSlotLetters(
-	slot: DailyPuzzleWordSlot,
+	slot: PuzzleWordSlot,
 	cellLetters: Map<string, string>,
 ) {
 	let revealedLetterCount = 0;
@@ -241,15 +245,15 @@ function countDisplayedSlotLetters(
 }
 
 export function getSortedWordSlots(
-	wordSlots: DailyPuzzleWordSlot[],
+	wordSlots: PuzzleWordSlot[],
 	guessedWordIds: number[],
 	cellLetters: Map<string, string>,
 ) {
 	const guessedWordOrder = new Map(
 		guessedWordIds.map((wordId, index) => [wordId, index]),
 	);
-	const foundSlots: DailyPuzzleWordSlot[] = [];
-	const notFoundSlots: DailyPuzzleWordSlot[] = [];
+	const foundSlots: PuzzleWordSlot[] = [];
+	const notFoundSlots: PuzzleWordSlot[] = [];
 
 	for (const slot of wordSlots) {
 		if (guessedWordOrder.has(slot.id)) {

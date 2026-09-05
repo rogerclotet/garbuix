@@ -195,7 +195,7 @@ const VALID_LETTER_LAYOUTS: readonly LetterLayout[] = [
 
 // The board starts on the circle; a player can pick the grid or the line in
 // /preferencies.
-const DEFAULT_LETTER_LAYOUT: LetterLayout = "circle";
+export const DEFAULT_LETTER_LAYOUT: LetterLayout = "circle";
 
 export function getLetterLayout(): LetterLayout {
 	if (typeof window === "undefined") return DEFAULT_LETTER_LAYOUT;

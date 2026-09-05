@@ -15,7 +15,7 @@ import type {
 	ClueResponse,
 } from "@/lib/clue-request-types";
 import { clueHelpGivenField, wordRowId } from "@/lib/clue-request-types";
-import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
+import type { PuzzleWordSlot } from "@/lib/puzzle-types";
 import type { RespondResult } from "@/lib/use-clue-requests";
 import {
 	getDisplayedSlotWord,
@@ -24,7 +24,8 @@ import {
 } from "./daily-helpers";
 
 type DailyWordListProps = {
-	puzzle: DailyPuzzlePublic;
+	puzzle: { wordSlots: PuzzleWordSlot[] };
+	idPrefix?: string;
 	guessedWordIds: number[];
 	revealedAnswers: Record<number, string>;
 	cellLetters: Map<string, string>;
@@ -46,6 +47,7 @@ type DailyWordListProps = {
 
 export function DailyWordList({
 	puzzle,
+	idPrefix = "",
 	guessedWordIds,
 	revealedAnswers,
 	cellLetters,
@@ -255,7 +257,7 @@ export function DailyWordList({
 				return (
 					<div
 						key={slot.id}
-						id={wordRowId(slot.id)}
+						id={`${idPrefix}${wordRowId(slot.id)}`}
 						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full scroll-mt-4 ${
 							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
 						}`}
@@ -316,7 +318,7 @@ export function DailyWordList({
 				return (
 					<div
 						key={slot.id}
-						id={wordRowId(slot.id)}
+						id={`${idPrefix}${wordRowId(slot.id)}`}
 						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3 scroll-mt-4"
 					>
 						<div className="flex items-center gap-2">

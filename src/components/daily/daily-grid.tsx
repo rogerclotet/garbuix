@@ -1,9 +1,16 @@
 import { type CSSProperties, useMemo } from "react";
-import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
+import type { DailyPuzzlePublic, PuzzleWordSlot } from "@/lib/puzzle-types";
 import { getSlotCellKey } from "./daily-helpers";
 
+export type PuzzleBoard = Pick<
+	DailyPuzzlePublic,
+	"rows" | "cols" | "gridMask"
+> & {
+	wordSlots: PuzzleWordSlot[];
+};
+
 type DailyGridProps = {
-	puzzle: DailyPuzzlePublic;
+	puzzle: PuzzleBoard;
 	revealedCells: Set<string>;
 	cellLetters: Map<string, string>;
 	highlightedWordId: number | null;

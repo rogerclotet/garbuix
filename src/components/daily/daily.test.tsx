@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Daily } from "./daily";
+import { useHowToPlayOpen } from "./how-to-play-store";
 
 const {
 	resolveGuessMock,
@@ -64,6 +65,7 @@ vi.mock("@/lib/puzzle-local", () => ({
 
 vi.mock("./how-to-play-store", () => ({
 	openHowToPlay: openHowToPlayMock,
+	useHowToPlayOpen: vi.fn(() => false),
 }));
 
 vi.mock("@/components/profile-preferences-tip-store", () => ({
@@ -261,6 +263,7 @@ describe("Daily submit feedback", () => {
 		applyLocalEventMock.mockReset();
 		captureEventMock.mockReset();
 		captureExceptionMock.mockReset();
+		vi.mocked(useHowToPlayOpen).mockReturnValue(false);
 		hasSeenHowToPlayMock.mockReset();
 		hasSeenHowToPlayMock.mockReturnValue(true);
 		markHowToPlaySeenMock.mockReset();
@@ -380,18 +383,36 @@ describe("Daily submit feedback", () => {
 		);
 	});
 
-	it("opens the how-to-play dialog on first visit and marks it seen", async () => {
+	it("opens the tutorial on first visit without marking it seen before finishing", async () => {
 		hasSeenHowToPlayMock.mockReturnValue(false);
 
 		renderDaily();
 
 		await waitFor(() => {
-			expect(markHowToPlaySeenMock).toHaveBeenCalledTimes(1);
+			expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
+			expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
 		});
 		expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
 		expect(captureEventMock).toHaveBeenCalledWith("how_to_play_shown", {
 			trigger: "first_visit",
 		});
+	});
+
+	it("starts new players in practice before showing a welcome dialog", async () => {
+		hasSeenHowToPlayMock.mockReturnValue(false);
+		hasSeenWelcomeMock.mockReturnValue(false);
+		renderDaily();
+		await waitFor(() => expect(openHowToPlayMock).toHaveBeenCalledTimes(1));
+		expect(screen.queryByText("Benvingut/da a Garbuix!")).toBeNull();
+	});
+
+	it("ignores live puzzle keyboard input while the tutorial is open", () => {
+		vi.mocked(useHowToPlayOpen).mockReturnValue(true);
+		renderDaily();
+		for (const key of "casa") fireEvent.keyDown(window, { key });
+		fireEvent.keyDown(window, { key: "Enter" });
+		expect(resolveGuessMock).not.toHaveBeenCalled();
+		expect(applyLocalEventMock).not.toHaveBeenCalled();
 	});
 
 	it("does not auto-open the how-to-play dialog on subsequent visits", async () => {

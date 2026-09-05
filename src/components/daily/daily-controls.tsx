@@ -40,7 +40,14 @@ const ROW_GAP_REM = 0.375;
 // row still lands inside the panel.
 const ROW_SUBMIT_GAP_REM = 0.25;
 
+export type TutorialControlTarget =
+	| { kind: "letter"; letter: string }
+	| { kind: "submit" }
+	| { kind: "hint" };
+
 type DailyControlsProps = {
+	inline?: boolean;
+	tutorialTarget?: TutorialControlTarget;
 	aiClueMode: boolean;
 	// How the letters are arranged: around the submit button, in a three-column
 	// grid, or in a single row. Independent of where the panel sits.
@@ -70,6 +77,8 @@ type DailyControlsProps = {
 };
 
 export function DailyControls({
+	inline = false,
+	tutorialTarget,
 	aiClueMode,
 	layout,
 	canUseHint,
@@ -90,6 +99,14 @@ export function DailyControls({
 	const [hintHoldProgress, setHintHoldProgress] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 	const hintHoldFrameRef = useRef<number | null>(null);
+	useEffect(
+		() => () => {
+			if (hintHoldFrameRef.current != null) {
+				cancelAnimationFrame(hintHoldFrameRef.current);
+			}
+		},
+		[],
+	);
 	// Measures the panel for as long as it is on screen. A finished puzzle
 	// unmounts the keypad, and the cleanup hands its room back.
 	const measurePanel = useCallback(
@@ -221,12 +238,16 @@ export function DailyControls({
 	const renderLetterButton = (letter: string) => (
 		<Button
 			key={`letter-${letter}`}
+			data-slot="letter-key"
 			variant="outline"
 			size="lg"
 			className={cn(
 				"daily-pressable daily-pressable-key font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
 				isCircle || isRow ? "" : "text-xl",
 				keySizeClass,
+				tutorialTarget?.kind === "letter" &&
+					tutorialTarget.letter === letter &&
+					"ring-2 ring-primary ring-offset-4 ring-offset-background bg-primary/10",
 			)}
 			style={keyStyle}
 			onPointerDown={(event) =>
@@ -250,6 +271,8 @@ export function DailyControls({
 			className={cn(
 				"daily-pressable daily-pressable-submit touch-manipulation",
 				submitSizeClass,
+				tutorialTarget?.kind === "submit" &&
+					"ring-2 ring-primary ring-offset-4 ring-offset-background",
 			)}
 			style={submitStyle}
 			disabled={currentGuess.length < 4}
@@ -288,8 +311,16 @@ export function DailyControls({
 				onPointerUp={cancelHintHold}
 				onPointerLeave={cancelHintHold}
 				onPointerCancel={cancelHintHold}
+				onClick={(event) => {
+					// Keyboard and assistive-technology activation has no pointer hold.
+					if (event.detail === 0 && canUseHint) onHint();
+				}}
 				onContextMenu={(e) => e.preventDefault()}
-				className="daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none"
+				className={cn(
+					"daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none",
+					tutorialTarget?.kind === "hint" &&
+						"ring-2 ring-amber-500 ring-offset-2 ring-offset-background bg-amber-500/10",
+				)}
 				disabled={!canUseHint || isComplete}
 				size="lg"
 				aria-description={
@@ -417,10 +448,20 @@ export function DailyControls({
 	return (
 		<div
 			ref={measurePanel}
-			className="fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto"
+			className={
+				inline
+					? "relative w-full"
+					: "fixed right-0 bottom-0 left-0 z-40 touch-none overscroll-none lg:static lg:shrink-0 lg:overflow-visible lg:touch-auto lg:overscroll-auto"
+			}
 		>
-			<div className="rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto">
-				<div className="hidden lg:block lg:text-left">
+			<div
+				className={
+					inline
+						? "select-none bg-background"
+						: "rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto"
+				}
+			>
+				<div className={inline ? "hidden" : "hidden lg:block lg:text-left"}>
 					<h2 className="font-semibold leading-none tracking-tight">
 						Endevina una paraula
 					</h2>
