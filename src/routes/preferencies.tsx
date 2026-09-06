@@ -544,7 +544,7 @@ function PreferencesPage() {
 					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
 				>
 					<div className="space-y-1">
-						<div className="font-medium">Pistes per paraules extra</div>
+						<div className="font-medium">Lletres per paraules extra</div>
 						<p className="text-sm text-muted-foreground font-ui">
 							Cada {WORDS_PER_BONUS_CLUE} paraules vàlides que no siguin del
 							trencaclosques, et revelem una lletra a l'atzar. Desactiva-ho per

@@ -1049,7 +1049,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 						date_key: puzzle.dateKey,
 						puzzle_id: puzzle.id,
 					});
-					toast.success("Pista desbloquejada!", {
+					toast.success("Lletra desbloquejada!", {
 						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
 				}
@@ -1513,11 +1513,10 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 										const bonusPercent =
 											(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
 										const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
-										const meterHeight = bonusCluesEnabled ? "h-6" : "h-7";
 										return (
-											<div className="flex flex-col gap-1">
+											<div className="flex flex-col overflow-hidden rounded-lg">
 												<div
-													className={`relative ${meterHeight} overflow-hidden rounded-full bg-muted/40`}
+													className="relative h-9 overflow-hidden bg-muted/40"
 													role="progressbar"
 													aria-valuenow={derivedProgress.guessedWordIds.length}
 													aria-valuemin={0}
@@ -1525,7 +1524,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 													aria-label="Paraules trobades"
 												>
 													<div
-														className="absolute inset-y-0 left-0 rounded-full bg-primary/15 transition-[width] duration-500 ease-out"
+														className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
 														style={{ width: `${percent}%` }}
 													/>
 													<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
@@ -1553,7 +1552,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 												</div>
 												{bonusCluesEnabled ? (
 													<div
-														className="relative h-6 overflow-hidden rounded-full bg-blue-500/10 dark:bg-blue-400/10"
+														className="relative h-6 overflow-hidden bg-blue-500/10 dark:bg-blue-400/10"
 														role="progressbar"
 														aria-valuenow={bonusInCycle}
 														aria-valuemin={0}
@@ -1561,7 +1560,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 														aria-label="Paraules vàlides de fora del joc"
 													>
 														<div
-															className="absolute inset-y-0 left-0 rounded-full bg-blue-500/25 transition-[width] duration-500 ease-out"
+															className="absolute inset-y-0 left-0 bg-blue-500/25 transition-[width] duration-500 ease-out"
 															style={{ width: `${bonusPercent}%` }}
 														/>
 														<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
@@ -1574,7 +1573,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 																</span>
 															</span>
 															<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
-																{wordsToNextClue} per a una pista
+																{wordsToNextClue} per a una lletra
 															</span>
 														</div>
 													</div>

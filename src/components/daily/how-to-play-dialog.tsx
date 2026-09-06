@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DEFAULT_LETTER_LAYOUT } from "@/lib/anon-identity";
 import { markHowToPlaySeen, markWelcomeSeen } from "@/lib/puzzle-local";
+import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
 import { DailyControls, type TutorialControlTarget } from "./daily-controls";
 import { DailyGrid } from "./daily-grid";
@@ -246,6 +247,12 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 							<Dialog.Description className="text-sm leading-snug text-muted-foreground font-ui">
 								{instruction}
 							</Dialog.Description>
+							{step === "complete" ? (
+								<p className="text-sm leading-snug text-muted-foreground font-ui">
+									Al repte diari, cada {WORDS_PER_BONUS_CLUE} paraules vàlides
+									de fora del joc et revelen una lletra a l'atzar.
+								</p>
+							) : null}
 						</div>
 						{step === "complete" ? (
 							<Button size="lg" onClick={onFinish}>
