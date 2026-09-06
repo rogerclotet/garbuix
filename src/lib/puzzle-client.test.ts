@@ -10,6 +10,7 @@ async function buildTestPuzzle() {
 		dateKey: "2026-04-11",
 		seed: 260411,
 		algorithmVersion: "1",
+		availableWordCount: 30,
 		letters: ["c", "o", "s", "a"],
 		initialShuffledLetters: ["c", "o", "s", "a"],
 		crossword: {

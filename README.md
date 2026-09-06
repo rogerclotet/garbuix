@@ -145,15 +145,19 @@ The crossword generator:
 
 ### Difficulty Rating
 
-Each daily puzzle gets a 1-3 star difficulty based on the corpus frequency of
-the words it contains:
+Each daily puzzle gets a 1-3 star difficulty based mainly on word rarity, with
+a small increase when its letters allow more valid guesses:
 
-- The score is the mean `log10(frequency)` of the puzzle's words. The generator
+- The base score is the mean `log10(frequency)` of the puzzle's words. The generator
   biases word selection toward common words, so a lower mean means rarer words
   and a harder puzzle.
-- The two thresholds in `src/lib/puzzle-difficulty.ts` are the empirical
-  terciles of a 365-day simulation, so the long-run distribution across
-  easy/medium/hard stays roughly even.
+- Count distinct valid guesses from the full guess dictionary, including bonus
+  words, using the same letter and normalization rules as gameplay. Subtract
+  `min(0.15, 0.05 * log2(max(count, 30) / 30))` from the base score. This adds
+  0.05 per doubling above 30 guesses and stops increasing at 240 guesses.
+- The original frequency thresholds remain 3.59 for easy and 3.30 for medium.
+  The modifier is smaller than the gap between them, so it can raise a rating
+  by at most one level. Rare-word puzzles stay hard even with few valid guesses.
 - The rating is stored on the puzzle row and shown as a 1-3 bar indicator
   (green/amber/red, with a label) on today's puzzle and on the previous-days
   history.
@@ -164,9 +168,9 @@ Check the distribution (and re-tune the thresholds if it drifts) with:
 pnpm run analyze:difficulty -- --days 365
 ```
 
-Existing puzzle rows created before the rating existed don't have a star value
-until backfilled. Fill today and yesterday (so the previous-day history shows
-it) with:
+Stored puzzles are rescored when opened. To update ratings across history and
+leaderboards without opening each puzzle, run the backfill after deploying the
+new formula. It updates both the database column and public snapshot:
 
 ```bash
 pnpm run backfill:difficulty            # today + yesterday

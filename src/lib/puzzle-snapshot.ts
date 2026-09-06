@@ -93,9 +93,11 @@ export async function buildPuzzleSnapshots(options: {
 	letters: string[];
 	initialShuffledLetters: string[];
 	algorithmVersion: string;
+	availableWordCount: number;
 }) {
 	const {
 		algorithmVersion,
+		availableWordCount,
 		crossword,
 		dateKey,
 		initialShuffledLetters,
@@ -159,9 +161,12 @@ export async function buildPuzzleSnapshots(options: {
 		gridLetters,
 	});
 
-	const difficulty = computePuzzleDifficulty(
-		crossword.words.map((wordPlacement) => wordPlacement.word.frequency),
-	);
+	const difficulty = computePuzzleDifficulty({
+		frequencies: crossword.words.map(
+			(wordPlacement) => wordPlacement.word.frequency,
+		),
+		availableWordCount,
+	});
 
 	const publicSnapshot: DailyPuzzlePublic = {
 		id: puzzleId,
