@@ -6,50 +6,58 @@ import {
 } from "@/lib/puzzle-snapshot";
 
 describe("puzzle-snapshot", () => {
-	it("keeps answers and grid letters out of the public snapshot", async () => {
-		const { privateSnapshot, publicSnapshot } = await buildPuzzleSnapshots({
-			puzzleId: "puzzle-1",
-			dateKey: "2026-03-10",
-			seed: 123,
-			algorithmVersion: "1",
-			letters: ["c", "a", "s"],
-			initialShuffledLetters: ["a", "c", "s"],
-			crossword: {
-				rows: 1,
-				cols: 3,
-				grid: [
-					[
-						{ letter: "c", wordIds: [0] },
-						{ letter: "a", wordIds: [0] },
-						{ letter: "s", wordIds: [0] },
+	it.each([
+		{ availableWordCount: 30, expectedDifficulty: 1 },
+		{ availableWordCount: 120, expectedDifficulty: 2 },
+	])(
+		"scores $availableWordCount guesses while keeping answers private",
+		async ({ availableWordCount, expectedDifficulty }) => {
+			const { privateSnapshot, publicSnapshot } = await buildPuzzleSnapshots({
+				puzzleId: "puzzle-1",
+				dateKey: "2026-03-10",
+				seed: 123,
+				algorithmVersion: "1",
+				availableWordCount,
+				letters: ["c", "a", "s"],
+				initialShuffledLetters: ["a", "c", "s"],
+				crossword: {
+					rows: 1,
+					cols: 3,
+					grid: [
+						[
+							{ letter: "c", wordIds: [0] },
+							{ letter: "a", wordIds: [0] },
+							{ letter: "s", wordIds: [0] },
+						],
 					],
-				],
-				words: [
-					{
-						id: 0,
-						startRow: 0,
-						startCol: 0,
-						direction: "horizontal",
-						revealed: false,
-						word: {
-							name: "cas",
-							areatematica: "general",
-							frequency: 1,
+					words: [
+						{
+							id: 0,
+							startRow: 0,
+							startCol: 0,
+							direction: "horizontal",
+							revealed: false,
+							word: {
+								name: "cas",
+								areatematica: "general",
+								frequency: 4_000,
+							},
 						},
-					},
-				],
-			},
-		});
+					],
+				},
+			});
 
-		expect(publicSnapshot).not.toHaveProperty("gridLetters");
-		expect(publicSnapshot.wordSlots[0]).not.toHaveProperty("displayWord");
-		expect(publicSnapshot.wordSlots[0]).not.toHaveProperty("normalizedWord");
-		expect(publicSnapshot.gridMask[0][0]).toEqual({ wordIds: [0] });
-		expect(JSON.stringify(publicSnapshot)).not.toContain("cas");
+			expect(publicSnapshot).not.toHaveProperty("gridLetters");
+			expect(publicSnapshot.difficulty).toBe(expectedDifficulty);
+			expect(publicSnapshot.wordSlots[0]).not.toHaveProperty("displayWord");
+			expect(publicSnapshot.wordSlots[0]).not.toHaveProperty("normalizedWord");
+			expect(publicSnapshot.gridMask[0][0]).toEqual({ wordIds: [0] });
+			expect(JSON.stringify(publicSnapshot)).not.toContain("cas");
 
-		expect(privateSnapshot.gridLetters[0]).toEqual(["c", "a", "s"]);
-		expect(privateSnapshot.wordSlots[0].displayWord).toBe("cas");
-	});
+			expect(privateSnapshot.gridLetters[0]).toEqual(["c", "a", "s"]);
+			expect(privateSnapshot.wordSlots[0].displayWord).toBe("cas");
+		},
+	);
 
 	it("creates hint capsules for every filled cell", async () => {
 		const { publicSnapshot } = await buildPuzzleSnapshots({
@@ -57,6 +65,7 @@ describe("puzzle-snapshot", () => {
 			dateKey: "2026-03-11",
 			seed: 456,
 			algorithmVersion: "1",
+			availableWordCount: 30,
 			letters: ["a", "b", "c", "d", "e", "f"],
 			initialShuffledLetters: ["f", "e", "d", "c", "b", "a"],
 			crossword: {
@@ -124,6 +133,7 @@ describe("puzzle-snapshot", () => {
 				dateKey: "2026-04-01",
 				seed: 260401,
 				algorithmVersion: "1",
+				availableWordCount: 30,
 				letters: ["c", "o", "n", "s", "l"],
 				initialShuffledLetters: ["l", "s", "n", "o", "c"],
 				crossword: {
@@ -176,6 +186,7 @@ describe("puzzle-snapshot", () => {
 			dateKey: "2026-04-02",
 			seed: 260402,
 			algorithmVersion: "1",
+			availableWordCount: 30,
 			letters: ["c", "o", "l", "a", "b", "r"],
 			initialShuffledLetters: ["r", "b", "a", "l", "o", "c"],
 			crossword: {

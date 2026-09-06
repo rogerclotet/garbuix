@@ -1,21 +1,27 @@
 import { asc, eq } from "drizzle-orm";
+import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { dailyPuzzles } from "@/db/schema";
 import { db, sql } from "@/lib/db";
 import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import {
+	buildNormalizedDictionary,
+	getValidNormalizedGuessesForLetters,
+} from "@/lib/puzzle-dictionary";
+import {
 	buildWordFrequencyLookup,
 	computeDifficultyForNormalizedWords,
 } from "@/lib/puzzle-difficulty";
 
 // Recompute and persist the 1-3 star difficulty for stored puzzles. Difficulty
-// is derived from the puzzle's word frequencies, which the public snapshot
-// doesn't keep, so we re-score the private snapshot's normalized words against
-// the current generation dictionary. By default this fills in today and
-// yesterday so the difficulty also shows on the previous-day history view.
+// uses target-word frequencies from the generation dictionary and the number
+// of valid guesses from the wider guess dictionary. Recompute both from the
+// private snapshot so old cached guess lists don't affect the score.
+// By default this updates today and yesterday.
 
 const frequencyLookup = buildWordFrequencyLookup(allWords as Word[]);
+const normalizedGuessWords = buildNormalizedDictionary(guessWords);
 
 function getArg(flag: string) {
 	const index = process.argv.indexOf(flag);
@@ -62,10 +68,14 @@ async function backfillRow(row: PuzzleRow): Promise<boolean> {
 	const normalizedWords = row.privateSnapshotJson.wordSlots.map(
 		(slot) => slot.normalizedWord,
 	);
-	const difficulty = computeDifficultyForNormalizedWords(
+	const difficulty = computeDifficultyForNormalizedWords({
 		normalizedWords,
 		frequencyLookup,
-	);
+		availableWordCount: getValidNormalizedGuessesForLetters(
+			normalizedGuessWords,
+			row.privateSnapshotJson.letters,
+		).length,
+	});
 
 	if (difficulty == null) {
 		console.warn(

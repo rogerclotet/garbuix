@@ -1,7 +1,7 @@
 import type { Word } from "@/data/types";
 import { normalizeWord } from "@/lib/puzzle-text";
 
-// 1 = easy (common words), 2 = medium, 3 = hard (rarer words).
+// 1 = easy, 2 = medium, 3 = hard. Rarity dominates; more valid guesses add difficulty.
 export type PuzzleDifficulty = 1 | 2 | 3;
 
 export const PUZZLE_DIFFICULTY_LEVELS = 3;
@@ -19,18 +19,27 @@ export function formatDifficultyPhrase(difficulty: PuzzleDifficulty): string {
 // Approximate Catalan copy for UI tooltips — difficulty is a rough guide, not exact.
 export const PUZZLE_DIFFICULTY_SUMMARIES: Record<PuzzleDifficulty, string> = {
 	1: "Majoria de paraules molt comunes",
-	2: "Majoritàriament paraules habituals",
-	3: "Algunes paraules més rares",
+	2: "Paraules menys comunes o més opcions possibles",
+	3: "Paraules més rares o moltes opcions possibles",
 };
 
-// Difficulty is the mean log10(corpus frequency) of the puzzle's words. The
-// generator biases word selection toward common words, so a lower mean means
-// the day's words are rarer and the puzzle is harder. The two thresholds are
-// the empirical terciles of a 365-day simulation (see
-// scripts/analyze-difficulty.ts), chosen so the long-run star distribution is
-// roughly even across easy/medium/hard.
+// Start with mean log10(corpus frequency), then subtract a small penalty for
+// the number of valid guesses. Lower scores mean harder puzzles. Keep the
+// original frequency-only terciles so rare puzzles remain hard regardless of
+// how few guesses their letters allow (see scripts/analyze-difficulty.ts).
 const EASY_MIN_MEAN_LOG_FREQUENCY = 3.59;
 const MEDIUM_MIN_MEAN_LOG_FREQUENCY = 3.3;
+
+// Viable letter sets currently allow 30-376 distinct guesses, with a median
+// near 107. Each doubling above 30 subtracts 0.05, capped at 240 guesses.
+// The 0.15 cap is smaller than the 0.29 gap between levels: word count alone
+// cannot turn an easy puzzle into a hard one, and never makes rare words easier.
+export function availableWordCountPenalty(availableWordCount: number): number {
+	return Math.min(
+		0.15,
+		0.05 * Math.log2(Math.max(availableWordCount, 30) / 30),
+	);
+}
 
 // Corpus frequencies are always >= 1 in practice, but clamp so a stray 0 can't
 // produce -Infinity and poison the mean.
@@ -50,13 +59,11 @@ export function meanLogFrequency(frequencies: readonly number[]): number {
 	return total / frequencies.length;
 }
 
-export function difficultyFromMeanLogFrequency(
-	meanLog: number,
-): PuzzleDifficulty {
-	if (meanLog >= EASY_MIN_MEAN_LOG_FREQUENCY) {
+export function difficultyFromScore(score: number): PuzzleDifficulty {
+	if (score >= EASY_MIN_MEAN_LOG_FREQUENCY) {
 		return 1;
 	}
-	if (meanLog >= MEDIUM_MIN_MEAN_LOG_FREQUENCY) {
+	if (score >= MEDIUM_MIN_MEAN_LOG_FREQUENCY) {
 		return 2;
 	}
 	return 3;
@@ -65,13 +72,20 @@ export function difficultyFromMeanLogFrequency(
 // Returns null when there are no frequencies to score (e.g. an empty puzzle or
 // every word missing from the lookup), so callers can leave difficulty unset
 // rather than reporting a misleading "hard".
-export function computePuzzleDifficulty(
-	frequencies: readonly number[],
-): PuzzleDifficulty | null {
+export function computePuzzleDifficulty({
+	frequencies,
+	availableWordCount,
+}: {
+	frequencies: readonly number[];
+	availableWordCount: number;
+}): PuzzleDifficulty | null {
 	if (frequencies.length === 0) {
 		return null;
 	}
-	return difficultyFromMeanLogFrequency(meanLogFrequency(frequencies));
+	return difficultyFromScore(
+		meanLogFrequency(frequencies) -
+			availableWordCountPenalty(availableWordCount),
+	);
 }
 
 // Maps each normalized word form to its highest corpus frequency. Built from the
@@ -94,10 +108,15 @@ export function buildWordFrequencyLookup(
 // Scores difficulty for a set of normalized words using a frequency lookup.
 // Words missing from the lookup are skipped; if every word is missing the
 // result is null.
-export function computeDifficultyForNormalizedWords(
-	normalizedWords: readonly string[],
-	frequencyLookup: ReadonlyMap<string, number>,
-): PuzzleDifficulty | null {
+export function computeDifficultyForNormalizedWords({
+	normalizedWords,
+	frequencyLookup,
+	availableWordCount,
+}: {
+	normalizedWords: readonly string[];
+	frequencyLookup: ReadonlyMap<string, number>;
+	availableWordCount: number;
+}): PuzzleDifficulty | null {
 	const frequencies: number[] = [];
 	for (const word of normalizedWords) {
 		const frequency = frequencyLookup.get(word);
@@ -105,5 +124,5 @@ export function computeDifficultyForNormalizedWords(
 			frequencies.push(frequency);
 		}
 	}
-	return computePuzzleDifficulty(frequencies);
+	return computePuzzleDifficulty({ frequencies, availableWordCount });
 }
