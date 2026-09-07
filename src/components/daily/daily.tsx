@@ -698,6 +698,9 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// Fetch clues for words the player has already found so they can be shown in
 	// the list. No toast, no letter fallback, no grid highlight — these are just
 	// for reading after the fact. Same availability as requested clues.
+	// Retry when pending events sync: signed-in players can only fetch a found
+	// word's clue after the server has saved their guess.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pendingEventCount retries clues after guesses sync.
 	useEffect(() => {
 		if (guessedWordIdsKey === "") {
 			setFoundClueTextsByWordId({});
@@ -727,7 +730,13 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [puzzle.id, puzzle.dateKey, guessedWordIdsKey, captureException]);
+	}, [
+		puzzle.id,
+		puzzle.dateKey,
+		guessedWordIdsKey,
+		pendingEventCount,
+		captureException,
+	]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])

@@ -11,7 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Daily } from "./daily";
 import { useHowToPlayOpen } from "./how-to-play-store";
 
+const progressState = vi.hoisted(() => {
+	const guessedWordIds: number[] = [];
+	return { guessedWordIds, pendingEventCount: 0 };
+});
+
 const {
+	getWordCluesMock,
 	resolveGuessMock,
 	applyLocalEventMock,
 	captureEventMock,
@@ -25,6 +31,7 @@ const {
 	openHowToPlayMock,
 	openProfilePreferencesTipMock,
 } = vi.hoisted(() => ({
+	getWordCluesMock: vi.fn(),
 	resolveGuessMock: vi.fn(),
 	applyLocalEventMock: vi.fn(),
 	captureEventMock: vi.fn(),
@@ -51,6 +58,10 @@ vi.mock("@/lib/puzzle-client", async () => {
 		resolveGuess: resolveGuessMock,
 	};
 });
+
+vi.mock("@/lib/puzzle-server-fns", () => ({
+	getWordClues: getWordCluesMock,
+}));
 
 vi.mock("@/lib/puzzle-local", () => ({
 	getDeviceId: vi.fn(() => "device-1"),
@@ -95,10 +106,11 @@ vi.mock("@/lib/use-observability", () => ({
 vi.mock("./use-daily-progress", () => ({
 	useDailyProgress: vi.fn(() => ({
 		applyLocalEvent: applyLocalEventMock,
+		pendingEventCount: progressState.pendingEventCount,
 		derivedProgress: {
 			puzzleId: "puzzle-1",
 			guessHashes: [],
-			guessedWordIds: [],
+			guessedWordIds: progressState.guessedWordIds,
 			revealedWordTokens: {},
 			hintedCells: [],
 			clueWordIds: [],
@@ -114,10 +126,6 @@ vi.mock("./use-daily-progress", () => ({
 
 vi.mock("./daily-grid", () => ({
 	DailyGrid: vi.fn(() => <div data-testid="daily-grid" />),
-}));
-
-vi.mock("./daily-word-list", () => ({
-	DailyWordList: vi.fn(() => <div data-testid="daily-word-list" />),
 }));
 
 vi.mock("./share-progress", () => ({
@@ -186,8 +194,8 @@ function installVibrateMock() {
 	return window.navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
 }
 
-function renderDaily() {
-	return render(
+function dailyView() {
+	return (
 		<Daily
 			initialData={{
 				historyEntries: null,
@@ -224,11 +232,15 @@ function renderDaily() {
 					hintCapsules: [],
 				},
 				progress: null,
-				rolloverAt: "2026-04-12T00:00:00.000Z",
+				rolloverAt: new Date(Date.now() + 86_400_000).toISOString(),
 				sessionUser: null,
 			}}
-		/>,
+		/>
 	);
+}
+
+function renderDaily() {
+	return render(dailyView());
 }
 
 async function submitCurrentGuess() {
@@ -259,6 +271,10 @@ async function submitCurrentGuess() {
 
 describe("Daily submit feedback", () => {
 	beforeEach(() => {
+		progressState.guessedWordIds = [];
+		progressState.pendingEventCount = 0;
+		getWordCluesMock.mockReset();
+		getWordCluesMock.mockResolvedValue({});
 		resolveGuessMock.mockReset();
 		applyLocalEventMock.mockReset();
 		captureEventMock.mockReset();
@@ -281,6 +297,23 @@ describe("Daily submit feedback", () => {
 
 	afterEach(() => {
 		cleanup();
+	});
+
+	it("shows a found word's clue when its guess finishes syncing", async () => {
+		const clue = "Allò que existeix o que hom concep com a existent.";
+		getWordCluesMock.mockResolvedValueOnce({}).mockResolvedValue({ 0: clue });
+		const { rerender } = renderDaily();
+
+		progressState.guessedWordIds = [0];
+		progressState.pendingEventCount = 1;
+		rerender(dailyView());
+		await waitFor(() => expect(getWordCluesMock).toHaveResolvedWith({}));
+		expect(screen.queryByText(clue)).toBeNull();
+
+		progressState.pendingEventCount = 0;
+		rerender(dailyView());
+
+		expect(await screen.findByText(clue)).toBeTruthy();
 	});
 
 	it.each([
