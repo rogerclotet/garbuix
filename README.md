@@ -73,11 +73,18 @@ POSTHOG_UI_HOST=https://us.posthog.com
 
 ### Production
 
-This builds the production image, waits for Postgres, runs `pnpm db:migrate`, and then starts the built server.
+Build both production images, stop the app and clue scheduler, apply migrations,
+then recreate both services from the new images. Stopping both writers before
+migrating prevents old code from querying removed columns. The app is briefly
+unavailable during migration and restart. If migration fails, both services stay
+stopped so the failure can be resolved before restarting.
 
 ```bash
-docker compose up -d --build
+sh scripts/deploy-compose.sh
 ```
+
+Use this script for production updates. A plain `docker compose up` can start the
+clue scheduler before the app finishes migrating the database.
 
 To pre-generate historical puzzle snapshots:
 
