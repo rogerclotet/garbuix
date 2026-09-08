@@ -11,18 +11,18 @@ jobs:
     container:
       image: node:25.2-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install unzip
         run: apt-get update && apt-get install -y unzip
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "25.2"
+          node-version-file: package.json
           cache: pnpm
 
       - run: pnpm install
@@ -40,7 +40,7 @@ jobs:
     container:
       image: alpine
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install SSH client
         run: apk add --no-cache openssh-client sshpass
