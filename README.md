@@ -23,7 +23,7 @@ A responsive web application for a Catalan crossword-style word game.
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 25.2.x (see `engines.node` in `package.json`)
 - pnpm (recommended) or npm
 
 ### Installation
