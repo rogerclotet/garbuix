@@ -37,7 +37,15 @@ const config = defineConfig(({ mode }) => {
 				devtools(),
 				nitro(),
 				tailwindcss(),
-				tanstackStart(),
+				tanstackStart({
+					importProtection: {
+						client: {
+							// This module is also loaded by Drizzle's CommonJS config
+							// loader, so protect it here without a runtime marker import.
+							specifiers: [/\/server-env(?:\.ts)?$/],
+						},
+					},
+				}),
 				viteReact(),
 				babel({ presets: [reactCompilerPreset()] }),
 			];
