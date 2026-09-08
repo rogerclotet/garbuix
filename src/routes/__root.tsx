@@ -20,7 +20,7 @@ import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { materialThemeCss } from "@/lib/material-theme";
-import { getObservabilityConfig } from "@/lib/observability-config";
+import { getObservabilityConfig } from "@/lib/observability-server-fns";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import appCss from "@/styles.css?url";
 
@@ -29,10 +29,13 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-	loader: async () => ({
-		observability: getObservabilityConfig(),
-		sessionUser: await getSessionUser(),
-	}),
+	loader: async () => {
+		const [observability, sessionUser] = await Promise.all([
+			getObservabilityConfig(),
+			getSessionUser(),
+		]);
+		return { observability, sessionUser };
+	},
 
 	head: () => ({
 		meta: [
