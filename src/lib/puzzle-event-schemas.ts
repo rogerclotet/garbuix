@@ -104,10 +104,12 @@ const progressStateSchema = z.object({
 	guessedWordIds: z.array(wordIdSchema).max(200),
 	revealedWordTokens: z.record(z.string().max(16), hashSchema),
 	hintedCells: z.array(cellKeySchema).max(500),
-	clueWordIds: z.array(wordIdSchema).max(200),
+	// Browser saves predating text hints have no clueWordIds field.
+	clueWordIds: z.array(wordIdSchema).max(200).default([]),
 	hintsUsed: z.number().int().min(0).max(1000),
 	guessCount: z.number().int().min(0).max(100_000),
-	bonusWordsFound: z.number().int().min(0).max(100_000),
+	// Bonus clues were added later without changing the local storage version.
+	bonusWordsFound: z.number().int().min(0).max(100_000).default(0),
 	shuffledLetters: z.array(z.string().min(1).max(4)).max(32),
 	completedAt: z.string().max(64).nullable(),
 	lastSyncedAt: z.string().max(64).nullable(),
