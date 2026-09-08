@@ -25,6 +25,7 @@ import {
 } from "@/lib/puzzle-service.server";
 import { HISTORY_PAGE_SIZE, type HistoryEntriesPage } from "@/lib/puzzle-types";
 import { consumeRateLimit, getClientAddress } from "@/lib/rate-limit.server";
+import type { WordCluesResult } from "@/lib/word-clues";
 
 // Every date key that reaches a server function comes from the client, so it is
 // validated at the boundary: well-formed, a real calendar date, and never in the
@@ -200,7 +201,7 @@ export const getWordClues = createServerFn({ method: "POST" })
 			wordIds: z.array(z.number().int().min(0).max(10_000)).max(20),
 		}),
 	)
-	.handler(async ({ data }) => {
+	.handler(async ({ data }): Promise<WordCluesResult> => {
 		return observeServerAction(
 			"getWordClues",
 			async () => {
@@ -231,18 +232,22 @@ export const getWordClues = createServerFn({ method: "POST" })
 								})
 							: null,
 				]);
-				const exceeded = rateLimits.find(
-					(limit) => limit != null && !limit.allowed,
+				const retryAfterSeconds = Math.max(
+					0,
+					...rateLimits.map((limit) =>
+						limit != null && !limit.allowed ? limit.retryAfterSeconds : 0,
+					),
 				);
-				if (exceeded) {
-					throw new Error("Too many clue requests. Try again later.");
+				if (retryAfterSeconds > 0) {
+					return { kind: "rate_limited", retryAfterSeconds };
 				}
 
-				return getWordCluesData({
+				const clues = await getWordCluesData({
 					puzzleId: data.puzzleId,
 					wordIds: data.wordIds,
 					userId: session?.user.id ?? null,
 				});
+				return { kind: "ok", clues };
 			},
 			{
 				properties: {
