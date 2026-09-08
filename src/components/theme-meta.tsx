@@ -1,37 +1,33 @@
 import { useTheme } from "next-themes";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { materialThemeMetaColors } from "@/lib/material-theme";
-
-function appendThemeColorMeta(content: string, media?: string) {
-	const meta = document.createElement("meta");
-	meta.setAttribute("name", "theme-color");
-	if (media) meta.setAttribute("media", media);
-	meta.setAttribute("content", content);
-	document.head.appendChild(meta);
-}
 
 export function ThemeMeta() {
 	const { theme } = useTheme();
+	const [mounted, setMounted] = useState(false);
 
+	// The saved theme is only available in the browser. Keep the first render
+	// consistent with the server's system-theme metadata during hydration.
 	useEffect(() => {
-		for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
-			meta.remove();
-		}
+		setMounted(true);
+	}, []);
 
-		if (theme === "light" || theme === "dark") {
-			appendThemeColorMeta(materialThemeMetaColors[theme]);
-			return;
-		}
+	if (mounted && (theme === "light" || theme === "dark")) {
+		return <meta name="theme-color" content={materialThemeMetaColors[theme]} />;
+	}
 
-		appendThemeColorMeta(
-			materialThemeMetaColors.light,
-			"(prefers-color-scheme: light)",
-		);
-		appendThemeColorMeta(
-			materialThemeMetaColors.dark,
-			"(prefers-color-scheme: dark)",
-		);
-	}, [theme]);
-
-	return null;
+	return (
+		<>
+			<meta
+				name="theme-color"
+				media="(prefers-color-scheme: light)"
+				content={materialThemeMetaColors.light}
+			/>
+			<meta
+				name="theme-color"
+				media="(prefers-color-scheme: dark)"
+				content={materialThemeMetaColors.dark}
+			/>
+		</>
+	);
 }

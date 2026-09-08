@@ -19,10 +19,7 @@ import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-	materialThemeCss,
-	materialThemeMetaColors,
-} from "@/lib/material-theme";
+import { materialThemeCss } from "@/lib/material-theme";
 import { getObservabilityConfig } from "@/lib/observability-config";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import appCss from "@/styles.css?url";
@@ -64,16 +61,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{
 				name: "color-scheme",
 				content: "light dark",
-			},
-			{
-				name: "theme-color",
-				media: "(prefers-color-scheme: light)",
-				content: materialThemeMetaColors.light,
-			},
-			{
-				name: "theme-color",
-				media: "(prefers-color-scheme: dark)",
-				content: materialThemeMetaColors.dark,
 			},
 		],
 		links: [
