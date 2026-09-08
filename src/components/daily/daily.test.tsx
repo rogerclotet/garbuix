@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -13,7 +14,8 @@ import { useHowToPlayOpen } from "./how-to-play-store";
 
 const progressState = vi.hoisted(() => {
 	const guessedWordIds: number[] = [];
-	return { guessedWordIds, pendingEventCount: 0 };
+	const clueWordIds: number[] = [];
+	return { guessedWordIds, clueWordIds, pendingEventCount: 0 };
 });
 
 const {
@@ -113,7 +115,7 @@ vi.mock("./use-daily-progress", () => ({
 			guessedWordIds: progressState.guessedWordIds,
 			revealedWordTokens: {},
 			hintedCells: [],
-			clueWordIds: [],
+			clueWordIds: progressState.clueWordIds,
 			hintsUsed: 0,
 			guessCount: 0,
 			bonusWordsFound: 0,
@@ -229,7 +231,13 @@ function dailyView() {
 							answerCapsule: "capsule-0",
 						},
 					],
-					hintCapsules: [],
+					hintCapsules: [
+						{
+							cellKey: "0,0",
+							hintSalt: "hint-salt",
+							hintCapsule: "hint-capsule",
+						},
+					],
 				},
 				progress: null,
 				rolloverAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -272,9 +280,10 @@ async function submitCurrentGuess() {
 describe("Daily submit feedback", () => {
 	beforeEach(() => {
 		progressState.guessedWordIds = [];
+		progressState.clueWordIds = [];
 		progressState.pendingEventCount = 0;
 		getWordCluesMock.mockReset();
-		getWordCluesMock.mockResolvedValue({});
+		getWordCluesMock.mockResolvedValue({ kind: "ok", clues: {} });
 		resolveGuessMock.mockReset();
 		applyLocalEventMock.mockReset();
 		captureEventMock.mockReset();
@@ -299,15 +308,77 @@ describe("Daily submit feedback", () => {
 		cleanup();
 	});
 
+	it("keeps loaded clues through unrelated progress syncs", async () => {
+		const clue = "Una pista ja carregada.";
+		progressState.guessedWordIds = [0];
+		getWordCluesMock.mockResolvedValue({ kind: "ok", clues: { 0: clue } });
+		const { rerender } = renderDaily();
+		expect(await screen.findByText(clue)).toBeTruthy();
+		const initialRequests = getWordCluesMock.mock.calls.length;
+
+		progressState.pendingEventCount = 1;
+		rerender(dailyView());
+		progressState.pendingEventCount = 0;
+		rerender(dailyView());
+
+		expect(getWordCluesMock).toHaveBeenCalledTimes(initialRequests);
+		expect(screen.getByText(clue)).toBeTruthy();
+	});
+
+	it("shares one lookup between requested and solved clues", async () => {
+		progressState.guessedWordIds = [0];
+		progressState.clueWordIds = [0];
+		getWordCluesMock.mockResolvedValue({
+			kind: "ok",
+			clues: { 0: "Una pista compartida." },
+		});
+		renderDaily();
+		await waitFor(() => expect(getWordCluesMock).toHaveBeenCalled());
+		expect(getWordCluesMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("reveals a fallback letter while rate limited without retrying early", async () => {
+		vi.useFakeTimers();
+		try {
+			progressState.clueWordIds = [0];
+			getWordCluesMock.mockResolvedValue({
+				kind: "rate_limited",
+				retryAfterSeconds: 60,
+			});
+			const { rerender } = renderDaily();
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(4_000);
+			});
+			progressState.pendingEventCount = 1;
+			rerender(dailyView());
+			progressState.pendingEventCount = 0;
+			rerender(dailyView());
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(4_000);
+			});
+			expect(applyLocalEventMock).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "text_hint_fallback",
+					payload: expect.objectContaining({ wordId: 0 }),
+				}),
+			);
+			expect(getWordCluesMock).toHaveBeenCalledTimes(1);
+			expect(captureExceptionMock).not.toHaveBeenCalled();
+		} finally {
+			cleanup();
+			vi.useRealTimers();
+		}
+	});
+
 	it("shows a found word's clue when its guess finishes syncing", async () => {
 		const clue = "Allò que existeix o que hom concep com a existent.";
-		getWordCluesMock.mockResolvedValueOnce({}).mockResolvedValue({ 0: clue });
+		getWordCluesMock.mockResolvedValue({ kind: "ok", clues: { 0: clue } });
 		const { rerender } = renderDaily();
 
 		progressState.guessedWordIds = [0];
 		progressState.pendingEventCount = 1;
 		rerender(dailyView());
-		await waitFor(() => expect(getWordCluesMock).toHaveResolvedWith({}));
+		expect(getWordCluesMock).not.toHaveBeenCalled();
 		expect(screen.queryByText(clue)).toBeNull();
 
 		progressState.pendingEventCount = 0;

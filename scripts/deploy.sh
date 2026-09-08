@@ -33,7 +33,7 @@ fi
 	    git pull
 	    export APP_PORT=$PORT
 	    docker builder prune -f --filter "until=24h" || true
-	    docker compose up -d --build --remove-orphans
+	    sh scripts/deploy-compose.sh
 	    docker image prune -f
 	    docker builder prune -f --filter "until=24h"
 	EOF

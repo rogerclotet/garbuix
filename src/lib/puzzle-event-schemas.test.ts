@@ -123,6 +123,20 @@ describe("puzzleClientEventsSchema", () => {
 });
 
 describe("anonymousImportPayloadSchema", () => {
+	// Browser saves from before text hints and bonus clues had neither field.
+	const legacyProgress = {
+		puzzleId: "puzzle-2026-05-28",
+		guessHashes: ["guess-1", "guess-2"],
+		guessedWordIds: [0],
+		revealedWordTokens: { "0": "token-1" },
+		hintedCells: ["1,2"],
+		hintsUsed: 1,
+		guessCount: 2,
+		shuffledLetters: ["a", "b", "c"],
+		completedAt: null,
+		lastSyncedAt: null,
+	};
+
 	const entry = {
 		dateKey: "2026-08-31",
 		seed: 260831,
@@ -133,6 +147,67 @@ describe("anonymousImportPayloadSchema", () => {
 		completed: true,
 		lastUpdated: "2026-08-31T21:00:00.000Z",
 	};
+
+	it("imports mixed save versions without losing progress", () => {
+		const textHintProgress = {
+			...legacyProgress,
+			puzzleId: "puzzle-2026-05-29",
+			clueWordIds: [2],
+		};
+		const currentProgress = {
+			...textHintProgress,
+			puzzleId: "puzzle-2026-06-01",
+			bonusWordsFound: 7,
+		};
+		const result = anonymousImportPayloadSchema.parse({
+			historyEntries: [entry],
+			activeProgressByDate: {
+				"2026-05-28": legacyProgress,
+				"2026-05-29": textHintProgress,
+				"2026-06-01": currentProgress,
+			},
+		});
+
+		expect(result).toEqual({
+			historyEntries: [entry],
+			activeProgressByDate: {
+				"2026-05-28": {
+					...legacyProgress,
+					clueWordIds: [],
+					bonusWordsFound: 0,
+				},
+				"2026-05-29": { ...textHintProgress, bonusWordsFound: 0 },
+				"2026-06-01": currentProgress,
+			},
+		});
+	});
+
+	it.each([
+		{ clueWordIds: null },
+		{ clueWordIds: "0" },
+		{ clueWordIds: [-1] },
+		{ clueWordIds: Array(201).fill(0) },
+		{ bonusWordsFound: null },
+		{ bonusWordsFound: "0" },
+		{ bonusWordsFound: -1 },
+		{ bonusWordsFound: 0.5 },
+		{ bonusWordsFound: 100_001 },
+		{ guessHashes: undefined },
+	])("rejects invalid progress fields: %j", (invalidFields) => {
+		const result = anonymousImportPayloadSchema.safeParse({
+			historyEntries: [],
+			activeProgressByDate: {
+				"2026-05-28": {
+					...legacyProgress,
+					clueWordIds: [],
+					bonusWordsFound: 0,
+					...invalidFields,
+				},
+			},
+		});
+
+		expect(result.success).toBe(false);
+	});
 
 	it("accepts a well-formed import", () => {
 		const result = anonymousImportPayloadSchema.safeParse({

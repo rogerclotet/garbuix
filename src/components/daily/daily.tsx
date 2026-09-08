@@ -27,7 +27,6 @@ import {
 	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
-import { getWordClues } from "@/lib/puzzle-server-fns";
 import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
@@ -38,6 +37,7 @@ import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useObservability } from "@/lib/use-observability";
+import { useWordClues } from "@/lib/use-word-clues";
 import { DailyConfetti } from "./daily-confetti";
 import { DailyControls } from "./daily-controls";
 import {
@@ -80,10 +80,6 @@ const HAPTIC_ERROR_PATTERN = [24, 32, 16];
 // If an AI clue can't be loaded within this window, degrade to a silent
 // single-letter reveal so the hint button never feels broken.
 const CLUE_FETCH_LETTER_FALLBACK_MS = 8000;
-const CLUE_FETCH_POLL_INTERVAL_MS = 2000;
-// Keep polling after the letter fallback so late syncs or slow generation can
-// still surface the AI clue without a page refresh.
-const CLUE_FETCH_MAX_MS = 45_000;
 // How long a freshly requested clue's grid ring stays lit before fading out, and
 // the fade duration itself (kept in sync with the CSS opacity transition).
 const CLUE_GRID_HIGHLIGHT_MS = 5000;
@@ -176,15 +172,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		wordId: number;
 		pathCount: number;
 	} | null>(null);
-	const [clueTextsByWordId, setClueTextsByWordId] = useState<
-		Record<number, string>
-	>({});
-	// Clues for words the player has already found, surfaced in the list out of
-	// curiosity or to help a friend. Kept separate from the requested-hint clues
-	// above so the hint fetch effect can freely reset its own map.
-	const [foundClueTextsByWordId, setFoundClueTextsByWordId] = useState<
-		Record<number, string>
-	>({});
 	// Word ids the player just asked a clue for; drained into a toast once the
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
 	// they stay quiet.
@@ -268,6 +255,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			deviceId,
 			initialData,
 		});
+
+	const clueTextsByWordId = useWordClues({
+		puzzleId: puzzle.id,
+		userId: activeUser?.id ?? null,
+		wordIds: [
+			...derivedProgress.clueWordIds,
+			...derivedProgress.guessedWordIds,
+		],
+		pendingEventCount,
+	});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -491,8 +488,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// The clue-fetch effect reveals fallback letters off the latest progress
 	// without re-firing on every reveal; keep the moving parts in a ref so the
 	// effect can stay keyed on the requested clue words alone.
-	const fallbackContextRef = useRef({ revealedCells, applyLocalEvent, puzzle });
-	fallbackContextRef.current = { revealedCells, applyLocalEvent, puzzle };
+	const fallbackContextRef = useRef({
+		revealedCells,
+		applyLocalEvent,
+		puzzle,
+		clueTextsByWordId,
+	});
+	fallbackContextRef.current = {
+		revealedCells,
+		applyLocalEvent,
+		puzzle,
+		clueTextsByWordId,
+	};
 
 	const cellLetters = useMemo(
 		() => buildCellLetters(puzzle.wordSlots, revealedAnswers, hintLetters),
@@ -517,12 +524,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		cellLetters,
 	]);
 
-	// Stable primitive key derived from the requested clue word ids, so the fetch
-	// effect refires only when the set actually changes (not on every render that
-	// produces a fresh array reference).
 	const clueWordIdsKey = derivedProgress.clueWordIds.join(",");
-	// Include pending sync count so clue fetches retry after hint events reach the server.
-	const clueFetchKey = `${clueWordIdsKey}:${pendingEventCount}`;
 
 	// Light a clue word's grid ring for a few seconds, then fade it back to the
 	// regular cell colors so it reads as a transient cue, not a permanent mark.
@@ -555,188 +557,51 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	useEffect(() => {
-		const separatorIndex = clueFetchKey.lastIndexOf(":");
-		const wordIdsKey =
-			separatorIndex >= 0
-				? clueFetchKey.slice(0, separatorIndex)
-				: clueFetchKey;
-		if (wordIdsKey === "") {
-			setClueTextsByWordId({});
-			return;
+		const pendingToasts = pendingClueToastWordIdsRef.current;
+		for (const wordId of Array.from(pendingToasts)) {
+			const clue = clueTextsByWordId[wordId];
+			if (!clue) continue;
+			toast("Pista", { description: clue, duration: 10000 });
+			lightClueWordRing(wordId);
+			pendingToasts.delete(wordId);
 		}
+	}, [clueTextsByWordId, lightClueWordRing]);
 
-		const wordIds = wordIdsKey.split(",").map(Number);
-		let cancelled = false;
-		const startedAt = Date.now();
-
-		// For every requested word that has no clue text, silently reveal one of
-		// its letters instead. Idempotent: words that already have a revealed cell
-		// (e.g. a fallback letter from a previous visit) are skipped, so a reload
-		// that refetches and still finds the clue missing won't reveal extra
-		// letters.
-		const revealFallbackLetters = (cluesByWordId: Record<number, string>) => {
+	// Letter fallback has its own timer, so waiting for progress sync or a rate
+	// limit never leaves a spent hint without help. Late text can still arrive.
+	useEffect(() => {
+		if (clueWordIdsKey === "") return;
+		const puzzleId = puzzle.id;
+		const wordIds = clueWordIdsKey.split(",").map(Number);
+		const timer = window.setTimeout(() => {
 			const {
 				revealedCells: currentRevealed,
 				applyLocalEvent: apply,
 				puzzle: currentPuzzle,
+				clueTextsByWordId: clues,
 			} = fallbackContextRef.current;
+			if (currentPuzzle.id !== puzzleId) return;
 			const revealed = new Set(currentRevealed);
-
 			for (const wordId of wordIds) {
-				if (cluesByWordId[wordId]) continue;
-
+				if (clues[wordId]) continue;
 				const slot = currentPuzzle.wordSlots.find((item) => item.id === wordId);
 				if (!slot) continue;
-
-				// One deterministic letter per word. Skip only when that exact cell is
-				// already revealed, so reloads stay idempotent (no extra letters, no
-				// duplicate events) without latching onto a crossing word's letter.
 				const cellKey = getSlotHintCellKey(currentPuzzle, slot);
 				if (!cellKey || revealed.has(cellKey)) continue;
-
 				revealed.add(cellKey);
 				apply(createPuzzleEvent("text_hint_fallback", { wordId, cellKey }));
 			}
-		};
+		}, CLUE_FETCH_LETTER_FALLBACK_MS);
+		return () => window.clearTimeout(timer);
+	}, [clueWordIdsKey, puzzle.id]);
 
-		void (async () => {
-			const sleep = (ms: number) =>
-				new Promise<void>((resolve) => {
-					window.setTimeout(resolve, ms);
-				});
-
-			const applyClueResults = (result: Record<number, string>) => {
-				if (cancelled || Object.keys(result).length === 0) return;
-
-				setClueTextsByWordId((current) => ({ ...current, ...result }));
-
-				const pendingToasts = pendingClueToastWordIdsRef.current;
-				for (const wordId of Array.from(pendingToasts)) {
-					const clue = result[wordId];
-					if (!clue) continue;
-					toast("Pista", { description: clue, duration: 10000 });
-					lightClueWordRing(wordId);
-					pendingToasts.delete(wordId);
-				}
-			};
-
-			let fetchedClues: Record<number, string> = {};
-			let fallbackApplied = false;
-			const deadline = startedAt + CLUE_FETCH_MAX_MS;
-
-			const maybeApplyLetterFallback = () => {
-				if (fallbackApplied || cancelled) return;
-				fallbackApplied = true;
-				revealFallbackLetters(fetchedClues);
-			};
-
-			try {
-				while (Date.now() < deadline && !cancelled) {
-					const result = await getWordClues({
-						data: { puzzleId: puzzle.id, wordIds },
-					});
-					if (cancelled) return;
-
-					fetchedClues = { ...fetchedClues, ...result };
-					applyClueResults(result);
-
-					if (wordIds.every((wordId) => fetchedClues[wordId])) {
-						return;
-					}
-
-					if (
-						!fallbackApplied &&
-						Date.now() - startedAt >= CLUE_FETCH_LETTER_FALLBACK_MS
-					) {
-						maybeApplyLetterFallback();
-					}
-
-					if (Date.now() + CLUE_FETCH_POLL_INTERVAL_MS >= deadline) {
-						break;
-					}
-
-					await sleep(CLUE_FETCH_POLL_INTERVAL_MS);
-				}
-
-				if (!cancelled) {
-					maybeApplyLetterFallback();
-				}
-			} catch (error) {
-				if (cancelled) return;
-				console.error("Failed to load word clues", error);
-				captureException(error, {
-					puzzle_date: puzzle.dateKey,
-					scope: "load_word_clues",
-				});
-				maybeApplyLetterFallback();
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [
-		puzzle.id,
-		puzzle.dateKey,
-		clueFetchKey,
-		captureException,
-		lightClueWordRing,
-	]);
-
-	// Stable primitive key so the found-clue fetch refires only when the set of
-	// found words actually changes, not on every render.
 	const guessedWordIdsKey = derivedProgress.guessedWordIds.join(",");
-
-	// Tell the clue-requests context which words we've solved so it can hide
-	// incoming help requests (badge + list) for words we haven't found yet.
 	useEffect(() => {
 		const wordIds =
 			guessedWordIdsKey === "" ? [] : guessedWordIdsKey.split(",").map(Number);
 		publishSolvedWordIds(wordIds);
 	}, [publishSolvedWordIds, guessedWordIdsKey]);
 
-	// Fetch clues for words the player has already found so they can be shown in
-	// the list. No toast, no letter fallback, no grid highlight — these are just
-	// for reading after the fact. Same availability as requested clues.
-	// Retry when pending events sync: signed-in players can only fetch a found
-	// word's clue after the server has saved their guess.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: pendingEventCount retries clues after guesses sync.
-	useEffect(() => {
-		if (guessedWordIdsKey === "") {
-			setFoundClueTextsByWordId({});
-			return;
-		}
-
-		const wordIds = guessedWordIdsKey.split(",").map(Number);
-		let cancelled = false;
-
-		void (async () => {
-			try {
-				const result = await getWordClues({
-					data: { puzzleId: puzzle.id, wordIds },
-				});
-				if (cancelled) return;
-				setFoundClueTextsByWordId(result);
-			} catch (error) {
-				if (cancelled) return;
-				console.error("Failed to load found word clues", error);
-				captureException(error, {
-					puzzle_date: puzzle.dateKey,
-					scope: "load_found_word_clues",
-				});
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [
-		puzzle.id,
-		puzzle.dateKey,
-		guessedWordIdsKey,
-		pendingEventCount,
-		captureException,
-	]);
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
 			? (initialData.historyEntries ?? [])
@@ -1655,7 +1520,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 								cellLetters={cellLetters}
 								clueTextsByWordId={clueTextsByWordId}
 								clueWordIds={derivedProgress.clueWordIds}
-								foundClueTextsByWordId={foundClueTextsByWordId}
+								foundClueTextsByWordId={clueTextsByWordId}
 								onWordTap={handleLocateWord}
 								canRequestHelp={canRequestHelp}
 								requestedHelpWordIds={requestedHelpWordIds}
