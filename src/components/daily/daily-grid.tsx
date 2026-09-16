@@ -110,7 +110,7 @@ export function DailyGrid({
 			}`}
 		>
 			<div
-				className="grid w-full max-w-2xl mx-auto @container [--grid-gap:3px] sm:[--grid-gap:4px]"
+				className="grid w-full max-w-2xl mx-auto @container [--grid-gap:2px]"
 				style={
 					{
 						"--cols": puzzle.cols,
@@ -164,7 +164,7 @@ export function DailyGrid({
 									} as CSSProperties)
 								: undefined
 						}
-						className={`relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square rounded-[0.4rem] sm:rounded-[0.6rem] text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
+						className={`puzzle-cell relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
 							isRevealed
 								? "bg-primary/12 border-primary/40 text-foreground"
 								: "bg-muted border-border/50"
@@ -183,7 +183,8 @@ export function DailyGrid({
 							<span
 								aria-hidden
 								style={{
-									transform: "translate(calc(50% + 1.5px), -50%)",
+									transform:
+										"translate(calc(50% + var(--grid-gap) / 2 + 1px), -50%)",
 								}}
 								className="pointer-events-none absolute top-1/2 right-0 z-10 text-[1.6em] font-black leading-none text-foreground"
 							>
@@ -194,7 +195,8 @@ export function DailyGrid({
 							<span
 								aria-hidden
 								style={{
-									transform: "translate(-50%, calc(50% + 1.5px))",
+									transform:
+										"translate(-50%, calc(50% + var(--grid-gap) / 2 + 1px))",
 								}}
 								className="pointer-events-none absolute bottom-0 left-1/2 z-10 text-[1.6em] font-black leading-none text-foreground"
 							>
