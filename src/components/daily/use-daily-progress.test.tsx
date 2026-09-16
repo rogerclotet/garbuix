@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,18 +11,26 @@ import {
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import type {
 	DailyPuzzlePublic,
+	PuzzleClientEvent,
 	PuzzleProgressState,
 	SessionUser,
 } from "@/lib/puzzle-types";
 import type { DailyData } from "./daily-types";
 import { useDailyProgress } from "./use-daily-progress";
 
-const { fetchUserProgressMock, importProgressMock, syncEventsMock } =
-	vi.hoisted(() => ({
-		fetchUserProgressMock: vi.fn(),
-		importProgressMock: vi.fn(),
-		syncEventsMock: vi.fn(),
-	}));
+const {
+	fetchUserProgressMock,
+	importProgressMock,
+	syncEventsMock,
+	captureEvent,
+	captureException,
+} = vi.hoisted(() => ({
+	captureEvent: vi.fn(),
+	captureException: vi.fn(),
+	fetchUserProgressMock: vi.fn(),
+	importProgressMock: vi.fn(),
+	syncEventsMock: vi.fn(),
+}));
 
 vi.mock("@tanstack/react-start", () => ({
 	useServerFn: (serverFn: unknown) => serverFn,
@@ -36,8 +44,8 @@ vi.mock("@/lib/puzzle-server-fns", () => ({
 
 vi.mock("@/lib/use-observability", () => ({
 	useObservability: () => ({
-		captureEvent: vi.fn(),
-		captureException: vi.fn(),
+		captureEvent,
+		captureException,
 	}),
 }));
 
@@ -59,6 +67,14 @@ vi.mock("sonner", () => ({
 		success: vi.fn(),
 	}),
 }));
+
+function deferred<T>() {
+	let resolve: (value: T) => void = vi.fn();
+	const promise = new Promise<T>((onResolve) => {
+		resolve = onResolve;
+	});
+	return { promise, resolve };
+}
 
 const DATE_KEY = "2026-06-11";
 const USER_ID = "user-1";
@@ -127,13 +143,19 @@ function createMemoryStorage(): Storage {
 }
 
 function Probe({ activeUser }: { activeUser: SessionUser }) {
-	const { derivedProgress } = useDailyProgress({
+	const { derivedProgress, isReady } = useDailyProgress({
 		activeUser,
 		deviceId: "device-1",
 		initialData: INITIAL_DATA,
 	});
 
-	return <span>{`words:${derivedProgress.guessedWordIds.join(",")}`}</span>;
+	return (
+		<span>
+			{isReady
+				? `words:${derivedProgress.guessedWordIds.join(",")}`
+				: "synchronizing"}
+		</span>
+	);
 }
 
 function SwitchableProbe({ activeUser }: { activeUser: SessionUser | null }) {
@@ -198,6 +220,221 @@ function renderBeforePaint(activeUser: SessionUser) {
 }
 
 describe("useDailyProgress local state", () => {
+	it("falls back to cached progress after a slow initial sync", async () => {
+		vi.useFakeTimers();
+		try {
+			saveAccountPuzzleCache(USER_ID, DATE_KEY, {
+				puzzleId: PUZZLE.id,
+				baseProgress: progressWith({ guessedWordIds: [1], guessCount: 2 }),
+				queuedEvents: [],
+			});
+			fetchUserProgressMock.mockReturnValue(new Promise(() => {}));
+			const { result, unmount } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			expect(result.current.isReady).toBe(false);
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(4_000);
+			});
+			expect(result.current.isReady).toBe(true);
+			expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
+			unmount();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("reconciles when a tab becomes visible and keeps polling after the first minute", async () => {
+		vi.useFakeTimers();
+		const visibility = vi
+			.spyOn(document, "visibilityState", "get")
+			.mockReturnValue("visible");
+		try {
+			const { result, unmount } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			await act(async () => {});
+			expect(result.current.isReady).toBe(true);
+			visibility.mockReturnValue("hidden");
+			act(() => document.dispatchEvent(new Event("visibilitychange")));
+			expect(result.current.isReady).toBe(false);
+			fetchUserProgressMock.mockClear();
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(60_000);
+			});
+			expect(fetchUserProgressMock).not.toHaveBeenCalled();
+			const remote = deferred<PuzzleProgressState>();
+			fetchUserProgressMock.mockReturnValueOnce(remote.promise);
+			visibility.mockReturnValue("visible");
+			act(() => document.dispatchEvent(new Event("visibilitychange")));
+			expect(result.current.isReady).toBe(false);
+			await act(async () =>
+				remote.resolve(progressWith({ guessedWordIds: [1], guessCount: 1 })),
+			);
+			expect(result.current.isReady).toBe(true);
+			expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(60_000);
+			});
+			expect(fetchUserProgressMock).toHaveBeenCalledTimes(3);
+			unmount();
+		} finally {
+			visibility.mockRestore();
+			vi.useRealTimers();
+		}
+	});
+
+	it("keeps an offline account playable without waiting for the network", async () => {
+		const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+		try {
+			const { result, unmount } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			expect(result.current.isReady).toBe(true);
+			await act(async () => {});
+			expect(fetchUserProgressMock).not.toHaveBeenCalled();
+			unmount();
+		} finally {
+			online.mockRestore();
+		}
+	});
+
+	it("backs off when the server cannot acknowledge a queued event", async () => {
+		vi.useFakeTimers();
+		try {
+			syncEventsMock.mockResolvedValue({
+				progress: progressWith({}),
+				ackedEventIds: [],
+			});
+			const { result, unmount } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			await act(async () => {});
+			await act(async () =>
+				result.current.applyLocalEvent({
+					id: "hint",
+					at: "2026-06-11T10:00:00.000Z",
+					type: "hint_used",
+					payload: { cellKey: "0,0" },
+				}),
+			);
+			expect(syncEventsMock).toHaveBeenCalledTimes(1);
+			expect(result.current.pendingEventCount).toBe(1);
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(29_000);
+			});
+			expect(syncEventsMock).toHaveBeenCalledTimes(1);
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(1_000);
+			});
+			expect(syncEventsMock).toHaveBeenCalledTimes(2);
+			unmount();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("drains moves added while an earlier upload is still in flight", async () => {
+		const firstUpload = deferred<{
+			progress: PuzzleProgressState;
+			ackedEventIds: string[];
+		}>();
+		syncEventsMock.mockReturnValueOnce(firstUpload.promise).mockResolvedValue({
+			progress: progressWith({ guessHashes: ["one", "two"], guessCount: 2 }),
+			ackedEventIds: ["two"],
+		});
+		const { result } = renderHook(() =>
+			useDailyProgress({
+				activeUser: { id: USER_ID, name: "Roger", email: "roger@example.com" },
+				deviceId: "device-1",
+				initialData: INITIAL_DATA,
+			}),
+		);
+		await act(async () => {});
+		const guess = (id: string): PuzzleClientEvent => ({
+			id,
+			at: "2026-06-11T10:00:00.000Z",
+			type: "guess_added",
+			payload: { guessHash: id, matchedWordId: null, unlockToken: null },
+		});
+		act(() => result.current.applyLocalEvent(guess("one")));
+		act(() => result.current.applyLocalEvent(guess("two")));
+		await act(async () =>
+			firstUpload.resolve({
+				progress: progressWith({ guessHashes: ["one"], guessCount: 1 }),
+				ackedEventIds: ["one"],
+			}),
+		);
+		await waitFor(() => expect(result.current.pendingEventCount).toBe(0));
+		expect(syncEventsMock).toHaveBeenCalledTimes(2);
+		expect(
+			syncEventsMock.mock.calls[1][0].data.events.map(
+				(event: PuzzleClientEvent) => event.id,
+			),
+		).toEqual(["two"]);
+	});
+
+	it("ignores account progress arriving after logout", async () => {
+		const fetchProgress = deferred<PuzzleProgressState>();
+		fetchUserProgressMock.mockReturnValue(fetchProgress.promise);
+		const { result, rerender } = renderHook(
+			({ activeUser }: { activeUser: SessionUser }) =>
+				useDailyProgress({
+					activeUser,
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			{
+				initialProps: {
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					} as SessionUser,
+				},
+			},
+		);
+		rerender({ activeUser: null });
+		await act(async () =>
+			fetchProgress.resolve(
+				progressWith({ guessedWordIds: [1, 2], guessCount: 3 }),
+			),
+		);
+		expect(result.current.derivedProgress.guessedWordIds).toEqual([]);
+	});
+
 	beforeEach(() => {
 		vi.stubGlobal("localStorage", createMemoryStorage());
 		vi.stubGlobal(
@@ -274,7 +511,7 @@ describe("useDailyProgress local state", () => {
 		rendered.unmount();
 	});
 
-	it("paints a signed-in player's cached progress, then reconciles with the server", async () => {
+	it("waits for account progress before presenting a signed-in board", async () => {
 		saveAccountPuzzleCache(USER_ID, DATE_KEY, {
 			puzzleId: PUZZLE.id,
 			baseProgress: progressWith({ guessedWordIds: [1], guessCount: 2 }),
@@ -293,7 +530,7 @@ describe("useDailyProgress local state", () => {
 			name: "Roger",
 			email: "roger@example.com",
 		});
-		expect(rendered.paintedText).toBe("words:1");
+		expect(rendered.paintedText).toBe("synchronizing");
 
 		await rendered.settle();
 		expect(rendered.container.textContent).toBe("words:1,2");

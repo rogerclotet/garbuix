@@ -2,15 +2,15 @@ import { getRouteApi } from "@tanstack/react-router";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { useAnonParticipantId } from "@/lib/anon-participant-store";
 import { userParticipantId } from "@/lib/leaderboard-types";
-import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { LeaderboardProvider } from "@/lib/use-leaderboard";
+import { useTodayDateKey } from "@/lib/use-today-date-key";
 
 const rootRoute = getRouteApi("__root__");
 
 export function LeaderboardRoot({ children }: PropsWithChildren) {
 	const rootData = rootRoute.useLoaderData();
 	const sessionUser = rootData.sessionUser;
-	const [dateKey, setDateKey] = useState<string | null>(null);
+	const dateKey = useTodayDateKey(rootData.dateKey);
 	const [localParticipantId, setLocalParticipantId] = useState<string | null>(
 		null,
 	);
@@ -21,7 +21,6 @@ export function LeaderboardRoot({ children }: PropsWithChildren) {
 	const anonParticipantId = useAnonParticipantId();
 
 	useEffect(() => {
-		setDateKey(getTodayDateKey());
 		setLocalParticipantId(
 			sessionUser?.id ? userParticipantId(sessionUser.id) : anonParticipantId,
 		);
@@ -29,6 +28,7 @@ export function LeaderboardRoot({ children }: PropsWithChildren) {
 
 	return (
 		<LeaderboardProvider
+			key={dateKey}
 			dateKey={dateKey}
 			localParticipantId={localParticipantId}
 			enabled={dateKey != null}

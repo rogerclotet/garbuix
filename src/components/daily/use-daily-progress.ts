@@ -1,5 +1,12 @@
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useReducer,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import {
 	getOrCreateAnonIdentity,
@@ -45,7 +52,8 @@ import type { DailyData, DailySessionUser } from "./daily-types";
 const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
 const SYNC_INITIAL_RETRY_DELAY_MS = 2_000;
 const SYNC_MAX_RETRY_DELAY_MS = 30_000;
-const PROGRESS_REVALIDATION_DELAYS_MS = [3_000, 10_000, 30_000];
+const PROGRESS_REVALIDATION_INTERVAL_MS = 30_000;
+const INITIAL_SYNC_WAIT_MS = 4_000;
 
 function hasMeaningfulProgress(progress: PuzzleProgressState) {
 	return (
@@ -118,15 +126,11 @@ function readLocalProgressState(options: {
 		getCompatibleProgress(cached.baseProgress, puzzle) ?? null;
 
 	return {
-		// With events still queued the cached base is the one they were recorded
-		// against, so it wins whenever it is the more advanced of the two.
 		baseProgress:
-			cachedQueuedEvents.length > 0
-				? (pickPreferredProgressState(
-						compatibleServerProgress,
-						cachedBaseProgress,
-					) ?? emptyProgress)
-				: (compatibleServerProgress ?? cachedBaseProgress ?? emptyProgress),
+			pickPreferredProgressState(
+				compatibleServerProgress,
+				cachedBaseProgress,
+			) ?? emptyProgress,
 		queuedEvents: cachedQueuedEvents,
 	};
 }
@@ -155,12 +159,17 @@ export function useDailyProgress({
 	);
 
 	const [baseProgress, setBaseProgress] = useState<PuzzleProgressState>(
-		() => getCompatibleProgress(initialData.progress, puzzle) ?? emptyProgress,
+		() =>
+			(initialData.sessionUser?.id === activeUserId
+				? getCompatibleProgress(initialData.progress, puzzle)
+				: null) ?? emptyProgress,
 	);
 	const [queuedEvents, setQueuedEvents] = useState<PuzzleClientEvent[]>([]);
 	// Flipped once this device's stored progress has been read, which only
 	// happens in the browser: during SSR there is no localStorage to read.
-	const [hasLoadedLocalState, setHasLoadedLocalState] = useState(false);
+	const [loadedIdentity, setLoadedIdentity] = useState<string | null>(null);
+	const identity = JSON.stringify([puzzle.id, activeUserId]);
+	const hasLoadedLocalState = loadedIdentity === identity;
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
@@ -171,7 +180,20 @@ export function useDailyProgress({
 	const syncFailureCountRef = useRef(0);
 	const hasActiveSyncFailureToastRef = useRef(false);
 	const syncedOrphanedDaysRef = useRef<Set<string>>(new Set());
-	const isSyncingRef = useRef(false);
+	// Request ownership survives queue changes, but ends with this player/puzzle.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: each player/puzzle needs its own request lifetime.
+	const scope = useMemo(
+		() => ({ active: false, syncing: false, revision: 0 }),
+		[activeUserId, puzzle.id],
+	);
+	const [syncRevision, wakeSync] = useReducer((value: number) => value + 1, 0);
+	const [readyScope, setReadyScope] = useState<typeof scope | null>(null);
+	useIsomorphicLayoutEffect(() => {
+		scope.active = true;
+		return () => {
+			scope.active = false;
+		};
+	}, [scope]);
 	const lastReportedAnonRef = useRef<{
 		dateKey: string | null;
 		wordsFound: number;
@@ -198,56 +220,47 @@ export function useDailyProgress({
 		[activeUserId, baseProgress, queuedEvents, totalWords],
 	);
 
-	const fetchLatestProgress = useCallback(async () => {
-		if (!activeUserId) {
-			return null;
-		}
-
+	const refreshProgressFromServer = useCallback(async () => {
+		if (!activeUserId || !navigator.onLine || scope.syncing) return false;
+		const revision = ++scope.revision;
 		try {
-			return (
-				(await fetchUserProgress({
-					data: { puzzleId: puzzle.id },
-				})) ??
-				getCompatibleProgress(initialData.progress, puzzle) ??
-				emptyProgress
-			);
+			const progress = await fetchUserProgress({
+				data: { puzzleId: puzzle.id },
+			});
+			if (!scope.active || scope.syncing || revision !== scope.revision)
+				return false;
+			const latestProgress =
+				getCompatibleProgress(progress, puzzle) ?? emptyProgress;
+			setBaseProgress((current) => {
+				const next =
+					pickPreferredProgressState(current, latestProgress) ?? latestProgress;
+				return isSameProgressState(current, next) &&
+					current.lastSyncedAt === next.lastSyncedAt
+					? current
+					: next;
+			});
 		} catch (error) {
-			if (!isLikelyOfflineOrNetworkError(error)) {
+			// Keep the local base and its outbox intact when a read fails.
+			if (scope.active && !isLikelyOfflineOrNetworkError(error)) {
 				captureException(error, {
 					puzzle_date: puzzle.dateKey,
 					puzzle_id: puzzle.id,
 					scope: "puzzle_progress_fetch",
 				});
 			}
-			return (
-				getCompatibleProgress(initialData.progress, puzzle) ?? emptyProgress
-			);
 		}
+		return true;
 	}, [
 		activeUserId,
 		captureException,
 		emptyProgress,
 		fetchUserProgress,
-		initialData.progress,
 		puzzle,
+		scope,
 	]);
 
-	const refreshProgressFromServer = useCallback(async () => {
-		const latestProgress = await fetchLatestProgress();
-		if (latestProgress) {
-			setBaseProgress((current) => {
-				const next =
-					pickPreferredProgressState(current, latestProgress) ?? latestProgress;
-				return isSameProgressState(current, next) ? current : next;
-			});
-		}
-	}, [fetchLatestProgress]);
-
-	// Applying the stored progress from a layout effect keeps it in the same
-	// frame as the first paint, so the player lands straight on their board
-	// instead of watching a loading state that only exists because the read was
-	// deferred. Anything the server may know better is reconciled right after,
-	// in the background, by the effect below.
+	// Read local progress before paint. Account boards remain behind the readiness
+	// gate until the server has reconciled this base and its pending events.
 	useIsomorphicLayoutEffect(() => {
 		const previousActiveUserId = previousActiveUserIdRef.current;
 		previousActiveUserIdRef.current = activeUserId;
@@ -271,7 +284,7 @@ export function useDailyProgress({
 			});
 			setBaseProgress(emptyProgress);
 			setQueuedEvents([]);
-			setHasLoadedLocalState(true);
+			setLoadedIdentity(identity);
 			return;
 		}
 
@@ -279,11 +292,15 @@ export function useDailyProgress({
 			activeUserId,
 			emptyProgress,
 			puzzle,
-			serverProgress: initialData.progress,
+			serverProgress:
+				initialData.sessionUser?.id === activeUserId
+					? initialData.progress
+					: null,
 		});
 
 		setBaseProgress((current) =>
-			isSameProgressState(current, localState.baseProgress)
+			isSameProgressState(current, localState.baseProgress) &&
+			current.lastSyncedAt === localState.baseProgress.lastSyncedAt
 				? current
 				: localState.baseProgress,
 		);
@@ -292,8 +309,15 @@ export function useDailyProgress({
 				? current
 				: localState.queuedEvents,
 		);
-		setHasLoadedLocalState(true);
-	}, [activeUserId, emptyProgress, initialData.progress, puzzle]);
+		setLoadedIdentity(identity);
+	}, [
+		activeUserId,
+		emptyProgress,
+		initialData.progress,
+		initialData.sessionUser?.id,
+		puzzle,
+		identity,
+	]);
 
 	// Reconciles the optimistically applied local state with the account's
 	// server-side progress, which another device may have moved on since.
@@ -303,12 +327,12 @@ export function useDailyProgress({
 		}
 
 		let cancelled = false;
+		// A slow or unreachable server must not prevent offline play.
+		const fallbackTimer = window.setTimeout(() => {
+			if (document.visibilityState !== "hidden") setReadyScope(scope);
+		}, INITIAL_SYNC_WAIT_MS);
 
 		const syncWithServer = async () => {
-			if (!cancelled) {
-				await refreshProgressFromServer();
-			}
-
 			if (
 				!hasImportedAnonymousData(activeUserId) &&
 				importAttemptedRef.current !== activeUserId
@@ -334,9 +358,6 @@ export function useDailyProgress({
 							imported_dates: result.importedDates.length,
 							legacy_dates: result.skippedLegacyDates.length,
 						});
-						if (!cancelled) {
-							await refreshProgressFromServer();
-						}
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
@@ -349,12 +370,20 @@ export function useDailyProgress({
 					}
 				}
 			}
+			if (!cancelled) {
+				const refreshed = await refreshProgressFromServer();
+				if (!cancelled && refreshed) {
+					window.clearTimeout(fallbackTimer);
+					setReadyScope(scope);
+				}
+			}
 		};
 
 		void syncWithServer();
 
 		return () => {
 			cancelled = true;
+			window.clearTimeout(fallbackTimer);
 		};
 	}, [
 		activeUserId,
@@ -364,62 +393,54 @@ export function useDailyProgress({
 		importProgress,
 		puzzle,
 		refreshProgressFromServer,
+		scope,
 	]);
 
 	useEffect(() => {
-		if (!activeUserId || typeof window === "undefined") {
-			return;
-		}
-
-		let cancelled = false;
-		const refreshFromServer = async () => {
-			if (!navigator.onLine) {
-				return;
-			}
-
-			await refreshProgressFromServer();
-			if (cancelled) {
-				return;
-			}
+		if (!activeUserId) return;
+		let fallbackTimer: number | undefined;
+		const refresh = () => {
+			if (document.visibilityState === "hidden" || !navigator.onLine) return;
+			void refreshProgressFromServer().then((refreshed) => {
+				if (scope.active && refreshed) {
+					window.clearTimeout(fallbackTimer);
+					setReadyScope(scope);
+				}
+			});
 		};
-
-		const handleFocus = () => {
-			void refreshFromServer();
+		const suspend = () => {
+			window.clearTimeout(fallbackTimer);
+			scope.revision += 1;
+			setReadyScope(null);
 		};
-
-		window.addEventListener("focus", handleFocus);
-		window.addEventListener("pageshow", handleFocus);
-
-		return () => {
-			cancelled = true;
-			window.removeEventListener("focus", handleFocus);
-			window.removeEventListener("pageshow", handleFocus);
+		const resume = () => {
+			suspend();
+			if (document.visibilityState === "hidden") return;
+			window.clearTimeout(fallbackTimer);
+			fallbackTimer = window.setTimeout(() => {
+				if (document.visibilityState !== "hidden") setReadyScope(scope);
+			}, INITIAL_SYNC_WAIT_MS);
+			refresh();
 		};
-	}, [activeUserId, refreshProgressFromServer]);
-
-	useEffect(() => {
-		if (!activeUserId || !isOnline || typeof window === "undefined") {
-			return;
-		}
-
-		let cancelled = false;
-		const timeoutIds = PROGRESS_REVALIDATION_DELAYS_MS.map((delayMs) =>
-			window.setTimeout(() => {
-				void refreshProgressFromServer().then(() => {
-					if (cancelled) {
-						return;
-					}
-				});
-			}, delayMs),
+		window.addEventListener("pagehide", suspend);
+		window.addEventListener("focus", resume);
+		window.addEventListener("pageshow", resume);
+		window.addEventListener("online", resume);
+		document.addEventListener("visibilitychange", resume);
+		const timer = window.setInterval(
+			refresh,
+			PROGRESS_REVALIDATION_INTERVAL_MS,
 		);
-
 		return () => {
-			cancelled = true;
-			for (const timeoutId of timeoutIds) {
-				window.clearTimeout(timeoutId);
-			}
+			window.clearInterval(timer);
+			window.clearTimeout(fallbackTimer);
+			window.removeEventListener("pagehide", suspend);
+			window.removeEventListener("focus", resume);
+			window.removeEventListener("pageshow", resume);
+			window.removeEventListener("online", resume);
+			document.removeEventListener("visibilitychange", resume);
 		};
-	}, [activeUserId, isOnline, refreshProgressFromServer]);
+	}, [activeUserId, refreshProgressFromServer, scope]);
 
 	useEffect(() => {
 		// Writing before the local read would overwrite the stored progress with
@@ -480,12 +501,14 @@ export function useDailyProgress({
 		toast.dismiss(SYNC_FAILURE_TOAST_ID);
 	}, [activeUserId]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: syncRevision wakes the outbox after an in-flight batch settles.
 	useEffect(() => {
 		if (
 			!activeUserId ||
+			!hasLoadedLocalState ||
 			queuedEvents.length === 0 ||
 			!isOnline ||
-			isSyncingRef.current
+			scope.syncing
 		) {
 			return;
 		}
@@ -500,9 +523,9 @@ export function useDailyProgress({
 			};
 		}
 
-		let cancelled = false;
 		const pendingEvents = [...queuedEvents];
-		isSyncingRef.current = true;
+		scope.syncing = true;
+		scope.revision += 1;
 		void syncEvents({
 			data: {
 				puzzleId: puzzle.id,
@@ -511,7 +534,7 @@ export function useDailyProgress({
 			},
 		})
 			.then((result) => {
-				if (cancelled) return;
+				if (!scope.active) return;
 				if (hasActiveSyncFailureToastRef.current) {
 					hasActiveSyncFailureToastRef.current = false;
 					toast.dismiss(SYNC_FAILURE_TOAST_ID);
@@ -532,7 +555,12 @@ export function useDailyProgress({
 						? pendingEvents.map((event) => event.id)
 						: result.ackedEventIds,
 				);
+				// A rejected batch must not spin in a tight retry loop.
+				if (eventIdsToClear.size === 0) {
+					setNextSyncRetryAt(Date.now() + SYNC_MAX_RETRY_DELAY_MS);
+				}
 				setBaseProgress(result.progress);
+				setReadyScope(scope);
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
@@ -543,6 +571,7 @@ export function useDailyProgress({
 				});
 			})
 			.catch((error) => {
+				if (!scope.active) return;
 				console.error("Failed to sync puzzle events", error);
 				const failureCount = syncFailureCountRef.current + 1;
 				const retryDelayMs = Math.min(
@@ -583,12 +612,10 @@ export function useDailyProgress({
 				});
 			})
 			.finally(() => {
-				isSyncingRef.current = false;
+				scope.syncing = false;
+				scope.revision += 1;
+				if (scope.active) wakeSync();
 			});
-
-		return () => {
-			cancelled = true;
-		};
 	}, [
 		activeUserId,
 		captureEvent,
@@ -596,6 +623,9 @@ export function useDailyProgress({
 		deviceId,
 		isOnline,
 		nextSyncRetryAt,
+		hasLoadedLocalState,
+		scope,
+		syncRevision,
 		puzzle.id,
 		queuedEvents,
 		syncEvents,
@@ -612,8 +642,9 @@ export function useDailyProgress({
 		if (staleCaches.length === 0) return;
 
 		for (const { dateKey, cache } of staleCaches) {
-			if (syncedOrphanedDaysRef.current.has(dateKey)) continue;
-			syncedOrphanedDaysRef.current.add(dateKey);
+			const cacheKey = `${activeUserId}:${dateKey}`;
+			if (syncedOrphanedDaysRef.current.has(cacheKey)) continue;
+			syncedOrphanedDaysRef.current.add(cacheKey);
 
 			void syncEvents({
 				data: {
@@ -623,11 +654,14 @@ export function useDailyProgress({
 				},
 			})
 				.then((result) => {
-					const remainingEvents = (cache.queuedEvents ?? []).filter(
+					const latestCache = getAccountPuzzleCache(activeUserId, dateKey);
+					if (latestCache?.puzzleId !== cache.puzzleId) return;
+					const remainingEvents = latestCache.queuedEvents.filter(
 						(event) => !result.ackedEventIds.includes(event.id),
 					);
 					saveAccountPuzzleCache(activeUserId, dateKey, {
-						...cache,
+						...latestCache,
+						baseProgress: result.progress,
 						queuedEvents: remainingEvents,
 					});
 				})
@@ -637,12 +671,13 @@ export function useDailyProgress({
 						dateKey,
 						error,
 					);
-					syncedOrphanedDaysRef.current.delete(dateKey);
+					syncedOrphanedDaysRef.current.delete(cacheKey);
 				});
 		}
 	}, [activeUserId, deviceId, isOnline, puzzle.dateKey, syncEvents]);
 
 	useEffect(() => {
+		if (!hasLoadedLocalState) return;
 		if (activeUserId) {
 			lastReportedAnonRef.current = {
 				dateKey: null,
@@ -738,6 +773,7 @@ export function useDailyProgress({
 			});
 	}, [
 		activeUserId,
+		hasLoadedLocalState,
 		derivedProgress.guessedWordIds.length,
 		derivedProgress.completedAt,
 		derivedProgress.hintsUsed,
@@ -747,6 +783,7 @@ export function useDailyProgress({
 	]);
 
 	const applyLocalEvent = (event: PuzzleClientEvent) => {
+		if (!scope.active || !hasLoadedLocalState) return;
 		if (activeUser) {
 			setQueuedEvents((previous) => [...previous, event]);
 			return;
@@ -761,5 +798,8 @@ export function useDailyProgress({
 		applyLocalEvent,
 		derivedProgress,
 		pendingEventCount: queuedEvents.length,
+		isReady:
+			hasLoadedLocalState &&
+			(!activeUserId || !isOnline || readyScope === scope),
 	};
 }

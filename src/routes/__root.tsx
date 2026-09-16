@@ -21,6 +21,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { materialThemeCss } from "@/lib/material-theme";
 import { getObservabilityConfig } from "@/lib/observability-server-fns";
+import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import appCss from "@/styles.css?url";
 
@@ -34,7 +35,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			getObservabilityConfig(),
 			getSessionUser(),
 		]);
-		return { observability, sessionUser };
+		return { observability, sessionUser, dateKey: getTodayDateKey() };
 	},
 
 	head: () => ({
