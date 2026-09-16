@@ -95,7 +95,10 @@ vi.mock("@/lib/puzzle-streaks", () => ({
 }));
 
 vi.mock("@/lib/use-active-session-user", () => ({
-	useActiveSessionUser: vi.fn(() => ({ activeUser: null })),
+	useActiveSessionUser: vi.fn(() => ({
+		activeUser: null,
+		session: { isPending: false },
+	})),
 }));
 
 vi.mock("@/lib/use-observability", () => ({
@@ -109,6 +112,7 @@ vi.mock("./use-daily-progress", () => ({
 	useDailyProgress: vi.fn(() => ({
 		applyLocalEvent: applyLocalEventMock,
 		pendingEventCount: progressState.pendingEventCount,
+		isReady: true,
 		derivedProgress: {
 			puzzleId: "puzzle-1",
 			guessHashes: [],

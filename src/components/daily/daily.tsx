@@ -1,4 +1,3 @@
-import { Loader2Icon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -12,12 +11,7 @@ import {
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
-import {
-	createPuzzleEvent,
-	decodeHintLetters,
-	decodeRevealedAnswers,
-	resolveGuess,
-} from "@/lib/puzzle-client";
+import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
@@ -27,6 +21,7 @@ import {
 	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
+import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import {
 	calculateHistoryStreaks,
 	upsertHistoryEntry,
@@ -61,12 +56,18 @@ import {
 	getSortedWordSlots,
 	getWordCellKeys,
 } from "./daily-helpers";
-import type { DailyData, DailySubmitFeedback } from "./daily-types";
+import { DailyLoadingPage } from "./daily-loading";
+import type {
+	DailyData,
+	DailySessionUser,
+	DailySubmitFeedback,
+} from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { openHowToPlay, useHowToPlayOpen } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { shareProgress } from "./share-progress";
 import { useDailyProgress } from "./use-daily-progress";
+import { useDecodedProgress } from "./use-decoded-progress";
 import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
 
@@ -144,16 +145,39 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function Daily({ initialData }: { initialData: DailyData }) {
+	return <DailySession key={initialData.puzzle.id} initialData={initialData} />;
+}
+
+function DailySession({ initialData }: { initialData: DailyData }) {
+	const { activeUser, session } = useActiveSessionUser(initialData.sessionUser);
+	const deviceId = useMemo(() => getDeviceId(), []);
+	const progressState = useDailyProgress({ activeUser, deviceId, initialData });
+	return (
+		<DailyGame
+			key={activeUser?.id ?? "anonymous"}
+			initialData={initialData}
+			activeUser={activeUser}
+			progressState={progressState}
+			sessionPending={session.isPending}
+		/>
+	);
+}
+
+function DailyGame({
+	initialData,
+	activeUser,
+	progressState,
+	sessionPending,
+}: {
+	initialData: DailyData;
+	activeUser: DailySessionUser;
+	progressState: ReturnType<typeof useDailyProgress>;
+	sessionPending: boolean;
+}) {
 	const isDesktopLayout = useIsDesktopLayout();
-	const { activeUser } = useActiveSessionUser(initialData.sessionUser);
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
-	const deviceId = useMemo(() => getDeviceId(), []);
 	const [currentGuess, setCurrentGuess] = useState("");
-	const [revealedAnswers, setRevealedAnswers] = useState<
-		Record<number, string>
-	>({});
-	const [hintLetters, setHintLetters] = useState<Record<string, string>>({});
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);
@@ -232,11 +256,8 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	const justCompletedRef = useRef(false);
 	const completionScheduledRef = useRef(false);
 	const completionTransitionTimerRef = useRef<number | null>(null);
-	const [displayComplete, setDisplayComplete] = useState(false);
+	const [isCompletionPending, setIsCompletionPending] = useState(false);
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
-	// Once the day rolls over we swap the rendered tree to a loading state before
-	// reloading, so a backgrounded PWA never flashes yesterday's puzzle on resume.
-	const [isRollingOver, setIsRollingOver] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const tutorialOpen = useHowToPlayOpen();
@@ -249,12 +270,35 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// Lets the header's share button reach the latest handler without making the
 	// published summary churn on every render.
 	const handleShareRef = useRef<() => Promise<void>>(async () => {});
-	const { applyLocalEvent, derivedProgress, pendingEventCount } =
-		useDailyProgress({
-			activeUser,
-			deviceId,
-			initialData,
-		});
+	const {
+		applyLocalEvent,
+		derivedProgress: liveProgress,
+		pendingEventCount,
+		isReady,
+	} = progressState;
+
+	const {
+		snapshot: decoded,
+		hasError: decodeFailed,
+		retry: retryDecode,
+	} = useDecodedProgress({
+		puzzle,
+		progress: liveProgress,
+		userId: activeUser?.id ?? null,
+		enabled:
+			isReady &&
+			(!sessionPending ||
+				activeUser !== null ||
+				(typeof navigator !== "undefined" && !navigator.onLine)),
+	});
+	const emptyProgress = useMemo(
+		() => createEmptyProgressState(puzzle),
+		[puzzle],
+	);
+	const derivedProgress = decoded?.progress ?? emptyProgress;
+	const revealedAnswers = decoded?.answers ?? {};
+	const hintLetters = decoded?.hints ?? {};
+	const isPresentable = decoded !== null;
 
 	const clueTextsByWordId = useWordClues({
 		puzzleId: puzzle.id,
@@ -265,42 +309,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		],
 		pendingEventCount,
 	});
-
-	useEffect(() => {
-		let cancelled = false;
-
-		void (async () => {
-			try {
-				const [nextAnswers, nextHints] = await Promise.all([
-					decodeRevealedAnswers(puzzle, derivedProgress),
-					decodeHintLetters(puzzle, derivedProgress),
-				]);
-
-				if (!cancelled) {
-					setRevealedAnswers((current) =>
-						JSON.stringify(current) === JSON.stringify(nextAnswers)
-							? current
-							: nextAnswers,
-					);
-					setHintLetters((current) =>
-						JSON.stringify(current) === JSON.stringify(nextHints)
-							? current
-							: nextHints,
-					);
-				}
-			} catch (error) {
-				console.error("Failed to decode puzzle progress", error);
-				captureExceptionRef.current(error, {
-					puzzle_date: puzzle.dateKey,
-					scope: "decode_progress",
-				});
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [derivedProgress, puzzle]);
 
 	useEffect(() => {
 		return () => {
@@ -360,7 +368,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	}, [captureEvent]);
 
 	useEffect(() => {
-		if (firstVisitChecked.current) return;
+		if (!isPresentable || firstVisitChecked.current) return;
 		firstVisitChecked.current = true;
 
 		if (!hasSeenHowToPlay()) {
@@ -381,6 +389,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		captureEvent,
 		openHowToPlayIfFirstVisit,
 		openProfilePreferencesTipIfNeeded,
+		isPresentable,
 	]);
 
 	const handleWelcomeOpenChange = useCallback(
@@ -442,43 +451,6 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		puzzle.id,
 		totalWords,
 	]);
-
-	useEffect(() => {
-		if (typeof window === "undefined") return;
-
-		const rolloverAt = new Date(initialData.rolloverAt).getTime();
-		const delay = Math.max(1_000, rolloverAt - Date.now());
-		// Don't reload straight from the visibility/focus handler: that keeps the
-		// stale puzzle painted for the whole reload round-trip. Flip to the loading
-		// state first (see the reload effect below) so the old day is hidden at once.
-		const beginRollover = () => setIsRollingOver(true);
-		const timer = window.setTimeout(beginRollover, delay);
-		const refreshIfExpired = () => {
-			if (Date.now() >= rolloverAt) {
-				beginRollover();
-			}
-		};
-
-		window.addEventListener("focus", refreshIfExpired);
-		window.addEventListener("pageshow", refreshIfExpired);
-		document.addEventListener("visibilitychange", refreshIfExpired);
-
-		return () => {
-			window.clearTimeout(timer);
-			window.removeEventListener("focus", refreshIfExpired);
-			window.removeEventListener("pageshow", refreshIfExpired);
-			document.removeEventListener("visibilitychange", refreshIfExpired);
-		};
-	}, [initialData.rolloverAt]);
-
-	// Reload only after the loading state has painted, so the resumed PWA shows the
-	// spinner instead of yesterday's puzzle while the new day's data is fetched.
-	useEffect(() => {
-		if (!isRollingOver || typeof window === "undefined") return;
-
-		const frame = window.requestAnimationFrame(() => window.location.reload());
-		return () => window.cancelAnimationFrame(frame);
-	}, [isRollingOver]);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -942,6 +914,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
 				justCompletedRef.current = true;
+				setIsCompletionPending(true);
 			}
 		} else if (result.kind === "not_in_dictionary") {
 			triggerHaptic(HAPTIC_ERROR_PATTERN);
@@ -1131,17 +1104,29 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	);
 
 	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
+	const displayComplete = isComplete && !isCompletionPending;
 
 	// Delay the visual completion state so the submit feedback animation plays first
 	useEffect(() => {
-		if (!isComplete || completionScheduledRef.current) return;
+		if (!isComplete) {
+			if (completionTransitionTimerRef.current != null)
+				window.clearTimeout(completionTransitionTimerRef.current);
+			if (winDialogTimerRef.current != null)
+				window.clearTimeout(winDialogTimerRef.current);
+			completionScheduledRef.current = false;
+			setIsCompletionPending(false);
+			setShouldFireConfetti(false);
+			setWinDialogOpen(false);
+			return;
+		}
+		if (completionScheduledRef.current) return;
 		completionScheduledRef.current = true;
 
 		if (justCompletedRef.current) {
 			// User just guessed the last word — wait for the feedback animation
 			justCompletedRef.current = false;
 			completionTransitionTimerRef.current = window.setTimeout(() => {
-				setDisplayComplete(true);
+				setIsCompletionPending(false);
 				setShouldFireConfetti(true);
 				completionTransitionTimerRef.current = null;
 				// Let confetti land before the modal pops up.
@@ -1152,7 +1137,7 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 			}, getSubmitFeedbackDuration());
 		} else {
 			// Puzzle was already complete on load — show immediately, no confetti
-			setDisplayComplete(true);
+			setIsCompletionPending(false);
 		}
 	}, [isComplete]);
 
@@ -1237,13 +1222,18 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 	// The header (rendered above this route) owns the share button, so it needs
 	// a way to reach the board's share handler.
 	useEffect(() => {
-		setDailyHeaderSummary({ onShare: openShare });
-	}, [openShare]);
+		setDailyHeaderSummary(isPresentable ? { onShare: openShare } : null);
+	}, [openShare, isPresentable]);
 
 	useEffect(() => () => setDailyHeaderSummary(null), []);
 
 	useEffect(() => {
-		if (typeof window === "undefined" || isComplete || tutorialOpen) {
+		if (
+			typeof window === "undefined" ||
+			!isPresentable ||
+			isComplete ||
+			tutorialOpen
+		) {
 			return;
 		}
 
@@ -1303,11 +1293,17 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 		handleGuess,
 		handleLetterClick,
 		isComplete,
+		isPresentable,
 		tutorialOpen,
 	]);
 
-	if (isRollingOver) {
-		return <DailyRolloverLoadingState />;
+	if (!isPresentable) {
+		return (
+			<DailyLoadingPage
+				synchronizing={Boolean(activeUser)}
+				onRetry={decodeFailed ? retryDecode : undefined}
+			/>
+		);
 	}
 
 	const keypadHeightCss =
@@ -1566,26 +1562,5 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 				}}
 			/>
 		</>
-	);
-}
-
-function DailyRolloverLoadingState() {
-	return (
-		<div className="relative overflow-hidden">
-			<div className="absolute inset-x-0 top-0 h-40 bg-linear-to-b from-primary/12 to-transparent" />
-			<div className="mx-auto flex min-h-[calc(100svh-6rem)] max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
-				<div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary shadow-sm">
-					<Loader2Icon className="size-8 animate-spin" />
-				</div>
-				<div className="space-y-2">
-					<h2 className="text-2xl font-semibold tracking-tight">
-						Carregant el repte d'avui
-					</h2>
-					<p className="max-w-md text-sm text-muted-foreground sm:text-base">
-						Ha començat un nou dia. Preparant el trencaclosques d'avui.
-					</p>
-				</div>
-			</div>
-		</div>
 	);
 }

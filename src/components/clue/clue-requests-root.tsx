@@ -1,24 +1,20 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { useAnonParticipantId } from "@/lib/anon-participant-store";
-import { getTodayDateKey } from "@/lib/puzzle-dates";
 import {
 	type AnonClueCredentials,
 	ClueRequestsProvider,
 } from "@/lib/use-clue-requests";
+import { useTodayDateKey } from "@/lib/use-today-date-key";
 
 const rootRoute = getRouteApi("__root__");
 
 export function ClueRequestsRoot({ children }: PropsWithChildren) {
 	const rootData = rootRoute.useLoaderData();
 	const sessionUser = rootData.sessionUser;
-	const [dateKey, setDateKey] = useState<string | null>(null);
+	const dateKey = useTodayDateKey(rootData.dateKey);
 	const [anonCredentials, setAnonCredentials] =
 		useState<AnonClueCredentials | null>(null);
-
-	useEffect(() => {
-		setDateKey(getTodayDateKey());
-	}, []);
 
 	useEffect(() => {
 		setAnonCredentials(sessionUser?.id ? null : { isGuest: true });
@@ -32,6 +28,7 @@ export function ClueRequestsRoot({ children }: PropsWithChildren) {
 
 	return (
 		<ClueRequestsProvider
+			key={dateKey}
 			dateKey={dateKey}
 			localUserId={localUserId}
 			anonCredentials={sessionUser?.id ? null : anonCredentials}

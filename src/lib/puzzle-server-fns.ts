@@ -85,7 +85,7 @@ export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 					return { status: "generating" as const };
 				}
 
-				const dailyData = await getDailyPuzzlePublicData(data?.dateKey);
+				const dailyData = await getDailyPuzzlePublicData(dateKey);
 				const progress = dailyData.sessionUser
 					? await getUserPuzzleProgressData(
 							dailyData.puzzle.id,
