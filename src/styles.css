@@ -134,6 +134,12 @@ code {
 	border-radius: 25%;
 }
 
+.puzzle-cell::before,
+.puzzle-cell::after {
+	border-radius: inherit;
+	corner-shape: inherit;
+}
+
 @supports (corner-shape: squircle) {
 	.puzzle-cell {
 		border-radius: 50%;
@@ -149,8 +155,6 @@ code {
 			var(--color-primary) 24%,
 			var(--color-background)
 		);
-		box-shadow: 0 0 0 0
-			color-mix(in srgb, var(--color-primary) 14%, transparent);
 	}
 
 	45% {
@@ -160,10 +164,6 @@ code {
 			var(--color-primary) 32%,
 			var(--color-background)
 		);
-		box-shadow:
-			0 0 0 0.2rem color-mix(in srgb, var(--color-primary) 12%, transparent),
-			0 0.4rem 0.8rem -0.7rem
-			color-mix(in srgb, var(--color-primary) 16%, transparent);
 	}
 
 	100% {
@@ -173,7 +173,27 @@ code {
 			var(--color-primary) 18%,
 			var(--color-background)
 		);
-		box-shadow: 0 0 0 0 transparent;
+	}
+}
+
+/* Use real borders for tile highlights. Shadow rendering can differ from the
+   tile's corner-shape in browsers with partial support. */
+.grid-word-just-guessed-cell::after,
+.grid-locate-cell::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 1px solid transparent;
+	pointer-events: none;
+}
+
+@keyframes grid-word-just-guessed-ring {
+	0%,
+	100% {
+		opacity: 0;
+	}
+	45% {
+		opacity: 1;
 	}
 }
 
@@ -197,7 +217,14 @@ code {
 .grid-word-just-guessed-cell {
 	animation: grid-word-just-guessed-cell-flash 260ms ease-out both;
 	animation-delay: var(--guess-letter-delay, 0ms);
-	will-change: transform, box-shadow, background-color;
+	will-change: transform, background-color;
+}
+
+.grid-word-just-guessed-cell::after {
+	inset: calc(-0.2rem - 1px);
+	border: 0.2rem solid color-mix(in srgb, var(--color-primary) 12%, transparent);
+	animation: grid-word-just-guessed-ring 260ms ease-out both;
+	animation-delay: var(--guess-letter-delay, 0ms);
 }
 
 .grid-word-just-guessed-letter {
@@ -330,8 +357,6 @@ code {
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: inherit;
-	corner-shape: inherit;
 	padding: 1px;
 	background: var(--clue-gradient);
 	-webkit-mask:
@@ -359,18 +384,30 @@ code {
 			var(--color-teal-200) 75%,
 			var(--color-background)
 		);
-		box-shadow: inset 0 0 0 1px
-			color-mix(in srgb, var(--color-teal-400) 60%, transparent);
 	}
 
 	100% {
 		background-color: transparent;
-		box-shadow: none;
+	}
+}
+
+@keyframes grid-locate-ring {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
 	}
 }
 
 .grid-locate-cell {
 	animation: grid-locate-flash 1300ms ease-out both;
+}
+
+.grid-locate-cell::after {
+	inset: 0;
+	border: 1px solid color-mix(in srgb, var(--color-teal-400) 60%, transparent);
+	animation: grid-locate-ring 1300ms ease-out both;
 }
 
 /* Tutorial targets stay visible until the player moves to another word. */
@@ -379,7 +416,12 @@ code {
 	background-color: var(--primary);
 	color: var(--primary-foreground);
 	border-color: var(--primary-foreground);
-	box-shadow: inset 0 0 0 1px var(--primary-foreground);
+}
+
+.tutorial-puzzle .grid-locate-cell::after {
+	inset: 0;
+	border: 1px solid var(--primary-foreground);
+	animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -397,6 +439,15 @@ code {
 
 	.grid-locate-cell {
 		animation: none;
+	}
+
+	.grid-word-just-guessed-cell::after,
+	.grid-locate-cell::after {
+		content: none;
+	}
+
+	.tutorial-puzzle .grid-locate-cell::after {
+		content: "";
 	}
 
 	.daily-submit-feedback {
