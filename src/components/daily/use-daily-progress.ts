@@ -53,7 +53,6 @@ const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
 const SYNC_INITIAL_RETRY_DELAY_MS = 2_000;
 const SYNC_MAX_RETRY_DELAY_MS = 30_000;
 const PROGRESS_REVALIDATION_INTERVAL_MS = 30_000;
-const INITIAL_SYNC_WAIT_MS = 4_000;
 
 function hasMeaningfulProgress(progress: PuzzleProgressState) {
 	return (
@@ -187,7 +186,6 @@ export function useDailyProgress({
 		[activeUserId, puzzle.id],
 	);
 	const [syncRevision, wakeSync] = useReducer((value: number) => value + 1, 0);
-	const [readyScope, setReadyScope] = useState<typeof scope | null>(null);
 	useIsomorphicLayoutEffect(() => {
 		scope.active = true;
 		return () => {
@@ -221,14 +219,13 @@ export function useDailyProgress({
 	);
 
 	const refreshProgressFromServer = useCallback(async () => {
-		if (!activeUserId || !navigator.onLine || scope.syncing) return false;
+		if (!activeUserId || !navigator.onLine || scope.syncing) return;
 		const revision = ++scope.revision;
 		try {
 			const progress = await fetchUserProgress({
 				data: { puzzleId: puzzle.id },
 			});
-			if (!scope.active || scope.syncing || revision !== scope.revision)
-				return false;
+			if (!scope.active || scope.syncing || revision !== scope.revision) return;
 			const latestProgress =
 				getCompatibleProgress(progress, puzzle) ?? emptyProgress;
 			setBaseProgress((current) => {
@@ -249,7 +246,6 @@ export function useDailyProgress({
 				});
 			}
 		}
-		return true;
 	}, [
 		activeUserId,
 		captureException,
@@ -259,8 +255,8 @@ export function useDailyProgress({
 		scope,
 	]);
 
-	// Read local progress before paint. Account boards remain behind the readiness
-	// gate until the server has reconciled this base and its pending events.
+	// Read this player's local progress before paint. Network reconciliation runs
+	// in the background while new moves are replayed from the persistent outbox.
 	useIsomorphicLayoutEffect(() => {
 		const previousActiveUserId = previousActiveUserIdRef.current;
 		previousActiveUserIdRef.current = activeUserId;
@@ -327,10 +323,6 @@ export function useDailyProgress({
 		}
 
 		let cancelled = false;
-		// A slow or unreachable server must not prevent offline play.
-		const fallbackTimer = window.setTimeout(() => {
-			if (document.visibilityState !== "hidden") setReadyScope(scope);
-		}, INITIAL_SYNC_WAIT_MS);
 
 		const syncWithServer = async () => {
 			if (
@@ -371,11 +363,7 @@ export function useDailyProgress({
 				}
 			}
 			if (!cancelled) {
-				const refreshed = await refreshProgressFromServer();
-				if (!cancelled && refreshed) {
-					window.clearTimeout(fallbackTimer);
-					setReadyScope(scope);
-				}
+				await refreshProgressFromServer();
 			}
 		};
 
@@ -383,7 +371,6 @@ export function useDailyProgress({
 
 		return () => {
 			cancelled = true;
-			window.clearTimeout(fallbackTimer);
 		};
 	}, [
 		activeUserId,
@@ -393,33 +380,20 @@ export function useDailyProgress({
 		importProgress,
 		puzzle,
 		refreshProgressFromServer,
-		scope,
 	]);
 
 	useEffect(() => {
 		if (!activeUserId) return;
-		let fallbackTimer: number | undefined;
 		const refresh = () => {
 			if (document.visibilityState === "hidden" || !navigator.onLine) return;
-			void refreshProgressFromServer().then((refreshed) => {
-				if (scope.active && refreshed) {
-					window.clearTimeout(fallbackTimer);
-					setReadyScope(scope);
-				}
-			});
+			void refreshProgressFromServer();
 		};
 		const suspend = () => {
-			window.clearTimeout(fallbackTimer);
+			// Invalidate older reads without hiding the locally hydrated board.
 			scope.revision += 1;
-			setReadyScope(null);
 		};
 		const resume = () => {
 			suspend();
-			if (document.visibilityState === "hidden") return;
-			window.clearTimeout(fallbackTimer);
-			fallbackTimer = window.setTimeout(() => {
-				if (document.visibilityState !== "hidden") setReadyScope(scope);
-			}, INITIAL_SYNC_WAIT_MS);
 			refresh();
 		};
 		window.addEventListener("pagehide", suspend);
@@ -433,7 +407,6 @@ export function useDailyProgress({
 		);
 		return () => {
 			window.clearInterval(timer);
-			window.clearTimeout(fallbackTimer);
 			window.removeEventListener("pagehide", suspend);
 			window.removeEventListener("focus", resume);
 			window.removeEventListener("pageshow", resume);
@@ -560,7 +533,6 @@ export function useDailyProgress({
 					setNextSyncRetryAt(Date.now() + SYNC_MAX_RETRY_DELAY_MS);
 				}
 				setBaseProgress(result.progress);
-				setReadyScope(scope);
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
@@ -798,8 +770,6 @@ export function useDailyProgress({
 		applyLocalEvent,
 		derivedProgress,
 		pendingEventCount: queuedEvents.length,
-		isReady:
-			hasLoadedLocalState &&
-			(!activeUserId || !isOnline || readyScope === scope),
+		isReady: hasLoadedLocalState,
 	};
 }
