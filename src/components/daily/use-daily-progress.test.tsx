@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	getAccountPuzzleCache,
 	saveAccountPuzzleCache,
 	saveAnonymousProgress,
 } from "@/lib/puzzle-local";
@@ -220,39 +221,28 @@ function renderBeforePaint(activeUser: SessionUser) {
 }
 
 describe("useDailyProgress local state", () => {
-	it("falls back to cached progress after a slow initial sync", async () => {
-		vi.useFakeTimers();
-		try {
-			saveAccountPuzzleCache(USER_ID, DATE_KEY, {
-				puzzleId: PUZZLE.id,
-				baseProgress: progressWith({ guessedWordIds: [1], guessCount: 2 }),
-				queuedEvents: [],
-			});
-			fetchUserProgressMock.mockReturnValue(new Promise(() => {}));
-			const { result, unmount } = renderHook(() =>
-				useDailyProgress({
-					activeUser: {
-						id: USER_ID,
-						name: "Roger",
-						email: "roger@example.com",
-					},
-					deviceId: "device-1",
-					initialData: INITIAL_DATA,
-				}),
-			);
-			expect(result.current.isReady).toBe(false);
-			await act(async () => {
-				await vi.advanceTimersByTimeAsync(4_000);
-			});
-			expect(result.current.isReady).toBe(true);
-			expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
-			unmount();
-		} finally {
-			vi.useRealTimers();
-		}
+	it("makes cached progress playable immediately while the initial fetch is pending", async () => {
+		saveAccountPuzzleCache(USER_ID, DATE_KEY, {
+			puzzleId: PUZZLE.id,
+			baseProgress: progressWith({ guessedWordIds: [1], guessCount: 2 }),
+			queuedEvents: [],
+		});
+		fetchUserProgressMock.mockReturnValue(new Promise(() => {}));
+		const { result } = renderHook(() =>
+			useDailyProgress({
+				activeUser: { id: USER_ID, name: "Roger", email: "roger@example.com" },
+				deviceId: "device-1",
+				initialData: INITIAL_DATA,
+			}),
+		);
+		expect(result.current.isReady).toBe(true);
+		expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
+		await act(async () => {});
+		expect(fetchUserProgressMock).toHaveBeenCalled();
+		expect(result.current.isReady).toBe(true);
 	});
 
-	it("reconciles when a tab becomes visible and keeps polling after the first minute", async () => {
+	it("keeps the board playable on resume and keeps polling after the first minute", async () => {
 		vi.useFakeTimers();
 		const visibility = vi
 			.spyOn(document, "visibilityState", "get")
@@ -273,7 +263,7 @@ describe("useDailyProgress local state", () => {
 			expect(result.current.isReady).toBe(true);
 			visibility.mockReturnValue("hidden");
 			act(() => document.dispatchEvent(new Event("visibilitychange")));
-			expect(result.current.isReady).toBe(false);
+			expect(result.current.isReady).toBe(true);
 			fetchUserProgressMock.mockClear();
 			await act(async () => {
 				await vi.advanceTimersByTimeAsync(60_000);
@@ -283,7 +273,7 @@ describe("useDailyProgress local state", () => {
 			fetchUserProgressMock.mockReturnValueOnce(remote.promise);
 			visibility.mockReturnValue("visible");
 			act(() => document.dispatchEvent(new Event("visibilitychange")));
-			expect(result.current.isReady).toBe(false);
+			expect(result.current.isReady).toBe(true);
 			await act(async () =>
 				remote.resolve(progressWith({ guessedWordIds: [1], guessCount: 1 })),
 			);
@@ -406,6 +396,98 @@ describe("useDailyProgress local state", () => {
 		).toEqual(["two"]);
 	});
 
+	it.each(["before", "after"])(
+		"keeps launch-time guesses when a stale fetch finishes %s the upload",
+		async (fetchOrder) => {
+			const remote = deferred<PuzzleProgressState>();
+			const upload = deferred<{
+				progress: PuzzleProgressState;
+				ackedEventIds: string[];
+			}>();
+			fetchUserProgressMock.mockReturnValue(remote.promise);
+			syncEventsMock.mockReturnValue(upload.promise);
+			const { result } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			await act(async () => {});
+			expect(fetchUserProgressMock).toHaveBeenCalledTimes(1);
+			expect(result.current.isReady).toBe(true);
+
+			act(() =>
+				result.current.applyLocalEvent({
+					id: "local-guess",
+					at: "2026-06-11T10:00:00.000Z",
+					type: "guess_added",
+					payload: {
+						guessHash: "local",
+						matchedWordId: 1,
+						unlockToken: "token-1",
+					},
+				}),
+			);
+			expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
+			expect(
+				getAccountPuzzleCache(USER_ID, DATE_KEY)?.queuedEvents.map(
+					(event) => event.id,
+				),
+			).toEqual(["local-guess"]);
+
+			const resolveFetch = () =>
+				act(async () => remote.resolve(progressWith({})));
+			if (fetchOrder === "before") await resolveFetch();
+			expect(result.current.derivedProgress.guessedWordIds).toEqual([1]);
+			expect(result.current.pendingEventCount).toBe(1);
+			await act(async () =>
+				upload.resolve({
+					progress: progressWith({
+						guessHashes: ["local", "other-device"],
+						guessedWordIds: [1, 2],
+						guessCount: 2,
+					}),
+					ackedEventIds: ["local-guess"],
+				}),
+			);
+			if (fetchOrder === "after") await resolveFetch();
+			expect(result.current.derivedProgress.guessedWordIds).toEqual([1, 2]);
+			expect(result.current.pendingEventCount).toBe(0);
+			expect(result.current.isReady).toBe(true);
+		},
+	);
+
+	it.each(["focus", "pageshow", "online"])(
+		"keeps the loaded board playable while %s starts a background refresh",
+		async (eventType) => {
+			const { result } = renderHook(() =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			);
+			await act(async () => {});
+			fetchUserProgressMock.mockClear();
+			fetchUserProgressMock.mockReturnValue(new Promise(() => {}));
+			act(() => {
+				window.dispatchEvent(new Event("pagehide"));
+				window.dispatchEvent(new Event(eventType));
+			});
+			expect(fetchUserProgressMock).toHaveBeenCalledTimes(1);
+			expect(result.current.isReady).toBe(true);
+		},
+	);
+
 	it("ignores account progress arriving after logout", async () => {
 		const fetchProgress = deferred<PuzzleProgressState>();
 		fetchUserProgressMock.mockReturnValue(fetchProgress.promise);
@@ -511,7 +593,7 @@ describe("useDailyProgress local state", () => {
 		rendered.unmount();
 	});
 
-	it("waits for account progress before presenting a signed-in board", async () => {
+	it("paints cached account progress before reconciling in the background", async () => {
 		saveAccountPuzzleCache(USER_ID, DATE_KEY, {
 			puzzleId: PUZZLE.id,
 			baseProgress: progressWith({ guessedWordIds: [1], guessCount: 2 }),
@@ -530,7 +612,7 @@ describe("useDailyProgress local state", () => {
 			name: "Roger",
 			email: "roger@example.com",
 		});
-		expect(rendered.paintedText).toBe("synchronizing");
+		expect(rendered.paintedText).toBe("words:1");
 
 		await rendered.settle();
 		expect(rendered.container.textContent).toBe("words:1,2");
