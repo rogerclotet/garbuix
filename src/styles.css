@@ -350,23 +350,26 @@ code {
 	will-change: background-position;
 }
 
-/* Grid-cell version of the clue highlight: a gradient ring drawn with a masked
-   pseudo-element so it overlays the cell's own background, keeps the rounded
-   corners, and uses the same palette as the word-list row. */
+/* Paint the clue ring as a real border. Some browsers clip masks to a circle
+   even when the tile and pseudo-element both use corner-shape: squircle. */
 .clue-gradient-cell::before {
 	content: "";
 	position: absolute;
 	inset: 0;
-	padding: 1px;
-	background: var(--clue-gradient);
-	-webkit-mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
-	-webkit-mask-composite: xor;
-	mask-composite: exclude;
+	border: 1px solid var(--color-green-500);
 	pointer-events: none;
 	opacity: 1;
 	transition: opacity 600ms ease;
+}
+
+/* Keep the center transparent so revealed cells and concurrent animations
+   show through. Older browsers keep the shape-matching solid border above. */
+@supports (background-clip: border-area) {
+	.clue-gradient-cell::before {
+		border-color: transparent;
+		background: var(--clue-gradient) border-box;
+		background-clip: border-area;
+	}
 }
 
 /* When the requested-clue ring has been lit for its 5s window, fade it back to
