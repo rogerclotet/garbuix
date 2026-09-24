@@ -1506,9 +1506,6 @@ function DailyGame({
 									: "pb-[calc(var(--daily-keypad-h)_+_1rem)]"
 							}`}
 						>
-							<h3 className="mb-3 shrink-0 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
-								Paraules ({derivedProgress.guessedWordIds.length}/{totalWords})
-							</h3>
 							<DailyWordList
 								puzzle={puzzle}
 								guessedWordIds={derivedProgress.guessedWordIds}
