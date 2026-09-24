@@ -1,9 +1,11 @@
 import {
 	Check,
+	Circle,
 	ClipboardCopy,
+	Clock3,
 	HelpingHand,
 	Info,
-	Loader2,
+	Sparkles,
 	Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -144,7 +146,7 @@ export function DailyWordList({
 		}
 
 		return (
-			<div className="flex flex-col gap-2 pl-7">
+			<div className="flex min-w-0 flex-col gap-2 pl-7">
 				{requests.map((request) => {
 					const helpedKey = clueHelpGivenField(
 						request.requesterId,
@@ -176,7 +178,7 @@ export function DailyWordList({
 							type="button"
 							variant="ghost"
 							size="sm"
-							className="h-7 w-fit gap-1.5 px-2 text-xs font-ui text-primary hover:text-primary"
+							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 px-0 py-2 text-left text-xs whitespace-normal font-ui text-primary hover:bg-transparent hover:text-primary hover:underline lg:min-h-9"
 							onClick={() => openComposer(request.id, "")}
 						>
 							<HelpingHand className="size-3.5" />
@@ -199,7 +201,7 @@ export function DailyWordList({
 		);
 		if (helpedWithoutOpenRequest.length === 0) return null;
 		return (
-			<div className="flex flex-col gap-1.5 pl-7">
+			<div className="flex min-w-0 flex-col gap-1.5 pl-7">
 				{helpedWithoutOpenRequest.map((record) => (
 					<span
 						key={clueHelpGivenField(record.requesterId, record.wordId)}
@@ -220,9 +222,9 @@ export function DailyWordList({
 		clueText: string,
 		tone: "muted" | "foreground",
 	) => (
-		<div className="flex items-start gap-1 pl-7">
+		<div className="flex min-w-0 items-start gap-1 pl-7">
 			<span
-				className={`block flex-1 text-sm italic font-ui ${
+				className={`block min-w-0 flex-1 text-sm leading-relaxed wrap-anywhere font-ui ${
 					tone === "foreground" ? "text-foreground" : "text-muted-foreground"
 				}`}
 			>
@@ -233,7 +235,7 @@ export function DailyWordList({
 					type="button"
 					variant="ghost"
 					size="icon"
-					className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+					className="size-11 shrink-0 text-muted-foreground hover:text-foreground lg:size-9"
 					aria-label="Fes servir aquesta pista"
 					title="Fes servir aquesta pista"
 					onClick={() => handleUseClue(wordId, clueText)}
@@ -245,109 +247,151 @@ export function DailyWordList({
 	);
 
 	return (
-		<div className="space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-			{notFoundSlots.map((slot) => {
-				const clueText = clueTextsByWordId[slot.id];
-				const peerClue = peerCluesByWordId[slot.id];
-				const hasIncoming = requestsByWordId.has(slot.id);
-				const isHighlighted =
-					cluedWordIds.has(slot.id) || Boolean(peerClue) || hasIncoming;
-				const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClue;
+		<div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
+			<div className="mb-4 flex shrink-0 items-baseline justify-between gap-3">
+				<h3 className="text-2xl font-extrabold tracking-tight lg:text-xl">
+					Paraules
+				</h3>
+				<span className="text-xs text-muted-foreground font-ui tabular-nums">
+					<span className="font-semibold text-primary">
+						{foundSlots.length}
+					</span>{" "}
+					de {puzzle.wordSlots.length} trobades
+				</span>
+			</div>
+			<div className="min-w-0 px-1 pb-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+				{notFoundSlots.length > 0 ? (
+					<h4 className="mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground font-ui">
+						Per descobrir{" "}
+						<span className="tabular-nums">{notFoundSlots.length}</span>
+					</h4>
+				) : null}
+				{notFoundSlots.map((slot) => {
+					const clueText = clueTextsByWordId[slot.id];
+					const peerClue = peerCluesByWordId[slot.id];
+					const hasIncoming = requestsByWordId.has(slot.id);
+					const isHighlighted =
+						cluedWordIds.has(slot.id) || Boolean(peerClue) || hasIncoming;
+					const isWaitingForHelp = requestedHelp.has(slot.id) && !peerClue;
 
-				return (
-					<div
-						key={slot.id}
-						id={`${idPrefix}${wordRowId(slot.id)}`}
-						className={`flex flex-col gap-1.5 py-2.5 px-3 rounded-lg w-full scroll-mt-4 ${
-							isHighlighted ? "clue-gradient-border" : "bg-muted/40"
-						}`}
-					>
-						<button
-							type="button"
-							onClick={() => onWordTap?.(slot.id)}
-							className="flex items-center gap-2 w-full text-left cursor-pointer"
+					return (
+						<div
+							key={slot.id}
+							id={`${idPrefix}${wordRowId(slot.id)}`}
+							className={`relative flex min-w-0 flex-col border-b border-border/60 py-2 pl-2 scroll-mt-4 ${
+								isHighlighted ? "word-clue-marker" : ""
+							}`}
 						>
-							<div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
-							<span className="font-mono text-muted-foreground tracking-widest">
-								{getDisplayedSlotWord(slot, cellLetters)}
-							</span>
-							<span className="text-xs text-muted-foreground ml-auto font-ui">
-								{slot.length} lletres
-							</span>
-						</button>
-						{clueText ? renderClueLine(slot.id, clueText, "muted") : null}
-						{peerClue ? (
-							<span className="block text-sm pl-7 font-ui">
-								<span className="italic text-foreground">{peerClue.text}</span>
-								<span className="ml-1.5 text-xs not-italic text-muted-foreground">
-									— {peerClue.responderName}
-								</span>
-							</span>
-						) : null}
-						{canRequestHelp ? (
-							<div className="pl-7">
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									className="h-7 gap-1.5 px-2 text-xs font-ui text-muted-foreground hover:text-foreground"
-									disabled={isWaitingForHelp}
-									onClick={() => onRequestHelp?.(slot.id)}
-								>
-									{isWaitingForHelp ? (
-										<>
-											<Loader2 className="size-3.5 animate-spin" />
-											Esperant pista…
-										</>
-									) : (
-										<>
-											<Users className="size-3.5" />
-											Demana ajuda
-										</>
-									)}
-								</Button>
-							</div>
-						) : null}
-					</div>
-				);
-			})}
-
-			{foundSlots.map((slot) => {
-				const foundClueText = foundClueTextsByWordId[slot.id];
-
-				return (
-					<div
-						key={slot.id}
-						id={`${idPrefix}${wordRowId(slot.id)}`}
-						className="flex flex-col gap-2 rounded-lg bg-primary/8 py-2.5 px-3 scroll-mt-4"
-					>
-						<div className="flex items-center gap-2">
-							<Check className="w-5 h-5 shrink-0 text-primary" />
-							<span className="font-medium text-foreground tracking-widest">
-								{revealedAnswers[slot.id]?.toUpperCase()}
-							</span>
-							<a
-								href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-								aria-label={`Consulta la definició de ${revealedAnswers[slot.id]?.toUpperCase() ?? ""} a l'Optimot`}
-								title="Consulta la definició a l'Optimot"
+							<button
+								type="button"
+								onClick={() => onWordTap?.(slot.id)}
+								className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-sm text-left cursor-pointer transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 							>
-								<Info className="size-4" />
-							</a>
-							<span className="text-xs text-muted-foreground ml-auto font-ui">
-								{slot.length} lletres
-							</span>
+								<span
+									className={`flex size-5 shrink-0 items-center justify-center ${isHighlighted ? "text-primary" : "text-muted-foreground"}`}
+									aria-hidden="true"
+								>
+									{peerClue ? (
+										<Users className="size-4" />
+									) : cluedWordIds.has(slot.id) ? (
+										<Sparkles className="size-4" />
+									) : isWaitingForHelp ? (
+										<Clock3 className="size-4" />
+									) : (
+										<Circle className="size-2" />
+									)}
+								</span>
+								<span className="min-w-0 font-bold tracking-[0.3em] wrap-anywhere">
+									{getDisplayedSlotWord(slot, cellLetters)}
+								</span>
+								<span className="ml-auto shrink-0 text-[0.625rem] text-muted-foreground font-ui">
+									{slot.length} lletres
+								</span>
+							</button>
+							{clueText ? renderClueLine(slot.id, clueText, "muted") : null}
+							{peerClue ? (
+								<span className="block pl-7 text-sm leading-relaxed wrap-anywhere font-ui">
+									<span className="text-foreground">{peerClue.text}</span>
+									<span className="mt-1 block text-xs text-muted-foreground">
+										Pista de {peerClue.responderName}
+									</span>
+								</span>
+							) : null}
+							{canRequestHelp ? (
+								<div className="pl-7">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-auto min-h-11 max-w-full gap-1.5 px-0 py-2 text-xs whitespace-normal font-ui text-primary hover:bg-transparent hover:text-primary hover:underline disabled:text-muted-foreground disabled:opacity-100 lg:min-h-9"
+										disabled={isWaitingForHelp}
+										onClick={() => onRequestHelp?.(slot.id)}
+									>
+										{isWaitingForHelp ? (
+											<>
+												<Clock3 className="size-3.5" />
+												Esperant pista…
+											</>
+										) : (
+											<>
+												<Users className="size-3.5" />
+												Demana ajuda
+											</>
+										)}
+									</Button>
+								</div>
+							) : null}
 						</div>
-						{foundClueText
-							? renderClueLine(slot.id, foundClueText, "muted")
-							: null}
-						{renderIncomingRequests(slot.id)}
-						{renderHelpedConfirmation(slot.id)}
-					</div>
-				);
-			})}
+					);
+				})}
+
+				{foundSlots.length > 0 ? (
+					<h4
+						className={`${notFoundSlots.length > 0 ? "mt-6" : ""} mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-primary font-ui`}
+					>
+						Trobades <span className="tabular-nums">{foundSlots.length}</span>
+					</h4>
+				) : null}
+				{foundSlots.map((slot) => {
+					const foundClueText = foundClueTextsByWordId[slot.id];
+
+					return (
+						<div
+							key={slot.id}
+							id={`${idPrefix}${wordRowId(slot.id)}`}
+							className="flex min-w-0 flex-col gap-1 border-b border-border/60 py-2 pl-2 scroll-mt-4"
+						>
+							<div className="flex min-h-11 items-center gap-2">
+								<Check
+									className="size-5 shrink-0 text-primary"
+									aria-hidden="true"
+								/>
+								<span className="min-w-0 font-semibold text-foreground tracking-wider wrap-anywhere">
+									{revealedAnswers[slot.id]?.toUpperCase()}
+								</span>
+								<a
+									href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:size-9"
+									aria-label={`Consulta la definició de ${revealedAnswers[slot.id]?.toUpperCase() ?? ""} a l'Optimot`}
+									title="Consulta la definició a l'Optimot"
+								>
+									<Info className="size-4" />
+								</a>
+								<span className="shrink-0 text-[0.625rem] text-muted-foreground font-ui">
+									{slot.length} lletres
+								</span>
+							</div>
+							{foundClueText
+								? renderClueLine(slot.id, foundClueText, "muted")
+								: null}
+							{renderIncomingRequests(slot.id)}
+							{renderHelpedConfirmation(slot.id)}
+						</div>
+					);
+				})}
+			</div>
 		</div>
 	);
 }

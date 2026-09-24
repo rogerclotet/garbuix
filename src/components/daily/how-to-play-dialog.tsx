@@ -281,9 +281,6 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 						aria-label="Paraules del tutorial"
 						className="scroll-mt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4"
 					>
-						<h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider font-ui">
-							Paraules ({state.foundWordIds.length}/5)
-						</h3>
 						<DailyWordList
 							puzzle={TUTORIAL_BOARD}
 							idPrefix="tutorial-"

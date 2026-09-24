@@ -63,6 +63,6 @@ describe("DailyWordList peer clues", () => {
 		renderWordList({ 0: response });
 
 		expect(screen.getByText(response.text)).toBeTruthy();
-		expect(screen.getByText("— Anna")).toBeTruthy();
+		expect(screen.getByText("Pista de Anna")).toBeTruthy();
 	});
 });
