@@ -27,7 +27,7 @@ const cellKeySchema = z.string().min(1).max(MAX_CELL_KEY_LENGTH);
 const wordIdSchema = z.number().int().min(0).max(MAX_WORD_ID);
 const hashSchema = z.string().min(1).max(MAX_HASH_LENGTH);
 
-const puzzleClientEventSchema = z.discriminatedUnion("type", [
+export const puzzleClientEventSchema = z.discriminatedUnion("type", [
 	z.object({
 		id: eventIdSchema,
 		at: eventAtSchema,
