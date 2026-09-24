@@ -126,3 +126,11 @@ export function computeDifficultyForNormalizedWords({
 	}
 	return computePuzzleDifficulty({ frequencies, availableWordCount });
 }
+
+// Narrows a stored difficulty (a nullable integer column or snapshot value) to
+// the 1-3 star union, dropping anything out of range to null.
+export function toPuzzleDifficulty(
+	value: number | null | undefined,
+): PuzzleDifficulty | null {
+	return value === 1 || value === 2 || value === 3 ? value : null;
+}

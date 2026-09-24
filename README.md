@@ -204,6 +204,22 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 
 ## Development Notes
 
+### Database integration tests
+
+`pnpm test` runs the unit and component suites. To also run the PostgreSQL
+persistence tests, point `TEST_DATABASE_URL` at a disposable test database:
+
+```bash
+docker run --rm --name garbuix-test-db -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=garbuix_test -p 127.0.0.1:55432:5432 postgres:17-alpine
+# In another terminal:
+TEST_DATABASE_URL=postgres://test:test@127.0.0.1:55432/garbuix_test pnpm test
+```
+
+The integration suite applies the repository's migrations and removes its test
+records afterward. It never uses `DATABASE_URL` as a fallback. Without
+`TEST_DATABASE_URL`, those tests are skipped. CI supplies a PostgreSQL service
+and runs them with the rest of the suite.
+
 ### Adding New UI Components
 
 Use shadcn CLI to add components:
