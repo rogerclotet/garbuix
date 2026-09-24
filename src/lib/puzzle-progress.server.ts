@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { dailyPuzzles, puzzleWordClues, userPuzzleEvents } from "@/db/schema";
 import { db } from "@/lib/db";
 import { captureServerEvent } from "@/lib/observability-server";
+import { puzzleClientEventSchema } from "@/lib/puzzle-event-schemas";
 import { publishLeaderboardForUser } from "@/lib/puzzle-leaderboard.server";
 import {
 	buildSyncedProgressState,
@@ -10,6 +11,7 @@ import {
 import {
 	getUserPuzzleProgressData,
 	saveUserPuzzleProgress,
+	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
 import {
 	collectAckedEventIds,
@@ -33,24 +35,13 @@ function getStoredEventAt(row: typeof userPuzzleEvents.$inferSelect): string {
 function toPuzzleClientEvent(
 	row: typeof userPuzzleEvents.$inferSelect,
 ): PuzzleClientEvent | null {
-	const at = getStoredEventAt(row);
-
-	switch (row.type) {
-		case "guess_added":
-		case "hint_used":
-		case "text_hint_requested":
-		case "bonus_clue_revealed":
-		case "letters_shuffled":
-		case "progress_reset":
-			return {
-				id: row.clientEventId,
-				at,
-				type: row.type,
-				payload: row.payload,
-			} as PuzzleClientEvent;
-		default:
-			return null;
-	}
+	const parsed = puzzleClientEventSchema.safeParse({
+		id: row.clientEventId,
+		at: getStoredEventAt(row),
+		type: row.type,
+		payload: row.payload,
+	});
+	return parsed.success ? parsed.data : null;
 }
 
 // Returns the clue text for the requested word ids, keyed by wordId. Only
@@ -190,100 +181,109 @@ export async function syncPuzzleEventsForUser(options: {
 	events: PuzzleClientEvent[];
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
-	const puzzleRow = await db.query.dailyPuzzles.findFirst({
-		where: eq(dailyPuzzles.id, puzzleId),
-	});
 
-	if (!puzzleRow) {
-		throw new Error("Puzzle not found");
-	}
-
-	const privateSnapshot = puzzleRow.privateSnapshotJson;
-	const publicSnapshot = puzzleRow.publicSnapshotJson;
-	const eventIds = events.map((event) => event.id);
-	const existingEvents =
-		eventIds.length === 0
-			? []
-			: await db.query.userPuzzleEvents.findMany({
+	const {
+		puzzleRow,
+		existingProgress,
+		nextProgress,
+		ackedEventIds,
+		diagnostics,
+	} = await withPuzzleProgressTransaction(
+		{ userId, puzzleId },
+		async (transaction) => {
+			const puzzleRow = await transaction.query.dailyPuzzles.findFirst({
+				where: eq(dailyPuzzles.id, puzzleId),
+			});
+			if (!puzzleRow) throw new Error("Puzzle not found");
+			const privateSnapshot = puzzleRow.privateSnapshotJson;
+			const publicSnapshot = puzzleRow.publicSnapshotJson;
+			const existingProgress = await getUserPuzzleProgressData(
+				puzzleId,
+				userId,
+				transaction,
+			);
+			let historicalEvents: PuzzleClientEvent[] = [];
+			if (!existingProgress) {
+				const rows = await transaction.query.userPuzzleEvents.findMany({
 					where: and(
 						eq(userPuzzleEvents.userId, userId),
 						eq(userPuzzleEvents.puzzleId, puzzleId),
-						eq(userPuzzleEvents.deviceId, deviceId),
-						inArray(userPuzzleEvents.clientEventId, eventIds),
 					),
 				});
-
-	const existingEventIdSet = new Set(
-		existingEvents.map((event) => event.clientEventId),
+				historicalEvents = rows
+					.map(toPuzzleClientEvent)
+					.filter((event) => event !== null);
+			}
+			// Recover the projection before validating hints, so retries and rebuilt
+			// rows use the same budget as an ordinary sync. Incoming events are only
+			// applied once, after validation and deduplication under the lock.
+			const baseProgress = buildSyncedProgressState({
+				existingProgress,
+				historicalEvents,
+				incomingEvents: [],
+				initialProgress: createEmptyProgressState(publicSnapshot),
+				totalWords: privateSnapshot.wordSlots.length,
+			});
+			const eventIds = events.map((event) => event.id);
+			const existingEvents =
+				eventIds.length === 0
+					? []
+					: await transaction.query.userPuzzleEvents.findMany({
+							where: and(
+								eq(userPuzzleEvents.userId, userId),
+								eq(userPuzzleEvents.puzzleId, puzzleId),
+								eq(userPuzzleEvents.deviceId, deviceId),
+								inArray(userPuzzleEvents.clientEventId, eventIds),
+							),
+						});
+			const existingEventIds = new Set(
+				existingEvents.map((event) => event.clientEventId),
+			);
+			const { diagnostics, filteredEvents } = await filterSyncablePuzzleEvents({
+				events,
+				existingEventIds,
+				publicSnapshot,
+				privateSnapshot,
+				existingHintState: baseProgress,
+			});
+			if (filteredEvents.length > 0) {
+				await transaction
+					.insert(userPuzzleEvents)
+					.values(
+						filteredEvents.map((event) => ({
+							id: crypto.randomUUID(),
+							userId,
+							puzzleId,
+							deviceId,
+							clientEventId: event.id,
+							type: event.type,
+							payload: { ...event.payload, _eventAt: event.at },
+						})),
+					)
+					.onConflictDoNothing();
+			}
+			const nextProgress = await saveUserPuzzleProgress(
+				userId,
+				buildSyncedProgressState({
+					existingProgress: baseProgress,
+					incomingEvents: filteredEvents,
+					initialProgress: baseProgress,
+					totalWords: privateSnapshot.wordSlots.length,
+				}),
+				transaction,
+			);
+			return {
+				puzzleRow,
+				existingProgress,
+				nextProgress,
+				diagnostics,
+				ackedEventIds: collectAckedEventIds({
+					existingEventIds,
+					filteredEvents,
+				}),
+			};
+		},
 	);
-
-	const existingProgress = await getUserPuzzleProgressData(puzzleId, userId);
-
-	const { diagnostics, filteredEvents } = await filterSyncablePuzzleEvents({
-		events,
-		existingEventIds: existingEventIdSet,
-		publicSnapshot,
-		privateSnapshot,
-		existingHintState: existingProgress
-			? {
-					hintsUsed: existingProgress.hintsUsed,
-					hintedCells: existingProgress.hintedCells,
-					clueWordIds: existingProgress.clueWordIds,
-				}
-			: undefined,
-	});
-
-	await Promise.all(
-		filteredEvents.map((event) =>
-			db
-				.insert(userPuzzleEvents)
-				.values({
-					id: crypto.randomUUID(),
-					userId,
-					puzzleId,
-					deviceId,
-					clientEventId: event.id,
-					type: event.type,
-					payload: {
-						...event.payload,
-						_eventAt: event.at,
-					},
-				})
-				.onConflictDoNothing(),
-		),
-	);
-
-	let historicalEvents: PuzzleClientEvent[] = [];
-
-	if (!existingProgress) {
-		const allEvents = await db.query.userPuzzleEvents.findMany({
-			where: and(
-				eq(userPuzzleEvents.userId, userId),
-				eq(userPuzzleEvents.puzzleId, puzzleId),
-			),
-		});
-
-		historicalEvents = allEvents
-			.map((row) => toPuzzleClientEvent(row))
-			.filter((event): event is PuzzleClientEvent => event !== null);
-	}
-
-	const nextProgress = buildSyncedProgressState({
-		existingProgress,
-		historicalEvents,
-		incomingEvents: filteredEvents,
-		initialProgress: createEmptyProgressState(publicSnapshot),
-		totalWords: privateSnapshot.wordSlots.length,
-	});
-
-	await saveUserPuzzleProgress(userId, nextProgress);
-
-	const ackedEventIds = collectAckedEventIds({
-		existingEventIds: new Set(
-			existingEvents.map((event) => event.clientEventId),
-		),
-		filteredEvents,
-	});
 
 	const previousWordsFound = existingProgress?.guessedWordIds.length ?? 0;
 	const previousCompletedAt = existingProgress?.completedAt ?? null;
@@ -308,7 +308,7 @@ export async function syncPuzzleEventsForUser(options: {
 			dateKey: puzzleRow.dateKey,
 			userId,
 			wordsFound: nextProgress.guessedWordIds.length,
-			totalWords: privateSnapshot.wordSlots.length,
+			totalWords: puzzleRow.privateSnapshotJson.wordSlots.length,
 			freeCluesUsed: nextProgress.hintsUsed,
 			tryCount: nextProgress.guessCount,
 			completedAt: nextCompletedAt,
@@ -336,9 +336,6 @@ export async function syncPuzzleEventsForUser(options: {
 	return {
 		ackedEventIds,
 		diagnostics,
-		progress: {
-			...nextProgress,
-			lastSyncedAt: new Date().toISOString(),
-		},
+		progress: nextProgress,
 	};
 }

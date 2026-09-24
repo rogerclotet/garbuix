@@ -22,6 +22,7 @@ import {
 import {
 	getUserPuzzleProgressData,
 	saveUserPuzzleProgress,
+	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
 import { toPuzzlePreview } from "@/lib/puzzle-snapshot";
 import { calculateHistoryStats } from "@/lib/puzzle-streaks";
@@ -333,10 +334,21 @@ export async function importAnonymousProgressForUser(options: {
 			continue;
 		}
 
-		const existingProgress = await getUserPuzzleProgressData(puzzle.id, userId);
-		const merged = mergeProgressStates(existingProgress, activeProgress);
-
-		await saveUserPuzzleProgress(userId, merged);
+		const merged = await withPuzzleProgressTransaction(
+			{ userId, puzzleId: puzzle.id },
+			async (transaction) => {
+				const existingProgress = await getUserPuzzleProgressData(
+					puzzle.id,
+					userId,
+					transaction,
+				);
+				return saveUserPuzzleProgress(
+					userId,
+					mergeProgressStates(existingProgress, activeProgress),
+					transaction,
+				);
+			},
+		);
 
 		importedDates.push(historyEntry.dateKey);
 		importedForLeaderboard.push({

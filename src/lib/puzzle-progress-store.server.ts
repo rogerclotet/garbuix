@@ -1,7 +1,24 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { userPuzzleProgress } from "@/db/schema";
 import { db } from "@/lib/db";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+
+type ProgressTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export async function withPuzzleProgressTransaction<T>(
+	identity: { userId: string; puzzleId: string },
+	action: (transaction: ProgressTransaction) => Promise<T>,
+): Promise<T> {
+	return db.transaction(async (transaction) => {
+		// Lock before reading or deduplicating, including when no progress row
+		// exists yet. Sync and guest import share this lock across app instances.
+		// Hash collisions only serialize unrelated puzzles; they cannot lose data.
+		await transaction.execute(sql`
+			select pg_advisory_xact_lock(hashtext(${identity.userId}), hashtext(${identity.puzzleId}))
+		`);
+		return action(transaction);
+	});
+}
 
 function serializeProgressRow(
 	row: typeof userPuzzleProgress.$inferSelect,
@@ -25,8 +42,9 @@ function serializeProgressRow(
 export async function getUserPuzzleProgressData(
 	puzzleId: string,
 	userId: string,
+	database: Pick<typeof db, "query"> = db,
 ) {
-	const row = await db.query.userPuzzleProgress.findFirst({
+	const row = await database.query.userPuzzleProgress.findFirst({
 		where: and(
 			eq(userPuzzleProgress.puzzleId, puzzleId),
 			eq(userPuzzleProgress.userId, userId),
@@ -58,6 +76,7 @@ function toStoredProgress(
 export async function saveUserPuzzleProgress(
 	userId: string,
 	progress: PuzzleProgressState,
+	database: ProgressTransaction,
 ) {
 	const fields = toStoredProgress(progress);
 	const row = {
@@ -66,7 +85,7 @@ export async function saveUserPuzzleProgress(
 		puzzleId: progress.puzzleId,
 		...fields,
 	};
-	await db.insert(userPuzzleProgress).values(row).onConflictDoUpdate({
+	await database.insert(userPuzzleProgress).values(row).onConflictDoUpdate({
 		target: userPuzzleProgress.id,
 		set: fields,
 	});
