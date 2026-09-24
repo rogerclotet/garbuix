@@ -176,9 +176,7 @@ export default function Header() {
 							className="flex items-center gap-3 hover:opacity-80 transition-opacity"
 						>
 							<Logo className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-							<h1 className="text-xl sm:text-2xl font-bold text-primary">
-								Garbuix!
-							</h1>
+							<h1 className="text-2xl font-bold text-primary">Garbuix!</h1>
 						</Link>
 					)}
 					{actionButtons(!innerTitle)}

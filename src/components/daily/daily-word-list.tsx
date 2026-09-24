@@ -248,17 +248,9 @@ export function DailyWordList({
 
 	return (
 		<div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
-			<div className="mb-4 flex shrink-0 items-baseline justify-between gap-3">
-				<h3 className="text-2xl font-extrabold tracking-tight lg:text-xl">
-					Paraules
-				</h3>
-				<span className="text-xs text-muted-foreground font-ui tabular-nums">
-					<span className="font-semibold text-primary">
-						{foundSlots.length}
-					</span>{" "}
-					de {puzzle.wordSlots.length} trobades
-				</span>
-			</div>
+			<h3 className="mb-4 shrink-0 text-2xl font-extrabold tracking-tight lg:text-xl">
+				Paraules
+			</h3>
 			<div className="min-w-0 px-1 pb-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
 				{notFoundSlots.length > 0 ? (
 					<h4 className="mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground font-ui">
