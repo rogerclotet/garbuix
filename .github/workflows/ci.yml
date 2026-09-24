@@ -30,8 +30,8 @@ jobs:
       - run: pnpm check
       - run: pnpm download-dict
       - run: pnpm typecheck
-      - name: Check migration config loading
-        run: pnpm test src/lib/drizzle-config.test.ts
+      - name: Run test suite
+        run: pnpm test
 
   deploy:
     needs: lint
