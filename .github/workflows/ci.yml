@@ -10,6 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: node:25.2-slim
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: garbuix_test
+        options: >-
+          --health-cmd "pg_isready -U test -d garbuix_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://test:test@postgres:5432/garbuix_test
     steps:
       - uses: actions/checkout@v7
 
