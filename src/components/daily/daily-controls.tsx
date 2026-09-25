@@ -196,7 +196,7 @@ export function DailyControls({
 		? "shrink-0"
 		: isCircle
 			? "rounded-full"
-			: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg sm:rounded-xl";
+			: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16";
 	const submitSizeClass = isRow
 		? "ml-1 shrink-0"
 		: isCircle
@@ -216,7 +216,6 @@ export function DailyControls({
 		? {
 				width: "var(--row-key)",
 				height: "var(--row-key)",
-				borderRadius: "calc(var(--row-key) * 0.31)",
 			}
 		: undefined;
 	const keyStyle: CSSProperties | undefined = isCircle
@@ -233,7 +232,9 @@ export function DailyControls({
 				width: "calc(var(--circle-key) + 0.5rem)",
 				height: "calc(var(--circle-key) + 0.5rem)",
 			}
-		: rowSquareStyle;
+		: isRow
+			? { ...rowSquareStyle, borderRadius: "calc(var(--row-key) * 0.31)" }
+			: undefined;
 
 	const renderLetterButton = (letter: string) => (
 		<Button
@@ -243,6 +244,7 @@ export function DailyControls({
 			size="lg"
 			className={cn(
 				"daily-pressable daily-pressable-key font-bold border border-border bg-background transition-all duration-100 touch-manipulation",
+				!isCircle && "puzzle-cell",
 				isCircle || isRow ? "" : "text-xl",
 				keySizeClass,
 				tutorialTarget?.kind === "letter" &&
