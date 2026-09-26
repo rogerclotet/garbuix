@@ -268,6 +268,7 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 		captureServerEvent({
 			event: "daily_puzzle_generated",
 			properties: {
+				game_mode: "classic",
 				date_key: dateKey,
 				puzzle_id: inserted[0].id,
 				seed,

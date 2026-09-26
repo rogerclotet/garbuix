@@ -44,6 +44,10 @@ const serverEnvSchema = z.object({
 	POSTHOG_HOST: z.string().url().optional(),
 	POSTHOG_KEY: optionalEnvString,
 	POSTHOG_UI_HOST: z.string().url().optional(),
+	UMAMI_HOST: optionalEnvString.pipe(
+		z.url({ protocol: /^https?$/ }).optional(),
+	),
+	UMAMI_WEBSITE_ID: optionalEnvString.pipe(z.uuid().optional()),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

@@ -345,6 +345,7 @@ export function useDailyProgress({
 					markAnonymousDataImported(activeUserId);
 					if (hasLocalProgress) {
 						captureEvent("anonymous_progress_imported", {
+							game_mode: "classic",
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
 							imported_dates: result.importedDates.length,
@@ -537,6 +538,7 @@ export function useDailyProgress({
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
 				captureEvent("puzzle_events_synced", {
+					game_mode: "classic",
 					acked_events: result.ackedEventIds.length,
 					puzzle_id: puzzle.id,
 					queued_events: pendingEvents.length,

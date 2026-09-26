@@ -269,6 +269,7 @@ export async function getHistoryPageDataForUser(
 		distinctId: userId,
 		event: "history_page_loaded_server",
 		properties: {
+			game_mode: "classic",
 			date_key: dateKey,
 			has_account_history: Boolean(accountHistory),
 			history_entry_count: accountHistory?.stats.totalDays ?? 0,
@@ -419,6 +420,7 @@ export async function importAnonymousProgressForUser(options: {
 		distinctId: userId,
 		event: "anonymous_progress_imported_server",
 		properties: {
+			game_mode: "classic",
 			active_progress_count: Object.keys(payload.activeProgressByDate).length,
 			imported_dates: importedDates.length,
 			legacy_dates: skippedLegacyDates.length,

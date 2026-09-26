@@ -1,19 +1,29 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { PostHog } from "posthog-node";
 import { getServerObservabilityConfig } from "@/lib/observability-config";
 import {
 	buildErrorProperties,
-	isObservabilityEnabled,
+	isPostHogEnabled,
 	toEventProperties,
 } from "@/lib/observability-shared";
+import { captureUmamiServerEvent } from "@/lib/umami-server";
 
 let posthogClient: PostHog | null | undefined;
+const serverContext = new AsyncLocalStorage<
+	ReturnType<typeof getRequestObservabilityContext>
+>();
 
 export function captureServerEvent(options: {
 	event: string;
 	distinctId?: string;
 	properties?: Record<string, unknown>;
 }) {
+	const context = serverContext.getStore();
+	void captureUmamiServerEvent({
+		event: options.event,
+		properties: { ...context?.properties, ...options.properties },
+	});
 	const client = getServerPostHog();
 	if (!client) {
 		return;
@@ -58,11 +68,9 @@ export async function observeServerAction<T>(
 	const context = getRequestObservabilityContext(options);
 
 	try {
-		if (!client) {
-			return await action();
-		}
-
-		return await client.withContext(context, action);
+		return await serverContext.run(context, () =>
+			client ? client.withContext(context, action) : action(),
+		);
 	} catch (error) {
 		captureServerException(error, {
 			distinctId: context.distinctId,
@@ -82,7 +90,7 @@ function getServerPostHog() {
 	}
 
 	const config = getServerObservabilityConfig();
-	if (!isObservabilityEnabled(config)) {
+	if (!isPostHogEnabled(config)) {
 		posthogClient = null;
 		return posthogClient;
 	}

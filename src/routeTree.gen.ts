@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as ApiUmamiRouteImport } from './routes/api/umami'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
@@ -38,6 +39,11 @@ const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
 const PreferenciesRoute = PreferenciesRouteImport.update({
   id: '/preferencies',
   path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUmamiRoute = ApiUmamiRouteImport.update({
+  id: '/api/umami',
+  path: '/api/umami',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MiniIndexRoute = MiniIndexRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/umami': typeof ApiUmamiRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/umami': typeof ApiUmamiRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini': typeof MiniIndexRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/umami': typeof ApiUmamiRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/umami'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini/'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/umami'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/umami'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini/'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  ApiUmamiRoute: typeof ApiUmamiRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
   PhSplatRoute: typeof PhSplatRoute
   MiniIndexRoute: typeof MiniIndexRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/preferencies'
       fullPath: '/preferencies'
       preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/umami': {
+      id: '/api/umami'
+      path: '/api/umami'
+      fullPath: '/api/umami'
+      preLoaderRoute: typeof ApiUmamiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mini/': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  ApiUmamiRoute: ApiUmamiRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
   PhSplatRoute: PhSplatRoute,
   MiniIndexRoute: MiniIndexRoute,

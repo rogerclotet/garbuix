@@ -12,6 +12,7 @@ import type {
 	DailyPuzzlePublic,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import { useObservability } from "@/lib/use-observability";
 
 export function useMiniProgress({
 	puzzle,
@@ -22,6 +23,7 @@ export function useMiniProgress({
 	initialProgress: PuzzleProgressState | null;
 	userId: string | null;
 }) {
+	const { captureEvent } = useObservability();
 	const [progress, setProgress] = useState(
 		initialProgress ?? createEmptyProgressState(puzzle),
 	);
@@ -76,6 +78,12 @@ export function useMiniProgress({
 					if (cancelled) return;
 					const synced = await syncMiniProgress({ data: saved });
 					if (cancelled) return;
+					captureEvent("puzzle_events_synced", {
+						game_mode: "mini",
+						guessed_word_count: synced.guessedWordIds.length,
+						hints_used: synced.hintsUsed,
+						completed: Boolean(synced.completedAt),
+					});
 					if (pending.current.get(dateKey) === saved)
 						pending.current.delete(dateKey);
 					if (dateKey === puzzle.dateKey) {
@@ -100,7 +108,7 @@ export function useMiniProgress({
 			clearInterval(timer);
 			window.removeEventListener("online", flush);
 		};
-	}, [persist, puzzle.dateKey, ready, userId]);
+	}, [captureEvent, persist, puzzle.dateKey, ready, userId]);
 
 	const dispatch = useCallback(
 		(event: MiniEvent) => {

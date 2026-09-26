@@ -88,6 +88,56 @@ POSTHOG_UI_HOST=https://us.posthog.com
 
 `POSTHOG_UI_HOST` is optional, but it helps PostHog link events back to the right project UI region.
 
+Umami is also optional and can run alongside PostHog or on its own. Set both
+runtime variables to enable it, then restart the app:
+
+```bash
+UMAMI_HOST=https://analytics.example.com
+UMAMI_WEBSITE_ID=00000000-0000-4000-8000-000000000000
+```
+
+Use your Umami server's base URL and the website ID from its tracking settings.
+These variables are passed to the app, scheduler, and backfill containers by
+Docker Compose. No rebuild or Umami API token is needed to change them. Leaving
+either variable empty disables Umami.
+
+Umami receives the existing product action names with only reviewed counts,
+booleans, and fixed choices. Both browser and server paths filter event data;
+new event names and properties must be added to `src/lib/umami-events.ts` after
+review. Errors, web vitals, free text, and unknown events are not sent to Umami.
+`$pageview` becomes a native Umami pageview. Only known page paths are retained;
+query strings, fragments, referrers, and page titles are discarded.
+
+Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
+`puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,
+`puzzle_letters_shuffled`, `puzzle_hint_requested`, and `puzzle_events_synced`.
+The shared hint event includes `hint_type=text` for Classic and `hint_type=letter`
+for Mini. Classic also retains `puzzle_text_hint_requested` for existing reports;
+use the shared event alone when comparing total hint use. Mini syncs snapshots,
+so its sync events report progress counts rather than Classic's event-batch counts.
+Puzzle generation, server progress sync, history loads, and game pageviews are
+also tagged with the game mode. The gameplay events contain no submitted guesses
+or answer text.
+
+Umami never receives account IDs, application device IDs, names, email addresses,
+or avatars from this integration. Browser requests use no cookies or referrer
+and go through `/api/umami`. The endpoint accepts events only and filters their
+properties again before sending them to the configured server's `/api/send`.
+
+For Umami's standard anonymous visitor counting, the proxy forwards the visitor's
+User-Agent and IP headers (`X-Forwarded-For`, `X-Real-IP`, and `CF-Connecting-IP`).
+Your reverse proxy must supply the actual visitor IP. These are processed by
+Umami to derive its anonymous session ID, with no `identify()` calls or account
+linking. Umami's opaque cache token is returned to the browser and reused in
+memory to preserve visits across events; it is not stored in cookies or local
+storage. Request-backed server events use the same visitor headers. Background
+jobs have no visitor context, and server events use `/server` as their page path.
+
+Unique visitors are estimates, not exact device or person counts. Network/browser
+changes and Umami's salt rotation can split one visitor; matching browsers on a
+shared IP can merge different visitors. See [Umami's session and metric definitions](https://docs.umami.is/docs/metric-definitions).
+PostHog's existing identification, feature flags, and observability remain unchanged.
+
 ### Production
 
 Build both production images, stop the app and clue scheduler, apply migrations,

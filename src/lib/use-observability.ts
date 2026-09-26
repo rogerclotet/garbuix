@@ -1,5 +1,5 @@
 import { usePostHog } from "@posthog/react";
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
 import type { Metric } from "web-vitals";
 import {
 	buildErrorProperties,
@@ -7,14 +7,17 @@ import {
 	type ObservabilityUser,
 	toEventProperties,
 } from "@/lib/observability-shared";
+import { UmamiContext } from "@/lib/umami";
 
 export function useObservability() {
 	const posthog = usePostHog();
+	const umami = useContext(UmamiContext);
 
 	return useMemo(
 		() => ({
 			captureEvent(event: string, properties?: Record<string, unknown>) {
 				posthog.capture(event, toEventProperties(properties));
+				umami?.captureEvent(event, properties);
 			},
 			captureException(error: unknown, properties?: Record<string, unknown>) {
 				posthog.captureException(
@@ -41,6 +44,6 @@ export function useObservability() {
 				};
 			},
 		}),
-		[posthog],
+		[posthog, umami],
 	);
 }

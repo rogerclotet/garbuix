@@ -5,6 +5,7 @@ import {
 	getMiniProgress,
 	saveMiniProgress,
 } from "@/lib/mini.server";
+import { captureServerEvent } from "@/lib/observability-server";
 import { getNextRolloverAt, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import { progressStateSchema } from "@/lib/puzzle-event-schemas";
 import { getAuthSession } from "@/lib/puzzle-service.server";
@@ -39,9 +40,19 @@ export const getMiniHistoryData = createServerFn({ method: "GET" }).handler(
 			ensureMiniPuzzle(getYesterdayDateKey()),
 			getAuthSession(),
 		]);
+		const entries = session ? await getMiniHistory(session.user.id) : [];
+		captureServerEvent({
+			event: "history_page_loaded_server",
+			distinctId: session?.user.id,
+			properties: {
+				game_mode: "mini",
+				has_account_history: Boolean(session),
+				history_entry_count: entries.length,
+			},
+		});
 		return {
 			userId: session?.user.id ?? null,
-			entries: session ? await getMiniHistory(session.user.id) : [],
+			entries,
 			yesterdayPuzzle: {
 				dateKey: yesterday.dateKey,
 				preview: toPuzzlePreview(yesterday.privateSnapshotJson),

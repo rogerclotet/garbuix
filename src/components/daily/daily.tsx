@@ -364,7 +364,10 @@ function DailyGame({
 	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
 		openHowToPlay();
-		captureEvent("how_to_play_shown", { trigger: "first_visit" });
+		captureEvent("how_to_play_shown", {
+			game_mode: "classic",
+			trigger: "first_visit",
+		});
 	}, [captureEvent]);
 
 	const openProfilePreferencesTipIfNeeded = useCallback(() => {
@@ -372,7 +375,10 @@ function DailyGame({
 		if (hasSeenProfilePreferencesTip()) return false;
 		markProfilePreferencesTipSeen();
 		openProfilePreferencesTip();
-		captureEvent("profile_preferences_tip_shown", { trigger: "return_visit" });
+		captureEvent("profile_preferences_tip_shown", {
+			game_mode: "classic",
+			trigger: "return_visit",
+		});
 		return true;
 	}, [captureEvent]);
 
@@ -388,7 +394,10 @@ function DailyGame({
 		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
 		if (shouldShowWelcome) {
 			setWelcomeOpen(true);
-			captureEvent("welcome_shown", { trigger: "first_visit" });
+			captureEvent("welcome_shown", {
+				game_mode: "classic",
+				trigger: "first_visit",
+			});
 			return;
 		}
 
@@ -444,11 +453,15 @@ function DailyGame({
 	);
 
 	const handleWelcomeContinueAnonymous = useCallback(() => {
-		captureEvent("welcome_dismissed", { choice: "anonymous" });
+		captureEvent("welcome_dismissed", {
+			game_mode: "classic",
+			choice: "anonymous",
+		});
 	}, [captureEvent]);
 
 	useEffect(() => {
 		captureEvent("puzzle_loaded", {
+			game_mode: "classic",
 			date_key: puzzle.dateKey,
 			is_authenticated: Boolean(activeUser),
 			puzzle_id: puzzle.id,
@@ -472,6 +485,7 @@ function DailyGame({
 
 		completionTrackedRef.current = true;
 		captureEvent("puzzle_completed", {
+			game_mode: "classic",
 			date_key: puzzle.dateKey,
 			guess_count: derivedProgress.guessCount,
 			hints_used: derivedProgress.hintsUsed,
@@ -861,6 +875,7 @@ function DailyGame({
 			triggerHaptic(HAPTIC_ERROR_PATTERN);
 			showSubmitFeedback(prettyGuess, "invalid_input");
 			captureEvent("puzzle_guess_result", {
+				game_mode: "classic",
 				date_key: puzzle.dateKey,
 				guess_length: guess.length,
 				matched: false,
@@ -879,6 +894,7 @@ function DailyGame({
 
 		showSubmitFeedback(prettyGuess, result.kind);
 		captureEvent("puzzle_guess_result", {
+			game_mode: "classic",
 			date_key: puzzle.dateKey,
 			guess_length: guess.length,
 			matched: result.matchedSlotId != null,
@@ -928,6 +944,7 @@ function DailyGame({
 					);
 					triggerHaptic(HAPTIC_SUCCESS_PATTERN);
 					captureEvent("bonus_clue_granted", {
+						game_mode: "classic",
 						bonus_words_found: nextBonusCount,
 						date_key: puzzle.dateKey,
 						puzzle_id: puzzle.id,
@@ -992,6 +1009,7 @@ function DailyGame({
 		triggerHaptic(HAPTIC_TAP_MS);
 		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
 		captureEvent("puzzle_letters_shuffled", {
+			game_mode: "classic",
 			date_key: puzzle.dateKey,
 			puzzle_id: puzzle.id,
 		});
@@ -1014,7 +1032,13 @@ function DailyGame({
 		if (derivedProgress.hintsUsed >= 3) return;
 		if (nextClueWordId == null) return;
 
+		captureEvent("puzzle_hint_requested", {
+			game_mode: "classic",
+			hint_type: "text",
+			hints_used_after: derivedProgress.hintsUsed + 1,
+		});
 		captureEvent("puzzle_text_hint_requested", {
+			game_mode: "classic",
 			date_key: puzzle.dateKey,
 			hints_used_after: derivedProgress.hintsUsed + 1,
 			puzzle_id: puzzle.id,
@@ -1054,6 +1078,7 @@ function DailyGame({
 		(wordId: number) => {
 			triggerHaptic(HAPTIC_TAP_MS);
 			captureEvent("peer_clue_requested", {
+				game_mode: "classic",
 				date_key: puzzle.dateKey,
 				puzzle_id: puzzle.id,
 				word_id: wordId,
@@ -1181,6 +1206,7 @@ function DailyGame({
 	const signInWithGoogle = useCallback(
 		async (source: string) => {
 			captureEvent("auth_sign_in_started", {
+				game_mode: "classic",
 				provider: "google",
 				source,
 			});
@@ -1198,7 +1224,10 @@ function DailyGame({
 	);
 
 	const handleWelcomeSignIn = useCallback(() => {
-		captureEvent("welcome_dismissed", { choice: "google" });
+		captureEvent("welcome_dismissed", {
+			game_mode: "classic",
+			choice: "google",
+		});
 		markWelcomeSeen();
 		setWelcomeOpen(false);
 		void signInWithGoogle("welcome_dialog");

@@ -321,6 +321,7 @@ export async function syncPuzzleEventsForUser(options: {
 		distinctId: userId,
 		event: "puzzle_progress_synced_server",
 		properties: {
+			game_mode: "classic",
 			acked_event_count: ackedEventIds.length,
 			completed: Boolean(nextProgress.completedAt),
 			device_id: deviceId,

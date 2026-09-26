@@ -5,11 +5,22 @@ export type ObservabilityConfig = {
 	posthogKey?: string;
 	posthogProxyPath?: string;
 	posthogUIHost?: string;
+	umamiEnabled?: boolean;
 };
 
 export type ObservabilityUser = Exclude<SessionUser, null>;
 
+export function getGameMode(pathname: string) {
+	if (pathname === "/mini" || pathname.startsWith("/mini/")) return "mini";
+	if (pathname === "/" || pathname === "/dies-anteriors") return "classic";
+	return undefined;
+}
+
 export function isObservabilityEnabled(config: ObservabilityConfig) {
+	return isPostHogEnabled(config) || Boolean(config.umamiEnabled);
+}
+
+export function isPostHogEnabled(config: ObservabilityConfig) {
 	return Boolean(
 		config.posthogKey && (config.posthogProxyPath ?? config.posthogHost),
 	);

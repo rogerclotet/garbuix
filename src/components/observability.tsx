@@ -5,8 +5,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Metric } from "web-vitals";
 import {
 	buildUserProperties,
+	getGameMode,
 	isObservabilityEnabled,
+	isPostHogEnabled,
 } from "@/lib/observability-shared";
+import { createUmamiClient, UmamiContext } from "@/lib/umami";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
@@ -94,9 +97,24 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 	const activeUserRef = useRef(activeUser);
 	activeUserRef.current = activeUser;
 	const [isClientReady, setIsClientReady] = useState(false);
+	const umami = useMemo(
+		() => (config.umamiEnabled ? createUmamiClient() : null),
+		[config.umamiEnabled],
+	);
+
+	useEffect(() => {
+		if (!umami) return;
+		const onPageHide = () => {
+			umami.captureEvent("$pageleave");
+		};
+		window.addEventListener("pagehide", onPageHide);
+		return () => {
+			window.removeEventListener("pagehide", onPageHide);
+		};
+	}, [umami]);
 
 	const options = useMemo<PostHogOptions | null>(() => {
-		if (!isObservabilityEnabled(config)) {
+		if (!isPostHogEnabled(config)) {
 			return null;
 		}
 
@@ -129,18 +147,26 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 		};
 	}, [config]);
 
-	if (!isObservabilityEnabled(config) || !options) {
+	if (!isObservabilityEnabled(config)) {
 		return <>{children}</>;
 	}
 
-	return (
-		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
+	const content = (
+		<UmamiContext.Provider value={umami}>
 			<ObservabilityRuntime
 				activeUser={activeUser}
 				isClientReady={isClientReady}
 			/>
 			{children}
+		</UmamiContext.Provider>
+	);
+
+	return options ? (
+		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
+			{content}
 		</PostHogProvider>
+	) : (
+		content
 	);
 }
 
@@ -165,6 +191,7 @@ function ObservabilityRuntime({
 
 		const displayMode = getDisplayMode();
 		captureEvent("$pageview", {
+			game_mode: getGameMode(location.pathname),
 			$current_url: window.location.href,
 			display_mode: displayMode,
 			is_standalone: displayMode !== "browser",

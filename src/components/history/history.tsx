@@ -129,6 +129,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					markAnonymousDataImported(activeUser.id);
 					if (hasLocalProgress) {
 						captureEvent("anonymous_history_imported", {
+							game_mode: "classic",
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
 							imported_dates: result.importedDates.length,
