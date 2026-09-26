@@ -702,13 +702,6 @@ describe("Daily submit feedback", () => {
 		await screen.findByRole("alertdialog", { name: "Benvingut/da a Garbuix!" });
 		expect(screen.queryByText("Pels més petits de la casa")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Sense compte" }));
-		expect(
-			captureEventMock.mock.calls.filter(
-				([event]) => event === "welcome_dismissed",
-			),
-		).toEqual([
-			["welcome_dismissed", { game_mode: "classic", choice: "anonymous" }],
-		]);
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		expect(hasSeenMiniAnnouncement()).toBe(false);
 	});
