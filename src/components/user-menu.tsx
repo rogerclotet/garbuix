@@ -24,6 +24,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
+import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
@@ -49,7 +50,7 @@ function ThemeMenuToggle() {
 				event.preventDefault();
 				const next = isDark ? "light" : "dark";
 				setTheme(next);
-				captureEvent("theme_preference_changed", { theme: next });
+				captureEvent(ANALYTICS_EVENT.THEME_PREFERENCE_CHANGED, { theme: next });
 			}}
 		>
 			{isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
@@ -80,7 +81,7 @@ export function UserMenu() {
 	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
 	const handleSignIn = async () => {
-		captureEvent("auth_sign_in_started", {
+		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
 			provider: "google",
 		});
 		await authClient.signIn.social({
@@ -90,7 +91,7 @@ export function UserMenu() {
 	};
 
 	const handleSignOut = async () => {
-		captureEvent("auth_sign_out_clicked");
+		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_OUT_CLICKED);
 		resetUser();
 		await authClient.signOut();
 		await session.refetch();

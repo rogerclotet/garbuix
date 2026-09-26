@@ -1,3 +1,4 @@
+import { GAME_MODE } from "@/lib/analytics-events";
 import type { SessionUser } from "@/lib/puzzle-types";
 
 export type ObservabilityConfig = {
@@ -11,8 +12,10 @@ export type ObservabilityConfig = {
 export type ObservabilityUser = Exclude<SessionUser, null>;
 
 export function getGameMode(pathname: string) {
-	if (pathname === "/mini" || pathname.startsWith("/mini/")) return "mini";
-	if (pathname === "/" || pathname === "/dies-anteriors") return "classic";
+	if (pathname === "/mini" || pathname.startsWith("/mini/"))
+		return GAME_MODE.MINI;
+	if (pathname === "/" || pathname === "/dies-anteriors")
+		return GAME_MODE.CLASSIC;
 	return undefined;
 }
 

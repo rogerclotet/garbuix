@@ -18,6 +18,7 @@ import { useDailyRollover } from "@/components/daily/use-daily-rollover";
 import { useDecodedProgress } from "@/components/daily/use-decoded-progress";
 import { useMiniProgress } from "@/components/mini/use-mini-progress";
 import { Button } from "@/components/ui/button";
+import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import { getMiniPageData } from "@/lib/mini-server-fns";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import { shuffleArray } from "@/lib/shuffle";
@@ -85,8 +86,8 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 	useEffect(() => {
 		if (!isPresentable || expired || loadTracked.current) return;
 		loadTracked.current = true;
-		captureEvent("puzzle_loaded", {
-			game_mode: "mini",
+		captureEvent(ANALYTICS_EVENT.PUZZLE_LOADED, {
+			game_mode: GAME_MODE.MINI,
 			is_authenticated: Boolean(userId),
 			rows: puzzle.rows,
 			total_words: puzzle.wordSlots.length,
@@ -118,8 +119,8 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		setBusy(true);
 		try {
 			const result = await resolveGuess({ puzzle, progress, guess });
-			captureEvent("puzzle_guess_result", {
-				game_mode: "mini",
+			captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
+				game_mode: GAME_MODE.MINI,
 				guess_length: guess.length,
 				matched: result.matchedSlotId != null,
 				result_kind: result.kind,
@@ -138,8 +139,8 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 				if (progress.guessedWordIds.length + 1 === puzzle.wordSlots.length) {
 					setCelebrate(true);
 					// Emit on the completing action, not when restoring a finished save.
-					captureEvent("puzzle_completed", {
-						game_mode: "mini",
+					captureEvent(ANALYTICS_EVENT.PUZZLE_COMPLETED, {
+						game_mode: GAME_MODE.MINI,
 						guess_count: progress.guessCount + 1,
 						hints_used: progress.hintsUsed,
 						is_authenticated: Boolean(userId),
@@ -221,9 +222,9 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		const cellKey = getRandomHintCellKey(puzzle, revealedCells);
 		if (!cellKey) return;
 		dispatch(createPuzzleEvent("hint_used", { cellKey }));
-		captureEvent("puzzle_hint_requested", {
-			game_mode: "mini",
-			hint_type: "letter",
+		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
+			game_mode: GAME_MODE.MINI,
+			hint_type: HINT_TYPE.LETTER,
 			hints_used_after: progress.hintsUsed + 1,
 		});
 		setMessage("Una lletra més! Mira on ha aparegut.");
@@ -236,7 +237,9 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 				shuffledLetters: shuffleArray(progress.shuffledLetters),
 			}),
 		);
-		captureEvent("puzzle_letters_shuffled", { game_mode: "mini" });
+		captureEvent(ANALYTICS_EVENT.PUZZLE_LETTERS_SHUFFLED, {
+			game_mode: GAME_MODE.MINI,
+		});
 	};
 
 	if (!isPresentable) {

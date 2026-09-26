@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { readMiniSaves, writeMiniSave } from "@/lib/mini-local";
 import {
 	applyMiniEvent,
@@ -78,8 +79,8 @@ export function useMiniProgress({
 					if (cancelled) return;
 					const synced = await syncMiniProgress({ data: saved });
 					if (cancelled) return;
-					captureEvent("puzzle_events_synced", {
-						game_mode: "mini",
+					captureEvent(ANALYTICS_EVENT.PUZZLE_EVENTS_SYNCED, {
+						game_mode: GAME_MODE.MINI,
 						guessed_word_count: synced.guessedWordIds.length,
 						hints_used: synced.hintsUsed,
 						completed: Boolean(synced.completedAt),

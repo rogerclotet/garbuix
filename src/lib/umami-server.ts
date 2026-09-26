@@ -1,5 +1,6 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import { getServerObservabilityConfig } from "@/lib/observability-config";
 import {
 	toUmamiPath,
@@ -52,7 +53,7 @@ async function sendUmamiMessage(
 				website: config.websiteId,
 				url: toUmamiPath(message.payload.url),
 				name:
-					message.payload.name === "$pageview"
+					message.payload.name === ANALYTICS_EVENT.PAGEVIEW
 						? undefined
 						: message.payload.name,
 				data: toUmamiProperties(message.payload.data),

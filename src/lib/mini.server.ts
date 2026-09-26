@@ -1,6 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { buildHistoryEntry } from "@/components/daily/daily-helpers";
 import { miniProgress, miniPuzzles } from "@/db/schema";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
 import {
 	generateMiniCrossword,
@@ -43,9 +44,9 @@ export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 		.returning({ id: miniPuzzles.id });
 	if (inserted.length > 0) {
 		captureServerEvent({
-			event: "daily_puzzle_generated",
+			event: ANALYTICS_EVENT.DAILY_PUZZLE_GENERATED,
 			properties: {
-				game_mode: "mini",
+				game_mode: GAME_MODE.MINI,
 				word_count: publicSnapshot.wordSlots.length,
 			},
 		});
@@ -161,10 +162,10 @@ export async function saveMiniProgress(
 		return progress;
 	});
 	captureServerEvent({
-		event: "puzzle_progress_synced_server",
+		event: ANALYTICS_EVENT.PUZZLE_PROGRESS_SYNCED_SERVER,
 		distinctId: userId,
 		properties: {
-			game_mode: "mini",
+			game_mode: GAME_MODE.MINI,
 			completed: Boolean(saved.completedAt),
 			guessed_word_count: saved.guessedWordIds.length,
 			hints_used: saved.hintsUsed,

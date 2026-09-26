@@ -13,6 +13,7 @@ import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
@@ -128,8 +129,8 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					});
 					markAnonymousDataImported(activeUser.id);
 					if (hasLocalProgress) {
-						captureEvent("anonymous_history_imported", {
-							game_mode: "classic",
+						captureEvent(ANALYTICS_EVENT.ANONYMOUS_HISTORY_IMPORTED, {
+							game_mode: GAME_MODE.CLASSIC,
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
 							imported_dates: result.importedDates.length,

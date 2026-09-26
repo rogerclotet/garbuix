@@ -1,12 +1,13 @@
 import { createContext } from "react";
 import { z } from "zod";
+import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import {
 	toUmamiPath,
 	toUmamiProperties,
 	umamiEventName,
 } from "@/lib/umami-events";
 
-export const UMAMI_PROXY_PATH = "/api/umami";
+export const UMAMI_PROXY_PATH = "/api/u";
 
 export const UmamiContext = createContext<ReturnType<
 	typeof createUmamiClient
@@ -58,7 +59,7 @@ export function createUmamiClient() {
 			if (!parsed.success) return;
 			// Umami counts events without a name as pageviews.
 			return send(
-				parsed.data === "$pageview" ? undefined : parsed.data,
+				parsed.data === ANALYTICS_EVENT.PAGEVIEW ? undefined : parsed.data,
 				properties,
 			);
 		},

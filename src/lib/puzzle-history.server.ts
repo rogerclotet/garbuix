@@ -5,6 +5,7 @@ import {
 	legacyImportedResults,
 	userPuzzleProgress,
 } from "@/db/schema";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
 import {
 	getLeaderboard,
@@ -267,9 +268,9 @@ export async function getHistoryPageDataForUser(
 
 	captureServerEvent({
 		distinctId: userId,
-		event: "history_page_loaded_server",
+		event: ANALYTICS_EVENT.HISTORY_PAGE_LOADED_SERVER,
 		properties: {
-			game_mode: "classic",
+			game_mode: GAME_MODE.CLASSIC,
 			date_key: dateKey,
 			has_account_history: Boolean(accountHistory),
 			history_entry_count: accountHistory?.stats.totalDays ?? 0,
@@ -418,9 +419,9 @@ export async function importAnonymousProgressForUser(options: {
 
 	captureServerEvent({
 		distinctId: userId,
-		event: "anonymous_progress_imported_server",
+		event: ANALYTICS_EVENT.ANONYMOUS_PROGRESS_IMPORTED_SERVER,
 		properties: {
-			game_mode: "classic",
+			game_mode: GAME_MODE.CLASSIC,
 			active_progress_count: Object.keys(payload.activeProgressByDate).length,
 			imported_dates: importedDates.length,
 			legacy_dates: skippedLegacyDates.length,

@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 function browserRequest(body: unknown) {
-	return new Request("https://garbuix.example/api/umami", {
+	return new Request("https://garbuix.example/api/u", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -192,7 +192,7 @@ describe("Umami proxy", () => {
 	});
 
 	it("handles malformed JSON and upstream errors without reporting another event", async () => {
-		const malformed = new Request("https://garbuix.example/api/umami", {
+		const malformed = new Request("https://garbuix.example/api/u", {
 			method: "POST",
 			body: "{",
 		});

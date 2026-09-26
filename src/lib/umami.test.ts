@@ -62,6 +62,7 @@ describe("Umami client privacy", () => {
 			guess: "private text",
 		});
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(fetchMock.mock.calls[0][0]).toBe("/api/u");
 		const options = fetchMock.mock.calls[0][1];
 		expect(JSON.parse(String(options?.body))).toEqual({
 			type: "event",

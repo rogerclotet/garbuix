@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	ensureMiniPuzzle,
 	getMiniHistory,
@@ -42,10 +43,10 @@ export const getMiniHistoryData = createServerFn({ method: "GET" }).handler(
 		]);
 		const entries = session ? await getMiniHistory(session.user.id) : [];
 		captureServerEvent({
-			event: "history_page_loaded_server",
+			event: ANALYTICS_EVENT.HISTORY_PAGE_LOADED_SERVER,
 			distinctId: session?.user.id,
 			properties: {
-				game_mode: "mini",
+				game_mode: GAME_MODE.MINI,
 				has_account_history: Boolean(session),
 				history_entry_count: entries.length,
 			},

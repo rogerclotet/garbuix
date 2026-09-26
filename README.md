@@ -112,16 +112,15 @@ Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
 `puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,
 `puzzle_letters_shuffled`, `puzzle_hint_requested`, and `puzzle_events_synced`.
 The shared hint event includes `hint_type=text` for Classic and `hint_type=letter`
-for Mini. Classic also retains `puzzle_text_hint_requested` for existing reports;
-use the shared event alone when comparing total hint use. Mini syncs snapshots,
-so its sync events report progress counts rather than Classic's event-batch counts.
+for Mini. Mini syncs snapshots, so its sync events report progress counts rather
+than Classic's event-batch counts.
 Puzzle generation, server progress sync, history loads, and game pageviews are
 also tagged with the game mode. The gameplay events contain no submitted guesses
 or answer text.
 
 Umami never receives account IDs, application device IDs, names, email addresses,
 or avatars from this integration. Browser requests use no cookies or referrer
-and go through `/api/umami`. The endpoint accepts events only and filters their
+and go through `/api/u`. The endpoint accepts events only and filters their
 properties again before sending them to the configured server's `/api/send`.
 
 For Umami's standard anonymous visitor counting, the proxy forwards the visitor's

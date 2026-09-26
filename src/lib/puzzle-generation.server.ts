@@ -3,6 +3,7 @@ import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { dailyPuzzles } from "@/db/schema";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
@@ -266,9 +267,9 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 
 	if (inserted[0]) {
 		captureServerEvent({
-			event: "daily_puzzle_generated",
+			event: ANALYTICS_EVENT.DAILY_PUZZLE_GENERATED,
 			properties: {
-				game_mode: "classic",
+				game_mode: GAME_MODE.CLASSIC,
 				date_key: dateKey,
 				puzzle_id: inserted[0].id,
 				seed,
