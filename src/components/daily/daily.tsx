@@ -1,7 +1,11 @@
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { openProfilePreferencesTip } from "@/components/profile-preferences-tip-store";
+import { MiniAnnouncementDialog } from "@/components/mini/mini-announcement-dialog";
+import {
+	openProfilePreferencesTip,
+	useProfilePreferencesTipOpen,
+} from "@/components/profile-preferences-tip-store";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -16,8 +20,10 @@ import {
 	getDeviceId,
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
+	hasSeenMiniAnnouncement,
 	hasSeenProfilePreferencesTip,
 	hasSeenWelcome,
+	markMiniAnnouncementSeen,
 	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
@@ -260,7 +266,9 @@ function DailyGame({
 	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
 	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
+	const [miniAnnouncementOpen, setMiniAnnouncementOpen] = useState(false);
 	const tutorialOpen = useHowToPlayOpen();
+	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const firstVisitChecked = useRef(false);
 	const [winDialogOpen, setWinDialogOpen] = useState(false);
 	const winDialogTimerRef = useRef<number | null>(null);
@@ -360,11 +368,12 @@ function DailyGame({
 	}, [captureEvent]);
 
 	const openProfilePreferencesTipIfNeeded = useCallback(() => {
-		if (!hasSeenHowToPlay()) return;
-		if (hasSeenProfilePreferencesTip()) return;
+		if (!hasSeenHowToPlay()) return false;
+		if (hasSeenProfilePreferencesTip()) return false;
 		markProfilePreferencesTipSeen();
 		openProfilePreferencesTip();
 		captureEvent("profile_preferences_tip_shown", { trigger: "return_visit" });
+		return true;
 	}, [captureEvent]);
 
 	useEffect(() => {
@@ -383,13 +392,41 @@ function DailyGame({
 			return;
 		}
 
-		openProfilePreferencesTipIfNeeded();
+		if (openProfilePreferencesTipIfNeeded()) return;
+
+		// Decide only on arrival. Finishing onboarding must not queue another dialog.
+		if (
+			tutorialOpen ||
+			profilePreferencesTipOpen ||
+			welcomeOpen ||
+			sharePreviewOpen ||
+			winDialogOpen ||
+			hasSeenMiniAnnouncement()
+		)
+			return;
+		const hasLocalPlay =
+			derivedProgress.guessCount > 0 ||
+			derivedProgress.hintsUsed > 0 ||
+			getSortedAnonymousHistoryEntries().some(
+				(entry) =>
+					entry.guessCount > 0 || entry.hintsUsed > 0 || entry.guessedWords > 0,
+			);
+		if (!activeUser && !hasLocalPlay) return;
+		markMiniAnnouncementSeen();
+		setMiniAnnouncementOpen(true);
 	}, [
 		activeUser,
 		captureEvent,
 		openHowToPlayIfFirstVisit,
 		openProfilePreferencesTipIfNeeded,
 		isPresentable,
+		derivedProgress.guessCount,
+		derivedProgress.hintsUsed,
+		tutorialOpen,
+		profilePreferencesTipOpen,
+		welcomeOpen,
+		sharePreviewOpen,
+		winDialogOpen,
 	]);
 
 	const handleWelcomeOpenChange = useCallback(
@@ -1232,7 +1269,8 @@ function DailyGame({
 			typeof window === "undefined" ||
 			!isPresentable ||
 			isComplete ||
-			tutorialOpen
+			tutorialOpen ||
+			miniAnnouncementOpen
 		) {
 			return;
 		}
@@ -1295,6 +1333,7 @@ function DailyGame({
 		isComplete,
 		isPresentable,
 		tutorialOpen,
+		miniAnnouncementOpen,
 	]);
 
 	if (!isPresentable) {
@@ -1532,6 +1571,10 @@ function DailyGame({
 				onOpenChange={handleWelcomeOpenChange}
 				onSignIn={handleWelcomeSignIn}
 				onContinueAnonymous={handleWelcomeContinueAnonymous}
+			/>
+			<MiniAnnouncementDialog
+				open={miniAnnouncementOpen}
+				onOpenChange={setMiniAnnouncementOpen}
 			/>
 			<SharePreviewDialog
 				open={sharePreviewOpen}

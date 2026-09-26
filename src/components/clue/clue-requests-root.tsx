@@ -5,11 +5,13 @@ import {
 	type AnonClueCredentials,
 	ClueRequestsProvider,
 } from "@/lib/use-clue-requests";
+import { useMiniRoute } from "@/lib/use-mini-route";
 import { useTodayDateKey } from "@/lib/use-today-date-key";
 
 const rootRoute = getRouteApi("__root__");
 
 export function ClueRequestsRoot({ children }: PropsWithChildren) {
+	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
 	const sessionUser = rootData.sessionUser;
 	const dateKey = useTodayDateKey(rootData.dateKey);
@@ -32,7 +34,7 @@ export function ClueRequestsRoot({ children }: PropsWithChildren) {
 			dateKey={dateKey}
 			localUserId={localUserId}
 			anonCredentials={sessionUser?.id ? null : anonCredentials}
-			enabled={dateKey != null}
+			enabled={dateKey != null && !mini}
 		>
 			{children}
 		</ClueRequestsProvider>

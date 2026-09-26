@@ -3,11 +3,13 @@ import { type PropsWithChildren, useEffect, useState } from "react";
 import { useAnonParticipantId } from "@/lib/anon-participant-store";
 import { userParticipantId } from "@/lib/leaderboard-types";
 import { LeaderboardProvider } from "@/lib/use-leaderboard";
+import { useMiniRoute } from "@/lib/use-mini-route";
 import { useTodayDateKey } from "@/lib/use-today-date-key";
 
 const rootRoute = getRouteApi("__root__");
 
 export function LeaderboardRoot({ children }: PropsWithChildren) {
+	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
 	const sessionUser = rootData.sessionUser;
 	const dateKey = useTodayDateKey(rootData.dateKey);
@@ -31,7 +33,7 @@ export function LeaderboardRoot({ children }: PropsWithChildren) {
 			key={dateKey}
 			dateKey={dateKey}
 			localParticipantId={localParticipantId}
-			enabled={dateKey != null}
+			enabled={dateKey != null && !mini}
 		>
 			{children}
 		</LeaderboardProvider>

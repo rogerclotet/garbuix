@@ -562,7 +562,7 @@ export function generateCrossword(
 	throw new Error("Failed to generate a valid crossword");
 }
 
-function tryGenerateCrossword(
+export function tryGenerateCrossword(
 	words: Word[],
 	minWords: number,
 	maxWords: number,

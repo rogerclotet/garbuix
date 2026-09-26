@@ -23,6 +23,7 @@ import { materialThemeCss } from "@/lib/material-theme";
 import { getObservabilityConfig } from "@/lib/observability-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
+import { useMiniRoute } from "@/lib/use-mini-route";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -81,10 +82,15 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
+	const mini = useMiniRoute();
 	const showDevtools = import.meta.env.DEV;
 
 	return (
-		<html lang="ca" suppressHydrationWarning>
+		<html
+			lang="ca"
+			data-game={mini ? "mini" : "regular"}
+			suppressHydrationWarning
+		>
 			<head>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
@@ -98,7 +104,7 @@ function RootDocument() {
 				>
 					<TooltipProvider delayDuration={300}>
 						<ObservabilityProvider>
-							<ThemeMeta />
+							<ThemeMeta mini={mini} />
 							<OrientationLock />
 							<ServiceWorkerRegister />
 							<LeaderboardRoot>
@@ -116,7 +122,7 @@ function RootDocument() {
 										</main>
 									</div>
 									<Toaster position="top-center" />
-									<LeaderboardToasts />
+									{mini ? null : <LeaderboardToasts />}
 								</ClueRequestsRoot>
 							</LeaderboardRoot>
 							{showDevtools ? (

@@ -28,12 +28,20 @@ vi.mock("@/lib/auth", () => ({ auth: {} }));
 import { user } from "@/db/auth-schema";
 import {
 	dailyPuzzles,
+	miniPuzzles,
 	puzzleWordClues,
 	userPuzzleEvents,
 	userPuzzleProgress,
 } from "@/db/schema";
 import { db, sql } from "@/lib/db";
+import {
+	ensureMiniPuzzle,
+	getMiniHistory,
+	getMiniProgress,
+	saveMiniProgress,
+} from "@/lib/mini.server";
 import { createUnlockToken, hashText } from "@/lib/puzzle-crypto";
+import { getHistoryEntriesForUser } from "@/lib/puzzle-history.server";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import {
 	getUserPuzzleProgressData,
@@ -428,6 +436,71 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 					where: eq(userPuzzleEvents.userId, fixture.id),
 				}),
 			).toHaveLength(4);
+		});
+		it("merges Mini across devices without touching regular progress or history", async () => {
+			const fixture = await createFixture();
+			const [mini, sameMini] = await Promise.all([
+				ensureMiniPuzzle("2026-03-09"),
+				ensureMiniPuzzle("2026-03-09"),
+			]);
+			expect(mini.publicSnapshotJson).toEqual(sameMini.publicSnapshotJson);
+			try {
+				const puzzle = mini.publicSnapshotJson;
+				const empty = createEmptyProgressState(puzzle);
+				const before = await getHistoryEntriesForUser(fixture.id);
+				const answers = await Promise.all(
+					puzzle.wordSlots.map(async (slot) => {
+						const answer = mini.privateSnapshotJson.wordSlots.find(
+							(word) => word.id === slot.id,
+						);
+						if (!answer) throw new Error("Missing test answer");
+						return [
+							String(slot.id),
+							await createUnlockToken(slot.slotSalt, answer.normalizedWord),
+						] as const;
+					}),
+				);
+				await Promise.all([
+					saveMiniProgress(fixture.id, {
+						...empty,
+						guessedWordIds: [0, 1],
+						revealedWordTokens: Object.fromEntries(answers.slice(0, 2)),
+						guessHashes: ["first", "second"],
+						hintedCells: puzzle.hintCapsules
+							.slice(0, 5)
+							.map((cell) => cell.cellKey),
+					}),
+					saveMiniProgress(fixture.id, {
+						...empty,
+						guessedWordIds: [2, 3, 4],
+						revealedWordTokens: Object.fromEntries(answers.slice(2)),
+						guessHashes: ["third", "fourth", "fifth"],
+						hintedCells: puzzle.hintCapsules
+							.slice(3, 7)
+							.map((cell) => cell.cellKey),
+					}),
+				]);
+				const saved = await getMiniProgress(fixture.id, puzzle.id);
+				expect(saved?.guessedWordIds).toHaveLength(5);
+				expect(saved?.guessCount).toBe(5);
+				expect(saved?.hintsUsed).toBe(7);
+				expect(saved?.completedAt).not.toBeNull();
+				expect(await getMiniHistory(fixture.id)).toEqual([
+					expect.objectContaining({
+						totalWords: 5,
+						guessedWords: 5,
+						hintsUsed: 7,
+						completed: true,
+					}),
+				]);
+				expect(await getHistoryEntriesForUser(fixture.id)).toEqual(before);
+				expect(await getMiniProgress("another-user", puzzle.id)).toBeNull();
+				await expect(
+					saveMiniProgress(fixture.id, { ...empty, puzzleId: fixture.id }),
+				).rejects.toThrow("Mini puzzle not found");
+			} finally {
+				await db.delete(miniPuzzles).where(eq(miniPuzzles.id, mini.id));
+			}
 		});
 	},
 );

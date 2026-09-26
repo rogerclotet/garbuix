@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as MiniIndexRouteImport } from './routes/mini.index'
+import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
@@ -36,6 +38,16 @@ const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
 const PreferenciesRoute = PreferenciesRouteImport.update({
   id: '/preferencies',
   path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MiniIndexRoute = MiniIndexRouteImport.update({
+  id: '/mini/',
+  path: '/mini/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MiniDiesAnteriorsRoute = MiniDiesAnteriorsRouteImport.update({
+  id: '/mini/dies-anteriors',
+  path: '/mini/dies-anteriors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PhSplatRoute = PhSplatRouteImport.update({
@@ -64,7 +76,9 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
+  '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -74,7 +88,9 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
+  '/mini': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -85,7 +101,9 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
+  '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -97,7 +115,9 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/mini/dies-anteriors'
     | '/ph/$'
+    | '/mini/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -107,7 +127,9 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/mini/dies-anteriors'
     | '/ph/$'
+    | '/mini'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -117,7 +139,9 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/mini/dies-anteriors'
     | '/ph/$'
+    | '/mini/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -128,7 +152,9 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
   PhSplatRoute: typeof PhSplatRoute
+  MiniIndexRoute: typeof MiniIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
@@ -162,6 +188,20 @@ declare module '@tanstack/react-router' {
       path: '/preferencies'
       fullPath: '/preferencies'
       preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mini/': {
+      id: '/mini/'
+      path: '/mini'
+      fullPath: '/mini/'
+      preLoaderRoute: typeof MiniIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mini/dies-anteriors': {
+      id: '/mini/dies-anteriors'
+      path: '/mini/dies-anteriors'
+      fullPath: '/mini/dies-anteriors'
+      preLoaderRoute: typeof MiniDiesAnteriorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ph/$': {
@@ -200,7 +240,9 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
   PhSplatRoute: PhSplatRoute,
+  MiniIndexRoute: MiniIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,

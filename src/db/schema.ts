@@ -20,6 +20,38 @@ import type {
 
 type StoredPuzzleEventPayload = Record<string, unknown>;
 
+// Separate tables keep Mini out of regular history, imports and leaderboards.
+export const miniPuzzles = pgTable("mini_puzzles", {
+	id: text("id").primaryKey(),
+	dateKey: date("date_key").notNull().unique(),
+	publicSnapshotJson: jsonb("public_snapshot_json")
+		.$type<DailyPuzzlePublic>()
+		.notNull(),
+	privateSnapshotJson: jsonb("private_snapshot_json")
+		.$type<DailyPuzzlePrivate>()
+		.notNull(),
+});
+
+export const miniProgress = pgTable(
+	"mini_progress",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		puzzleId: text("puzzle_id")
+			.notNull()
+			.references(() => miniPuzzles.id, { onDelete: "cascade" }),
+		progressJson: jsonb("progress_json").$type<PuzzleProgressState>().notNull(),
+	},
+	(table) => [
+		uniqueIndex("mini_progress_user_puzzle_idx").on(
+			table.userId,
+			table.puzzleId,
+		),
+	],
+);
+
 export const dailyPuzzles = pgTable(
 	"daily_puzzles",
 	{

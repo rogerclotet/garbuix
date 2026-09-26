@@ -98,7 +98,7 @@ const historySummaryEntrySchema = z.object({
 	difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).nullish(),
 });
 
-const progressStateSchema = z.object({
+export const progressStateSchema = z.object({
 	puzzleId: z.string().min(1).max(MAX_ID_LENGTH),
 	guessHashes: z.array(hashSchema).max(100_000),
 	guessedWordIds: z.array(wordIdSchema).max(200),

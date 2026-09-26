@@ -12,6 +12,7 @@ import {
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
+import { Logo } from "@/components/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { useMiniRoute } from "@/lib/use-mini-route";
 import { useObservability } from "@/lib/use-observability";
 import { initialsFromName } from "@/lib/user-profile";
 
@@ -63,6 +65,7 @@ function ThemeMenuToggle() {
 }
 
 export function UserMenu() {
+	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
 	const router = useRouter();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
@@ -142,7 +145,7 @@ export function UserMenu() {
 					</>
 				) : null}
 				<DropdownMenuItem asChild>
-					<Link to="/dies-anteriors">
+					<Link to={mini ? "/mini/dies-anteriors" : "/dies-anteriors"}>
 						<History className="size-4" />
 						<span>Historial</span>
 					</Link>
@@ -156,11 +159,19 @@ export function UserMenu() {
 					<span>Com s'hi juga</span>
 				</DropdownMenuItem>
 				<DropdownMenuItem asChild>
-					<Link to="/preferencies">
-						<Settings className="size-4" />
-						<span>Preferències</span>
+					<Link to={mini ? "/" : "/mini"}>
+						<Logo className="size-4" aria-hidden />
+						<span>{mini ? "Garbuix!" : "Garbuix mini"}</span>
 					</Link>
 				</DropdownMenuItem>
+				{!mini ? (
+					<DropdownMenuItem asChild>
+						<Link to="/preferencies">
+							<Settings className="size-4" />
+							<span>Preferències</span>
+						</Link>
+					</DropdownMenuItem>
+				) : null}
 				<ThemeMenuToggle />
 				<DropdownMenuSeparator />
 				{session.isPending ? (
