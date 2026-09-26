@@ -189,10 +189,10 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 	}
 
 	return (
-		<div className="mini-game mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:px-6 sm:pt-6">
+		<div className="mini-game mx-auto flex h-full min-h-0 max-w-4xl flex-col gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 md:h-auto md:min-h-full md:gap-0 md:px-6 md:pb-[calc(env(safe-area-inset-bottom)+1rem)] md:pt-6">
 			<DailyConfetti fire={celebrate} />
 			<div
-				className="mb-4 flex justify-center gap-1"
+				className="flex shrink-0 justify-center gap-1 md:mb-4"
 				role="img"
 				aria-label={`${visibleProgress.guessedWordIds.length} de 5 paraules trobades`}
 			>
@@ -217,9 +217,12 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 					Torna a carregar les lletres
 				</Button>
 			) : null}
-			<div className="grid flex-1 items-center gap-4 sm:gap-8 md:grid-cols-[1.1fr_1fr]">
-				<div className="mx-auto w-full max-w-sm md:max-w-md">
+			{/* On mobile these children share the viewport-height flex column:
+			    the board takes the remaining room above the words and controls. */}
+			<div className="contents md:grid md:flex-1 md:grid-cols-[1.1fr_1fr] md:items-center md:gap-8">
+				<div className="mx-auto flex min-h-0 w-full max-w-sm flex-1 md:aspect-square md:max-w-md">
 					<DailyGrid
+						fitHeight
 						puzzle={puzzle}
 						revealedCells={new Set(cellLetters.keys())}
 						cellLetters={cellLetters}
@@ -227,7 +230,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 						locateCells={locateSlot ? getWordCellKeys(locateSlot) : undefined}
 					/>
 				</div>
-				<div className="space-y-3">
+				<div className="order-2 shrink-0 space-y-1 md:order-none md:space-y-3">
 					{complete ? (
 						<div className="rounded-3xl bg-primary/10 p-6 text-center">
 							<PartyPopper
@@ -245,7 +248,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 					) : (
 						<>
 							<p
-								className="min-h-10 text-center text-sm text-muted-foreground"
+								className="text-center text-sm text-muted-foreground md:min-h-10"
 								role="status"
 							>
 								{message}
@@ -285,15 +288,17 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 									runPressAction={() => {}}
 								/>
 							</fieldset>
-							<p className="text-center text-xs text-muted-foreground">
-								Pots repetir les lletres i demanar tantes pistes com vulguis.
+							<p className="text-center text-xs text-muted-foreground max-md:[@media(max-height:700px)]:hidden">
+								{!canUseHint && ready
+									? "Ja pots veure totes les lletres. Escriu les paraules per completar el joc!"
+									: "Pots repetir les lletres i demanar tantes pistes com vulguis."}
 							</p>
 						</>
 					)}
 				</div>
 			</div>
 			<section
-				className="mt-5 border-t border-border/60 pt-4"
+				className="order-1 shrink-0 border-t border-border/60 pt-2 md:order-none md:mt-5 md:pt-4"
 				aria-label="Les cinc paraules"
 			>
 				<div className="flex flex-wrap justify-center gap-2">
@@ -313,12 +318,6 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 						);
 					})}
 				</div>
-				{!complete && !canUseHint && ready ? (
-					<p className="mt-3 text-center text-sm text-muted-foreground">
-						Ja pots veure totes les lletres. Escriu les paraules per completar
-						el joc!
-					</p>
-				) : null}
 			</section>
 		</div>
 	);
