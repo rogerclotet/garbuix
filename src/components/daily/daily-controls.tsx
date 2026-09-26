@@ -350,7 +350,7 @@ export function DailyControls({
 					/>
 				)}
 				<span className="relative">
-					{mini ? "Pista ∞" : `Pista (${3 - hintsUsed})`}
+					{mini ? "Pista" : `Pista (${3 - hintsUsed})`}
 				</span>
 			</Button>
 			<Button
