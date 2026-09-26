@@ -119,7 +119,7 @@ export default function Header() {
 					</Link>
 				</Button>
 			) : null}
-			{helpRequestCount > 0 ? (
+			{pathname === "/" && helpRequestCount > 0 ? (
 				<Button
 					variant="ghost"
 					size="icon"
