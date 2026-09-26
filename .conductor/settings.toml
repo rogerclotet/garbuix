@@ -1,0 +1,31 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[[preview_urls]]
+name = "Garbuix"
+url = "http://localhost:$CONDUCTOR_PORT"
+
+[scripts]
+# .worktreeinclude copies .env and dictionaries; generate any missing dictionaries.
+# Initialize fnm in each non-interactive shell and resolve package.json engines.node.
+setup = '''
+set -e
+eval "$(fnm env --shell bash)"
+fnm use --resolve-engines --install-if-missing
+pnpm install --frozen-lockfile
+pnpm ensure-dict
+'''
+# Workspaces use the same database and Redis from the copied .env.
+run_mode = "nonconcurrent"
+# These scripts create no external resources that need archive cleanup.
+archive = "true"
+
+[scripts.run.dev]
+available_in = ["local"]
+command = '''
+set -e
+eval "$(fnm env --shell bash)"
+fnm use --resolve-engines
+BETTER_AUTH_URL="http://localhost:$CONDUCTOR_PORT" pnpm dev --port "$CONDUCTOR_PORT" --strictPort
+'''
+default = true
+icon = "play"
