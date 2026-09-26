@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	getOrCreateAnonIdentity,
 	getReportedAnonProgress,
@@ -344,7 +345,8 @@ export function useDailyProgress({
 					});
 					markAnonymousDataImported(activeUserId);
 					if (hasLocalProgress) {
-						captureEvent("anonymous_progress_imported", {
+						captureEvent(ANALYTICS_EVENT.ANONYMOUS_PROGRESS_IMPORTED, {
+							game_mode: GAME_MODE.CLASSIC,
 							active_progress_count: Object.keys(payload.activeProgressByDate)
 								.length,
 							imported_dates: result.importedDates.length,
@@ -536,7 +538,8 @@ export function useDailyProgress({
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
-				captureEvent("puzzle_events_synced", {
+				captureEvent(ANALYTICS_EVENT.PUZZLE_EVENTS_SYNCED, {
+					game_mode: GAME_MODE.CLASSIC,
 					acked_events: result.ackedEventIds.length,
 					puzzle_id: puzzle.id,
 					queued_events: pendingEvents.length,

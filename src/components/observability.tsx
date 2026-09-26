@@ -3,10 +3,14 @@ import { getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { PostHogConfig } from "posthog-js";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { Metric } from "web-vitals";
+import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import {
 	buildUserProperties,
+	getGameMode,
 	isObservabilityEnabled,
+	isPostHogEnabled,
 } from "@/lib/observability-shared";
+import { createUmamiClient, UmamiContext } from "@/lib/umami";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
@@ -94,9 +98,24 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 	const activeUserRef = useRef(activeUser);
 	activeUserRef.current = activeUser;
 	const [isClientReady, setIsClientReady] = useState(false);
+	const umami = useMemo(
+		() => (config.umamiEnabled ? createUmamiClient() : null),
+		[config.umamiEnabled],
+	);
+
+	useEffect(() => {
+		if (!umami) return;
+		const onPageHide = () => {
+			umami.captureEvent(ANALYTICS_EVENT.PAGELEAVE);
+		};
+		window.addEventListener("pagehide", onPageHide);
+		return () => {
+			window.removeEventListener("pagehide", onPageHide);
+		};
+	}, [umami]);
 
 	const options = useMemo<PostHogOptions | null>(() => {
-		if (!isObservabilityEnabled(config)) {
+		if (!isPostHogEnabled(config)) {
 			return null;
 		}
 
@@ -129,18 +148,26 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 		};
 	}, [config]);
 
-	if (!isObservabilityEnabled(config) || !options) {
+	if (!isObservabilityEnabled(config)) {
 		return <>{children}</>;
 	}
 
-	return (
-		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
+	const content = (
+		<UmamiContext.Provider value={umami}>
 			<ObservabilityRuntime
 				activeUser={activeUser}
 				isClientReady={isClientReady}
 			/>
 			{children}
+		</UmamiContext.Provider>
+	);
+
+	return options ? (
+		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
+			{content}
 		</PostHogProvider>
+	) : (
+		content
 	);
 }
 
@@ -164,7 +191,8 @@ function ObservabilityRuntime({
 		}
 
 		const displayMode = getDisplayMode();
-		captureEvent("$pageview", {
+		captureEvent(ANALYTICS_EVENT.PAGEVIEW, {
+			game_mode: getGameMode(location.pathname),
 			$current_url: window.location.href,
 			display_mode: displayMode,
 			is_standalone: displayMode !== "browser",
@@ -184,7 +212,7 @@ function ObservabilityRuntime({
 			return;
 		}
 
-		captureEvent("pwa_launched", {
+		captureEvent(ANALYTICS_EVENT.PWA_LAUNCHED, {
 			display_mode: displayMode,
 			pathname: window.location.pathname,
 			referrer: document.referrer || null,
@@ -220,7 +248,7 @@ function ObservabilityRuntime({
 		const onBeforeInstallPrompt = (event: Event) => {
 			const installEvent = event as BeforeInstallPromptEvent;
 
-			captureEvent("pwa_install_prompt_available", {
+			captureEvent(ANALYTICS_EVENT.PWA_INSTALL_PROMPT_AVAILABLE, {
 				display_mode: getDisplayMode(),
 				pathname: window.location.pathname,
 				platforms: installEvent.platforms ?? [],
@@ -228,7 +256,7 @@ function ObservabilityRuntime({
 
 			void installEvent.userChoice
 				?.then((choice) => {
-					captureEvent("pwa_install_prompt_choice", {
+					captureEvent(ANALYTICS_EVENT.PWA_INSTALL_PROMPT_CHOICE, {
 						display_mode: getDisplayMode(),
 						outcome: choice.outcome,
 						pathname: window.location.pathname,
@@ -239,7 +267,7 @@ function ObservabilityRuntime({
 		};
 
 		const onAppInstalled = () => {
-			captureEvent("pwa_installed", {
+			captureEvent(ANALYTICS_EVENT.PWA_INSTALLED, {
 				display_mode: getDisplayMode(),
 				pathname: window.location.pathname,
 			});

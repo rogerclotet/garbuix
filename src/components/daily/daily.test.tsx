@@ -545,6 +545,7 @@ describe("Daily submit feedback", () => {
 		});
 		expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
 		expect(captureEventMock).toHaveBeenCalledWith("how_to_play_shown", {
+			game_mode: "classic",
 			trigger: "first_visit",
 		});
 	});
@@ -593,7 +594,7 @@ describe("Daily submit feedback", () => {
 		expect(openProfilePreferencesTipMock).toHaveBeenCalledTimes(1);
 		expect(captureEventMock).toHaveBeenCalledWith(
 			"profile_preferences_tip_shown",
-			{ trigger: "return_visit" },
+			{ game_mode: "classic", trigger: "return_visit" },
 		);
 	});
 

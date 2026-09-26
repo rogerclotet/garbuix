@@ -6,6 +6,7 @@ import {
 	openProfilePreferencesTip,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
+import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -364,7 +365,10 @@ function DailyGame({
 	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
 		openHowToPlay();
-		captureEvent("how_to_play_shown", { trigger: "first_visit" });
+		captureEvent(ANALYTICS_EVENT.HOW_TO_PLAY_SHOWN, {
+			game_mode: GAME_MODE.CLASSIC,
+			trigger: "first_visit",
+		});
 	}, [captureEvent]);
 
 	const openProfilePreferencesTipIfNeeded = useCallback(() => {
@@ -372,7 +376,10 @@ function DailyGame({
 		if (hasSeenProfilePreferencesTip()) return false;
 		markProfilePreferencesTipSeen();
 		openProfilePreferencesTip();
-		captureEvent("profile_preferences_tip_shown", { trigger: "return_visit" });
+		captureEvent(ANALYTICS_EVENT.PROFILE_PREFERENCES_TIP_SHOWN, {
+			game_mode: GAME_MODE.CLASSIC,
+			trigger: "return_visit",
+		});
 		return true;
 	}, [captureEvent]);
 
@@ -388,7 +395,10 @@ function DailyGame({
 		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
 		if (shouldShowWelcome) {
 			setWelcomeOpen(true);
-			captureEvent("welcome_shown", { trigger: "first_visit" });
+			captureEvent(ANALYTICS_EVENT.WELCOME_SHOWN, {
+				game_mode: GAME_MODE.CLASSIC,
+				trigger: "first_visit",
+			});
 			return;
 		}
 
@@ -444,11 +454,15 @@ function DailyGame({
 	);
 
 	const handleWelcomeContinueAnonymous = useCallback(() => {
-		captureEvent("welcome_dismissed", { choice: "anonymous" });
+		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
+			game_mode: GAME_MODE.CLASSIC,
+			choice: "anonymous",
+		});
 	}, [captureEvent]);
 
 	useEffect(() => {
-		captureEvent("puzzle_loaded", {
+		captureEvent(ANALYTICS_EVENT.PUZZLE_LOADED, {
+			game_mode: GAME_MODE.CLASSIC,
 			date_key: puzzle.dateKey,
 			is_authenticated: Boolean(activeUser),
 			puzzle_id: puzzle.id,
@@ -471,7 +485,8 @@ function DailyGame({
 		}
 
 		completionTrackedRef.current = true;
-		captureEvent("puzzle_completed", {
+		captureEvent(ANALYTICS_EVENT.PUZZLE_COMPLETED, {
+			game_mode: GAME_MODE.CLASSIC,
 			date_key: puzzle.dateKey,
 			guess_count: derivedProgress.guessCount,
 			hints_used: derivedProgress.hintsUsed,
@@ -860,7 +875,8 @@ function DailyGame({
 		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(guess)) {
 			triggerHaptic(HAPTIC_ERROR_PATTERN);
 			showSubmitFeedback(prettyGuess, "invalid_input");
-			captureEvent("puzzle_guess_result", {
+			captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
+				game_mode: GAME_MODE.CLASSIC,
 				date_key: puzzle.dateKey,
 				guess_length: guess.length,
 				matched: false,
@@ -878,7 +894,8 @@ function DailyGame({
 		});
 
 		showSubmitFeedback(prettyGuess, result.kind);
-		captureEvent("puzzle_guess_result", {
+		captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
+			game_mode: GAME_MODE.CLASSIC,
 			date_key: puzzle.dateKey,
 			guess_length: guess.length,
 			matched: result.matchedSlotId != null,
@@ -927,7 +944,8 @@ function DailyGame({
 						createPuzzleEvent("bonus_clue_revealed", { cellKey }),
 					);
 					triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-					captureEvent("bonus_clue_granted", {
+					captureEvent(ANALYTICS_EVENT.BONUS_CLUE_GRANTED, {
+						game_mode: GAME_MODE.CLASSIC,
 						bonus_words_found: nextBonusCount,
 						date_key: puzzle.dateKey,
 						puzzle_id: puzzle.id,
@@ -991,7 +1009,8 @@ function DailyGame({
 	const handleShuffle = useCallback(() => {
 		triggerHaptic(HAPTIC_TAP_MS);
 		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
-		captureEvent("puzzle_letters_shuffled", {
+		captureEvent(ANALYTICS_EVENT.PUZZLE_LETTERS_SHUFFLED, {
+			game_mode: GAME_MODE.CLASSIC,
 			date_key: puzzle.dateKey,
 			puzzle_id: puzzle.id,
 		});
@@ -1014,11 +1033,10 @@ function DailyGame({
 		if (derivedProgress.hintsUsed >= 3) return;
 		if (nextClueWordId == null) return;
 
-		captureEvent("puzzle_text_hint_requested", {
-			date_key: puzzle.dateKey,
+		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
+			game_mode: GAME_MODE.CLASSIC,
+			hint_type: HINT_TYPE.TEXT,
 			hints_used_after: derivedProgress.hintsUsed + 1,
-			puzzle_id: puzzle.id,
-			word_id: nextClueWordId,
 		});
 		applyLocalEvent(
 			createPuzzleEvent("text_hint_requested", {
@@ -1033,8 +1051,6 @@ function DailyGame({
 		captureEvent,
 		derivedProgress.hintsUsed,
 		nextClueWordId,
-		puzzle.dateKey,
-		puzzle.id,
 		triggerHaptic,
 	]);
 
@@ -1053,7 +1069,8 @@ function DailyGame({
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
 			triggerHaptic(HAPTIC_TAP_MS);
-			captureEvent("peer_clue_requested", {
+			captureEvent(ANALYTICS_EVENT.PEER_CLUE_REQUESTED, {
+				game_mode: GAME_MODE.CLASSIC,
 				date_key: puzzle.dateKey,
 				puzzle_id: puzzle.id,
 				word_id: wordId,
@@ -1180,7 +1197,8 @@ function DailyGame({
 
 	const signInWithGoogle = useCallback(
 		async (source: string) => {
-			captureEvent("auth_sign_in_started", {
+			captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
+				game_mode: GAME_MODE.CLASSIC,
 				provider: "google",
 				source,
 			});
@@ -1198,7 +1216,10 @@ function DailyGame({
 	);
 
 	const handleWelcomeSignIn = useCallback(() => {
-		captureEvent("welcome_dismissed", { choice: "google" });
+		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
+			game_mode: GAME_MODE.CLASSIC,
+			choice: "google",
+		});
 		markWelcomeSeen();
 		setWelcomeOpen(false);
 		void signInWithGoogle("welcome_dialog");

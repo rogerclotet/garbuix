@@ -1,3 +1,4 @@
+import { GAME_MODE } from "@/lib/analytics-events";
 import type { SessionUser } from "@/lib/puzzle-types";
 
 export type ObservabilityConfig = {
@@ -5,11 +6,24 @@ export type ObservabilityConfig = {
 	posthogKey?: string;
 	posthogProxyPath?: string;
 	posthogUIHost?: string;
+	umamiEnabled?: boolean;
 };
 
 export type ObservabilityUser = Exclude<SessionUser, null>;
 
+export function getGameMode(pathname: string) {
+	if (pathname === "/mini" || pathname.startsWith("/mini/"))
+		return GAME_MODE.MINI;
+	if (pathname === "/" || pathname === "/dies-anteriors")
+		return GAME_MODE.CLASSIC;
+	return undefined;
+}
+
 export function isObservabilityEnabled(config: ObservabilityConfig) {
+	return isPostHogEnabled(config) || Boolean(config.umamiEnabled);
+}
+
+export function isPostHogEnabled(config: ObservabilityConfig) {
 	return Boolean(
 		config.posthogKey && (config.posthogProxyPath ?? config.posthogHost),
 	);

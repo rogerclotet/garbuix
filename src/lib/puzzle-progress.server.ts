@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { dailyPuzzles, puzzleWordClues, userPuzzleEvents } from "@/db/schema";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
 import { captureServerEvent } from "@/lib/observability-server";
 import { puzzleClientEventSchema } from "@/lib/puzzle-event-schemas";
@@ -319,8 +320,9 @@ export async function syncPuzzleEventsForUser(options: {
 
 	captureServerEvent({
 		distinctId: userId,
-		event: "puzzle_progress_synced_server",
+		event: ANALYTICS_EVENT.PUZZLE_PROGRESS_SYNCED_SERVER,
 		properties: {
+			game_mode: GAME_MODE.CLASSIC,
 			acked_event_count: ackedEventIds.length,
 			completed: Boolean(nextProgress.completedAt),
 			device_id: deviceId,

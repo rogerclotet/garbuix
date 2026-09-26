@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	ensureMiniPuzzle,
 	getMiniHistory,
 	getMiniProgress,
 	saveMiniProgress,
 } from "@/lib/mini.server";
+import { captureServerEvent } from "@/lib/observability-server";
 import { getNextRolloverAt, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import { progressStateSchema } from "@/lib/puzzle-event-schemas";
 import { getAuthSession } from "@/lib/puzzle-service.server";
@@ -39,9 +41,19 @@ export const getMiniHistoryData = createServerFn({ method: "GET" }).handler(
 			ensureMiniPuzzle(getYesterdayDateKey()),
 			getAuthSession(),
 		]);
+		const entries = session ? await getMiniHistory(session.user.id) : [];
+		captureServerEvent({
+			event: ANALYTICS_EVENT.HISTORY_PAGE_LOADED_SERVER,
+			distinctId: session?.user.id,
+			properties: {
+				game_mode: GAME_MODE.MINI,
+				has_account_history: Boolean(session),
+				history_entry_count: entries.length,
+			},
+		});
 		return {
 			userId: session?.user.id ?? null,
-			entries: session ? await getMiniHistory(session.user.id) : [],
+			entries,
 			yesterdayPuzzle: {
 				dateKey: yesterday.dateKey,
 				preview: toPuzzlePreview(yesterday.privateSnapshotJson),

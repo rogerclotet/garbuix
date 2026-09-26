@@ -1,12 +1,14 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { buildHistoryEntry } from "@/components/daily/daily-helpers";
 import { miniProgress, miniPuzzles } from "@/db/schema";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
 import {
 	generateMiniCrossword,
 	MINI_ALGORITHM_VERSION,
 } from "@/lib/mini-generator";
 import { mergeMiniProgress } from "@/lib/mini-progress";
+import { captureServerEvent } from "@/lib/observability-server";
 import { createUnlockToken } from "@/lib/puzzle-crypto";
 import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
@@ -30,7 +32,7 @@ export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 		algorithmVersion: MINI_ALGORITHM_VERSION,
 		availableWordCount: 5,
 	});
-	await db
+	const inserted = await db
 		.insert(miniPuzzles)
 		.values({
 			id,
@@ -38,7 +40,17 @@ export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 			publicSnapshotJson: { ...publicSnapshot, difficulty: null },
 			privateSnapshotJson: privateSnapshot,
 		})
-		.onConflictDoNothing();
+		.onConflictDoNothing()
+		.returning({ id: miniPuzzles.id });
+	if (inserted.length > 0) {
+		captureServerEvent({
+			event: ANALYTICS_EVENT.DAILY_PUZZLE_GENERATED,
+			properties: {
+				game_mode: GAME_MODE.MINI,
+				word_count: publicSnapshot.wordSlots.length,
+			},
+		});
+	}
 	// Read the winner of a concurrent generation, including its capsule salts.
 	const saved = await db.query.miniPuzzles.findFirst({
 		where: eq(miniPuzzles.dateKey, dateKey),
@@ -115,7 +127,7 @@ export async function saveMiniProgress(
 			: puzzle.initialShuffledLetters,
 		completedAt: null,
 	};
-	return db.transaction(async (transaction) => {
+	const saved = await db.transaction(async (transaction) => {
 		await transaction.execute(
 			sql`select pg_advisory_xact_lock(hashtextextended(${`mini:${userId}:${puzzle.id}`}, 0))`,
 		);
@@ -149,4 +161,15 @@ export async function saveMiniProgress(
 			});
 		return progress;
 	});
+	captureServerEvent({
+		event: ANALYTICS_EVENT.PUZZLE_PROGRESS_SYNCED_SERVER,
+		distinctId: userId,
+		properties: {
+			game_mode: GAME_MODE.MINI,
+			completed: Boolean(saved.completedAt),
+			guessed_word_count: saved.guessedWordIds.length,
+			hints_used: saved.hintsUsed,
+		},
+	});
+	return saved;
 }

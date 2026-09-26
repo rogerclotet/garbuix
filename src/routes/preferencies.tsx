@@ -17,6 +17,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -212,31 +213,31 @@ function PreferencesPage() {
 	const handleToggleSharePreview = (next: boolean) => {
 		setShowSharePreview(next);
 		setSkipSharePreview(!next);
-		captureEvent("share_preview_toggled", { skip: !next });
+		captureEvent(ANALYTICS_EVENT.SHARE_PREVIEW_TOGGLED, { skip: !next });
 	};
 
 	const handleToggleVibration = (next: boolean) => {
 		setVibrationEnabled(next);
 		setVibrationPreference(next);
-		captureEvent("vibration_toggled", { enabled: next });
+		captureEvent(ANALYTICS_EVENT.VIBRATION_TOGGLED, { enabled: next });
 	};
 
 	const handleLayoutChange = (next: LetterLayout) => {
 		setLetterLayoutState(next);
 		setLetterLayout(next);
-		captureEvent("letter_layout_changed", { layout: next });
+		captureEvent(ANALYTICS_EVENT.LETTER_LAYOUT_CHANGED, { layout: next });
 	};
 
 	const handleToggleBonusClues = (next: boolean) => {
 		setBonusCluesEnabledState(next);
 		setBonusCluesEnabled(next);
-		captureEvent("bonus_clues_toggled", { enabled: next });
+		captureEvent(ANALYTICS_EVENT.BONUS_CLUES_TOGGLED, { enabled: next });
 	};
 
 	const handleThemeChange = (next: string) => {
 		const value = next as ThemePreference;
 		setTheme(value);
-		captureEvent("theme_preference_changed", { theme: value });
+		captureEvent(ANALYTICS_EVENT.THEME_PREFERENCE_CHANGED, { theme: value });
 	};
 
 	const handleAvatarPreferenceChange = (next: AvatarPreference) => {
@@ -276,7 +277,7 @@ function PreferencesPage() {
 
 		const markProfileSaved = () => {
 			setDisplayName(normalized);
-			captureEvent("profile_updated", {
+			captureEvent(ANALYTICS_EVENT.PROFILE_UPDATED, {
 				is_authenticated: Boolean(activeUser),
 				avatar_preference: avatarPreference,
 			});
