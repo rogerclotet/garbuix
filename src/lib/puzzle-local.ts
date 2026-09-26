@@ -14,6 +14,7 @@ const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
 const PROFILE_PREFERENCES_TIP_SEEN_KEY =
 	"paraules-profile-preferences-tip-seen-v1";
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
+const MINI_ANNOUNCEMENT_SEEN_KEY = "garbuix-mini-announcement-seen-v1";
 // Re-show the welcome dialog to anonymous users periodically so they keep
 // getting nudged to sign in. We store the last-shown timestamp and only
 // suppress the dialog within this cooldown window.
@@ -175,6 +176,25 @@ export function hasSeenWelcome(): boolean {
 export function markWelcomeSeen() {
 	if (typeof window === "undefined") return;
 	window.localStorage.setItem(WELCOME_SEEN_KEY, String(Date.now()));
+}
+
+export function hasSeenMiniAnnouncement(): boolean {
+	if (typeof window === "undefined") return true;
+	try {
+		return window.localStorage.getItem(MINI_ANNOUNCEMENT_SEEN_KEY) === "1";
+	} catch {
+		// Skip announcements when we cannot remember that they have been shown.
+		return true;
+	}
+}
+
+export function markMiniAnnouncementSeen() {
+	if (typeof window === "undefined") return;
+	try {
+		window.localStorage.setItem(MINI_ANNOUNCEMENT_SEEN_KEY, "1");
+	} catch {
+		// A blocked storage write must not interrupt the game.
+	}
 }
 
 export function getDeviceId() {

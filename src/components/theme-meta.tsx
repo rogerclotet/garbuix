@@ -1,8 +1,12 @@
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { materialThemeMetaColors } from "@/lib/material-theme";
+import {
+	materialThemeMetaColors,
+	miniThemeMetaColors,
+} from "@/lib/material-theme";
 
-export function ThemeMeta() {
+export function ThemeMeta({ mini = false }: { mini?: boolean }) {
+	const colors = mini ? miniThemeMetaColors : materialThemeMetaColors;
 	const { theme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 
@@ -13,7 +17,7 @@ export function ThemeMeta() {
 	}, []);
 
 	if (mounted && (theme === "light" || theme === "dark")) {
-		return <meta name="theme-color" content={materialThemeMetaColors[theme]} />;
+		return <meta name="theme-color" content={colors[theme]} />;
 	}
 
 	return (
@@ -21,12 +25,12 @@ export function ThemeMeta() {
 			<meta
 				name="theme-color"
 				media="(prefers-color-scheme: light)"
-				content={materialThemeMetaColors.light}
+				content={colors.light}
 			/>
 			<meta
 				name="theme-color"
 				media="(prefers-color-scheme: dark)"
-				content={materialThemeMetaColors.dark}
+				content={colors.dark}
 			/>
 		</>
 	);

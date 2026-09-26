@@ -14,6 +14,23 @@ A responsive web application for a Catalan crossword-style word game.
 
 ## How to Play
 
+### Garbuix mini
+
+`/mini` is a separate daily game for early readers, also available in the menu.
+Each board has five connected words drawn from the curated Catalan vocabulary in
+`src/data/mini-words.ts`. All words have 3–5 letters. Hints reveal one hidden cell
+per tap, with no limit, descriptive clues, or leaderboard.
+
+Mini has a purple theme, separate browser saves and account progress, and its own
+history at `/mini/dies-anteriors`, including yesterday's completed board. Guest
+progress imports into Mini when signing in. Regular Garbuix results are untouched.
+Daily puzzles follow the same Europe/Madrid rollover as the regular game.
+
+Apply the database migrations with `pnpm db:migrate` before running this version.
+Migration `0008` adds the `mini_puzzles` and `mini_progress` tables.
+
+### Regular Garbuix
+
 1. Look at the crossword grid (letters are hidden initially)
 2. Type a word you think appears in the crossword
 3. When you guess correctly, the word reveals on the grid

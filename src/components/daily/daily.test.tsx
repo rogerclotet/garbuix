@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 
 import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
+import {
 	act,
 	cleanup,
 	fireEvent,
@@ -9,14 +16,26 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	getSortedAnonymousHistoryEntries,
+	hasSeenMiniAnnouncement,
+} from "@/lib/puzzle-local";
+import type { SessionUser } from "@/lib/puzzle-types";
 import { Daily } from "./daily";
 import { useHowToPlayOpen } from "./how-to-play-store";
 
 const progressState = vi.hoisted(() => {
 	const guessedWordIds: number[] = [];
 	const clueWordIds: number[] = [];
-	return { guessedWordIds, clueWordIds, pendingEventCount: 0 };
+	return { guessedWordIds, clueWordIds, pendingEventCount: 0, guessCount: 0 };
 });
+
+const sessionState = vi.hoisted(
+	(): { activeUser: SessionUser; session: { isPending: boolean } } => ({
+		activeUser: null,
+		session: { isPending: false },
+	}),
+);
 
 const {
 	getWordCluesMock,
@@ -65,7 +84,10 @@ vi.mock("@/lib/puzzle-server-fns", () => ({
 	getWordClues: getWordCluesMock,
 }));
 
-vi.mock("@/lib/puzzle-local", () => ({
+vi.mock("@/lib/puzzle-local", async () => ({
+	...(await vi.importActual<typeof import("@/lib/puzzle-local")>(
+		"@/lib/puzzle-local",
+	)),
 	getDeviceId: vi.fn(() => "device-1"),
 	getSortedAnonymousHistoryEntries: vi.fn(() => []),
 	hasSeenHowToPlay: hasSeenHowToPlayMock,
@@ -83,6 +105,7 @@ vi.mock("./how-to-play-store", () => ({
 
 vi.mock("@/components/profile-preferences-tip-store", () => ({
 	openProfilePreferencesTip: openProfilePreferencesTipMock,
+	useProfilePreferencesTipOpen: vi.fn(() => false),
 }));
 
 vi.mock("@/lib/puzzle-streaks", () => ({
@@ -95,10 +118,7 @@ vi.mock("@/lib/puzzle-streaks", () => ({
 }));
 
 vi.mock("@/lib/use-active-session-user", () => ({
-	useActiveSessionUser: vi.fn(() => ({
-		activeUser: null,
-		session: { isPending: false },
-	})),
+	useActiveSessionUser: vi.fn(() => sessionState),
 }));
 
 vi.mock("@/lib/use-observability", () => ({
@@ -121,7 +141,7 @@ vi.mock("./use-daily-progress", () => ({
 			hintedCells: [],
 			clueWordIds: progressState.clueWordIds,
 			hintsUsed: 0,
-			guessCount: 0,
+			guessCount: progressState.guessCount,
 			bonusWordsFound: 0,
 			shuffledLetters: ["c", "o", "s", "a"],
 			completedAt: null,
@@ -255,6 +275,25 @@ function renderDaily() {
 	return render(dailyView());
 }
 
+function renderAnnouncementVisit() {
+	const root = createRootRoute();
+	const home = createRoute({
+		getParentRoute: () => root,
+		path: "/",
+		component: dailyView,
+	});
+	const mini = createRoute({
+		getParentRoute: () => root,
+		path: "/mini",
+		component: () => <h1>Mini game</h1>,
+	});
+	const router = createRouter({
+		routeTree: root.addChildren([home, mini]),
+		history: createMemoryHistory({ initialEntries: ["/"] }),
+	});
+	return { ...render(<RouterProvider router={router} />), router };
+}
+
 async function submitCurrentGuess() {
 	for (const letter of ["C", "O", "S", "A"]) {
 		fireEvent.pointerDown(screen.getByRole("button", { name: letter }), {
@@ -283,6 +322,10 @@ async function submitCurrentGuess() {
 
 describe("Daily submit feedback", () => {
 	beforeEach(() => {
+		installLocalStorageMock({ "garbuix-mini-announcement-seen-v1": "1" });
+		sessionState.activeUser = null;
+		progressState.guessCount = 0;
+		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([]);
 		progressState.guessedWordIds = [];
 		progressState.clueWordIds = [];
 		progressState.pendingEventCount = 0;
@@ -581,6 +624,109 @@ describe("Daily submit feedback", () => {
 		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
 		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
 	});
+
+	it.each(["local", "google"])(
+		"announces Mini only once for an existing %s session",
+		async (kind) => {
+			installLocalStorageMock();
+			if (kind === "local") progressState.guessCount = 3;
+			else
+				sessionState.activeUser = {
+					id: "parent",
+					name: "Parent",
+					email: "parent@example.com",
+				};
+			const first = renderAnnouncementVisit();
+			await screen.findByRole("alertdialog", { name: "Garbuix mini" });
+			expect(screen.getByText("Pels més petits de la casa")).toBeTruthy();
+			expect(
+				screen
+					.getByRole("link", { name: "Provar Garbuix mini" })
+					.getAttribute("href"),
+			).toBe("/mini");
+			expect(hasSeenMiniAnnouncement()).toBe(true);
+			for (const key of "cosa") fireEvent.keyDown(window, { key });
+			fireEvent.keyDown(window, { key: "Enter" });
+			expect(resolveGuessMock).not.toHaveBeenCalled();
+			fireEvent.click(
+				screen.getByRole("button", { name: "Continuar amb Garbuix" }),
+			);
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+			first.unmount();
+			renderAnnouncementVisit();
+			await screen.findByTestId("daily-grid");
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+		},
+	);
+
+	it("lets a returning local player open Mini even before starting today's puzzle", async () => {
+		installLocalStorageMock();
+		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([
+			{
+				dateKey: "2026-04-10",
+				seed: 260410,
+				totalWords: 8,
+				guessedWords: 3,
+				guessCount: 4,
+				hintsUsed: 0,
+				completed: false,
+				lastUpdated: "2026-04-10T12:00:00Z",
+			},
+		]);
+		const { router } = renderAnnouncementVisit();
+		fireEvent.click(
+			await screen.findByRole("link", { name: "Provar Garbuix mini" }),
+		);
+		await screen.findByRole("heading", { name: "Mini game" });
+		expect(router.state.location.pathname).toBe("/mini");
+		expect(hasSeenMiniAnnouncement()).toBe(true);
+	});
+
+	it("does not announce Mini to a new local player or interrupt their first guesses", async () => {
+		installLocalStorageMock();
+		const view = renderDaily();
+		await screen.findByTestId("daily-grid");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		progressState.guessCount = 1;
+		view.rerender(dailyView());
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(hasSeenMiniAnnouncement()).toBe(false);
+	});
+
+	it("keeps the welcome dialog and does not follow it with a Mini announcement", async () => {
+		installLocalStorageMock();
+		progressState.guessCount = 3;
+		hasSeenWelcomeMock.mockReturnValue(false);
+		renderDaily();
+		await screen.findByRole("alertdialog", { name: "Benvingut/da a Garbuix!" });
+		expect(screen.queryByText("Pels més petits de la casa")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Sense compte" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(hasSeenMiniAnnouncement()).toBe(false);
+	});
+
+	it.each(["tutorial", "profile tip"])(
+		"defers Mini for the whole visit when the %s is due",
+		async (kind) => {
+			installLocalStorageMock();
+			progressState.guessCount = 3;
+			if (kind === "tutorial") hasSeenHowToPlayMock.mockReturnValue(false);
+			else hasSeenProfilePreferencesTipMock.mockReturnValue(false);
+			const view = renderDaily();
+			await waitFor(() =>
+				expect(
+					kind === "tutorial"
+						? openHowToPlayMock
+						: openProfilePreferencesTipMock,
+				).toHaveBeenCalledTimes(1),
+			);
+			hasSeenHowToPlayMock.mockReturnValue(true);
+			hasSeenProfilePreferencesTipMock.mockReturnValue(true);
+			view.rerender(dailyView());
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(hasSeenMiniAnnouncement()).toBe(false);
+		},
+	);
 
 	it("triggers haptics on the first touch release", async () => {
 		const vibrateMock = installVibrateMock();

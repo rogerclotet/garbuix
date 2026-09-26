@@ -353,7 +353,7 @@ code {
 	0% {
 		background-color: color-mix(
 			in srgb,
-			var(--color-teal-200) 75%,
+			var(--locate-color, var(--color-teal-200)) 75%,
 			var(--color-background)
 		);
 	}
@@ -378,7 +378,12 @@ code {
 
 .grid-locate-cell::after {
 	inset: 0;
-	border: 1px solid color-mix(in srgb, var(--color-teal-400) 60%, transparent);
+	border: 1px solid
+		color-mix(
+			in srgb,
+			var(--locate-color, var(--color-teal-400)) 60%,
+			transparent
+		);
 	animation: grid-locate-ring 1300ms ease-out both;
 }
 

@@ -224,6 +224,38 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		}
 	};
 
+	return (
+		<HistoryView
+			entries={entries}
+			stats={stats}
+			yesterdayPuzzle={yesterdayPuzzle}
+			yesterdayLeaderboard={initialData.yesterdayLeaderboard}
+			hasMore={hasMore}
+			isLoadingMore={isLoadingMore}
+			onLoadMore={handleLoadMore}
+		/>
+	);
+}
+
+export function HistoryView({
+	entries,
+	stats,
+	yesterdayPuzzle,
+	yesterdayLeaderboard,
+	hasMore,
+	isLoadingMore,
+	onLoadMore,
+	mini = false,
+}: {
+	entries: HistorySummaryEntry[];
+	stats: HistoryStats;
+	yesterdayPuzzle: HistoryData["yesterdayPuzzle"];
+	yesterdayLeaderboard?: LeaderboardSnapshot;
+	hasMore: boolean;
+	isLoadingMore: boolean;
+	onLoadMore: () => void;
+	mini?: boolean;
+}) {
 	const statCards = [
 		{
 			label: "Dies jugats",
@@ -236,6 +268,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		{
 			label: "Pistes donades",
 			value: stats.cluesGiven,
+			hidden: mini,
 		},
 		{
 			label: "Ratxa actual",
@@ -255,7 +288,9 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		<div className="min-h-screen px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-16">
 			<div className="max-w-5xl mx-auto space-y-6">
 				<p className="text-sm text-muted-foreground font-ui">
-					Consulta els resultats dels dies passats i el teu progrés.
+					{mini
+						? "El teu progrés a Garbuixmini, amb les seves pròpies estadístiques."
+						: "Consulta els resultats dels dies passats i el teu progrés."}
 				</p>
 
 				<div className="grid gap-6 lg:grid-cols-2">
@@ -273,19 +308,21 @@ export function History({ initialData }: { initialData: HistoryData }) {
 						) : (
 							<>
 								<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-									{statCards.map((stat) => (
-										<div
-											key={stat.label}
-											className="flex min-h-24 flex-col rounded-xl bg-muted/50 px-3 py-3 sm:min-h-28 sm:px-4 sm:py-4"
-										>
-											<span className="text-xs text-muted-foreground font-medium leading-tight font-ui sm:text-sm">
-												{stat.label}
-											</span>
-											<div className="mt-auto pt-2 text-2xl leading-none font-bold tabular-nums sm:text-3xl">
-												{stat.value}
+									{statCards
+										.filter((stat) => !stat.hidden)
+										.map((stat) => (
+											<div
+												key={stat.label}
+												className="flex min-h-24 flex-col rounded-xl bg-muted/50 px-3 py-3 sm:min-h-28 sm:px-4 sm:py-4"
+											>
+												<span className="text-xs text-muted-foreground font-medium leading-tight font-ui sm:text-sm">
+													{stat.label}
+												</span>
+												<div className="mt-auto pt-2 text-2xl leading-none font-bold tabular-nums sm:text-3xl">
+													{stat.value}
+												</div>
 											</div>
-										</div>
-									))}
+										))}
 								</div>
 
 								<div className="space-y-4">
@@ -346,7 +383,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 										<div className="flex justify-center pt-1">
 											<Button
 												variant="outline"
-												onClick={handleLoadMore}
+												onClick={onLoadMore}
 												disabled={isLoadingMore}
 											>
 												{isLoadingMore ? "Carregant…" : "Carrega'n més"}
@@ -421,13 +458,13 @@ export function History({ initialData }: { initialData: HistoryData }) {
 								</>
 							) : null}
 
-							{initialData.yesterdayLeaderboard ? (
+							{yesterdayLeaderboard ? (
 								<div className="space-y-3 border-t border-border/50 pt-4">
 									<h4 className="text-base font-semibold">
 										Classificació d'ahir
 									</h4>
 									<LeaderboardList
-										entries={initialData.yesterdayLeaderboard.entries}
+										entries={yesterdayLeaderboard.entries}
 										emptyMessage="Ningú no va aparèixer ahir al rànquing."
 									/>
 								</div>

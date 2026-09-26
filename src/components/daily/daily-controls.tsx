@@ -46,6 +46,7 @@ export type TutorialControlTarget =
 	| { kind: "hint" };
 
 type DailyControlsProps = {
+	mini?: boolean;
 	inline?: boolean;
 	tutorialTarget?: TutorialControlTarget;
 	aiClueMode: boolean;
@@ -77,6 +78,7 @@ type DailyControlsProps = {
 };
 
 export function DailyControls({
+	mini = false,
 	inline = false,
 	tutorialTarget,
 	aiClueMode,
@@ -277,7 +279,7 @@ export function DailyControls({
 					"ring-2 ring-primary ring-offset-4 ring-offset-background",
 			)}
 			style={submitStyle}
-			disabled={currentGuess.length < 4}
+			disabled={currentGuess.length < (mini ? 3 : 4)}
 			aria-label="Comprovar"
 		>
 			<CornerDownLeft
@@ -309,13 +311,13 @@ export function DailyControls({
 			</Button>
 			<Button
 				variant="ghost"
-				onPointerDown={handleHintPointerDown}
+				onPointerDown={mini ? undefined : handleHintPointerDown}
 				onPointerUp={cancelHintHold}
 				onPointerLeave={cancelHintHold}
 				onPointerCancel={cancelHintHold}
 				onClick={(event) => {
 					// Keyboard and assistive-technology activation has no pointer hold.
-					if (event.detail === 0 && canUseHint) onHint();
+					if ((mini || event.detail === 0) && canUseHint) onHint();
 				}}
 				onContextMenu={(e) => e.preventDefault()}
 				className={cn(
@@ -326,9 +328,11 @@ export function DailyControls({
 				disabled={!canUseHint || isComplete}
 				size="lg"
 				aria-description={
-					aiClueMode
-						? "Mantén premut per rebre una pista de la IA"
-						: "Mantén premut per revelar una lletra"
+					mini
+						? "Toca per revelar una lletra. Pistes il·limitades."
+						: aiClueMode
+							? "Mantén premut per rebre una pista de la IA"
+							: "Mantén premut per revelar una lletra"
 				}
 			>
 				<span
@@ -345,7 +349,9 @@ export function DailyControls({
 						className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
 					/>
 				)}
-				<span className="relative">Pista ({3 - hintsUsed})</span>
+				<span className="relative">
+					{mini ? "Pista" : `Pista (${3 - hintsUsed})`}
+				</span>
 			</Button>
 			<Button
 				variant="ghost"

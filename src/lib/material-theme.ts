@@ -85,7 +85,57 @@ ${toCssVariables(appScheme.light)}
 .dark {
 ${toCssVariables(appScheme.dark)}
 }
+
+:root[data-game="mini"] {
+${toCssVariables({
+	background: "#fbf8fc",
+	foreground: "#302638",
+	card: "#fbf8fc",
+	"card-foreground": "#302638",
+	popover: "#fbf8fc",
+	"popover-foreground": "#302638",
+	primary: "#7953a5",
+	"primary-foreground": "#ffffff",
+	secondary: "#ede4f4",
+	"secondary-foreground": "#302638",
+	muted: "#f0e9f5",
+	"muted-foreground": "#766681",
+	accent: "#ede4f4",
+	"accent-foreground": "#302638",
+	border: "#ded0e9",
+	input: "#ded0e9",
+	ring: "#7953a5",
+	"mini-gold": "#a36b08",
+	"locate-color": "#c4a4e3",
+})}
+}
+
+:root.dark[data-game="mini"] {
+${toCssVariables({
+	background: "#211a29",
+	foreground: "#eee5f5",
+	card: "#211a29",
+	"card-foreground": "#eee5f5",
+	popover: "#211a29",
+	"popover-foreground": "#eee5f5",
+	primary: "#c7a3ed",
+	"primary-foreground": "#30203f",
+	secondary: "#3d2f49",
+	"secondary-foreground": "#eee5f5",
+	muted: "#33283e",
+	"muted-foreground": "#b5a4c2",
+	accent: "#3d2f49",
+	"accent-foreground": "#eee5f5",
+	border: "#4b3a59",
+	input: "#4b3a59",
+	ring: "#c7a3ed",
+	"mini-gold": "#f2c76a",
+	"locate-color": "#9670ba",
+})}
+}
 `.trim();
+
+export const miniThemeMetaColors = { light: "#fbf8fc", dark: "#211a29" };
 
 export const materialThemeMetaColors = {
 	light: appScheme.light.background,

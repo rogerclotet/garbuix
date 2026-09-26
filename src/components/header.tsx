@@ -13,6 +13,7 @@ import {
 	useHowToPlayOpen,
 } from "@/components/daily/how-to-play-store";
 import { Logo } from "@/components/logo";
+import { MiniHelpDialog } from "@/components/mini/mini-help-dialog";
 import { ProfilePreferencesTipDialog } from "@/components/profile-preferences-tip-dialog";
 import {
 	setProfilePreferencesTipOpen,
@@ -22,14 +23,17 @@ import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
+import { useMiniRoute } from "@/lib/use-mini-route";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
 	"/dies-anteriors": "Dies anteriors",
 	"/preferencies": "Preferències",
+	"/mini/dies-anteriors": "Historial mini",
 };
 
 export default function Header() {
+	const mini = useMiniRoute();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const historyIndex = useRouterState({
 		select: (s) => s.location.state.__TSR_index,
@@ -76,6 +80,10 @@ export default function Header() {
 	};
 
 	const goHome = () => {
+		if (mini) {
+			void navigate({ to: "/mini" });
+			return;
+		}
 		const homeHistoryIndex = homeHistoryIndexRef.current;
 
 		// Rewind to the last game entry, dropping every inner page visited since.
@@ -143,7 +151,11 @@ export default function Header() {
 
 	const dialogs = (
 		<>
-			<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+			{mini ? (
+				<MiniHelpDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+			) : (
+				<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+			)}
 			<ProfilePreferencesTipDialog
 				open={profilePreferencesTipOpen}
 				onOpenChange={setProfilePreferencesTipOpen}
@@ -172,14 +184,25 @@ export default function Header() {
 						</div>
 					) : (
 						<Link
-							to="/"
+							to={mini ? "/mini" : "/"}
 							className="flex items-center gap-3 hover:opacity-80 transition-opacity"
 						>
-							<Logo className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-							<h1 className="text-2xl font-bold text-primary">Garbuix!</h1>
+							<Logo
+								className="w-5 h-5 sm:w-6 sm:h-6 text-primary"
+								aria-label={mini ? "Logo Garbuixmini" : "Logo Garbuix!"}
+							/>
+							<h1 className="text-2xl font-bold text-primary">
+								{mini ? (
+									<>
+										Garbuix<span className="text-[var(--mini-gold)]">mini</span>
+									</>
+								) : (
+									"Garbuix!"
+								)}
+							</h1>
 						</Link>
 					)}
-					{actionButtons(!innerTitle)}
+					{actionButtons(!innerTitle && !mini)}
 				</div>
 			</div>
 			{dialogs}
