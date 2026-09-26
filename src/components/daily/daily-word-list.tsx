@@ -102,6 +102,24 @@ export function DailyWordList({
 		),
 	);
 
+	const needsHelpWordIds = new Set(
+		incomingRequests
+			.filter(
+				(request) =>
+					onRespondToClue &&
+					!helpedKeys.has(
+						clueHelpGivenField(request.requesterId, request.wordId),
+					),
+			)
+			.map((request) => request.wordId),
+	);
+	const needsHelpSlots = foundSlots.filter((slot) =>
+		needsHelpWordIds.has(slot.id),
+	);
+	const otherFoundSlots = foundSlots.filter(
+		(slot) => !needsHelpWordIds.has(slot.id),
+	);
+
 	const respondAndRecord = (
 		requestId: string,
 		text: string,
@@ -246,6 +264,41 @@ export function DailyWordList({
 		</div>
 	);
 
+	const renderFoundSlot = (slot: PuzzleWordSlot) => {
+		const foundClueText = foundClueTextsByWordId[slot.id];
+
+		return (
+			<div
+				key={slot.id}
+				id={`${idPrefix}${wordRowId(slot.id)}`}
+				className="flex min-w-0 flex-col gap-1 border-b border-border/60 py-2 pl-2 scroll-mt-4"
+			>
+				<div className="flex min-h-11 items-center gap-2">
+					<Check className="size-5 shrink-0 text-primary" aria-hidden="true" />
+					<span className="min-w-0 font-semibold text-foreground tracking-wider wrap-anywhere">
+						{revealedAnswers[slot.id]?.toUpperCase()}
+					</span>
+					<a
+						href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:size-9"
+						aria-label={`Consulta la definició de ${revealedAnswers[slot.id]?.toUpperCase() ?? ""} a l'Optimot`}
+						title="Consulta la definició a l'Optimot"
+					>
+						<Info className="size-4" />
+					</a>
+					<span className="shrink-0 text-[0.625rem] text-muted-foreground font-ui">
+						{slot.length} lletres
+					</span>
+				</div>
+				{foundClueText ? renderClueLine(slot.id, foundClueText, "muted") : null}
+				{renderIncomingRequests(slot.id)}
+				{renderHelpedConfirmation(slot.id)}
+			</div>
+		);
+	};
+
 	return (
 		<div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
 			<h3 className="mb-4 shrink-0 text-2xl font-extrabold tracking-tight lg:text-xl">
@@ -337,52 +390,25 @@ export function DailyWordList({
 					);
 				})}
 
-				{foundSlots.length > 0 ? (
+				{needsHelpSlots.length > 0 ? (
 					<h4
 						className={`${notFoundSlots.length > 0 ? "mt-6" : ""} mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-primary font-ui`}
 					>
-						Trobades <span className="tabular-nums">{foundSlots.length}</span>
+						Ajuda pendent{" "}
+						<span className="tabular-nums">{needsHelpSlots.length}</span>
 					</h4>
 				) : null}
-				{foundSlots.map((slot) => {
-					const foundClueText = foundClueTextsByWordId[slot.id];
+				{needsHelpSlots.map(renderFoundSlot)}
 
-					return (
-						<div
-							key={slot.id}
-							id={`${idPrefix}${wordRowId(slot.id)}`}
-							className="flex min-w-0 flex-col gap-1 border-b border-border/60 py-2 pl-2 scroll-mt-4"
-						>
-							<div className="flex min-h-11 items-center gap-2">
-								<Check
-									className="size-5 shrink-0 text-primary"
-									aria-hidden="true"
-								/>
-								<span className="min-w-0 font-semibold text-foreground tracking-wider wrap-anywhere">
-									{revealedAnswers[slot.id]?.toUpperCase()}
-								</span>
-								<a
-									href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring lg:size-9"
-									aria-label={`Consulta la definició de ${revealedAnswers[slot.id]?.toUpperCase() ?? ""} a l'Optimot`}
-									title="Consulta la definició a l'Optimot"
-								>
-									<Info className="size-4" />
-								</a>
-								<span className="shrink-0 text-[0.625rem] text-muted-foreground font-ui">
-									{slot.length} lletres
-								</span>
-							</div>
-							{foundClueText
-								? renderClueLine(slot.id, foundClueText, "muted")
-								: null}
-							{renderIncomingRequests(slot.id)}
-							{renderHelpedConfirmation(slot.id)}
-						</div>
-					);
-				})}
+				{otherFoundSlots.length > 0 ? (
+					<h4
+						className={`${notFoundSlots.length > 0 || needsHelpSlots.length > 0 ? "mt-6" : ""} mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-primary font-ui`}
+					>
+						Trobades{" "}
+						<span className="tabular-nums">{otherFoundSlots.length}</span>
+					</h4>
+				) : null}
+				{otherFoundSlots.map(renderFoundSlot)}
 			</div>
 		</div>
 	);
