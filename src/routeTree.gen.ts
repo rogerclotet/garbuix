@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiMonitoringRouteImport } from './routes/api/monitoring'
 import { Route as ApiURouteImport } from './routes/api/u'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
@@ -39,6 +41,16 @@ const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
 const PreferenciesRoute = PreferenciesRouteImport.update({
   id: '/preferencies',
   path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMonitoringRoute = ApiMonitoringRouteImport.update({
+  id: '/api/monitoring',
+  path: '/api/monitoring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiURoute = ApiURouteImport.update({
@@ -82,6 +94,8 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
@@ -95,6 +109,8 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
@@ -109,6 +125,8 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
@@ -124,6 +142,8 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/health'
+    | '/api/monitoring'
     | '/api/u'
     | '/mini/dies-anteriors'
     | '/ph/$'
@@ -137,6 +157,8 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/health'
+    | '/api/monitoring'
     | '/api/u'
     | '/mini/dies-anteriors'
     | '/ph/$'
@@ -150,6 +172,8 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/api/health'
+    | '/api/monitoring'
     | '/api/u'
     | '/mini/dies-anteriors'
     | '/ph/$'
@@ -164,6 +188,8 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiMonitoringRoute: typeof ApiMonitoringRoute
   ApiURoute: typeof ApiURoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
   PhSplatRoute: typeof PhSplatRoute
@@ -201,6 +227,20 @@ declare module '@tanstack/react-router' {
       path: '/preferencies'
       fullPath: '/preferencies'
       preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/monitoring': {
+      id: '/api/monitoring'
+      path: '/api/monitoring'
+      fullPath: '/api/monitoring'
+      preLoaderRoute: typeof ApiMonitoringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/u': {
@@ -260,6 +300,8 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ApiMonitoringRoute: ApiMonitoringRoute,
   ApiURoute: ApiURoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
   PhSplatRoute: PhSplatRoute,

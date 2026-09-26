@@ -1,4 +1,5 @@
 import { usePostHog } from "@posthog/react";
+import * as Sentry from "@sentry/tanstackstart-react";
 import { useContext, useMemo } from "react";
 import type { Metric } from "web-vitals";
 import {
@@ -20,6 +21,7 @@ export function useObservability() {
 				umami?.captureEvent(event, properties);
 			},
 			captureException(error: unknown, properties?: Record<string, unknown>) {
+				Sentry.captureException(error, { extra: properties });
 				posthog.captureException(
 					error,
 					buildErrorProperties(error, properties),

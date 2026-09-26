@@ -1,0 +1,15 @@
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/api/health")({
+	server: {
+		handlers: {
+			GET: () =>
+				Response.json(
+					{ status: "ok" },
+					{ headers: { "Cache-Control": "no-store" } },
+				),
+			HEAD: () =>
+				new Response(null, { headers: { "Cache-Control": "no-store" } }),
+		},
+	},
+});

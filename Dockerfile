@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:25.2-slim AS base
 
 RUN npm install -g pnpm@10.30.3
@@ -6,13 +7,13 @@ WORKDIR /app
 
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
 
 COPY . .
-RUN pnpm build
+RUN --mount=type=secret,id=glitchtip_env pnpm build
 
 FROM base AS dev
 
@@ -22,7 +23,7 @@ FROM base AS production
 
 ENV NODE_ENV=production
 
-COPY package.json pnpm-lock.yaml tsconfig.json drizzle.config.ts ./
+COPY package.json pnpm-lock.yaml tsconfig.json drizzle.config.ts instrument.server.ts ./
 COPY drizzle ./drizzle
 COPY scripts ./scripts
 COPY src ./src
@@ -33,7 +34,7 @@ COPY --from=builder /app/src/data/catalan-guess-words.json ./src/data/catalan-gu
 
 EXPOSE 3000
 
-CMD ["sh", "-lc", "pnpm db:migrate && node .output/server/index.mjs"]
+CMD ["sh", "-lc", "pnpm db:migrate && exec pnpm start"]
 
 FROM alpine AS supercronic-download
 ARG SUPERCRONIC_VERSION=0.2.33
