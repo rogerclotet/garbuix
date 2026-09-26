@@ -4,7 +4,7 @@ import { getMiniHistoryData } from "@/lib/mini-server-fns";
 
 export const Route = createFileRoute("/mini/dies-anteriors")({
 	loader: () => getMiniHistoryData(),
-	head: () => ({ meta: [{ title: "Historial · Garbuixmini" }] }),
+	head: () => ({ meta: [{ title: "Historial · Garbuix mini" }] }),
 	component: MiniHistoryPage,
 });
 

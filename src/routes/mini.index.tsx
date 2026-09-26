@@ -6,7 +6,7 @@ import { getMiniPageData } from "@/lib/mini-server-fns";
 export const Route = createFileRoute("/mini/")({
 	loader: () => getMiniPageData(),
 	pendingComponent: DailyLoadingPage,
-	head: () => ({ meta: [{ title: "Garbuixmini · Cinc paraules cada dia" }] }),
+	head: () => ({ meta: [{ title: "Garbuix mini" }] }),
 	component: MiniPage,
 });
 
