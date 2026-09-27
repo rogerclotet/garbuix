@@ -15,7 +15,8 @@ import {
 	getClientAddress,
 	tooManyRequests,
 } from "@/lib/rate-limit.server";
-import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
+import { isRedisConfigured } from "@/lib/redis.server";
+import { createRedisSseStream } from "@/lib/redis-sse.server";
 import { normalizeDisplayNameInput } from "@/lib/user-profile";
 
 export const Route = createFileRoute("/api/leaderboard/$")({
@@ -223,8 +224,6 @@ async function handleAnonProfilePost(request: Request, dateKey: string) {
 	});
 }
 
-const HEARTBEAT_INTERVAL_MS = 25_000;
-
 function openSseStream(dateKey: string): Response {
 	if (!isRedisConfigured()) {
 		const emptyStream = new ReadableStream({
@@ -243,60 +242,12 @@ function openSseStream(dateKey: string): Response {
 		});
 	}
 
-	const sub = getRedisSub();
-	const channelName = leaderboardChannel(dateKey);
-	const encoder = new TextEncoder();
-	let heartbeat: ReturnType<typeof setInterval> | null = null;
-	let listener: ((channel: string, message: string) => void) | null = null;
-
-	const stream = new ReadableStream({
-		async start(controller) {
-			const send = (chunk: string) => {
-				try {
-					controller.enqueue(encoder.encode(chunk));
-				} catch {
-					// stream already closed
-				}
-			};
-
-			try {
-				const snapshot = await getLeaderboard(dateKey);
-				send(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);
-			} catch (error) {
-				console.warn("[leaderboard:sse] initial snapshot failed", error);
-				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, entries: [] })}\n\n`,
-				);
-			}
-
-			if (sub) {
-				listener = (channel, message) => {
-					if (channel === channelName) {
-						send(`event: update\ndata: ${message}\n\n`);
-					}
-				};
-				sub.on("message", listener);
-				try {
-					await sub.subscribe(channelName);
-				} catch (error) {
-					console.warn("[leaderboard:sse] subscribe failed", error);
-				}
-			}
-
-			heartbeat = setInterval(() => {
-				send(`: keep-alive ${Date.now()}\n\n`);
-			}, HEARTBEAT_INTERVAL_MS);
-		},
-		cancel() {
-			if (heartbeat) {
-				clearInterval(heartbeat);
-				heartbeat = null;
-			}
-			if (sub && listener) {
-				sub.off("message", listener);
-				listener = null;
-			}
-		},
+	const stream = createRedisSseStream({
+		channels: [leaderboardChannel(dateKey)],
+		event: "update",
+		snapshot: () => getLeaderboard(dateKey),
+		fallbackSnapshot: { dateKey, entries: [] },
+		logPrefix: "[leaderboard:sse]",
 	});
 
 	return new Response(stream, {
