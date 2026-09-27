@@ -147,9 +147,7 @@ self.addEventListener("fetch", (event) => {
 		return;
 	}
 
-	// Feature-flag config and analytics are always live. Caching
-	// /ph/array/<token>/config.js pins its `hasFeatureFlags` value, and a stale
-	// `false` stops posthog-js from ever loading flags on that device.
+	// Fetch analytics and SDK configuration directly from the network.
 	if (url.pathname.startsWith(POSTHOG_PROXY_PREFIX)) {
 		return;
 	}

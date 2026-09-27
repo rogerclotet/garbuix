@@ -18,7 +18,7 @@ const webVitals = vi.hoisted(() => ({
 vi.mock("web-vitals", () => webVitals);
 
 const identify = vi.fn();
-const setPersonPropertiesForFlags = vi.fn();
+const initializePostHog = vi.fn();
 const reset = vi.fn();
 const capture = vi.fn();
 const captureException = vi.fn();
@@ -29,7 +29,6 @@ const posthogConfig = {
 	posthogUIHost: "https://eu.posthog.com",
 };
 let observability: ObservabilityConfig = posthogConfig;
-const fetchMock = vi.fn<typeof fetch>();
 let location = { pathname: "/", searchStr: "" };
 
 const sessionUser = {
@@ -72,7 +71,6 @@ const posthog = {
 	captureException,
 	identify,
 	reset,
-	setPersonPropertiesForFlags,
 	__loaded: true,
 };
 
@@ -86,9 +84,9 @@ vi.mock("@posthog/react", () => ({
 		options?: { loaded?: (client: unknown) => void };
 	}) => {
 		useEffect(() => {
+			initializePostHog(options);
 			options?.loaded?.({
 				identify,
-				setPersonPropertiesForFlags,
 			});
 		}, [options]);
 		return children;
@@ -110,23 +108,18 @@ beforeEach(() => {
 describe("ObservabilityProvider", () => {
 	afterEach(() => {
 		cleanup();
-		vi.unstubAllGlobals();
 	});
 	beforeEach(() => {
 		observability = posthogConfig;
 		location = { pathname: "/", searchStr: "" };
-		fetchMock
-			.mockReset()
-			.mockResolvedValue(new Response(null, { status: 204 }));
-		vi.stubGlobal("fetch", fetchMock);
 		identify.mockClear();
-		setPersonPropertiesForFlags.mockClear();
+		initializePostHog.mockClear();
 		reset.mockClear();
 		capture.mockClear();
 		captureException.mockClear();
 	});
 
-	it("identifies the session user from PostHog's loaded callback so email-targeted flags are available before the first /flags request", async () => {
+	it("identifies the session user and disables feature flag evaluation", async () => {
 		render(
 			<ObservabilityProvider>
 				<div>app</div>
@@ -143,49 +136,9 @@ describe("ObservabilityProvider", () => {
 			name: "User",
 		};
 		expect(identify).toHaveBeenCalledWith("user-1", expectedProperties);
-		expect(setPersonPropertiesForFlags).toHaveBeenCalledWith(
-			expectedProperties,
+		expect(initializePostHog).toHaveBeenCalledWith(
+			expect.objectContaining({ advanced_disable_feature_flags: true }),
 		);
-	});
-});
-
-function CaptureOnMount() {
-	const { captureEvent } = useObservability();
-	useEffect(() => {
-		captureEvent("puzzle_guess_result", { matched: true, guess_length: 2 });
-	}, [captureEvent]);
-	return <div>game</div>;
-}
-
-function sentMessages() {
-	return fetchMock.mock.calls.map(([, options]) =>
-		JSON.parse(String(options?.body)),
-	);
-}
-
-function CaptureErrorOnMount() {
-	const { captureException } = useObservability();
-	useEffect(() => {
-		captureException(new Error("private@example.com"), {
-			scope: "profile_save",
-		});
-	}, [captureException]);
-	return null;
-}
-
-describe("Umami through ObservabilityProvider", () => {
-	beforeEach(() => {
-		observability = { umamiEnabled: true };
-		location = { pathname: "/", searchStr: "" };
-		capture.mockClear();
-		fetchMock
-			.mockReset()
-			.mockResolvedValue(new Response(null, { status: 204 }));
-		vi.stubGlobal("fetch", fetchMock);
-	});
-	afterEach(() => {
-		cleanup();
-		vi.unstubAllGlobals();
 	});
 
 	it.each([
@@ -199,119 +152,43 @@ describe("Umami through ObservabilityProvider", () => {
 				<div>app</div>
 			</ObservabilityProvider>,
 		);
-		expect(sentMessages()).toContainEqual(
+		expect(capture).toHaveBeenCalledWith(
+			"$pageview",
 			expect.objectContaining({
-				payload: expect.objectContaining({
-					data: expect.objectContaining({ game_mode: gameMode }),
-				}),
+				game_mode: gameMode,
+				pathname,
 			}),
 		);
 	});
 
-	it.each([false, true])(
-		"reports performance with PostHog enabled=%s",
-		async (posthogEnabled) => {
-			observability = posthogEnabled
-				? { ...posthogConfig, umamiEnabled: true }
-				: { umamiEnabled: true };
-			window.history.replaceState({}, "", "/mini");
-			const { rerender, unmount } = render(
-				<ObservabilityProvider>
-					<div>app</div>
-				</ObservabilityProvider>,
-			);
-			await waitFor(() => expect(webVitals.onLCP).toHaveBeenCalledTimes(1));
-			for (const observer of Object.values(webVitals))
-				expect(observer).toHaveBeenCalledTimes(1);
-			const report: (metric: Metric) => void = webVitals.onLCP.mock.calls[0][0];
-			location = { pathname: "/preferencies", searchStr: "" };
-			window.history.replaceState({}, "", "/preferencies");
-			rerender(
-				<ObservabilityProvider>
-					<div>app</div>
-				</ObservabilityProvider>,
-			);
-			const metric: Metric = {
-				name: "LCP",
-				value: 1200,
-				delta: 1200,
-				rating: "good",
-				id: "private-metric-id",
-				navigationType: "navigate",
-				navigationId: 1,
-				entries: [],
-			};
-			report(metric);
-			expect(
-				sentMessages().filter((message) => message.type === "performance"),
-			).toEqual([
-				{ type: "performance", payload: { url: "/mini", lcp: 1200 } },
-			]);
-			if (posthogEnabled)
-				expect(capture).toHaveBeenCalledWith("web_vital", {
-					name: "LCP",
-					value: 1200,
-					delta: 1200,
-					rating: "good",
-					id: "private-metric-id",
-					navigation_type: "navigate",
-				});
-			expect(webVitals.onLCP).toHaveBeenCalledTimes(1);
-			unmount();
-			fetchMock.mockClear();
-			report(metric);
-			expect(fetchMock).not.toHaveBeenCalled();
-			window.history.replaceState({}, "", "/");
-		},
-	);
-
-	it("keeps identification and raw errors in PostHog only", () => {
-		observability = { ...posthogConfig, umamiEnabled: true };
-		captureException.mockClear();
-		render(
-			<ObservabilityProvider>
-				<CaptureErrorOnMount />
-			</ObservabilityProvider>,
-		);
-		expect(identify).toHaveBeenCalledWith(
-			sessionUser.id,
-			expect.objectContaining({ email: sessionUser.email }),
-		);
-		expect(captureException).toHaveBeenCalled();
-		expect(sentMessages().every((message) => message.type === "event")).toBe(
-			true,
-		);
-		expect(JSON.stringify(sentMessages())).not.toMatch(
-			/private@example|user@example|user-1|\$exception/,
-		);
-	});
-
-	it("tracks initial and SPA pageviews with PostHog disabled", () => {
+	it("tracks initial and SPA pageviews", () => {
 		const { rerender } = render(
 			<ObservabilityProvider>
 				<div>app</div>
 			</ObservabilityProvider>,
 		);
 		expect(
-			sentMessages().filter((m) => m.type === "event" && !m.payload.name),
+			capture.mock.calls.filter(([event]) => event === "$pageview"),
 		).toHaveLength(1);
 		location = { pathname: "/preferencies", searchStr: "?theme=dark" };
-		window.history.replaceState({}, "", "/preferencies?theme=dark");
 		rerender(
 			<ObservabilityProvider>
 				<div>app</div>
 			</ObservabilityProvider>,
 		);
-		const pageviews = sentMessages().filter(
-			(m) => m.type === "event" && !m.payload.name,
+		expect(
+			capture.mock.calls.filter(([event]) => event === "$pageview"),
+		).toHaveLength(2);
+		expect(capture).toHaveBeenCalledWith(
+			"$pageview",
+			expect.objectContaining({
+				pathname: "/preferencies",
+				search: "?theme=dark",
+			}),
 		);
-		expect(pageviews).toHaveLength(2);
-		expect(pageviews[1].payload.url).toBe("/preferencies");
-		window.history.replaceState({}, "", "/");
 	});
 
-	it("mirrors custom events to both providers, including child mount effects", () => {
-		observability = { ...posthogConfig, umamiEnabled: true };
+	it("captures custom events from child mount effects", () => {
 		render(
 			<ObservabilityProvider>
 				<CaptureOnMount />
@@ -321,46 +198,81 @@ describe("Umami through ObservabilityProvider", () => {
 			matched: true,
 			guess_length: 2,
 		});
-		expect(
-			sentMessages().filter((m) => m.payload.name === "puzzle_guess_result"),
-		).toEqual([
-			expect.objectContaining({
-				payload: expect.objectContaining({
-					name: "puzzle_guess_result",
-					data: { matched: true, guess_length: 2 },
-				}),
-			}),
-		]);
 	});
 
-	it("sends no Umami requests when disabled", () => {
-		observability = {};
+	it("captures exceptions", () => {
 		render(
 			<ObservabilityProvider>
-				<CaptureOnMount />
+				<CaptureErrorOnMount />
 			</ObservabilityProvider>,
 		);
-		expect(fetchMock).not.toHaveBeenCalled();
+		expect(captureException).toHaveBeenCalledWith(
+			expect.any(Error),
+			expect.objectContaining({ scope: "profile_save" }),
+		);
 	});
 
-	it("removes page exit listeners when unmounted", () => {
+	it("reports Web Vitals until unmounted", async () => {
 		const { unmount } = render(
 			<ObservabilityProvider>
 				<div>app</div>
 			</ObservabilityProvider>,
 		);
-		window.dispatchEvent(new Event("pagehide"));
-		expect(
-			sentMessages().some((message) => message.payload.name === "$exception"),
-		).toBe(false);
-		expect(sentMessages()).toContainEqual(
-			expect.objectContaining({
-				payload: expect.objectContaining({ name: "$pageleave" }),
-			}),
-		);
+		await waitFor(() => expect(webVitals.onLCP).toHaveBeenCalledTimes(1));
+		for (const observer of Object.values(webVitals))
+			expect(observer).toHaveBeenCalledTimes(1);
+		const report: (metric: Metric) => void = webVitals.onLCP.mock.calls[0][0];
+		const metric: Metric = {
+			name: "LCP",
+			value: 1200,
+			delta: 1200,
+			rating: "good",
+			id: "metric-id",
+			navigationType: "navigate",
+			navigationId: 1,
+			entries: [],
+		};
+		report(metric);
+		expect(capture).toHaveBeenCalledWith("web_vital", {
+			name: "LCP",
+			value: 1200,
+			delta: 1200,
+			rating: "good",
+			id: "metric-id",
+			navigation_type: "navigate",
+		});
 		unmount();
-		fetchMock.mockClear();
-		window.dispatchEvent(new Event("pagehide"));
-		expect(fetchMock).not.toHaveBeenCalled();
+		capture.mockClear();
+		report(metric);
+		expect(capture).not.toHaveBeenCalled();
+	});
+
+	it("skips analytics runtime when PostHog is disabled", () => {
+		observability = {};
+		render(
+			<ObservabilityProvider>
+				<div>app</div>
+			</ObservabilityProvider>,
+		);
+		expect(initializePostHog).not.toHaveBeenCalled();
+		expect(capture).not.toHaveBeenCalled();
 	});
 });
+
+function CaptureOnMount() {
+	const { captureEvent } = useObservability();
+	useEffect(() => {
+		captureEvent("puzzle_guess_result", { matched: true, guess_length: 2 });
+	}, [captureEvent]);
+	return <div>game</div>;
+}
+
+function CaptureErrorOnMount() {
+	const { captureException } = useObservability();
+	useEffect(() => {
+		captureException(new Error("private@example.com"), {
+			scope: "profile_save",
+		});
+	}, [captureException]);
+	return null;
+}
