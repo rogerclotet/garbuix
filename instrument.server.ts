@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/tanstackstart-react";
 import { z } from "zod";
 import { glitchtipEnvSchema } from "./src/lib/glitchtip-config.ts";
 import { scrubGlitchTipEvent } from "./src/lib/glitchtip-scrub.ts";
+import { prepareGlitchTipServerEvent } from "./src/lib/glitchtip-server-event.ts";
 
 // Vite loads .env after this preload runs. Preserve variables supplied by Docker
 // or the shell, and allow deployments without a local .env file.
@@ -39,7 +40,7 @@ if (env.GLITCHTIP_DSN && !Sentry.getClient()) {
 		enableLogs: env.GLITCHTIP_ENABLE_LOGS,
 		sendDefaultPii: false,
 		sendClientReports: false,
-		beforeSend: scrubGlitchTipEvent,
+		beforeSend: prepareGlitchTipServerEvent,
 		beforeSendTransaction: scrubGlitchTipEvent,
 		integrations: (defaults) => [
 			...defaults.filter((integration) => integration.name !== "HttpSession"),
