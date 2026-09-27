@@ -31,8 +31,6 @@ jobs:
         run: apt-get update && apt-get install -y unzip
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - uses: actions/setup-node@v7
         with:

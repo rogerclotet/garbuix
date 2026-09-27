@@ -1,3 +1,6 @@
+# Keep pnpm's 24-hour release quarantine explicit for every install and update.
+minimumReleaseAge: 1440
+
 allowBuilds:
   '@prisma/client': false
   '@sentry/cli': true
