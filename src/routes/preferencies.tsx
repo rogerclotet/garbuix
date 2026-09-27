@@ -261,6 +261,7 @@ function PreferencesPage() {
 			resetUser();
 			await session.refetch();
 			await router.invalidate({ sync: true });
+			await router.navigate({ to: "/" });
 		} catch {
 			toast.error("No s'ha pogut tancar la sessió. Torna-ho a provar.");
 		} finally {
