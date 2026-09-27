@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/tanstackstart-react";
+import { getErrorReporter } from "./error-tracking.server";
 
 export function captureServerException(
 	error: unknown,
@@ -6,7 +6,9 @@ export function captureServerException(
 		properties?: Record<string, unknown>;
 	},
 ) {
-	Sentry.captureException(error, { extra: options?.properties });
+	// Additional context from callers is deliberately not sent to PostHog.
+	void options;
+	getErrorReporter()?.capture(error);
 }
 
 export async function observeServerAction<T>(
@@ -17,7 +19,7 @@ export async function observeServerAction<T>(
 	},
 ) {
 	try {
-		return await Sentry.startSpan({ name, op: "function" }, action);
+		return await action();
 	} catch (error) {
 		captureServerException(error, {
 			properties: { action: name, ...options?.properties },

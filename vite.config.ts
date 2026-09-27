@@ -7,7 +7,10 @@ import babel from "@rolldown/plugin-babel";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
-import { glitchtipClientSourceMaps, glitchtipServerSourceMaps } from "./scripts/glitchtip-build.ts";
+import {
+	posthogClientSourceMaps,
+	posthogServerSourceMaps,
+} from "./scripts/posthog-build.ts";
 import { getSecurityHeaders } from "./src/lib/security-headers";
 
 function readBuildVersions() {
@@ -49,8 +52,8 @@ const config = defineConfig(({ mode }) => {
 				}),
 				viteReact(),
 				babel({ presets: [reactCompilerPreset()] }),
-				glitchtipClientSourceMaps(),
-				glitchtipServerSourceMaps(),
+				posthogClientSourceMaps(),
+				posthogServerSourceMaps(),
 			];
 
 	return {

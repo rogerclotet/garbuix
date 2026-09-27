@@ -82,111 +82,56 @@ refresh that volume after upgrades without waiting for confirmation.
 
 ### Observability
 
-#### GlitchTip
+#### PostHog error tracking
 
-GlitchTip runs independently of PostHog. Set the project DSN at
-runtime, then restart the app. Docker Compose passes these settings through.
-The public browser configuration is embedded in the SSR document, so changing
-the DSN does not require rebuilding the image.
+Set `POSTHOG_KEY` and `POSTHOG_HOST` to enable browser and server error reporting,
+independently of `ANALYTICS_ENABLED`; leave the key blank to disable it locally.
+`POSTHOG_ENVIRONMENT` labels reports and defaults to `NODE_ENV`.
 
-```dotenv
-GLITCHTIP_DSN=https://PUBLIC_KEY@glitchtip.example.com/1
-GLITCHTIP_ENVIRONMENT=production
-GLITCHTIP_TRACES_SAMPLE_RATE=0.1
-GLITCHTIP_ENABLE_LOGS=false
-```
+The browser uses PostHog's stack parser without loading its analytics SDK and
+sends errors through `/api/monitoring` without cookies or a referrer. The server
+sends `$exception` events with a fresh ID for each report, no person profiles,
+and no geo-IP enrichment. Reports contain error types, redacted messages, stack
+frames, build version and runtime, with no user/session IDs, request payloads,
+URLs, breadcrumbs, replay, general console logs or performance tracing.
+Do not put personal information in error messages; redaction cannot recognize
+every possible name or sensitive value.
 
-Leaving the DSN blank disables reporting. The integration captures browser
-exceptions and rejected promises before hydration, React/router errors,
-server-function and API failures, unhandled Node errors, and errors explicitly
-reported through `useObservability()` or `captureServerException()`. Server
-`console.error` calls are captured too, including errors handled internally by
-React's streaming renderer. `pnpm dev` and `pnpm start` preload the SDK before
-application dependencies load. Use `pnpm start` for production instrumentation.
-The nightly scheduler's puzzle and clue backfill commands preload it too, and
-flush queued reports when those processes exit.
+Uncaught browser errors, unhandled rejections, React/router errors, server
+functions, API failures, server-rendering errors and explicit capture calls are
+covered. Incoming client disconnects and usage-collection errors are excluded.
+Repeated captures of the same Error object are deduplicated in memory; reporting
+is capped at 10 errors/minute per page and 100/minute per server process.
 
-Errors include breadcrumbs, the build release, environment, and a `runtime`
-tag distinguishing `browser` from `server`. Account IDs are not attached to reports. Usage-collection requests and their
-breadcrumbs/spans are excluded. Request bodies, headers, cookies and
-query strings are removed from error/transaction request metadata. Avoid
-putting secrets in error messages, breadcrumbs, custom properties or logs.
-
-Performance sampling defaults to 10%, including page loads, navigations,
-requests, and actions wrapped in `observeServerAction()`. Set the rate to `0`
-to disable traces or `1` while verifying the setup. Error capture is independent
-of this rate. SDK session tracking and client reports are disabled; replay,
-profiling and feedback widgets are not enabled.
-
-[GlitchTip 6.1 and later support structured logs](https://glitchtip.com/blog/2026-03-23-glitchtip-6-1-released/).
-Set `GLITCHTIP_ENABLE_LOGS=true` to send `console.warn`/`console.error` as logs
-and enable explicit structured logging in browser or server code:
-
-```ts
-import { logger } from "@sentry/tanstackstart-react";
-
-logger.info("Puzzle generation completed", { date_key: dateKey });
-```
-
-Browser envelopes use `/api/monitoring`, which only forwards to the configured
-DSN, limits bodies to 1 MiB, and preserves GlitchTip's rate-limit headers. It
-does not forward app cookies or follow upstream redirects. This works with the
-app's existing same-origin Content Security Policy. The app server must be able
-to POST to GlitchTip's `/api/1/envelope/`, using the project ID from the DSN.
-If GlitchTip is behind Pangolin or another login gateway, give that ingest path
-non-interactive access. Source-map upload API calls must also reach GlitchTip
-with their bearer token, rather than redirecting to the gateway's login page.
-
-To upload source maps automatically during `pnpm build`, add:
+To upload source maps during `pnpm build`, configure:
 
 ```dotenv
-GLITCHTIP_URL=https://glitchtip.example.com
-GLITCHTIP_ORG=your-organization-slug
-GLITCHTIP_PROJECT=your-project-slug
-GLITCHTIP_AUTH_TOKEN=your-token
+POSTHOG_CLI_HOST=https://eu.posthog.com
+POSTHOG_CLI_PROJECT_ID=your-project-id
+POSTHOG_CLI_API_KEY=your-personal-api-key
 ```
 
-Use a token with `project:releases` and `org:read`. These values are build-only;
-the auth token never enters public runtime configuration. Compose mounts `.env`
-as a BuildKit secret for the upload step instead of copying it into the image.
-For direct Docker builds, pass `--secret id=glitchtip_env,src=.env`.
+Use a personal API key with **error tracking write** and **organization read**
+scopes, for the same project as `POSTHOG_KEY`. The CLI host is the PostHog UI/API
+host, while `POSTHOG_HOST` is the ingestion host. See [PostHog's CLI setup](https://posthog.com/docs/error-tracking/upload-source-maps/cli).
 
-The build adds matching debug IDs to the deployed JavaScript and maps. It
-composes both stages of server maps back to the original TypeScript. Browser
-maps and copies of their matching JS live in `.output/sourcemaps/client`,
-outside the served `.output/public` directory; server maps stay with the server
-chunks. Without an upload token, builds still prepare these files privately.
-Upload an existing build later with `pnpm glitchtip:upload`. Configured upload
-failures stop the build before the deployment script stops the running app.
+Docker mounts `.env` as the build-only `posthog_env` secret. Tokens stay out of
+browser bundles and image layers. Builds inject PostHog chunk IDs into the
+actual deployed JavaScript, compose Nitro's two server build stages back to
+TypeScript, and move client maps to `.output/sourcemaps/client` outside the
+public directory. Upload failures fail the build; without an API key, maps are
+prepared locally and uploading is skipped. Upload the same build later with
+`pnpm posthog:upload`, keeping `.output/server`, `.output/public` and
+`.output/sourcemaps` together. Configure error retention and alerts in PostHog.
 
-Events and uploads use `garbuix@<version>` from `version.json`. If you override
-`APP_VERSION`, give each distinct build a unique value. Keep `.output/server`,
-`.output/sourcemaps`, and `.output/public` from the same build together.
-
-To verify delivery, trigger a browser error with
-`setTimeout(() => { throw new Error("GlitchTip browser test"); }, 0)` in the
-browser console. In GlitchTip, check the event's release, environment and
-`runtime` tag. For source-map verification, temporarily throw from a known
-line in app code, build/upload, and confirm that line resolves to TS/TSX. Remove
-the test throw afterward. A quick server transport check is:
-
-```bash
-node --import ./instrument.server.ts --input-type=module -e '
-  import * as Sentry from "@sentry/tanstackstart-react";
-  Sentry.captureException(new Error("GlitchTip server test"));
-  await Sentry.flush(5000);
-'
-```
-
-In GlitchTip, create a [GET uptime monitor](https://glitchtip.com/documentation/uptime-monitoring/)
-for `https://your-app/api/health`, expecting status 200. This checks the running
-HTTP server. Monitor `/` as well if you want failures of the rendered page and
-its database dependencies to count as downtime. Configure project alerts in
-GlitchTip to receive error and downtime notifications.
+To verify delivery, throw an error from the browser console and check PostHog's
+Error Tracking view; verify source maps with an error thrown from built app code
+(console snippets have no uploaded source map).
+The existing `/api/health` endpoint remains available for external uptime checks.
 
 #### Anonymous daily usage
 
-The browser does not load PostHog. It sends an explicit, validated action to
+Usage collection does not load the PostHog analytics SDK. It sends an explicit, validated action to
 `/api/usage` without cookies or a referrer. The server increments a daily counter
 without recording individual events, account IDs, browser IDs or session IDs.
 At 00:15 Europe/Madrid the scheduler sends completed daily totals to PostHog.
@@ -361,7 +306,7 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 The menu's **Sobre el joc** page shows the version embedded in the running app.
 Production builds generate a 16-character content hash from the source, public
 assets, and build inputs. Identical inputs produce the same version, with no
-manual version bump. It also identifies the release in GlitchTip.
+manual version bump. It also identifies the release in PostHog.
 
 `APP_VERSION` can override the hash at build time. The generated manifest is
 available at `/version.json`; the About page uses the bundled value so an older

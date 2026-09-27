@@ -10,8 +10,8 @@ const error = vi.fn();
 vi.mock("./usage-client", () => ({
 	captureUsage: (event: unknown) => capture(event),
 }));
-vi.mock("@sentry/tanstackstart-react", () => ({
-	captureException: (...args: unknown[]) => error(...args),
+vi.mock("./error-tracking-client", () => ({
+	captureBrowserException: (...args: unknown[]) => error(...args),
 }));
 afterEach(() => {
 	capture.mockClear();

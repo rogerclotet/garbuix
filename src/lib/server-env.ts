@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { glitchtipEnvSchema } from "./glitchtip-config";
+import { posthogEnvSchema } from "./error-tracking-config";
 
 const optionalEnvString = z.preprocess(
 	(value) =>
@@ -35,7 +35,7 @@ const authSecretSchema = isProduction
 	: z.string().min(1).default(DEV_AUTH_SECRET);
 
 const serverEnvSchema = z.object({
-	...glitchtipEnvSchema.shape,
+	...posthogEnvSchema.shape,
 	BETTER_AUTH_SECRET: authSecretSchema,
 	DATABASE_URL: z
 		.string()
@@ -47,11 +47,6 @@ const serverEnvSchema = z.object({
 		.enum(["true", "false"])
 		.default("false")
 		.transform((value) => value === "true"),
-	POSTHOG_HOST: z.preprocess(
-		(value) => (value === "" ? undefined : value),
-		z.string().url().optional(),
-	),
-	POSTHOG_KEY: optionalEnvString,
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

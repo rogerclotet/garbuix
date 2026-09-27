@@ -14,8 +14,10 @@ const HASHED_FILES = [
 	"pnpm-lock.yaml",
 	"vite.config.ts",
 	"instrument.server.ts",
-	"scripts/glitchtip-build.ts",
-	"scripts/glitchtip-sourcemaps.ts",
+	"scripts/posthog-build.ts",
+	"scripts/posthog-cli.ts",
+	"scripts/posthog-inject.ts",
+	"scripts/posthog-sourcemaps.ts",
 ];
 
 // Build artifacts. Hashing them would make the version depend on whether a

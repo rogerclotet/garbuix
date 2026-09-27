@@ -44,9 +44,9 @@ function PrivacyPage() {
 			<section className="space-y-3">
 				<h3 className="text-base font-semibold">Errors tècnics</h3>
 				<p>
-					Podem fer servir GlitchTip per detectar errors i problemes de
-					rendiment. Eliminem dels informes els identificadors de compte i el
-					contingut de les peticions.
+					Podem fer servir PostHog per detectar errors tècnics. Els informes
+					inclouen el tipus d'error i el punt del codi on s'ha produït, sense
+					associar-los al teu compte ni incloure el contingut de les peticions.
 				</p>
 			</section>
 			<footer className="border-t border-border/40 pt-5 text-muted-foreground">

@@ -1,9 +1,17 @@
-import {
-	sentryGlobalFunctionMiddleware,
-	sentryGlobalRequestMiddleware,
-} from "@sentry/tanstackstart-react";
 import { createMiddleware, createStart } from "@tanstack/react-start";
+import { getErrorReporter } from "@/lib/error-tracking.server";
 import { getSecurityHeaders } from "@/lib/security-headers";
+
+const errorFunctionMiddleware = createMiddleware({ type: "function" }).server(
+	async ({ next }) => {
+		try {
+			return await next();
+		} catch (error) {
+			getErrorReporter()?.capture(error, false);
+			throw error;
+		}
+	},
+);
 
 // Runs for every request Start handles — SSR documents, server functions and
 // the API routes. Nitro route rules cover static assets but never reach these,
@@ -33,6 +41,6 @@ const securityHeadersMiddleware = createMiddleware({ type: "request" }).server(
 );
 
 export const startInstance = createStart(() => ({
-	requestMiddleware: [sentryGlobalRequestMiddleware, securityHeadersMiddleware],
-	functionMiddleware: [sentryGlobalFunctionMiddleware],
+	requestMiddleware: [securityHeadersMiddleware],
+	functionMiddleware: [errorFunctionMiddleware],
 }));

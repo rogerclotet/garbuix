@@ -1,10 +1,9 @@
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { createConnection, type Socket } from "node:net";
-import type { Event } from "@sentry/tanstackstart-react";
 import { HTTPError } from "nitro/h3";
 import { expect, it } from "vitest";
-import { prepareGlitchTipServerEvent } from "./glitchtip-server-event";
+import { isIncomingRequestAbort } from "./error-tracking.server";
 
 it("drops the real incoming disconnect and H3's wrapper around it", async () => {
 	let start = () => {};
@@ -37,15 +36,14 @@ it("drops the real incoming disconnect and H3's wrapper around it", async () => 
 		const error = await aborted;
 		expect(error).toMatchObject({ message: "aborted", code: "ECONNRESET" });
 		for (const originalException of [error, new HTTPError(error)]) {
-			expect(prepareGlitchTipServerEvent({}, { originalException })).toBeNull();
+			expect(isIncomingRequestAbort(originalException)).toBe(true);
 		}
 		// A domain failure must still be reported even if it has this cause.
-		const event: Event = { message: "Saving progress failed" };
 		expect(
-			prepareGlitchTipServerEvent(event, {
-				originalException: new Error(event.message, { cause: error }),
-			}),
-		).toBe(event);
+			isIncomingRequestAbort(
+				new Error("Saving progress failed", { cause: error }),
+			),
+		).toBe(false);
 	} finally {
 		client?.destroy();
 		server.closeAllConnections();
@@ -56,10 +54,7 @@ it("drops the real incoming disconnect and H3's wrapper around it", async () => 
 it("keeps malformed HTTPError cause chains without looping", () => {
 	const error = new HTTPError({ message: "aborted", status: 500 });
 	Object.defineProperty(error, "cause", { value: error });
-	const event: Event = { message: "failure" };
-	expect(prepareGlitchTipServerEvent(event, { originalException: error })).toBe(
-		event,
-	);
+	expect(isIncomingRequestAbort(error)).toBe(false);
 });
 
 it.each([
@@ -70,24 +65,12 @@ it.each([
 	new HTTPError({ message: "aborted", status: 500 }),
 	undefined,
 ])("preserves unconfirmed aborts, timeouts and other errors: %s", (error) => {
-	const event: Event = { message: "failure" };
-	expect(prepareGlitchTipServerEvent(event, { originalException: error })).toBe(
-		event,
-	);
+	expect(isIncomingRequestAbort(error)).toBe(false);
 });
 
-it("preserves upstream connection resets and still scrubs request secrets", () => {
+it("preserves upstream connection resets", () => {
 	const error = Object.assign(new Error("aborted"), { code: "ECONNRESET" });
 	error.stack =
 		"Error: aborted\n    at socketCloseListener (node:_http_client:500:12)";
-	const event: Event = {
-		request: {
-			url: "https://garbuix.app/api/clue-requests/test?token=secret",
-			headers: { Cookie: "secret" },
-			data: "private body",
-		},
-	};
-	expect(
-		prepareGlitchTipServerEvent(event, { originalException: error }),
-	).toEqual({ request: { url: "https://garbuix.app/api/clue-requests/test" } });
+	expect(isIncomingRequestAbort(error)).toBe(false);
 });

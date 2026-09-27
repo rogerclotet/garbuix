@@ -1,11 +1,20 @@
-// Also initializes Vite's isolated development worker. Production preloads it
-// before importing the app so database and HTTP libraries can be instrumented.
+// Initializes both Vite's worker and the production server. The reporter is
+// shared with the Node preload, which also covers maintenance scripts.
 import "../instrument.server";
-import { wrapFetchWithSentry } from "@sentry/tanstackstart-react";
 import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
+import { getErrorReporter } from "./lib/error-tracking.server";
 
-export default createServerEntry(
-	wrapFetchWithSentry({
-		fetch: (request) => handler.fetch(request),
-	}),
-);
+export default createServerEntry({
+	async fetch(request) {
+		const reporter = getErrorReporter();
+		const run = async () => {
+			try {
+				return await handler.fetch(request);
+			} catch (error) {
+				reporter?.capture(error, false);
+				throw error;
+			}
+		};
+		return reporter ? reporter.withRequest(request.url, run) : run();
+	},
+});

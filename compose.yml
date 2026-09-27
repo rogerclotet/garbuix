@@ -46,7 +46,7 @@ services:
       context: .
       target: production
       secrets:
-        - glitchtip_env
+        - posthog_env
     image: paraules-app:prod
     depends_on:
       db:
@@ -64,10 +64,7 @@ services:
       ANALYTICS_ENABLED: "${ANALYTICS_ENABLED:-false}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
+      POSTHOG_ENVIRONMENT: "${POSTHOG_ENVIRONMENT:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     ports:
@@ -79,7 +76,7 @@ services:
       context: .
       target: scheduler
       secrets:
-        - glitchtip_env
+        - posthog_env
     image: paraules-scheduler:prod
     depends_on:
       db:
@@ -97,10 +94,7 @@ services:
       ANALYTICS_ENABLED: "${ANALYTICS_ENABLED:-false}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
+      POSTHOG_ENVIRONMENT: "${POSTHOG_ENVIRONMENT:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     restart: unless-stopped
@@ -110,7 +104,7 @@ services:
       context: .
       target: production
       secrets:
-        - glitchtip_env
+        - posthog_env
     image: paraules-app:prod
     command: ["pnpm", "backfill:puzzles"]
     depends_on:
@@ -125,10 +119,7 @@ services:
       ANALYTICS_ENABLED: "${ANALYTICS_ENABLED:-false}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
+      POSTHOG_ENVIRONMENT: "${POSTHOG_ENVIRONMENT:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     profiles: ["ops"]
@@ -140,5 +131,5 @@ volumes:
 
 # Available only during the source-map upload step, never copied into an image.
 secrets:
-  glitchtip_env:
+  posthog_env:
     file: .env

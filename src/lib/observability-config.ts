@@ -5,15 +5,7 @@ export function getObservabilityConfig(): ObservabilityConfig {
 	const env = getServerEnv();
 
 	return {
-		glitchtip: env.GLITCHTIP_DSN
-			? {
-					dsn: env.GLITCHTIP_DSN,
-					environment:
-						env.GLITCHTIP_ENVIRONMENT ?? process.env.NODE_ENV ?? "development",
-					tracesSampleRate: env.GLITCHTIP_TRACES_SAMPLE_RATE,
-					enableLogs: env.GLITCHTIP_ENABLE_LOGS,
-				}
-			: undefined,
+		errorTrackingEnabled: Boolean(env.POSTHOG_KEY && env.POSTHOG_HOST),
 		analyticsEnabled: env.ANALYTICS_ENABLED,
 	};
 }

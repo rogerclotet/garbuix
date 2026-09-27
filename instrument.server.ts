@@ -1,60 +1,55 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { loadEnvFile } from "node:process";
-import * as Sentry from "@sentry/tanstackstart-react";
 import { z } from "zod";
-import { glitchtipEnvSchema } from "./src/lib/glitchtip-config.ts";
-import { scrubGlitchTipEvent } from "./src/lib/glitchtip-scrub.ts";
-import { prepareGlitchTipServerEvent } from "./src/lib/glitchtip-server-event.ts";
+import { posthogEnvSchema } from "./src/lib/error-tracking-config.ts";
+import {
+	createErrorReporter,
+	getErrorReporter,
+} from "./src/lib/error-tracking.server.ts";
 
-// Vite loads .env after this preload runs. Preserve variables supplied by Docker
-// or the shell, and allow deployments without a local .env file.
 if (existsSync(".env")) loadEnvFile(".env");
-
-const env = glitchtipEnvSchema.parse(process.env);
-
-if (env.GLITCHTIP_DSN && !Sentry.getClient()) {
+const env = posthogEnvSchema.parse(process.env);
+if (env.POSTHOG_KEY && env.POSTHOG_HOST && !getErrorReporter()) {
 	const manifestPath =
 		process.env.NODE_ENV === "production"
-			? "./.output/public/version.json"
-			: "./public/version.json";
+			? ".output/public/version.json"
+			: "public/version.json";
 	let version = "dev";
 	try {
 		version = z
 			.object({ version: z.string() })
-			.parse(JSON.parse(readFileSync(resolve(manifestPath), "utf8"))).version;
+			.parse(JSON.parse(readFileSync(manifestPath, "utf8"))).version;
 	} catch {
-		// A development checkout need not have a build manifest yet.
 		if (process.env.NODE_ENV === "production")
 			throw new Error(
 				"Missing build version. Run pnpm build before starting the server.",
 			);
 	}
-
-	Sentry.init({
-		dsn: env.GLITCHTIP_DSN,
+	const reporter = createErrorReporter({
+		key: env.POSTHOG_KEY,
+		host: env.POSTHOG_HOST,
 		environment:
-			env.GLITCHTIP_ENVIRONMENT ?? process.env.NODE_ENV ?? "development",
+			env.POSTHOG_ENVIRONMENT ?? process.env.NODE_ENV ?? "development",
 		release: `garbuix@${version}`,
-		tracesSampleRate: env.GLITCHTIP_TRACES_SAMPLE_RATE,
-		enableLogs: env.GLITCHTIP_ENABLE_LOGS,
-		sendDefaultPii: false,
-		sendClientReports: false,
-		beforeSend: prepareGlitchTipServerEvent,
-		beforeSendTransaction: scrubGlitchTipEvent,
-		integrations: (defaults) => [
-			...defaults.filter((integration) => integration.name !== "HttpSession"),
-			// React's streaming SSR renderer logs errors that it handles internally.
-			Sentry.captureConsoleIntegration({ levels: ["error"] }),
-			...(env.GLITCHTIP_ENABLE_LOGS
-				? [Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] })]
-				: []),
-		],
-		initialScope: { tags: { runtime: "server" } },
 	});
-	Sentry.registerSentryServerTunnelRoute("/api/monitoring");
-	// Let short-lived maintenance jobs deliver queued events before exiting.
+	globalThis.__garbuixErrorReporter = reporter;
+	const originalConsoleError = console.error.bind(console);
+	console.error = (...args: unknown[]) => {
+		originalConsoleError(...args);
+		// React's streaming renderer handles some errors internally and logs them.
+		// Never serialize arbitrary log arguments, which may contain request data.
+		const error = args.find((value) => value instanceof Error);
+		if (error) reporter.capture(error);
+	};
+	// Unhandled rejections become uncaught exceptions under Node's default mode.
+	// Preserve a failing process exit after allowing the report to finish.
+	process.on("uncaughtException", async (error) => {
+		originalConsoleError(error);
+		reporter.capture(error, false);
+		await reporter.flush();
+		process.exit(1);
+	});
 	process.once("beforeExit", () => {
-		void Sentry.flush(2000);
+		void reporter.flush();
 	});
 }

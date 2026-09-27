@@ -1,8 +1,8 @@
 import "./instrument.client";
-import * as Sentry from "@sentry/tanstackstart-react";
 import { StartClient } from "@tanstack/react-start/client";
 import { StrictMode, startTransition } from "react";
 import { hydrateRoot } from "react-dom/client";
+import { captureBrowserException } from "./lib/error-tracking-client";
 
 startTransition(() => {
 	hydrateRoot(
@@ -11,8 +11,9 @@ startTransition(() => {
 			<StartClient />
 		</StrictMode>,
 		{
-			onUncaughtError: Sentry.reactErrorHandler(),
-			onRecoverableError: Sentry.reactErrorHandler(),
+			onUncaughtError: (error) => captureBrowserException(error, false),
+			onRecoverableError: (error) => captureBrowserException(error),
+			onCaughtError: (error) => captureBrowserException(error),
 		},
 	);
 });

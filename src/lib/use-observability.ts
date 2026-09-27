@@ -1,5 +1,5 @@
-import * as Sentry from "@sentry/tanstackstart-react";
 import { useContext, useMemo } from "react";
+import { captureBrowserException } from "@/lib/error-tracking-client";
 import { captureUsage } from "@/lib/usage-client";
 import { UsageEnabledContext } from "@/lib/usage-context";
 import type { UsageAction } from "@/lib/usage-events";
@@ -12,7 +12,8 @@ export function useObservability() {
 				if (enabled) captureUsage(action);
 			},
 			captureException(error: unknown, properties?: Record<string, unknown>) {
-				Sentry.captureException(error, { extra: properties });
+				void properties;
+				captureBrowserException(error);
 			},
 		}),
 		[enabled],

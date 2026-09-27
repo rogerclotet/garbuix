@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import {
 	copyFile,
 	mkdir,
@@ -8,13 +7,13 @@ import {
 	rm,
 } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import SentryCli from "@sentry/cli";
 import type { Plugin } from "vite";
+import { injectPostHogSourceMaps } from "./posthog-inject.ts";
 
-export function glitchtipServerSourceMaps(): Plugin {
+export function posthogServerSourceMaps(): Plugin {
 	const intermediateDir = `${resolve("node_modules/.nitro/vite/services")}/`;
 	return {
-		name: "glitchtip-server-source-maps",
+		name: "posthog-server-source-maps",
 		apply: "build",
 		applyToEnvironment: (environment) => environment.name === "nitro",
 		async load(id) {
@@ -39,9 +38,9 @@ export function glitchtipServerSourceMaps(): Plugin {
 	};
 }
 
-export function glitchtipClientSourceMaps(): Plugin {
+export function posthogClientSourceMaps(): Plugin {
 	return {
-		name: "glitchtip-client-source-maps",
+		name: "posthog-client-source-maps",
 		apply: "build",
 		applyToEnvironment: (environment) => environment.name === "client",
 		writeBundle: {
@@ -52,11 +51,7 @@ export function glitchtipClientSourceMaps(): Plugin {
 				const archiveDir = resolve(".output/sourcemaps/client");
 				// Nitro computes static asset sizes and ETags after the client build.
 				// Inject before that happens, and remove maps before it indexes them.
-				execFileSync(
-					SentryCli.getPath(),
-					["sourcemaps", "inject", "--quiet", join(publicDir, "assets")],
-					{ stdio: "inherit" },
-				);
+				await injectPostHogSourceMaps(join(publicDir, "assets"));
 				await rm(archiveDir, { recursive: true, force: true });
 				await archiveMaps(publicDir, publicDir, archiveDir);
 			},

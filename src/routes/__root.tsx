@@ -20,9 +20,9 @@ import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
-	GLITCHTIP_CONFIG_ID,
-	serializeGlitchTipConfig,
-} from "@/lib/glitchtip-config";
+	ERROR_TRACKING_CONFIG_ID,
+	serializeErrorTrackingConfig,
+} from "@/lib/error-tracking-config";
 import { materialThemeCss } from "@/lib/material-theme";
 import { getObservabilityConfig } from "@/lib/observability-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
@@ -97,10 +97,10 @@ function RootDocument() {
 			suppressHydrationWarning
 		>
 			<head>
-				{/* Public runtime settings for the browser SDK, available before
+				{/* Public runtime setting for the error reporter, available before
 				    React hydration. application/json keeps this block inert. */}
-				<script id={GLITCHTIP_CONFIG_ID} type="application/json">
-					{serializeGlitchTipConfig(observability.glitchtip)}
+				<script id={ERROR_TRACKING_CONFIG_ID} type="application/json">
+					{serializeErrorTrackingConfig(observability.errorTrackingEnabled)}
 				</script>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
