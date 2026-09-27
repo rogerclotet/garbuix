@@ -7,7 +7,7 @@ import {
 	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
-} from "./daily-helpers";
+} from "@/lib/puzzle-helpers";
 
 function buildHintPuzzle(hintCellKeys: string[]) {
 	return {

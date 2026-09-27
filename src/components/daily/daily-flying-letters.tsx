@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
+import { getSlotCellKey } from "@/lib/puzzle-helpers";
 import type { DailyPuzzleWordSlot } from "@/lib/puzzle-types";
-import { getSlotCellKey } from "./daily-helpers";
 
 const FLY_DURATION_MS = 740;
 const STAGGER_MS = 42;

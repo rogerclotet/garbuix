@@ -8,25 +8,25 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
-import { DailyConfetti } from "@/components/daily/daily-confetti";
-import { DailyControls } from "@/components/daily/daily-controls";
-import { DailyGrid } from "@/components/daily/daily-grid";
-import {
-	buildCellLetters,
-	buildRevealedCells,
-	getDisplayedSlotWord,
-	getGuessKeyboardAction,
-	getRandomHintCellKey,
-	getWordCellKeys,
-} from "@/components/daily/daily-helpers";
-import { DailyLoadingPage } from "@/components/daily/daily-loading";
-import { useDailyRollover } from "@/components/daily/use-daily-rollover";
-import { useDecodedProgress } from "@/components/daily/use-decoded-progress";
 import { useMiniProgress } from "@/components/mini/use-mini-progress";
+import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
+import { PuzzleControls } from "@/components/puzzle/puzzle-controls";
+import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
+import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
+import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
+import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
+import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import { Button } from "@/components/ui/button";
 import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import { getMiniPageData } from "@/lib/mini-server-fns";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
+import {
+	buildCellLetters,
+	buildRevealedCells,
+	getDisplayedSlotWord,
+	getRandomHintCellKey,
+	getWordCellKeys,
+} from "@/lib/puzzle-helpers";
 import { shuffleArray } from "@/lib/shuffle";
 import { useObservability } from "@/lib/use-observability";
 
@@ -183,47 +183,18 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		userId,
 	]);
 
-	useEffect(() => {
-		if (!isPresentable || expired || complete) return;
-		const handleKey = (event: KeyboardEvent) => {
-			const target = event.target;
-			if (
-				event.ctrlKey ||
-				event.metaKey ||
-				event.altKey ||
-				document.querySelector(
-					'[role="dialog"], [role="alertdialog"], [role="menu"]',
-				)
-			)
-				return;
-			if (
-				target instanceof HTMLElement &&
-				(target.isContentEditable ||
-					["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-			)
-				return;
-			if (
-				target instanceof HTMLElement &&
-				target.closest("button, a") &&
-				(event.key === "Enter" || event.key === " ")
-			)
-				return;
-			const action = getGuessKeyboardAction(
-				event.key,
-				puzzle.letters,
-				event.code,
-			);
-			if (!action) return;
-			event.preventDefault();
-			if (submitting.current) return;
-			if (action.type === "append_letter") appendLetter(action.letter);
-			else if (action.type === "backspace")
-				setGuess((current) => current.slice(0, -1));
-			else void submit();
-		};
-		window.addEventListener("keydown", handleKey);
-		return () => window.removeEventListener("keydown", handleKey);
-	}, [appendLetter, complete, expired, isPresentable, puzzle.letters, submit]);
+	usePuzzleKeyboard({
+		enabled: isPresentable && !expired && !complete,
+		letters: puzzle.letters,
+		guess,
+		minimumGuessLength: 3,
+		isBusy: () => submitting.current,
+		onLetter: appendLetter,
+		onBackspace: () => setGuess((current) => current.slice(0, -1)),
+		onSubmit: () => {
+			void submit();
+		},
+	});
 
 	useEffect(() => {
 		if (highlightedWordId === null && locateId === null) return;
@@ -261,7 +232,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 
 	if (!isPresentable) {
 		return (
-			<DailyLoadingPage
+			<PuzzleLoadingPage
 				synchronizing={Boolean(userId)}
 				onRetry={decoded.hasError ? decoded.retry : undefined}
 			/>
@@ -281,7 +252,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 			className="mini-game mx-auto h-full max-w-4xl px-4 pt-2 lg:flex lg:h-auto lg:min-h-full lg:flex-col lg:px-6 lg:pb-[calc(env(safe-area-inset-bottom)+1rem)] lg:pt-6"
 			style={layoutStyle}
 		>
-			<DailyConfetti fire={celebrate} />
+			<PuzzleConfetti fire={celebrate} />
 			{/* The word list starts behind the fixed panel and scrolls clear of it. */}
 			<div className="flex h-[calc(100%_-_var(--mini-panel-h))] flex-col gap-2 pb-2 lg:contents">
 				<div
@@ -315,7 +286,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 						ref={boardRef}
 						className="mx-auto flex min-h-0 w-full max-w-sm flex-1 lg:aspect-square lg:max-w-md"
 					>
-						<DailyGrid
+						<PuzzleGrid
 							fitHeight
 							puzzle={puzzle}
 							revealedCells={new Set(cellLetters.keys())}
@@ -358,7 +329,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 									disabled={!ready || busy || expired}
 									aria-label="Forma una paraula"
 								>
-									<DailyControls
+									<PuzzleControls
 										mini
 										inline
 										aiClueMode={false}

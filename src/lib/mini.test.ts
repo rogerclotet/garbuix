@@ -1,8 +1,4 @@
 import { describe, expect, it } from "vitest";
-import {
-	buildRevealedCells,
-	getRandomHintCellKey,
-} from "@/components/daily/daily-helpers";
 import { MINI_WORDS } from "@/data/mini-words";
 import { generateMiniCrossword } from "@/lib/mini-generator";
 import { applyMiniEvent, mergeMiniProgress } from "@/lib/mini-progress";
@@ -12,6 +8,7 @@ import {
 	resolveGuess,
 } from "@/lib/puzzle-client";
 import { addDaysToDateKey } from "@/lib/puzzle-dates";
+import { buildRevealedCells, getRandomHintCellKey } from "@/lib/puzzle-helpers";
 import {
 	applyPuzzleEvent,
 	createEmptyProgressState,

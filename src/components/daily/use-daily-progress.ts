@@ -15,6 +15,7 @@ import {
 	setReportedAnonProgress,
 } from "@/lib/anon-identity";
 import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
+import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import {
 	buildAnonymousImportPayload,
 	clearAnonymousProgress,
@@ -47,7 +48,6 @@ import type {
 } from "@/lib/puzzle-types";
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 import { useObservability } from "@/lib/use-observability";
-import { buildHistoryEntry } from "./daily-helpers";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
 const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";

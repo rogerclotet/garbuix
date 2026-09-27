@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { sealAnswerCapsule, sealHintCapsule } from "@/lib/puzzle-crypto";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
-import { useDecodedProgress } from "./use-decoded-progress";
 
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@/lib/use-observability", () => ({

@@ -1,5 +1,4 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { buildHistoryEntry } from "@/components/daily/daily-helpers";
 import { miniProgress, miniPuzzles } from "@/db/schema";
 import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
@@ -11,6 +10,7 @@ import { mergeMiniProgress } from "@/lib/mini-progress";
 import { captureServerEvent } from "@/lib/observability-server";
 import { createUnlockToken } from "@/lib/puzzle-crypto";
 import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
+import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
 

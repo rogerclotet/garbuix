@@ -1,6 +1,6 @@
 import { type CSSProperties, useMemo } from "react";
+import { getSlotCellKey } from "@/lib/puzzle-helpers";
 import type { DailyPuzzlePublic, PuzzleWordSlot } from "@/lib/puzzle-types";
-import { getSlotCellKey } from "./daily-helpers";
 
 export type PuzzleBoard = Pick<
 	DailyPuzzlePublic,
@@ -9,7 +9,7 @@ export type PuzzleBoard = Pick<
 	wordSlots: PuzzleWordSlot[];
 };
 
-type DailyGridProps = {
+type PuzzleGridProps = {
 	puzzle: PuzzleBoard;
 	revealedCells: Set<string>;
 	cellLetters: Map<string, string>;
@@ -26,7 +26,7 @@ type DailyGridProps = {
 	fitHeight?: boolean;
 };
 
-export function DailyGrid({
+export function PuzzleGrid({
 	puzzle,
 	revealedCells,
 	cellLetters,
@@ -39,7 +39,7 @@ export function DailyGrid({
 	clueCellsFading = false,
 	locateCells,
 	fitHeight = false,
-}: DailyGridProps) {
+}: PuzzleGridProps) {
 	const animatingCellKeys = useMemo(() => {
 		if (animatingWordId == null) {
 			return new Set<string>();

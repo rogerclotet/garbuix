@@ -1,4 +1,4 @@
-import { buildRevealedCells } from "@/components/daily/daily-helpers";
+import { buildRevealedCells } from "@/lib/puzzle-helpers";
 import { applyPuzzleEvent, mergeProgressStates } from "@/lib/puzzle-progress";
 import type {
 	DailyPuzzlePublic,

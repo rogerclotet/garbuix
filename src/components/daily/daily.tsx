@@ -1,117 +1,43 @@
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
 import { MiniAnnouncementDialog } from "@/components/mini/mini-announcement-dialog";
-import {
-	openProfilePreferencesTip,
-	useProfilePreferencesTipOpen,
-} from "@/components/profile-preferences-tip-store";
-import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
+import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
+import { PuzzleControls } from "@/components/puzzle/puzzle-controls";
+import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
+import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
+import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
+import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
+import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
-	getSkipSharePreview,
-	isVibrationEnabled,
 	type LetterLayout,
 } from "@/lib/anon-identity";
-import { authClient } from "@/lib/auth-client";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
-import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
-import {
-	getDeviceId,
-	getSortedAnonymousHistoryEntries,
-	hasSeenHowToPlay,
-	hasSeenMiniAnnouncement,
-	hasSeenProfilePreferencesTip,
-	hasSeenWelcome,
-	markMiniAnnouncementSeen,
-	markProfilePreferencesTipSeen,
-	markWelcomeSeen,
-} from "@/lib/puzzle-local";
+import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
+import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
-import {
-	calculateHistoryStreaks,
-	upsertHistoryEntry,
-} from "@/lib/puzzle-streaks";
-import { formatGuess, getPlayableWordLetters } from "@/lib/puzzle-text";
-import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
-import { shuffleArray } from "@/lib/shuffle";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { useClueRequests } from "@/lib/use-clue-requests";
 import { useObservability } from "@/lib/use-observability";
-import { useWordClues } from "@/lib/use-word-clues";
-import { DailyConfetti } from "./daily-confetti";
-import { DailyControls } from "./daily-controls";
-import {
-	buildFlyingLetterPaths,
-	DailyFlyingLetters,
-	type FlyingLettersAnimation,
-	GRID_GUESS_BOUNCE_MS,
-	getWordCellKeysInOrder,
-	HIGHLIGHT_AFTER_LAND_MS,
-} from "./daily-flying-letters";
-import { DailyGrid } from "./daily-grid";
-import { setDailyHeaderSummary } from "./daily-header-store";
-import {
-	buildCellLetters,
-	buildHistoryEntry,
-	buildRevealedCells,
-	getGuessKeyboardAction,
-	getRandomHintCellKey,
-	getSlotCellKey,
-	getSlotHintCellKey,
-	getSortedWordSlots,
-	getWordCellKeys,
-} from "./daily-helpers";
-import { DailyLoadingPage } from "./daily-loading";
-import type {
-	DailyData,
-	DailySessionUser,
-	DailySubmitFeedback,
-} from "./daily-types";
+import { DailyFlyingLetters } from "./daily-flying-letters";
+import { DailyStatus } from "./daily-status";
+import type { DailyData, DailySessionUser } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
-import { openHowToPlay, useHowToPlayOpen } from "./how-to-play-store";
 import { SharePreviewDialog } from "./share-preview-dialog";
-import { shareProgress } from "./share-progress";
+import { useDailyActions } from "./use-daily-actions";
+import { useDailyAnimations } from "./use-daily-animations";
+import { useDailyClues } from "./use-daily-clues";
+import { useDailyCompletion } from "./use-daily-completion";
+import { useDailyOnboarding } from "./use-daily-onboarding";
 import { useDailyProgress } from "./use-daily-progress";
-import { useDecodedProgress } from "./use-decoded-progress";
+import { useDailyShare } from "./use-daily-share";
 import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
 
-const POINTER_CLICK_DEDUP_MS = 350;
-const SUBMIT_FEEDBACK_DURATION_MS = 520;
-const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
-const HAPTIC_TAP_MS = 14;
-const HAPTIC_SUBMIT_MS = 18;
-const HAPTIC_SUCCESS_PATTERN = [14, 28, 20];
-const HAPTIC_ERROR_PATTERN = [24, 32, 16];
-// If an AI clue can't be loaded within this window, degrade to a silent
-// single-letter reveal so the hint button never feels broken.
-const CLUE_FETCH_LETTER_FALLBACK_MS = 8000;
-// How long a freshly requested clue's grid ring stays lit before fading out, and
-// the fade duration itself (kept in sync with the CSS opacity transition).
-const CLUE_GRID_HIGHLIGHT_MS = 5000;
-const CLUE_GRID_FADE_MS = 600;
-// Duration of the teal tap-to-locate flash (kept in sync with the CSS animation).
-const LOCATE_FLASH_MS = 1300;
 // Room the classic keypad claims until it has reported its real height: roughly
 // the circle arrangement, which is what the server renders. Only the first
 // paint uses it, and only the board's size depends on it.
 const CLASSIC_KEYPAD_FALLBACK_HEIGHT = "17rem";
-// Number of valid off-puzzle words the player must find to earn a free letter reveal.
-function getSubmitFeedbackDuration() {
-	if (
-		typeof window === "undefined" ||
-		typeof window.matchMedia !== "function"
-	) {
-		return SUBMIT_FEEDBACK_DURATION_MS;
-	}
-
-	return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-		? REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS
-		: SUBMIT_FEEDBACK_DURATION_MS;
-}
-
 // The width at which the board switches to its two-column desktop layout,
 // where the keypad lives in a narrow side column. Matches the `lg:` breakpoint
 // the classic layout is built on.
@@ -136,19 +62,6 @@ function useIsDesktopLayout(): boolean {
 	}, []);
 
 	return isDesktop;
-}
-
-function isEditableTarget(target: EventTarget | null) {
-	if (!(target instanceof HTMLElement)) {
-		return false;
-	}
-
-	return (
-		target.isContentEditable ||
-		target.closest(
-			"input, textarea, select, [contenteditable='true'], [role='textbox']",
-		) !== null
-	);
 }
 
 export function Daily({ initialData }: { initialData: DailyData }) {
@@ -184,29 +97,6 @@ function DailyGame({
 	const isDesktopLayout = useIsDesktopLayout();
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
-	const [currentGuess, setCurrentGuess] = useState("");
-	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
-		null,
-	);
-	const [flyingLettersAnimation, setFlyingLettersAnimation] =
-		useState<FlyingLettersAnimation | null>(null);
-	const [animatingWordId, setAnimatingWordId] = useState<number | null>(null);
-	const [animatingPreExistingLetters, setAnimatingPreExistingLetters] =
-		useState<Set<string>>(() => new Set());
-	const [landedAnimatingCells, setLandedAnimatingCells] = useState<Set<string>>(
-		() => new Set(),
-	);
-	const [bounceCells, setBounceCells] = useState<Set<string>>(() => new Set());
-	const bounceClearTimersRef = useRef<Map<string, number>>(new Map());
-	const flyingLettersIdRef = useRef(0);
-	const pendingFlyCompleteRef = useRef<{
-		wordId: number;
-		pathCount: number;
-	} | null>(null);
-	// Word ids the player just asked a clue for; drained into a toast once the
-	// clue text resolves. Reloads refetch every clue but add nothing here, so
-	// they stay quiet.
-	const pendingClueToastWordIdsRef = useRef<Set<number>>(new Set());
 	// A player can opt into any of the three arrangements via /preferencies.
 	// Initialise to the default so SSR markup is deterministic, then read the
 	// stored choice after mount.
@@ -218,67 +108,14 @@ function DailyGame({
 	// side column, so a seven-across row falls back to the grid.
 	const effectiveLetterLayout: LetterLayout =
 		letterLayout === "line" && isDesktopLayout ? "grid" : letterLayout;
-	const {
-		subscribe: subscribeClueRequests,
-		requestClue,
-		resolveClue,
-		incomingRequests,
-		respondToClue,
-		helpGivenRecords,
-		receivedClues,
-		requestedHelpWordIds,
-		publishSolvedWordIds,
-	} = useClueRequests();
-	// Clues delivered by other players (receivedClues) and the words this player
-	// asked help for (requestedHelpWordIds) both live in the provider so they
-	// persist across SSE reconnects and page reloads (replayed in the snapshot).
-	// Each response carries the responder's name so we can attribute the clue.
-	const [submitFeedback, setSubmitFeedback] =
-		useState<DailySubmitFeedback | null>(null);
 	// Bonus clues for valid off-puzzle words (default on; off = hardcore mode).
 	// Read from localStorage on mount, so SSR renders the default first.
 	const [bonusCluesEnabled, setBonusCluesEnabled] = useState(true);
-	const [anonymousHistoryEntries, setAnonymousHistoryEntries] = useState(
-		() => initialData.historyEntries ?? [],
-	);
-	// Transient grid highlight for a freshly requested AI clue: the gradient ring
-	// shows for 5s, then fades back to the regular cell colors.
-	const [clueGridCells, setClueGridCells] = useState<Set<string>>(new Set());
-	const [clueGridFading, setClueGridFading] = useState(false);
-	const clueGridFadeTimerRef = useRef<number | null>(null);
-	const clueGridClearTimerRef = useRef<number | null>(null);
-	// Transient teal flash on a word's grid cells when its list row is tapped.
-	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
-	const locateClearTimerRef = useRef<number | null>(null);
-	const gridRef = useRef<HTMLDivElement>(null);
 	// Height of the keypad pinned to the bottom of the classic board. Measured
 	// rather than assumed: which arrangement the letters use is a preference, and
 	// each one is a different height.
 	const [keypadHeight, setKeypadHeight] = useState<number | null>(null);
-	const lastPointerPressAtRef = useRef(0);
-	const highlightResetTimerRef = useRef<number | null>(null);
-	const submitFeedbackIdRef = useRef(0);
-	const submitFeedbackResetTimerRef = useRef<number | null>(null);
-	const completionTrackedRef = useRef(false);
-	const justCompletedRef = useRef(false);
-	const completionScheduledRef = useRef(false);
-	const completionTransitionTimerRef = useRef<number | null>(null);
-	const [isCompletionPending, setIsCompletionPending] = useState(false);
-	const [shouldFireConfetti, setShouldFireConfetti] = useState(false);
-	const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
-	const [welcomeOpen, setWelcomeOpen] = useState(false);
-	const [miniAnnouncementOpen, setMiniAnnouncementOpen] = useState(false);
-	const tutorialOpen = useHowToPlayOpen();
-	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
-	const firstVisitChecked = useRef(false);
-	const [winDialogOpen, setWinDialogOpen] = useState(false);
-	const winDialogTimerRef = useRef<number | null>(null);
-	const { captureEvent, captureException } = useObservability();
-	const captureExceptionRef = useRef(captureException);
-	captureExceptionRef.current = captureException;
-	// Lets the header's share button reach the latest handler without making the
-	// published summary churn on every render.
-	const handleShareRef = useRef<() => Promise<void>>(async () => {});
+	const { captureEvent } = useObservability();
 	const {
 		applyLocalEvent,
 		derivedProgress: liveProgress,
@@ -309,156 +146,9 @@ function DailyGame({
 	const hintLetters = decoded?.hints ?? {};
 	const isPresentable = decoded !== null;
 
-	const clueTextsByWordId = useWordClues({
-		puzzleId: puzzle.id,
-		userId: activeUser?.id ?? null,
-		wordIds: [
-			...derivedProgress.clueWordIds,
-			...derivedProgress.guessedWordIds,
-		],
-		pendingEventCount,
-	});
-
-	useEffect(() => {
-		return () => {
-			if (highlightResetTimerRef.current != null) {
-				window.clearTimeout(highlightResetTimerRef.current);
-			}
-			if (submitFeedbackResetTimerRef.current != null) {
-				window.clearTimeout(submitFeedbackResetTimerRef.current);
-			}
-			if (completionTransitionTimerRef.current != null) {
-				window.clearTimeout(completionTransitionTimerRef.current);
-			}
-			if (winDialogTimerRef.current != null) {
-				window.clearTimeout(winDialogTimerRef.current);
-			}
-			if (clueGridFadeTimerRef.current != null) {
-				window.clearTimeout(clueGridFadeTimerRef.current);
-			}
-			if (clueGridClearTimerRef.current != null) {
-				window.clearTimeout(clueGridClearTimerRef.current);
-			}
-			if (locateClearTimerRef.current != null) {
-				window.clearTimeout(locateClearTimerRef.current);
-			}
-			for (const timer of bounceClearTimersRef.current.values()) {
-				window.clearTimeout(timer);
-			}
-			bounceClearTimersRef.current.clear();
-		};
-	}, []);
-
 	useEffect(() => {
 		setBonusCluesEnabled(getBonusCluesEnabled());
 	}, []);
-
-	useEffect(() => {
-		if (activeUser) {
-			setAnonymousHistoryEntries(initialData.historyEntries ?? []);
-			return;
-		}
-
-		setAnonymousHistoryEntries(getSortedAnonymousHistoryEntries());
-	}, [activeUser, initialData.historyEntries]);
-
-	const openHowToPlayIfFirstVisit = useCallback(() => {
-		if (hasSeenHowToPlay()) return;
-		openHowToPlay();
-		captureEvent(ANALYTICS_EVENT.HOW_TO_PLAY_SHOWN, {
-			game_mode: GAME_MODE.CLASSIC,
-			trigger: "first_visit",
-		});
-	}, [captureEvent]);
-
-	const openProfilePreferencesTipIfNeeded = useCallback(() => {
-		if (!hasSeenHowToPlay()) return false;
-		if (hasSeenProfilePreferencesTip()) return false;
-		markProfilePreferencesTipSeen();
-		openProfilePreferencesTip();
-		captureEvent(ANALYTICS_EVENT.PROFILE_PREFERENCES_TIP_SHOWN, {
-			game_mode: GAME_MODE.CLASSIC,
-			trigger: "return_visit",
-		});
-		return true;
-	}, [captureEvent]);
-
-	useEffect(() => {
-		if (!isPresentable || firstVisitChecked.current) return;
-		firstVisitChecked.current = true;
-
-		if (!hasSeenHowToPlay()) {
-			openHowToPlayIfFirstVisit();
-			return;
-		}
-
-		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
-		if (shouldShowWelcome) {
-			setWelcomeOpen(true);
-			captureEvent(ANALYTICS_EVENT.WELCOME_SHOWN, {
-				game_mode: GAME_MODE.CLASSIC,
-				trigger: "first_visit",
-			});
-			return;
-		}
-
-		if (openProfilePreferencesTipIfNeeded()) return;
-
-		// Decide only on arrival. Finishing onboarding must not queue another dialog.
-		if (
-			tutorialOpen ||
-			profilePreferencesTipOpen ||
-			welcomeOpen ||
-			sharePreviewOpen ||
-			winDialogOpen ||
-			hasSeenMiniAnnouncement()
-		)
-			return;
-		const hasLocalPlay =
-			derivedProgress.guessCount > 0 ||
-			derivedProgress.hintsUsed > 0 ||
-			getSortedAnonymousHistoryEntries().some(
-				(entry) =>
-					entry.guessCount > 0 || entry.hintsUsed > 0 || entry.guessedWords > 0,
-			);
-		if (!activeUser && !hasLocalPlay) return;
-		markMiniAnnouncementSeen();
-		setMiniAnnouncementOpen(true);
-	}, [
-		activeUser,
-		captureEvent,
-		openHowToPlayIfFirstVisit,
-		openProfilePreferencesTipIfNeeded,
-		isPresentable,
-		derivedProgress.guessCount,
-		derivedProgress.hintsUsed,
-		tutorialOpen,
-		profilePreferencesTipOpen,
-		welcomeOpen,
-		sharePreviewOpen,
-		winDialogOpen,
-	]);
-
-	const handleWelcomeOpenChange = useCallback(
-		(next: boolean) => {
-			setWelcomeOpen(next);
-			if (next) return;
-			markWelcomeSeen();
-			if (!hasSeenHowToPlay()) {
-				openHowToPlayIfFirstVisit();
-				return;
-			}
-			openProfilePreferencesTipIfNeeded();
-		},
-		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
-	);
-
-	const handleWelcomeContinueAnonymous = useCallback(() => {
-		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
-			game_mode: GAME_MODE.CLASSIC,
-			choice: "anonymous",
-		});
-	}, [captureEvent]);
 
 	useEffect(() => {
 		captureEvent(ANALYTICS_EVENT.PUZZLE_LOADED, {
@@ -478,888 +168,118 @@ function DailyGame({
 		totalWords,
 	]);
 
-	useEffect(() => {
-		const isComplete = derivedProgress.guessedWordIds.length === totalWords;
-		if (!isComplete || completionTrackedRef.current) {
-			return;
-		}
-
-		completionTrackedRef.current = true;
-		captureEvent(ANALYTICS_EVENT.PUZZLE_COMPLETED, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			guess_count: derivedProgress.guessCount,
-			hints_used: derivedProgress.hintsUsed,
-			is_authenticated: Boolean(activeUser),
-			puzzle_id: puzzle.id,
-		});
-	}, [
-		activeUser,
-		captureEvent,
-		derivedProgress.guessCount,
-		derivedProgress.guessedWordIds.length,
-		derivedProgress.hintsUsed,
-		puzzle.dateKey,
-		puzzle.id,
-		totalWords,
-	]);
-
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
 		[puzzle, derivedProgress],
 	);
-
-	// The clue-fetch effect reveals fallback letters off the latest progress
-	// without re-firing on every reveal; keep the moving parts in a ref so the
-	// effect can stay keyed on the requested clue words alone.
-	const fallbackContextRef = useRef({
-		revealedCells,
-		applyLocalEvent,
-		puzzle,
-		clueTextsByWordId,
-	});
-	fallbackContextRef.current = {
-		revealedCells,
-		applyLocalEvent,
-		puzzle,
-		clueTextsByWordId,
-	};
 
 	const cellLetters = useMemo(
 		() => buildCellLetters(puzzle.wordSlots, revealedAnswers, hintLetters),
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
 	);
 
-	const nextClueWordId = useMemo(() => {
-		const { notFoundSlots } = getSortedWordSlots(
-			puzzle.wordSlots,
-			derivedProgress.guessedWordIds,
-			cellLetters,
-		);
-		const requested = new Set(derivedProgress.clueWordIds);
-		const candidates = notFoundSlots.filter((slot) => !requested.has(slot.id));
-		if (candidates.length === 0) return null;
-		const choice = candidates[Math.floor(Math.random() * candidates.length)];
-		return choice?.id ?? null;
-	}, [
-		puzzle.wordSlots,
-		derivedProgress.guessedWordIds,
-		derivedProgress.clueWordIds,
-		cellLetters,
-	]);
-
-	const clueWordIdsKey = derivedProgress.clueWordIds.join(",");
-
-	// Light a clue word's grid ring for a few seconds, then fade it back to the
-	// regular cell colors so it reads as a transient cue, not a permanent mark.
-	// Only used for words that resolved to a real AI clue — letter fallbacks add
-	// the letter without highlighting the word.
-	const lightClueWordRing = useCallback(
-		(wordId: number) => {
-			const clueSlot = puzzle.wordSlots.find((slot) => slot.id === wordId);
-			if (!clueSlot) return;
-
-			if (clueGridFadeTimerRef.current != null) {
-				window.clearTimeout(clueGridFadeTimerRef.current);
-			}
-			if (clueGridClearTimerRef.current != null) {
-				window.clearTimeout(clueGridClearTimerRef.current);
-			}
-			setClueGridFading(false);
-			setClueGridCells(getWordCellKeys(clueSlot));
-			clueGridFadeTimerRef.current = window.setTimeout(() => {
-				setClueGridFading(true);
-				clueGridFadeTimerRef.current = null;
-			}, CLUE_GRID_HIGHLIGHT_MS);
-			clueGridClearTimerRef.current = window.setTimeout(() => {
-				setClueGridCells(new Set());
-				setClueGridFading(false);
-				clueGridClearTimerRef.current = null;
-			}, CLUE_GRID_HIGHLIGHT_MS + CLUE_GRID_FADE_MS);
-		},
-		[puzzle.wordSlots],
-	);
-
-	useEffect(() => {
-		const pendingToasts = pendingClueToastWordIdsRef.current;
-		for (const wordId of Array.from(pendingToasts)) {
-			const clue = clueTextsByWordId[wordId];
-			if (!clue) continue;
-			toast("Pista", { description: clue, duration: 10000 });
-			lightClueWordRing(wordId);
-			pendingToasts.delete(wordId);
-		}
-	}, [clueTextsByWordId, lightClueWordRing]);
-
-	// Letter fallback has its own timer, so waiting for progress sync or a rate
-	// limit never leaves a spent hint without help. Late text can still arrive.
-	useEffect(() => {
-		if (clueWordIdsKey === "") return;
-		const puzzleId = puzzle.id;
-		const wordIds = clueWordIdsKey.split(",").map(Number);
-		const timer = window.setTimeout(() => {
-			const {
-				revealedCells: currentRevealed,
-				applyLocalEvent: apply,
-				puzzle: currentPuzzle,
-				clueTextsByWordId: clues,
-			} = fallbackContextRef.current;
-			if (currentPuzzle.id !== puzzleId) return;
-			const revealed = new Set(currentRevealed);
-			for (const wordId of wordIds) {
-				if (clues[wordId]) continue;
-				const slot = currentPuzzle.wordSlots.find((item) => item.id === wordId);
-				if (!slot) continue;
-				const cellKey = getSlotHintCellKey(currentPuzzle, slot);
-				if (!cellKey || revealed.has(cellKey)) continue;
-				revealed.add(cellKey);
-				apply(createPuzzleEvent("text_hint_fallback", { wordId, cellKey }));
-			}
-		}, CLUE_FETCH_LETTER_FALLBACK_MS);
-		return () => window.clearTimeout(timer);
-	}, [clueWordIdsKey, puzzle.id]);
-
-	const guessedWordIdsKey = derivedProgress.guessedWordIds.join(",");
-	useEffect(() => {
-		const wordIds =
-			guessedWordIdsKey === "" ? [] : guessedWordIdsKey.split(",").map(Number);
-		publishSolvedWordIds(wordIds);
-	}, [publishSolvedWordIds, guessedWordIdsKey]);
-
-	const streakStats = useMemo(() => {
-		const baseEntries = activeUser
-			? (initialData.historyEntries ?? [])
-			: anonymousHistoryEntries;
-		const streakEntries = upsertHistoryEntry(
-			baseEntries,
-			buildHistoryEntry(puzzle, derivedProgress),
-		);
-
-		return calculateHistoryStreaks(streakEntries, {
-			referenceDateKey: puzzle.dateKey,
-		});
-	}, [
-		activeUser,
-		anonymousHistoryEntries,
-		derivedProgress,
-		initialData.historyEntries,
-		puzzle,
-	]);
-
-	const triggerHaptic = useCallback(
-		(pattern: number | number[] = HAPTIC_TAP_MS) => {
-			if (typeof navigator === "undefined") {
-				return;
-			}
-
-			if (typeof navigator.vibrate !== "function") {
-				return;
-			}
-
-			if (!isVibrationEnabled()) {
-				return;
-			}
-
-			navigator.vibrate(pattern);
-		},
-		[],
-	);
-
-	const runPressAction = useCallback(
-		(
-			event: React.PointerEvent<HTMLButtonElement>,
-			action: () => void,
-		): void => {
-			if (event.pointerType === "mouse") {
-				if (event.type !== "pointerdown" || event.button !== 0) {
-					return;
-				}
-			} else if (event.type !== "pointerup") {
-				return;
-			}
-
-			lastPointerPressAtRef.current = performance.now();
-			event.preventDefault();
-			action();
-		},
-		[],
-	);
-
-	const runClickAction = useCallback(
-		(_event: React.MouseEvent<HTMLButtonElement>, action: () => void): void => {
-			const elapsedSincePointerPress =
-				performance.now() - lastPointerPressAtRef.current;
-			if (elapsedSincePointerPress < POINTER_CLICK_DEDUP_MS) {
-				return;
-			}
-
-			action();
-		},
-		[],
-	);
-
-	const showSubmitFeedback = useCallback(
-		(word: string, kind: DailySubmitFeedback["kind"]) => {
-			const nextFeedbackId = submitFeedbackIdRef.current + 1;
-			submitFeedbackIdRef.current = nextFeedbackId;
-			setSubmitFeedback({
-				id: nextFeedbackId,
-				word,
-				kind,
-			});
-
-			if (submitFeedbackResetTimerRef.current != null) {
-				window.clearTimeout(submitFeedbackResetTimerRef.current);
-			}
-
-			submitFeedbackResetTimerRef.current = window.setTimeout(() => {
-				setSubmitFeedback((current) =>
-					current?.id === nextFeedbackId ? null : current,
-				);
-				submitFeedbackResetTimerRef.current = null;
-			}, getSubmitFeedbackDuration());
-		},
-		[],
-	);
-
-	const clearSubmitFeedback = useCallback(() => {
-		if (submitFeedbackResetTimerRef.current != null) {
-			window.clearTimeout(submitFeedbackResetTimerRef.current);
-			submitFeedbackResetTimerRef.current = null;
-		}
-		setSubmitFeedback(null);
-	}, []);
-
-	const startWordHighlight = useCallback((wordId: number) => {
-		setHighlightedWordId(wordId);
-		if (highlightResetTimerRef.current != null) {
-			window.clearTimeout(highlightResetTimerRef.current);
-		}
-		highlightResetTimerRef.current = window.setTimeout(() => {
-			setHighlightedWordId((current) => (current === wordId ? null : current));
-			highlightResetTimerRef.current = null;
-		}, HIGHLIGHT_AFTER_LAND_MS);
-	}, []);
-
-	const finishFlyingLettersCleanup = useCallback(() => {
-		setAnimatingWordId(null);
-		setAnimatingPreExistingLetters(new Set());
-		setLandedAnimatingCells(new Set());
-		setBounceCells(new Set());
-		setFlyingLettersAnimation(null);
-		pendingFlyCompleteRef.current = null;
-		for (const timer of bounceClearTimersRef.current.values()) {
-			window.clearTimeout(timer);
-		}
-		bounceClearTimersRef.current.clear();
-	}, []);
-
-	const finishFlyingLettersFallback = useCallback(
-		(wordId: number) => {
-			finishFlyingLettersCleanup();
-			startWordHighlight(wordId);
-		},
-		[finishFlyingLettersCleanup, startWordHighlight],
-	);
-
-	const handleFlyingLetterLand = useCallback((cellKey: string) => {
-		setLandedAnimatingCells((previous) => {
-			if (previous.has(cellKey)) {
-				return previous;
-			}
-			const next = new Set(previous);
-			next.add(cellKey);
-			return next;
-		});
-		setBounceCells((previous) => {
-			if (previous.has(cellKey)) {
-				return previous;
-			}
-			const next = new Set(previous);
-			next.add(cellKey);
-			return next;
-		});
-
-		const existingTimer = bounceClearTimersRef.current.get(cellKey);
-		if (existingTimer != null) {
-			window.clearTimeout(existingTimer);
-		}
-
-		const timer = window.setTimeout(() => {
-			setBounceCells((previous) => {
-				if (!previous.has(cellKey)) {
-					return previous;
-				}
-				const next = new Set(previous);
-				next.delete(cellKey);
-				return next;
-			});
-			bounceClearTimersRef.current.delete(cellKey);
-		}, GRID_GUESS_BOUNCE_MS);
-		bounceClearTimersRef.current.set(cellKey, timer);
-	}, []);
-
-	const triggerFlyingLetters = useCallback(
-		(
-			wordId: number,
-			displayWord: string,
-			preExistingLetterCells: Set<string>,
-		) => {
-			const slot = puzzle.wordSlots.find((wordSlot) => wordSlot.id === wordId);
-			const gridRoot = gridRef.current;
-			if (!slot || !gridRoot) {
-				finishFlyingLettersFallback(wordId);
-				return;
-			}
-
-			const prefersReducedMotion =
-				typeof window !== "undefined" &&
-				typeof window.matchMedia === "function" &&
-				window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-			if (prefersReducedMotion) {
-				finishFlyingLettersFallback(wordId);
-				return;
-			}
-
-			setAnimatingWordId(wordId);
-			setAnimatingPreExistingLetters(preExistingLetterCells);
-			setLandedAnimatingCells(new Set());
-			setBounceCells(new Set());
-
-			window.requestAnimationFrame(() => {
-				window.requestAnimationFrame(() => {
-					const sourceElement = document.querySelector<HTMLElement>(
-						'[data-slot="submit-feedback"]',
-					);
-					if (!sourceElement) {
-						finishFlyingLettersFallback(wordId);
-						return;
-					}
-
-					const letters = getPlayableWordLetters(displayWord);
-					const paths = buildFlyingLetterPaths({
-						sourceElement,
-						targetCellKeys: getWordCellKeysInOrder(slot),
-						letters,
-						gridRoot,
-					});
-
-					if (paths.length === 0) {
-						finishFlyingLettersFallback(wordId);
-						return;
-					}
-
-					pendingFlyCompleteRef.current = {
-						wordId,
-						pathCount: paths.length,
-					};
-					flyingLettersIdRef.current += 1;
-					setFlyingLettersAnimation({
-						id: flyingLettersIdRef.current,
-						paths,
-					});
-				});
-			});
-		},
-		[finishFlyingLettersFallback, puzzle.wordSlots],
-	);
-
-	const handleGuess = useCallback(async () => {
-		triggerHaptic(HAPTIC_SUBMIT_MS);
-
-		if (!currentGuess.trim()) return;
-		const guess = currentGuess.trim();
-		const prettyGuess = formatGuess(guess);
-
-		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(guess)) {
-			triggerHaptic(HAPTIC_ERROR_PATTERN);
-			showSubmitFeedback(prettyGuess, "invalid_input");
-			captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: puzzle.dateKey,
-				guess_length: guess.length,
-				matched: false,
-				puzzle_id: puzzle.id,
-				result_kind: "invalid_input",
-			});
-			setCurrentGuess("");
-			return;
-		}
-
-		const result = await resolveGuess({
-			puzzle,
-			progress: derivedProgress,
-			guess,
-		});
-
-		showSubmitFeedback(prettyGuess, result.kind);
-		captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			guess_length: guess.length,
-			matched: result.matchedSlotId != null,
-			puzzle_id: puzzle.id,
-			result_kind: result.kind,
-		});
-
-		const isNewBonusWord =
-			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
-
-		const preExistingLetterCells = new Set<string>();
-		if (result.kind === "new_word" && result.matchedSlotId != null) {
-			const matchedSlot = puzzle.wordSlots.find(
-				(wordSlot) => wordSlot.id === result.matchedSlotId,
-			);
-			if (matchedSlot) {
-				for (let index = 0; index < matchedSlot.length; index += 1) {
-					const cellKey = getSlotCellKey(matchedSlot, index);
-					if (cellLetters.has(cellKey)) {
-						preExistingLetterCells.add(cellKey);
-					}
-				}
-			}
-		}
-
-		if (!result.isRepeatGuess) {
-			applyLocalEvent(
-				createPuzzleEvent("guess_added", {
-					guessHash: result.guessHash,
-					matchedWordId: result.matchedSlotId,
-					unlockToken: result.unlockToken,
-					validNotInPuzzle: isNewBonusWord,
-				}),
-			);
-		}
-
-		// Every WORDS_PER_BONUS_CLUE-th valid off-puzzle word grants a free random
-		// letter reveal. The counter updates asynchronously via the event above, so
-		// we look one ahead.
-		if (isNewBonusWord && bonusCluesEnabled) {
-			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
-			if (nextBonusCount % WORDS_PER_BONUS_CLUE === 0) {
-				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
-				if (cellKey) {
-					applyLocalEvent(
-						createPuzzleEvent("bonus_clue_revealed", { cellKey }),
-					);
-					triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-					captureEvent(ANALYTICS_EVENT.BONUS_CLUE_GRANTED, {
-						game_mode: GAME_MODE.CLASSIC,
-						bonus_words_found: nextBonusCount,
-						date_key: puzzle.dateKey,
-						puzzle_id: puzzle.id,
-					});
-					toast.success("Lletra desbloquejada!", {
-						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
-					});
-				}
-			}
-		}
-
-		if (result.kind === "new_word") {
-			triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-			if (result.matchedSlotId != null && result.displayWord) {
-				triggerFlyingLetters(
-					result.matchedSlotId,
-					result.displayWord,
-					preExistingLetterCells,
-				);
-			}
-
-			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {
-				justCompletedRef.current = true;
-				setIsCompletionPending(true);
-			}
-		} else if (result.kind === "not_in_dictionary") {
-			triggerHaptic(HAPTIC_ERROR_PATTERN);
-		}
-
-		setCurrentGuess("");
-	}, [
-		applyLocalEvent,
-		bonusCluesEnabled,
-		captureEvent,
-		cellLetters,
-		currentGuess,
-		derivedProgress,
-		puzzle,
-		revealedCells,
+	const {
+		gridRef,
+		gridEffects,
+		flyingLettersProps,
+		submitFeedback,
 		showSubmitFeedback,
-		totalWords,
+		clearSubmitFeedback,
 		triggerFlyingLetters,
-		triggerHaptic,
-	]);
-
-	const handleLetterClick = useCallback(
-		(letter: string) => {
-			triggerHaptic(HAPTIC_TAP_MS);
-			clearSubmitFeedback();
-			setCurrentGuess((previous) => previous + letter);
-		},
-		[clearSubmitFeedback, triggerHaptic],
-	);
-
-	const handleBackspace = useCallback(() => {
-		triggerHaptic(HAPTIC_TAP_MS);
-		clearSubmitFeedback();
-		setCurrentGuess((previous) => previous.slice(0, -1));
-	}, [clearSubmitFeedback, triggerHaptic]);
-
-	const handleShuffle = useCallback(() => {
-		triggerHaptic(HAPTIC_TAP_MS);
-		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
-		captureEvent(ANALYTICS_EVENT.PUZZLE_LETTERS_SHUFFLED, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			puzzle_id: puzzle.id,
-		});
-		applyLocalEvent(
-			createPuzzleEvent("letters_shuffled", {
-				shuffledLetters,
-			}),
-		);
-	}, [
-		applyLocalEvent,
-		captureEvent,
-		derivedProgress.shuffledLetters,
-		puzzle.dateKey,
-		puzzle.id,
-		triggerHaptic,
-	]);
-
-	const handleHint = useCallback(() => {
-		triggerHaptic(HAPTIC_TAP_MS);
-		if (derivedProgress.hintsUsed >= 3) return;
-		if (nextClueWordId == null) return;
-
-		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
-			game_mode: GAME_MODE.CLASSIC,
-			hint_type: HINT_TYPE.TEXT,
-			hints_used_after: derivedProgress.hintsUsed + 1,
-		});
-		applyLocalEvent(
-			createPuzzleEvent("text_hint_requested", {
-				wordId: nextClueWordId,
-			}),
-		);
-		pendingClueToastWordIdsRef.current.add(nextClueWordId);
-		// The grid ring is lit only once the clue text resolves (see the
-		// clue-fetch effect); a letter fallback adds the letter without it.
-	}, [
-		applyLocalEvent,
-		captureEvent,
-		derivedProgress.hintsUsed,
-		nextClueWordId,
-		triggerHaptic,
-	]);
-
-	// Self-serve hint availability: a hint remains in the budget AND there's an
-	// unclued missing word to target.
-	const canUseSelfHint =
-		derivedProgress.hintsUsed < 3 && nextClueWordId != null;
-
-	// Peer clue requests: ask other connected players for a clue about an unfound
-	// word once self-serve hints can't help — either the 3-hint budget is spent,
-	// or every missing word already has a clue so a remaining hint can't be spent
-	// on a new one.
-	const canRequestHelp =
-		derivedProgress.guessedWordIds.length < totalWords && !canUseSelfHint;
-
-	const handleRequestHelp = useCallback(
-		(wordId: number) => {
-			triggerHaptic(HAPTIC_TAP_MS);
-			captureEvent(ANALYTICS_EVENT.PEER_CLUE_REQUESTED, {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: puzzle.dateKey,
-				puzzle_id: puzzle.id,
-				word_id: wordId,
-			});
-			// Tell responders whether this player already unlocked the word's AI
-			// clue, so they know copying it back into a reply wouldn't help.
-			const hasAiClue = derivedProgress.clueWordIds.includes(wordId);
-			// The provider tracks the pending state (optimistic add + rollback on
-			// failure); here we only surface the failure to the player.
-			void requestClue(wordId, hasAiClue).then((created) => {
-				if (!created) {
-					toast.error("No s'ha pogut demanar ajuda");
-				}
-			});
-		},
-		[
-			captureEvent,
-			derivedProgress.clueWordIds,
-			puzzle.dateKey,
-			puzzle.id,
-			requestClue,
-			triggerHaptic,
-		],
-	);
-
-	// Toast clues as they arrive live. The clue itself is stored in the provider
-	// (and replayed in the snapshot), so display doesn't depend on this firing.
-	useEffect(() => {
-		const unsubscribe = subscribeClueRequests((event) => {
-			if (event.type !== "response") return;
-			const { text, responderName } = event.response;
-			toast(`Pista de ${responderName}`, {
-				description: text,
-				duration: 12000,
-			});
-		});
-		return unsubscribe;
-	}, [subscribeClueRequests]);
-
-	// Once the asker finds a word they'd asked help for, the request is no longer
-	// needed: resolve it so other players' badges/buttons clear. resolveClue also
-	// drops the word from the provider's "waiting" state.
-	useEffect(() => {
-		const found = requestedHelpWordIds.filter((wordId) =>
-			derivedProgress.guessedWordIds.includes(wordId),
-		);
-		if (found.length === 0) return;
-		for (const wordId of found) {
-			void resolveClue(wordId);
-		}
-	}, [derivedProgress.guessedWordIds, requestedHelpWordIds, resolveClue]);
-
-	// Tapping an incomplete word flashes its grid cells in off-white teal so the
-	// player can locate it, scrolling the grid into view on mobile when needed.
-	const handleLocateWord = useCallback(
-		(wordId: number) => {
-			const slot = puzzle.wordSlots.find((item) => item.id === wordId);
-			if (!slot) return;
-
-			const cellKeys = getWordCellKeys(slot);
-			// Clear first, then set on the next frame so the animation restarts even
-			// when the same word is tapped repeatedly.
-			if (locateClearTimerRef.current != null) {
-				window.clearTimeout(locateClearTimerRef.current);
-			}
-			setLocateCells(new Set());
-			window.requestAnimationFrame(() => {
-				setLocateCells(cellKeys);
-				locateClearTimerRef.current = window.setTimeout(() => {
-					setLocateCells(new Set());
-					locateClearTimerRef.current = null;
-				}, LOCATE_FLASH_MS);
-			});
-
-			const grid = gridRef.current;
-			if (grid && window.matchMedia("(max-width: 1023px)").matches) {
-				const rect = grid.getBoundingClientRect();
-				const offScreen = rect.top < 0 || rect.bottom > window.innerHeight;
-				if (offScreen) {
-					grid.scrollIntoView({ behavior: "smooth", block: "center" });
-				}
-			}
-		},
-		[puzzle.wordSlots],
-	);
-
-	const isComplete = derivedProgress.guessedWordIds.length === totalWords;
-	const displayComplete = isComplete && !isCompletionPending;
-
-	// Delay the visual completion state so the submit feedback animation plays first
-	useEffect(() => {
-		if (!isComplete) {
-			if (completionTransitionTimerRef.current != null)
-				window.clearTimeout(completionTransitionTimerRef.current);
-			if (winDialogTimerRef.current != null)
-				window.clearTimeout(winDialogTimerRef.current);
-			completionScheduledRef.current = false;
-			setIsCompletionPending(false);
-			setShouldFireConfetti(false);
-			setWinDialogOpen(false);
-			return;
-		}
-		if (completionScheduledRef.current) return;
-		completionScheduledRef.current = true;
-
-		if (justCompletedRef.current) {
-			// User just guessed the last word — wait for the feedback animation
-			justCompletedRef.current = false;
-			completionTransitionTimerRef.current = window.setTimeout(() => {
-				setIsCompletionPending(false);
-				setShouldFireConfetti(true);
-				completionTransitionTimerRef.current = null;
-				// Let confetti land before the modal pops up.
-				winDialogTimerRef.current = window.setTimeout(() => {
-					setWinDialogOpen(true);
-					winDialogTimerRef.current = null;
-				}, 900);
-			}, getSubmitFeedbackDuration());
-		} else {
-			// Puzzle was already complete on load — show immediately, no confetti
-			setIsCompletionPending(false);
-		}
-	}, [isComplete]);
-
-	const signInWithGoogle = useCallback(
-		async (source: string) => {
-			captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
-				game_mode: GAME_MODE.CLASSIC,
-				provider: "google",
-				source,
-			});
-			try {
-				await authClient.signIn.social({
-					provider: "google",
-					callbackURL: window.location.href,
-				});
-			} catch (error) {
-				captureException(error, { scope: `${source}_sign_in` });
-				toast.error("No s'ha pogut iniciar la sessió");
-			}
-		},
-		[captureEvent, captureException],
-	);
-
-	const handleWelcomeSignIn = useCallback(() => {
-		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
-			game_mode: GAME_MODE.CLASSIC,
-			choice: "google",
-		});
-		markWelcomeSeen();
-		setWelcomeOpen(false);
-		void signInWithGoogle("welcome_dialog");
-	}, [captureEvent, signInWithGoogle]);
-
-	const completionStats = useMemo(() => {
-		if (derivedProgress.guessedWordIds.length !== totalWords) return undefined;
-		return {
-			guessCount: derivedProgress.guessCount,
-			hintsUsed: derivedProgress.hintsUsed,
-			completedAt: derivedProgress.completedAt,
-			currentStreak: streakStats.currentStreak,
-		};
-	}, [
-		derivedProgress.completedAt,
-		derivedProgress.guessCount,
-		derivedProgress.guessedWordIds.length,
-		derivedProgress.hintsUsed,
-		streakStats.currentStreak,
-		totalWords,
-	]);
-
-	const openShare = useCallback(() => {
-		if (getSkipSharePreview()) {
-			void handleShareRef.current();
-			return;
-		}
-		setSharePreviewOpen(true);
-	}, []);
-
-	const handleShare = useCallback(async () => {
-		try {
-			const result = await shareProgress(
-				puzzle,
-				revealedCells,
-				derivedProgress.guessedWordIds.length,
-				totalWords,
-				completionStats,
-			);
-			if (result === "copied") {
-				toast.success("Imatge copiada!");
-			}
-		} catch {
-			toast.error("No s'ha pogut compartir");
-		}
-	}, [
+		handleLocateWord,
+	} = useDailyAnimations(puzzle);
+	const {
+		isComplete,
+		displayComplete,
+		shouldFireConfetti,
+		winDialogOpen,
+		setWinDialogOpen,
+		streakStats,
 		completionStats,
+		markCompleting,
+	} = useDailyCompletion({ initialData, activeUser, derivedProgress });
+	const { sharePreviewOpen, setSharePreviewOpen, handleShare } = useDailyShare({
 		puzzle,
 		revealedCells,
-		derivedProgress.guessedWordIds.length,
-		totalWords,
-	]);
-
-	// Kept current every render: the header's share button reaches the handler
-	// through this ref, and openShare is published to the header only once.
-	handleShareRef.current = handleShare;
-
-	// The header (rendered above this route) owns the share button, so it needs
-	// a way to reach the board's share handler.
-	useEffect(() => {
-		setDailyHeaderSummary(isPresentable ? { onShare: openShare } : null);
-	}, [openShare, isPresentable]);
-
-	useEffect(() => () => setDailyHeaderSummary(null), []);
-
-	useEffect(() => {
-		if (
-			typeof window === "undefined" ||
-			!isPresentable ||
-			isComplete ||
-			tutorialOpen ||
-			miniAnnouncementOpen
-		) {
-			return;
-		}
-
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (
-				event.defaultPrevented ||
-				event.metaKey ||
-				event.ctrlKey ||
-				event.altKey ||
-				isEditableTarget(event.target)
-			) {
-				return;
-			}
-
-			const action = getGuessKeyboardAction(
-				event.key,
-				derivedProgress.shuffledLetters,
-				event.code,
-			);
-			if (!action) {
-				return;
-			}
-
-			if (action.type === "submit") {
-				if (event.repeat || currentGuess.trim().length < 4) {
-					return;
-				}
-
-				event.preventDefault();
-				void handleGuess();
-				return;
-			}
-
-			if (action.type === "backspace") {
-				if (currentGuess.length === 0) {
-					return;
-				}
-
-				event.preventDefault();
-				handleBackspace();
-				return;
-			}
-
-			event.preventDefault();
-			handleLetterClick(action.letter);
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [
+		guessedCount: derivedProgress.guessedWordIds.length,
+		completionStats,
+		isPresentable,
+	});
+	const {
+		welcomeOpen,
+		miniAnnouncementOpen,
+		setMiniAnnouncementOpen,
+		tutorialOpen,
+		handleWelcomeOpenChange,
+		handleWelcomeContinueAnonymous,
+		handleWelcomeSignIn,
+		signInWithGoogle,
+	} = useDailyOnboarding({
+		activeUser,
+		isPresentable,
+		derivedProgress,
+		sharePreviewOpen,
+		winDialogOpen,
+	});
+	const {
+		clueGridCells,
+		clueGridFading,
+		clueTextsByWordId,
+		canUseSelfHint,
+		canRequestHelp,
+		handleHint,
+		handleRequestHelp,
+		requestedHelpWordIds,
+		receivedClues,
+		incomingRequests,
+		helpGivenRecords,
+		respondToClue,
+	} = useDailyClues({
+		puzzle,
+		derivedProgress,
+		userId: activeUser?.id ?? null,
+		pendingEventCount,
+		revealedCells,
+		cellLetters,
+		applyLocalEvent,
+	});
+	const {
 		currentGuess,
-		derivedProgress.shuffledLetters,
-		handleBackspace,
+		triggerHaptic,
+		runPressAction,
+		runClickAction,
 		handleGuess,
 		handleLetterClick,
-		isComplete,
-		isPresentable,
-		tutorialOpen,
-		miniAnnouncementOpen,
-	]);
+		handleBackspace,
+		handleShuffle,
+	} = useDailyActions({
+		puzzle,
+		derivedProgress,
+		applyLocalEvent,
+		cellLetters,
+		revealedCells,
+		bonusCluesEnabled,
+		showSubmitFeedback,
+		clearSubmitFeedback,
+		triggerFlyingLetters,
+		markCompleting,
+	});
+	usePuzzleKeyboard({
+		enabled:
+			isPresentable && !isComplete && !tutorialOpen && !miniAnnouncementOpen,
+		letters: derivedProgress.shuffledLetters,
+		guess: currentGuess,
+		minimumGuessLength: 4,
+		onLetter: handleLetterClick,
+		onBackspace: handleBackspace,
+		onSubmit: () => {
+			void handleGuess();
+		},
+	});
 
 	if (!isPresentable) {
 		return (
-			<DailyLoadingPage
+			<PuzzleLoadingPage
 				synchronizing={Boolean(activeUser)}
 				onRetry={decodeFailed ? retryDecode : undefined}
 			/>
@@ -1369,45 +289,10 @@ function DailyGame({
 	const keypadHeightCss =
 		keypadHeight == null ? CLASSIC_KEYPAD_FALLBACK_HEIGHT : `${keypadHeight}px`;
 
-	const completionSummary = (
-		<div className="space-y-1">
-			<p className="text-sm font-medium text-muted-foreground font-ui">
-				Felicitats!
-			</p>
-			<h2 className="text-xl font-semibold tracking-tight">
-				Has completat el joc
-			</h2>
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm font-medium text-muted-foreground font-ui">
-				<span>
-					{derivedProgress.guessCount} intent
-					{derivedProgress.guessCount === 1 ? "" : "s"}
-				</span>
-				<span>
-					{derivedProgress.hintsUsed === 1
-						? `${derivedProgress.hintsUsed} pista`
-						: `${derivedProgress.hintsUsed} pistes`}
-				</span>
-				{streakStats.currentStreak >= 3 ? (
-					<span>Ratxa: {streakStats.currentStreak} dies 🔥</span>
-				) : null}
-			</div>
-		</div>
-	);
-
 	return (
 		<>
-			<DailyConfetti fire={shouldFireConfetti} />
-			<DailyFlyingLetters
-				animation={flyingLettersAnimation}
-				onLetterLand={handleFlyingLetterLand}
-				onComplete={() => {
-					const pending = pendingFlyCompleteRef.current;
-					if (!pending) {
-						return;
-					}
-					finishFlyingLettersCleanup();
-				}}
-			/>
+			<PuzzleConfetti fire={shouldFireConfetti} />
+			<DailyFlyingLetters {...flyingLettersProps} />
 			<div
 				// h-full, not min-h-full: the word list below the fold overflows this
 				// box on purpose, so the board above it can be sized against the room
@@ -1425,117 +310,33 @@ function DailyGame({
 						<div
 							className={`mb-4 shrink-0 sm:mb-6 lg:col-span-2 lg:row-start-1 ${displayComplete ? "pt-2 sm:pt-0" : ""}`}
 						>
-							{displayComplete
-								? completionSummary
-								: (() => {
-										const percent = Math.min(
-											100,
-											Math.max(
-												0,
-												(derivedProgress.guessedWordIds.length / totalWords) *
-													100,
-											),
-										);
-										// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
-										// clue and resets each time one is earned; the label keeps the total.
-										const bonusCount = derivedProgress.bonusWordsFound;
-										const bonusInCycle = bonusCount % WORDS_PER_BONUS_CLUE;
-										const bonusPercent =
-											(bonusInCycle / WORDS_PER_BONUS_CLUE) * 100;
-										const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
-										return (
-											<div className="flex flex-col overflow-hidden rounded-lg">
-												<div
-													className="relative h-9 overflow-hidden bg-muted/40"
-													role="progressbar"
-													aria-valuenow={derivedProgress.guessedWordIds.length}
-													aria-valuemin={0}
-													aria-valuemax={totalWords}
-													aria-label="Paraules trobades"
-												>
-													<div
-														className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
-														style={{ width: `${percent}%` }}
-													/>
-													<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-														<span className="flex items-baseline gap-1">
-															<span className="text-foreground tabular-nums text-xs">
-																{derivedProgress.guessedWordIds.length}
-															</span>
-															<span className="text-muted-foreground/50">
-																/
-															</span>
-															<span className="text-muted-foreground tabular-nums">
-																{totalWords}
-															</span>
-															<span className="ml-1 hidden text-muted-foreground sm:inline">
-																paraules
-															</span>
-														</span>
-														<span className="text-muted-foreground tabular-nums">
-															{derivedProgress.guessCount}{" "}
-															{derivedProgress.guessCount === 1
-																? "intent"
-																: "intents"}
-														</span>
-													</div>
-												</div>
-												{bonusCluesEnabled ? (
-													<div
-														className="relative h-6 overflow-hidden bg-blue-500/10 dark:bg-blue-400/10"
-														role="progressbar"
-														aria-valuenow={bonusInCycle}
-														aria-valuemin={0}
-														aria-valuemax={WORDS_PER_BONUS_CLUE}
-														aria-label="Paraules vàlides de fora del joc"
-													>
-														<div
-															className="absolute inset-y-0 left-0 bg-blue-500/25 transition-[width] duration-500 ease-out"
-															style={{ width: `${bonusPercent}%` }}
-														/>
-														<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-															<span className="flex items-baseline gap-1">
-																<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
-																	{bonusCount}
-																</span>
-																<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
-																	paraules extra
-																</span>
-															</span>
-															<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
-																{wordsToNextClue} per a una lletra
-															</span>
-														</div>
-													</div>
-												) : null}
-											</div>
-										);
-									})()}
+							<DailyStatus
+								progress={derivedProgress}
+								totalWords={totalWords}
+								displayComplete={displayComplete}
+								currentStreak={streakStats.currentStreak}
+								bonusCluesEnabled={bonusCluesEnabled}
+							/>
 						</div>
 
 						<div
 							ref={gridRef}
 							className="flex min-h-0 flex-1 flex-col pb-2 lg:col-start-1 lg:row-start-2 lg:pb-8"
 						>
-							<DailyGrid
+							<PuzzleGrid
 								fitHeight
 								puzzle={puzzle}
 								revealedCells={revealedCells}
 								cellLetters={cellLetters}
-								highlightedWordId={highlightedWordId}
-								animatingWordId={animatingWordId}
-								animatingPreExistingLetters={animatingPreExistingLetters}
-								landedAnimatingCells={landedAnimatingCells}
-								bounceCells={bounceCells}
+								{...gridEffects}
 								clueCells={clueGridCells}
 								clueCellsFading={clueGridFading}
-								locateCells={locateCells}
 							/>
 						</div>
 					</div>
 
 					<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
-						<DailyControls
+						<PuzzleControls
 							aiClueMode
 							layout={effectiveLetterLayout}
 							canUseHint={canUseSelfHint}
@@ -1545,7 +346,10 @@ function DailyGame({
 							onHeightChange={setKeypadHeight}
 							shuffledLetters={derivedProgress.shuffledLetters}
 							onBackspace={handleBackspace}
-							onHint={handleHint}
+							onHint={() => {
+								triggerHaptic();
+								handleHint();
+							}}
 							onLetterClick={handleLetterClick}
 							onShuffle={handleShuffle}
 							onSubmitGuess={() => {
@@ -1578,7 +382,10 @@ function DailyGame({
 								canRequestHelp={canRequestHelp}
 								requestedHelpWordIds={requestedHelpWordIds}
 								peerCluesByWordId={receivedClues}
-								onRequestHelp={handleRequestHelp}
+								onRequestHelp={(wordId) => {
+									triggerHaptic();
+									handleRequestHelp(wordId);
+								}}
 								incomingRequests={incomingRequests}
 								helpGivenRecords={helpGivenRecords}
 								onRespondToClue={respondToClue}

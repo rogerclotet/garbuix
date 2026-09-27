@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { LetterLayout } from "@/lib/anon-identity";
 import { cn } from "@/lib/utils";
-import type { DailySubmitFeedback } from "./daily-types";
+import type { PuzzleSubmitFeedback } from "./puzzle-types";
 
 const HINT_HOLD_MS = 600;
 
@@ -45,7 +45,7 @@ export type TutorialControlTarget =
 	| { kind: "submit" }
 	| { kind: "hint" };
 
-type DailyControlsProps = {
+type PuzzleControlsProps = {
 	mini?: boolean;
 	inline?: boolean;
 	tutorialTarget?: TutorialControlTarget;
@@ -66,7 +66,7 @@ type DailyControlsProps = {
 	onLetterClick: (letter: string) => void;
 	onShuffle: () => void;
 	onSubmitGuess: () => void;
-	submitFeedback: DailySubmitFeedback | null;
+	submitFeedback: PuzzleSubmitFeedback | null;
 	runClickAction: (
 		event: MouseEvent<HTMLButtonElement>,
 		action: () => void,
@@ -77,7 +77,7 @@ type DailyControlsProps = {
 	) => void;
 };
 
-export function DailyControls({
+export function PuzzleControls({
 	mini = false,
 	inline = false,
 	tutorialTarget,
@@ -97,7 +97,7 @@ export function DailyControls({
 	submitFeedback,
 	runClickAction,
 	runPressAction,
-}: DailyControlsProps) {
+}: PuzzleControlsProps) {
 	const [hintHoldProgress, setHintHoldProgress] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 	const hintHoldFrameRef = useRef<number | null>(null);
