@@ -117,6 +117,7 @@ const paths = new Set([
 	"/mini",
 	"/mini/",
 	"/preferencies",
+	"/sobre-el-joc",
 	"/classificacio",
 	"/dies-anteriors",
 	"/mini/dies-anteriors",

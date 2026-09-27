@@ -3,6 +3,7 @@ import {
 	ChevronRight,
 	HelpCircle,
 	History,
+	Info,
 	LogIn,
 	Menu,
 	Moon,
@@ -166,6 +167,12 @@ export function UserMenu() {
 				>
 					<HelpCircle className="size-4" />
 					<span>Com s'hi juga</span>
+				</DropdownMenuItem>
+				<DropdownMenuItem asChild>
+					<Link to="/sobre-el-joc">
+						<Info className="size-4" />
+						<span>Sobre el joc</span>
+					</Link>
 				</DropdownMenuItem>
 				{!mini ? (
 					<DropdownMenuItem asChild>
