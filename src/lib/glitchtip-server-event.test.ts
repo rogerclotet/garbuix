@@ -30,7 +30,7 @@ it("drops the real incoming disconnect and H3's wrapper around it", async () => 
 		client = createConnection({ host: "127.0.0.1", port: address.port });
 		await once(client, "connect");
 		client.write(
-			"POST /api/u HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\npartial",
+			"POST /ph/e/ HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\npartial",
 		);
 		await started;
 		client.destroy();

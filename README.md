@@ -80,7 +80,7 @@ The app will be available at `http://localhost:3000` and Postgres at `localhost:
 
 #### GlitchTip
 
-GlitchTip runs independently of PostHog and Umami. Set the project DSN at
+GlitchTip runs independently of PostHog. Set the project DSN at
 runtime, then restart the app. Docker Compose passes these settings through.
 The public browser configuration is embedded in the SSR document, so changing
 the DSN does not require rebuilding the image.
@@ -180,7 +180,7 @@ HTTP server. Monitor `/` as well if you want failures of the rendered page and
 its database dependencies to count as downtime. Configure project alerts in
 GlitchTip to receive error and downtime notifications.
 
-#### PostHog and Umami
+#### PostHog
 
 PostHog is optional. To enable it, set these runtime variables in `.env` before starting the app:
 
@@ -192,33 +192,8 @@ POSTHOG_UI_HOST=https://us.posthog.com
 
 `POSTHOG_UI_HOST` is optional, but it helps PostHog link events back to the right project UI region.
 
-Umami is also optional and can run alongside PostHog or on its own. Set both
-runtime variables to enable it, then restart the app:
-
-```bash
-UMAMI_HOST=https://analytics.example.com
-UMAMI_WEBSITE_ID=00000000-0000-4000-8000-000000000000
-```
-
-Use your Umami server's base URL and the website ID from its tracking settings.
-These variables are passed to the app, scheduler, and backfill containers by
-Docker Compose. No rebuild or Umami API token is needed to change them. Leaving
-either variable empty disables Umami.
-
-Umami receives the existing product action names with only reviewed counts,
-booleans, and fixed choices. Both browser and server paths filter event data;
-new event names and properties must be added to `src/lib/umami-events.ts` after
-review. Errors, free text, and unknown events are not sent to Umami.
-`$pageview` becomes a native Umami pageview. Only known page paths are retained;
-query strings, fragments, referrers, and page titles are discarded.
-
-The existing Web Vitals collector sends LCP, INP, CLS, FCP, and TTFB as native
-Umami performance measurements through `/api/u`. View them in the website's
-**Performance** tab, available in [Umami 3.1.0 and later](https://docs.umami.is/docs/performance).
-Only numeric measurements and a known page path are sent. Timings use milliseconds;
-CLS is a unitless score. Metrics belong to the document's initial path, even after
-SPA navigation, and some are finalized when the page is hidden. Collection starts
-after deployment; historical visits cannot be backfilled.
+Feature flag evaluation is disabled. PostHog continues to capture product events,
+pageviews, Web Vitals, user identification, and exceptions.
 
 Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
 `puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,
@@ -229,25 +204,6 @@ than Classic's event-batch counts.
 Puzzle generation, server progress sync, history loads, and game pageviews are
 also tagged with the game mode. The gameplay events contain no submitted guesses
 or answer text.
-
-Umami never receives account IDs, application device IDs, names, email addresses,
-or avatars from this integration. Browser requests use no cookies or referrer
-and go through `/api/u`. The endpoint accepts events only and filters their
-properties again before sending them to the configured server's `/api/send`.
-
-For Umami's standard anonymous visitor counting, the proxy forwards the visitor's
-User-Agent and IP headers (`X-Forwarded-For`, `X-Real-IP`, and `CF-Connecting-IP`).
-Your reverse proxy must supply the actual visitor IP. These are processed by
-Umami to derive its anonymous session ID, with no `identify()` calls or account
-linking. Umami's opaque cache token is returned to the browser and reused in
-memory to preserve visits across events; it is not stored in cookies or local
-storage. Request-backed server events use the same visitor headers. Background
-jobs have no visitor context, and server events use `/server` as their page path.
-
-Unique visitors are estimates, not exact device or person counts. Network/browser
-changes and Umami's salt rotation can split one visitor; matching browsers on a
-shared IP can merge different visitors. See [Umami's session and metric definitions](https://docs.umami.is/docs/metric-definitions).
-PostHog's existing identification, feature flags, and observability remain unchanged.
 
 ### Production
 

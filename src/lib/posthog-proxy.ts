@@ -1,7 +1,7 @@
 export const POSTHOG_PROXY_PATH = "/ph";
 
-// PostHog serves JS SDK assets and remote config (recording conditions,
-// feature flags, sampling) from the assets origin. Match the official proxy
+// PostHog serves JS SDK assets and remote configuration from the assets
+// origin. Match the official proxy
 // guidance: route /static/ and /array/ there; everything else to the API host.
 const POSTHOG_ASSETS_PATH_PREFIXES = [
 	`${POSTHOG_PROXY_PATH}/static/`,

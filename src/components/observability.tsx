@@ -8,10 +8,8 @@ import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import {
 	buildUserProperties,
 	getGameMode,
-	isObservabilityEnabled,
 	isPostHogEnabled,
 } from "@/lib/observability-shared";
-import { createUmamiClient, UmamiContext } from "@/lib/umami";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useObservability } from "@/lib/use-observability";
 
@@ -99,26 +97,11 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 	const activeUserRef = useRef(activeUser);
 	activeUserRef.current = activeUser;
 	const [isClientReady, setIsClientReady] = useState(false);
-	const umami = useMemo(
-		() => (config.umamiEnabled ? createUmamiClient() : null),
-		[config.umamiEnabled],
-	);
 
 	useEffect(() => {
 		if (!config.glitchtip) return;
 		Sentry.setUser(activeUser ? { id: activeUser.id } : null);
 	}, [activeUser, config.glitchtip]);
-
-	useEffect(() => {
-		if (!umami) return;
-		const onPageHide = () => {
-			umami.captureEvent(ANALYTICS_EVENT.PAGELEAVE);
-		};
-		window.addEventListener("pagehide", onPageHide);
-		return () => {
-			window.removeEventListener("pagehide", onPageHide);
-		};
-	}, [umami]);
 
 	const options = useMemo<PostHogOptions | null>(() => {
 		if (!isPostHogEnabled(config)) {
@@ -132,6 +115,7 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 		return {
 			__add_tracing_headers: tracingHosts,
 			api_host: apiHost,
+			advanced_disable_feature_flags: true,
 			capture_exceptions: {
 				capture_console_errors: false,
 				capture_unhandled_errors: true,
@@ -147,33 +131,24 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 				if (user) {
 					const properties = buildUserProperties(user);
 					posthog.identify(user.id, properties);
-					posthog.setPersonPropertiesForFlags(properties);
 				}
 				setIsClientReady(true);
 			},
 		};
 	}, [config]);
 
-	if (!isObservabilityEnabled(config)) {
+	if (!options) {
 		return <>{children}</>;
 	}
 
-	const content = (
-		<UmamiContext.Provider value={umami}>
+	return (
+		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
 			<ObservabilityRuntime
 				activeUser={activeUser}
 				isClientReady={isClientReady}
 			/>
 			{children}
-		</UmamiContext.Provider>
-	);
-
-	return options ? (
-		<PostHogProvider apiKey={config.posthogKey ?? ""} options={options}>
-			{content}
 		</PostHogProvider>
-	) : (
-		content
 	);
 }
 
@@ -300,9 +275,6 @@ function ObservabilityRuntime({
 		}
 
 		let cancelled = false;
-		// Web Vitals describe the document navigation, even if an SPA route
-		// changes before a metric is finalized on page hide.
-		const pathname = window.location.pathname;
 
 		void import("web-vitals").then(({ onCLS, onFCP, onINP, onLCP, onTTFB }) => {
 			if (cancelled) {
@@ -310,7 +282,7 @@ function ObservabilityRuntime({
 			}
 
 			const reportMetric = (metric: Metric) => {
-				if (!cancelled) captureWebVital(metric, pathname);
+				if (!cancelled) captureWebVital(metric);
 			};
 
 			onCLS(reportMetric);

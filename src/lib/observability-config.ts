@@ -18,7 +18,6 @@ export function getObservabilityConfig(): ObservabilityConfig {
 		posthogKey: env.POSTHOG_KEY,
 		posthogProxyPath: env.POSTHOG_KEY ? POSTHOG_PROXY_PATH : undefined,
 		posthogUIHost: env.POSTHOG_UI_HOST,
-		umamiEnabled: Boolean(env.UMAMI_HOST && env.UMAMI_WEBSITE_ID),
 	};
 }
 
@@ -30,9 +29,5 @@ export function getServerObservabilityConfig() {
 		posthogKey: env.POSTHOG_KEY,
 		posthogProxyPath: env.POSTHOG_KEY ? POSTHOG_PROXY_PATH : undefined,
 		posthogUIHost: env.POSTHOG_UI_HOST,
-		umami:
-			env.UMAMI_HOST && env.UMAMI_WEBSITE_ID
-				? { host: env.UMAMI_HOST, websiteId: env.UMAMI_WEBSITE_ID }
-				: undefined,
 	};
 }

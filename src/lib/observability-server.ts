@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import * as Sentry from "@sentry/tanstackstart-react";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { PostHog } from "posthog-node";
@@ -8,23 +7,14 @@ import {
 	isPostHogEnabled,
 	toEventProperties,
 } from "@/lib/observability-shared";
-import { captureUmamiServerEvent } from "@/lib/umami-server";
 
 let posthogClient: PostHog | null | undefined;
-const serverContext = new AsyncLocalStorage<
-	ReturnType<typeof getRequestObservabilityContext>
->();
 
 export function captureServerEvent(options: {
 	event: string;
 	distinctId?: string;
 	properties?: Record<string, unknown>;
 }) {
-	const context = serverContext.getStore();
-	void captureUmamiServerEvent({
-		event: options.event,
-		properties: { ...context?.properties, ...options.properties },
-	});
 	const client = getServerPostHog();
 	if (!client) {
 		return;
@@ -73,10 +63,8 @@ export async function observeServerAction<T>(
 	const context = getRequestObservabilityContext(options);
 
 	try {
-		return await serverContext.run(context, () =>
-			Sentry.startSpan({ name, op: "function" }, () =>
-				client ? client.withContext(context, action) : action(),
-			),
+		return await Sentry.startSpan({ name, op: "function" }, () =>
+			client ? client.withContext(context, action) : action(),
 		);
 	} catch (error) {
 		captureServerException(error, {
