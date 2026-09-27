@@ -1,9 +1,9 @@
-import { getRouteApi, Link, useRouter } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import {
+	ChevronRight,
 	HelpCircle,
 	History,
 	LogIn,
-	LogOut,
 	Menu,
 	Moon,
 	Settings,
@@ -19,7 +19,6 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -68,9 +67,8 @@ function ThemeMenuToggle() {
 export function UserMenu() {
 	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
-	const router = useRouter();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
-	const { captureEvent, resetUser } = useObservability();
+	const { captureEvent } = useObservability();
 	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
 	const triggerLabel = activeUser
@@ -88,14 +86,6 @@ export function UserMenu() {
 			provider: "google",
 			callbackURL: window.location.href,
 		});
-	};
-
-	const handleSignOut = async () => {
-		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_OUT_CLICKED);
-		resetUser();
-		await authClient.signOut();
-		await session.refetch();
-		await router.invalidate({ sync: true });
 	};
 
 	return (
@@ -116,32 +106,35 @@ export function UserMenu() {
 			>
 				{activeUser ? (
 					<>
-						<DropdownMenuLabel className="flex items-center gap-2">
-							<Avatar className="size-8 shrink-0 border border-border">
-								{showUserImage ? (
-									<AvatarImage
-										src={activeUser.image ?? undefined}
-										alt={activeUser.name}
-										referrerPolicy="no-referrer"
-										onError={() => {
-											setFailedImageSrc(imageSrc);
-										}}
-									/>
-								) : (
-									<AvatarFallback className="bg-muted text-muted-foreground text-xs">
-										{avatarInitials}
-									</AvatarFallback>
-								)}
-							</Avatar>
-							<div className="flex min-w-0 flex-col gap-0.5">
-								<span className="truncate text-foreground text-sm">
-									{activeUser.name}
-								</span>
-								<span className="truncate text-xs font-normal">
-									{activeUser.email}
-								</span>
-							</div>
-						</DropdownMenuLabel>
+						<DropdownMenuItem asChild className="gap-2 font-medium sm:gap-2">
+							<Link to="/preferencies" aria-label="Obrir el perfil">
+								<Avatar className="size-8 shrink-0 border border-border">
+									{showUserImage ? (
+										<AvatarImage
+											src={activeUser.image ?? undefined}
+											alt={activeUser.name}
+											referrerPolicy="no-referrer"
+											onError={() => {
+												setFailedImageSrc(imageSrc);
+											}}
+										/>
+									) : (
+										<AvatarFallback className="bg-muted text-muted-foreground text-xs">
+											{avatarInitials}
+										</AvatarFallback>
+									)}
+								</Avatar>
+								<div className="flex min-w-0 flex-col gap-0.5">
+									<span className="truncate text-foreground text-sm">
+										{activeUser.name}
+									</span>
+									<span className="truncate text-xs font-normal text-muted-foreground">
+										{activeUser.email}
+									</span>
+								</div>
+								<ChevronRight className="ml-auto size-4" />
+							</Link>
+						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 					</>
 				) : null}
@@ -159,12 +152,6 @@ export function UserMenu() {
 					<HelpCircle className="size-4" />
 					<span>Com s'hi juga</span>
 				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
-					<Link to={mini ? "/" : "/mini"}>
-						<Logo className="size-4" aria-hidden />
-						<span>{mini ? "Garbuix!" : "Garbuix mini"}</span>
-					</Link>
-				</DropdownMenuItem>
 				{!mini ? (
 					<DropdownMenuItem asChild>
 						<Link to="/preferencies">
@@ -174,23 +161,29 @@ export function UserMenu() {
 					</DropdownMenuItem>
 				) : null}
 				<ThemeMenuToggle />
+				{!activeUser ? (
+					<>
+						<DropdownMenuSeparator />
+						{session.isPending ? (
+							<DropdownMenuItem disabled>
+								<Menu className="size-4" />
+								<span>Compte...</span>
+							</DropdownMenuItem>
+						) : (
+							<DropdownMenuItem onSelect={handleSignIn}>
+								<LogIn className="size-4" />
+								<span>Entrar</span>
+							</DropdownMenuItem>
+						)}
+					</>
+				) : null}
 				<DropdownMenuSeparator />
-				{session.isPending ? (
-					<DropdownMenuItem disabled>
-						<Menu className="size-4" />
-						<span>Compte...</span>
-					</DropdownMenuItem>
-				) : activeUser ? (
-					<DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
-						<LogOut className="size-4" />
-						<span>Tancar sessió</span>
-					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem onSelect={handleSignIn}>
-						<LogIn className="size-4" />
-						<span>Entrar</span>
-					</DropdownMenuItem>
-				)}
+				<DropdownMenuItem asChild>
+					<Link to={mini ? "/" : "/mini"}>
+						<Logo className="size-4" aria-hidden />
+						<span>{mini ? "Garbuix!" : "Garbuix mini"}</span>
+					</Link>
+				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

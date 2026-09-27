@@ -4,8 +4,10 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useId, useState } from "react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +34,7 @@ import {
 	setSkipSharePreview,
 	setVibrationPreference,
 } from "@/lib/anon-identity";
+import { authClient } from "@/lib/auth-client";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
 import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
@@ -162,7 +165,7 @@ function PreferencesPage() {
 	const rootData = rootRoute.useLoaderData();
 	const router = useRouter();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
-	const { captureEvent } = useObservability();
+	const { captureEvent, resetUser } = useObservability();
 	const saveProfile = useServerFn(updateUserProfile);
 	const fetchSessionUser = useServerFn(getSessionUser);
 	const sharePreviewToggleId = useId();
@@ -181,6 +184,7 @@ function PreferencesPage() {
 	const [avatarPreference, setAvatarPreferenceState] =
 		useState<AvatarPreference>("initials");
 	const [profileSaving, setProfileSaving] = useState(false);
+	const [signingOut, setSigningOut] = useState(false);
 	const [profileError, setProfileError] = useState<string | null>(null);
 	const [profileSaved, setProfileSaved] = useState(false);
 	const [mounted, setMounted] = useState(false);
@@ -243,6 +247,25 @@ function PreferencesPage() {
 	const handleAvatarPreferenceChange = (next: AvatarPreference) => {
 		setAvatarPreferenceState(next);
 		setProfileSaved(false);
+	};
+
+	const handleSignOut = async () => {
+		setSigningOut(true);
+		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_OUT_CLICKED);
+		try {
+			const result = await authClient.signOut();
+			if (result.error) {
+				toast.error("No s'ha pogut tancar la sessió. Torna-ho a provar.");
+				return;
+			}
+			resetUser();
+			await session.refetch();
+			await router.invalidate({ sync: true });
+		} catch {
+			toast.error("No s'ha pogut tancar la sessió. Torna-ho a provar.");
+		} finally {
+			setSigningOut(false);
+		}
 	};
 
 	const handleSaveProfile = async () => {
@@ -357,7 +380,7 @@ function PreferencesPage() {
 						<Button
 							type="button"
 							onClick={handleSaveProfile}
-							disabled={profileSaving}
+							disabled={profileSaving || signingOut}
 							className="shrink-0"
 						>
 							{profileSaving ? "Desant..." : "Desa el perfil"}
@@ -559,6 +582,26 @@ function PreferencesPage() {
 					/>
 				</label>
 			</section>
+			{activeUser ? (
+				<section className="flex flex-col gap-4 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+					<div className="min-w-0 space-y-1">
+						<h2 className="font-medium">Compte</h2>
+						<p className="break-words text-sm text-muted-foreground font-ui">
+							{activeUser.email}
+						</p>
+					</div>
+					<Button
+						type="button"
+						variant="destructive"
+						className="min-h-11 self-start sm:self-auto"
+						disabled={session.isPending || signingOut || profileSaving}
+						onClick={handleSignOut}
+					>
+						<LogOut className="size-4" />
+						{signingOut ? "Tancant sessió..." : "Tancar sessió"}
+					</Button>
+				</section>
+			) : null}
 		</div>
 	);
 }
