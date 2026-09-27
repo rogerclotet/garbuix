@@ -7,6 +7,7 @@ import babel from "@rolldown/plugin-babel";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
+import { glitchtipClientSourceMaps, glitchtipServerSourceMaps } from "./scripts/glitchtip-build.ts";
 import { getSecurityHeaders } from "./src/lib/security-headers";
 
 function readBuildVersions() {
@@ -48,10 +49,15 @@ const config = defineConfig(({ mode }) => {
 				}),
 				viteReact(),
 				babel({ presets: [reactCompilerPreset()] }),
+				glitchtipClientSourceMaps(),
+				glitchtipServerSourceMaps(),
 			];
 
 	return {
+		build: { sourcemap: "hidden" },
 		nitro: {
+			sourcemap: true,
+			experimental: { sourcemapMinify: false },
 			routeRules: {
 				"/**": { headers: getSecurityHeaders(mode === "production") },
 			},

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import * as Sentry from "@sentry/tanstackstart-react";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { PostHog } from "posthog-node";
 import { getServerObservabilityConfig } from "@/lib/observability-config";
@@ -43,6 +44,10 @@ export function captureServerException(
 		properties?: Record<string, unknown>;
 	},
 ) {
+	Sentry.captureException(error, {
+		user: options?.distinctId ? { id: options.distinctId } : undefined,
+		extra: options?.properties,
+	});
 	const client = getServerPostHog();
 	if (!client) {
 		return;
@@ -69,7 +74,9 @@ export async function observeServerAction<T>(
 
 	try {
 		return await serverContext.run(context, () =>
-			client ? client.withContext(context, action) : action(),
+			Sentry.startSpan({ name, op: "function" }, () =>
+				client ? client.withContext(context, action) : action(),
+			),
 		);
 	} catch (error) {
 		captureServerException(error, {

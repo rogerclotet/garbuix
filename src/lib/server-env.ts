@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { glitchtipEnvSchema } from "./glitchtip-config";
 
 const optionalEnvString = z.preprocess(
 	(value) =>
@@ -34,6 +35,7 @@ const authSecretSchema = isProduction
 	: z.string().min(1).default(DEV_AUTH_SECRET);
 
 const serverEnvSchema = z.object({
+	...glitchtipEnvSchema.shape,
 	BETTER_AUTH_SECRET: authSecretSchema,
 	DATABASE_URL: z
 		.string()

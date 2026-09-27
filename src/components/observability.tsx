@@ -1,4 +1,5 @@
 import { PostHogProvider } from "@posthog/react";
+import * as Sentry from "@sentry/tanstackstart-react";
 import { getRouteApi, useRouterState } from "@tanstack/react-router";
 import type { PostHogConfig } from "posthog-js";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -102,6 +103,11 @@ export function ObservabilityProvider({ children }: { children: ReactNode }) {
 		() => (config.umamiEnabled ? createUmamiClient() : null),
 		[config.umamiEnabled],
 	);
+
+	useEffect(() => {
+		if (!config.glitchtip) return;
+		Sentry.setUser(activeUser ? { id: activeUser.id } : null);
+	}, [activeUser, config.glitchtip]);
 
 	useEffect(() => {
 		if (!umami) return;

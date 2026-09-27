@@ -1,7 +1,9 @@
 import { GAME_MODE } from "@/lib/analytics-events";
+import type { GlitchTipClientConfig } from "@/lib/glitchtip-config";
 import type { SessionUser } from "@/lib/puzzle-types";
 
 export type ObservabilityConfig = {
+	glitchtip?: GlitchTipClientConfig;
 	posthogHost?: string;
 	posthogKey?: string;
 	posthogProxyPath?: string;

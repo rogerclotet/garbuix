@@ -19,6 +19,10 @@ import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+	GLITCHTIP_CONFIG_ID,
+	serializeGlitchTipConfig,
+} from "@/lib/glitchtip-config";
 import { materialThemeCss } from "@/lib/material-theme";
 import { getObservabilityConfig } from "@/lib/observability-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
@@ -82,6 +86,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
+	const { observability } = Route.useLoaderData();
 	const mini = useMiniRoute();
 	const showDevtools = import.meta.env.DEV;
 
@@ -92,6 +97,11 @@ function RootDocument() {
 			suppressHydrationWarning
 		>
 			<head>
+				{/* Public runtime settings for the browser SDK, available before
+				    React hydration. application/json keeps this block inert. */}
+				<script id={GLITCHTIP_CONFIG_ID} type="application/json">
+					{serializeGlitchTipConfig(observability.glitchtip)}
+				</script>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
 			</head>

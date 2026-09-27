@@ -9,7 +9,14 @@ import { dirname, join, resolve } from "node:path";
 // re-download has to be part of the hash. Hashing only the precached assets is
 // what previously froze every client at the same version across app releases.
 const HASHED_ROOTS = ["src", "public"];
-const HASHED_FILES = ["package.json", "pnpm-lock.yaml", "vite.config.ts"];
+const HASHED_FILES = [
+	"package.json",
+	"pnpm-lock.yaml",
+	"vite.config.ts",
+	"instrument.server.ts",
+	"scripts/glitchtip-build.ts",
+	"scripts/glitchtip-sourcemaps.ts",
+];
 
 // Build artifacts. Hashing them would make the version depend on whether a
 // previous build already ran in this working directory: version.json is written
