@@ -38,6 +38,13 @@ vi.mock("@/lib/mini-server-fns", () => ({
 }));
 
 beforeEach(() => {
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			observe() {}
+			disconnect() {}
+		},
+	);
 	captureEvent.mockClear();
 	vi.mocked(syncMiniProgress).mockReset();
 	captureException.mockClear();
