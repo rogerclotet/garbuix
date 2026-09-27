@@ -36,7 +36,8 @@ import {
 	getClientAddress,
 	tooManyRequests,
 } from "@/lib/rate-limit.server";
-import { getRedisSub, isRedisConfigured } from "@/lib/redis.server";
+import { isRedisConfigured } from "@/lib/redis.server";
+import { createRedisSseStream } from "@/lib/redis-sse.server";
 
 export const Route = createFileRoute("/api/clue-requests/$")({
 	server: {
@@ -431,8 +432,6 @@ async function handleResolve(
 	return Response.json({ resolved: true });
 }
 
-const HEARTBEAT_INTERVAL_MS = 25_000;
-
 function openSseStream(dateKey: string, userId: string): Response {
 	if (!isRedisConfigured()) {
 		const emptyStream = new ReadableStream({
@@ -449,75 +448,31 @@ function openSseStream(dateKey: string, userId: string): Response {
 		return new Response(emptyStream, { headers: sseHeaders() });
 	}
 
-	const sub = getRedisSub();
-	const requestsChannelName = clueRequestsChannel(dateKey);
-	const responsesChannelName = clueResponsesChannel(userId, dateKey);
-	const encoder = new TextEncoder();
-	let heartbeat: ReturnType<typeof setInterval> | null = null;
-	let listener: ((channel: string, message: string) => void) | null = null;
-
-	const stream = new ReadableStream({
-		async start(controller) {
-			const send = (chunk: string) => {
-				try {
-					controller.enqueue(encoder.encode(chunk));
-				} catch {
-					// stream already closed
-				}
+	const stream = createRedisSseStream({
+		channels: [
+			clueRequestsChannel(dateKey),
+			clueResponsesChannel(userId, dateKey),
+		],
+		event: "message",
+		snapshot: async () => {
+			const [pending, responses, helpGiven] = await Promise.all([
+				getPendingClueRequests(dateKey),
+				getClueInbox(userId, dateKey),
+				getHelpGivenRecords(userId, dateKey),
+			]);
+			// Replay delivered clues and the viewer's own pending requests so a
+			// reconnect restores both the inbox and the waiting-for-help state.
+			return {
+				dateKey,
+				requests: pending.filter((r) => r.requesterId !== userId),
+				ownRequests: pending.filter((r) => r.requesterId === userId),
+				responses,
+				helpGiven,
+				participantId: userId,
 			};
-
-			try {
-				const [pending, responses, helpGiven] = await Promise.all([
-					getPendingClueRequests(dateKey),
-					getClueInbox(userId, dateKey),
-					getHelpGivenRecords(userId, dateKey),
-				]);
-				// Don't echo the viewer's own open requests back as actionable; ship
-				// them separately so a reload restores the "waiting for help" state.
-				// Replay any clues already delivered so a missed live event recovers.
-				const requests = pending.filter((r) => r.requesterId !== userId);
-				const ownRequests = pending.filter((r) => r.requesterId === userId);
-				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests, ownRequests, responses, helpGiven, participantId: userId })}\n\n`,
-				);
-			} catch (error) {
-				console.warn("[clue-request:sse] initial snapshot failed", error);
-				send(
-					`event: snapshot\ndata: ${JSON.stringify({ dateKey, requests: [], responses: [] })}\n\n`,
-				);
-			}
-
-			if (sub) {
-				listener = (channel, message) => {
-					if (
-						channel === requestsChannelName ||
-						channel === responsesChannelName
-					) {
-						send(`event: message\ndata: ${message}\n\n`);
-					}
-				};
-				sub.on("message", listener);
-				try {
-					await sub.subscribe(requestsChannelName, responsesChannelName);
-				} catch (error) {
-					console.warn("[clue-request:sse] subscribe failed", error);
-				}
-			}
-
-			heartbeat = setInterval(() => {
-				send(`: keep-alive ${Date.now()}\n\n`);
-			}, HEARTBEAT_INTERVAL_MS);
 		},
-		cancel() {
-			if (heartbeat) {
-				clearInterval(heartbeat);
-				heartbeat = null;
-			}
-			if (sub && listener) {
-				sub.off("message", listener);
-				listener = null;
-			}
-		},
+		fallbackSnapshot: { dateKey, requests: [], responses: [] },
+		logPrefix: "[clue-request:sse]",
 	});
 
 	return new Response(stream, { headers: sseHeaders() });
