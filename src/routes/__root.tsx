@@ -97,14 +97,11 @@ function RootDocument() {
 			suppressHydrationWarning
 		>
 			<head>
-				<script
-					id={GLITCHTIP_CONFIG_ID}
-					type="application/json"
-					// biome-ignore lint/security/noDangerouslySetInnerHtml: JSON is escaped to prevent closing the script element.
-					dangerouslySetInnerHTML={{
-						__html: serializeGlitchTipConfig(observability.glitchtip),
-					}}
-				/>
+				{/* Public runtime settings for the browser SDK, available before
+				    React hydration. application/json keeps this block inert. */}
+				<script id={GLITCHTIP_CONFIG_ID} type="application/json">
+					{serializeGlitchTipConfig(observability.glitchtip)}
+				</script>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
 			</head>

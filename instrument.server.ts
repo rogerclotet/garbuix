@@ -1,9 +1,14 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { loadEnvFile } from "node:process";
 import * as Sentry from "@sentry/tanstackstart-react";
 import { z } from "zod";
 import { glitchtipEnvSchema } from "./src/lib/glitchtip-config.ts";
 import { scrubGlitchTipEvent } from "./src/lib/glitchtip-scrub.ts";
+
+// Vite loads .env after this preload runs. Preserve variables supplied by Docker
+// or the shell, and allow deployments without a local .env file.
+if (existsSync(".env")) loadEnvFile(".env");
 
 const env = glitchtipEnvSchema.parse(process.env);
 

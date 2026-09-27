@@ -167,7 +167,7 @@ line in app code, build/upload, and confirm that line resolves to TS/TSX. Remove
 the test throw afterward. A quick server transport check is:
 
 ```bash
-node --env-file=.env --import ./instrument.server.ts --input-type=module -e '
+node --import ./instrument.server.ts --input-type=module -e '
   import * as Sentry from "@sentry/tanstackstart-react";
   Sentry.captureException(new Error("GlitchTip server test"));
   await Sentry.flush(5000);
