@@ -399,6 +399,18 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 
 ## Development Notes
 
+### Build version
+
+The menu's **Sobre el joc** page shows the version embedded in the running app.
+Production builds generate a 16-character content hash from the source, public
+assets, and build inputs. Identical inputs produce the same version, with no
+manual version bump. It also identifies the release in GlitchTip.
+
+`APP_VERSION` can override the hash at build time. The generated manifest is
+available at `/version.json`; the About page uses the bundled value so an older
+open tab still shows its own version. Without a generated manifest, local
+development shows `dev`.
+
 ### Database integration tests
 
 `pnpm test` runs the unit and component suites. To also run the PostgreSQL

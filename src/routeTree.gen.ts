@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMonitoringRouteImport } from './routes/api/monitoring'
 import { Route as ApiURouteImport } from './routes/api/u'
@@ -41,6 +42,11 @@ const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
 const PreferenciesRoute = PreferenciesRouteImport.update({
   id: '/preferencies',
   path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SobreElJocRoute = SobreElJocRouteImport.update({
+  id: '/sobre-el-joc',
+  path: '/sobre-el-joc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
   '/api/u': typeof ApiURoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
     | '/api/u'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
     | '/api/u'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
     | '/api/u'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  SobreElJocRoute: typeof SobreElJocRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMonitoringRoute: typeof ApiMonitoringRoute
   ApiURoute: typeof ApiURoute
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/preferencies'
       fullPath: '/preferencies'
       preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sobre-el-joc': {
+      id: '/sobre-el-joc'
+      path: '/sobre-el-joc'
+      fullPath: '/sobre-el-joc'
+      preLoaderRoute: typeof SobreElJocRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -300,6 +320,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  SobreElJocRoute: SobreElJocRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMonitoringRoute: ApiMonitoringRoute,
   ApiURoute: ApiURoute,
