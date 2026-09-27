@@ -28,7 +28,7 @@ const error = new TypeError(
 	"Failed to fetch dynamically imported module: https://garbuix.app/assets/classificacio-b2pi-xLG.js",
 );
 
-function renderError(failure = error) {
+function renderError(failure: unknown = error) {
 	return render(
 		<StrictMode>
 			<RouterErrorComponent error={failure} reset={() => {}} />
@@ -88,6 +88,18 @@ it("reports ordinary application errors without reloading", () => {
 	expect(reload).not.toHaveBeenCalled();
 	expect(captureException).toHaveBeenCalled();
 });
+
+it.each([null, "Route failed", { message: error.message }])(
+	"reports a non-Error throw without reloading: %j",
+	(failure) => {
+		renderError(failure);
+		expect(screen.getByText("Hi ha hagut un error")).toBeDefined();
+		expect(reload).not.toHaveBeenCalled();
+		expect(captureException).toHaveBeenCalledWith(failure, {
+			scope: "router_error_boundary",
+		});
+	},
+);
 
 it("offers a manual reload while offline", () => {
 	vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);

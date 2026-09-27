@@ -51,7 +51,9 @@ export const account = pgTable(
 	"account",
 	{
 		id: text("id").primaryKey(),
-		issuer: text("issuer").notNull(),
+		// Retain legacy values from Better Auth 1.7.0 through 1.7.2.
+		// New accounts omit this column.
+		issuer: text("issuer"),
 		accountId: text("account_id").notNull(),
 		providerId: text("provider_id").notNull(),
 		userId: text("user_id")
@@ -71,8 +73,8 @@ export const account = pgTable(
 	},
 	(table) => [
 		index("account_userId_idx").on(table.userId),
-		uniqueIndex("account_issuer_account_id_uidx").on(
-			table.issuer,
+		uniqueIndex("account_provider_id_account_id_uidx").on(
+			table.providerId,
 			table.accountId,
 		),
 	],

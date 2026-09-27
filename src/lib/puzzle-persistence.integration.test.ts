@@ -25,7 +25,7 @@ vi.mock("@tanstack/react-start/server", () => ({
 }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 
-import { user } from "@/db/auth-schema";
+import { account, user } from "@/db/auth-schema";
 import {
 	dailyPuzzles,
 	miniPuzzles,
@@ -75,6 +75,68 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 		afterAll(async () => {
 			await sql.end();
 			vi.unstubAllEnvs();
+		});
+
+		it("creates provider accounts and reads sessions with the real auth adapter", async () => {
+			const { auth } = await vi.importActual<typeof import("./auth")>("./auth");
+			const { internalAdapter } = await auth.$context;
+			const createdUser = await internalAdapter.createUser(
+				{
+					name: "Auth migration test",
+					email: `${crypto.randomUUID()}@example.test`,
+				},
+				{ method: "oauth", oauth: { providerId: "google" } },
+			);
+			fixtureIds.push(createdUser.id);
+			const accountId = crypto.randomUUID();
+			const createdAccount = await internalAdapter.createAccount({
+				userId: createdUser.id,
+				providerId: "google",
+				accountId,
+			});
+			expect(
+				await internalAdapter.findAccountByKey({
+					providerId: "google",
+					accountId,
+				}),
+			).toMatchObject({ id: createdAccount.id, userId: createdUser.id });
+			// Accounts created before the upgrade retain issuer data and stay usable.
+			const legacyAccountId = crypto.randomUUID();
+			await db.insert(account).values({
+				id: legacyAccountId,
+				issuer: "local:oauth:google",
+				providerId: "google",
+				accountId: legacyAccountId,
+				userId: createdUser.id,
+			});
+			expect(
+				await internalAdapter.findAccountByKey({
+					providerId: "google",
+					accountId: legacyAccountId,
+				}),
+			).toMatchObject({ id: legacyAccountId, userId: createdUser.id });
+			// The same subject is allowed at another provider, but never twice at one.
+			await internalAdapter.createAccount({
+				userId: createdUser.id,
+				providerId: "github",
+				accountId,
+			});
+			await expect(
+				internalAdapter.createAccount({
+					userId: createdUser.id,
+					providerId: "google",
+					accountId,
+				}),
+			).rejects.toMatchObject({ cause: { code: "23505" } });
+			const createdSession = await internalAdapter.createSession(
+				createdUser.id,
+			);
+			expect(
+				await internalAdapter.findSession(createdSession.token),
+			).toMatchObject({
+				user: { id: createdUser.id },
+				session: { id: createdSession.id },
+			});
 		});
 
 		async function createFixture() {

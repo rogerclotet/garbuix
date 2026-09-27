@@ -251,6 +251,23 @@ PostHog's existing identification, feature flags, and observability remain uncha
 
 ### Production
 
+Migration `0009` is required for Better Auth 1.7.6. It makes the legacy
+`account.issuer` column nullable, preserves its values, and replaces its unique
+index with one on `provider_id` and `account_id`. Check for duplicate identities
+before deploying:
+
+```sql
+SELECT provider_id, account_id, count(*)
+FROM account
+GROUP BY provider_id, account_id
+HAVING count(*) > 1;
+```
+
+Resolve any returned rows without merging distinct users. The migration fails
+if duplicates remain. Use `sh scripts/deploy-compose.sh` to stop the old writers,
+apply the migration, and start the updated app together. See the
+[Better Auth upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide#account-identity-keeps-the-provider-key).
+
 Build both production images, stop the app and clue scheduler, apply migrations,
 then recreate both services from the new images. Stopping both writers before
 migrating prevents old code from querying removed columns. The app is briefly

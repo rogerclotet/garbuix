@@ -30,10 +30,12 @@ export function RouterErrorComponent({ error }: ErrorComponentProps) {
 	const reloadingError = useRef<Error | null>(null);
 
 	useEffect(() => {
-		if (reloadingError.current === error) return;
-		if (reloadMissingRouteBundle(error)) {
-			reloadingError.current = error;
-			return;
+		if (error instanceof Error) {
+			if (reloadingError.current === error) return;
+			if (reloadMissingRouteBundle(error)) {
+				reloadingError.current = error;
+				return;
+			}
 		}
 		captureException(error, {
 			scope: "router_error_boundary",

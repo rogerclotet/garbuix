@@ -64,6 +64,13 @@
       "when": 1790427131449,
       "tag": "0008_cheerful_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790496192798,
+      "tag": "0009_better_auth_provider_account",
+      "breakpoints": true
     }
   ]
 }
