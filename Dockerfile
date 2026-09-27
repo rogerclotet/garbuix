@@ -6,7 +6,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm@10.34.5
+RUN npm install -g pnpm@11.25.0
 
 WORKDIR /app
 
@@ -27,8 +27,10 @@ ENV NODE_ENV=development
 FROM base AS production
 
 ENV NODE_ENV=production
+# Dependencies are verified in the deps stage; do not reinstall at startup.
+ENV pnpm_config_verify_deps_before_run=false
 
-COPY package.json pnpm-lock.yaml tsconfig.json drizzle.config.ts instrument.server.ts ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json drizzle.config.ts instrument.server.ts ./
 COPY drizzle ./drizzle
 COPY scripts ./scripts
 COPY src ./src
