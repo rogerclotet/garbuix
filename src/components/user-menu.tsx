@@ -137,7 +137,22 @@ export function UserMenu() {
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 					</>
-				) : null}
+				) : (
+					<>
+						{session.isPending ? (
+							<DropdownMenuItem disabled>
+								<Menu className="size-4" />
+								<span>Compte...</span>
+							</DropdownMenuItem>
+						) : (
+							<DropdownMenuItem onSelect={handleSignIn}>
+								<LogIn className="size-4" />
+								<span>Entrar</span>
+							</DropdownMenuItem>
+						)}
+						<DropdownMenuSeparator />
+					</>
+				)}
 				<DropdownMenuItem asChild>
 					<Link to={mini ? "/mini/dies-anteriors" : "/dies-anteriors"}>
 						<History className="size-4" />
@@ -161,22 +176,6 @@ export function UserMenu() {
 					</DropdownMenuItem>
 				) : null}
 				<ThemeMenuToggle />
-				{!activeUser ? (
-					<>
-						<DropdownMenuSeparator />
-						{session.isPending ? (
-							<DropdownMenuItem disabled>
-								<Menu className="size-4" />
-								<span>Compte...</span>
-							</DropdownMenuItem>
-						) : (
-							<DropdownMenuItem onSelect={handleSignIn}>
-								<LogIn className="size-4" />
-								<span>Entrar</span>
-							</DropdownMenuItem>
-						)}
-					</>
-				) : null}
 				<DropdownMenuSeparator />
 				<DropdownMenuItem asChild>
 					<Link to={mini ? "/" : "/mini"}>
