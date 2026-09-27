@@ -208,9 +208,17 @@ either variable empty disables Umami.
 Umami receives the existing product action names with only reviewed counts,
 booleans, and fixed choices. Both browser and server paths filter event data;
 new event names and properties must be added to `src/lib/umami-events.ts` after
-review. Errors, web vitals, free text, and unknown events are not sent to Umami.
+review. Errors, free text, and unknown events are not sent to Umami.
 `$pageview` becomes a native Umami pageview. Only known page paths are retained;
 query strings, fragments, referrers, and page titles are discarded.
+
+The existing Web Vitals collector sends LCP, INP, CLS, FCP, and TTFB as native
+Umami performance measurements through `/api/u`. View them in the website's
+**Performance** tab, available in [Umami 3.1.0 and later](https://docs.umami.is/docs/performance).
+Only numeric measurements and a known page path are sent. Timings use milliseconds;
+CLS is a unitless score. Metrics belong to the document's initial path, even after
+SPA navigation, and some are finalized when the page is hidden. Collection starts
+after deployment; historical visits cannot be backfilled.
 
 Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
 `puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,

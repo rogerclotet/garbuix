@@ -35,15 +35,16 @@ export function useObservability() {
 			resetUser() {
 				posthog.reset();
 			},
-			toWebVitalProperties(metric: Metric) {
-				return {
+			captureWebVital(metric: Metric, pathname: string) {
+				posthog.capture("web_vital", {
 					delta: metric.delta,
 					id: metric.id,
 					name: metric.name,
 					navigation_type: metric.navigationType,
 					rating: metric.rating,
 					value: metric.value,
-				};
+				});
+				umami?.captureWebVital(metric, pathname);
 			},
 		}),
 		[posthog, umami],

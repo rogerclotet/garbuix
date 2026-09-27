@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Metric } from "web-vitals";
 import { createUmamiClient } from "@/lib/umami";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -79,7 +80,64 @@ describe("Umami client privacy", () => {
 		});
 	});
 
-	it("has no identification API and drops errors, web vitals, and unknown events", () => {
+	it.each([
+		["LCP", "lcp", 1234.5],
+		["INP", "inp", 80],
+		["CLS", "cls", 0],
+		["FCP", "fcp", 600],
+		["TTFB", "ttfb", 150],
+	] satisfies [Metric["name"], string, number][])(
+		"sends %s as a native performance measurement",
+		async (name, key, value) => {
+			await createUmamiClient().captureWebVital(
+				{ name, value },
+				"/mini?secret=email#private",
+			);
+			expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+				type: "performance",
+				payload: { url: "/mini", [key]: value },
+			});
+			expect(fetchMock.mock.calls[0][1]).toMatchObject({
+				keepalive: true,
+				credentials: "omit",
+				referrerPolicy: "no-referrer",
+			});
+		},
+	);
+
+	it.each([-1, Number.NaN, Number.POSITIVE_INFINITY, 60_001])(
+		"drops invalid performance measurements: %s",
+		async (value) => {
+			await createUmamiClient().captureWebVital({ name: "LCP", value }, "/");
+			expect(fetchMock).not.toHaveBeenCalled();
+		},
+	);
+
+	it("shares the anonymous cache between events and performance and tolerates offline metrics", async () => {
+		fetchMock.mockImplementation(async () =>
+			Response.json({ cache: "anonymous-visit-token" }),
+		);
+		const client = createUmamiClient();
+		await client.captureEvent("$pageview");
+		await client.captureWebVital(
+			{ name: "CLS", value: 0.02 },
+			"/users/private@example.com",
+		);
+		expect(fetchMock.mock.calls[1][1]?.headers).toHaveProperty(
+			"x-umami-cache",
+			"anonymous-visit-token",
+		);
+		expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+			type: "performance",
+			payload: { url: "/other", cls: 0.02 },
+		});
+		fetchMock.mockRejectedValue(new TypeError("offline"));
+		await expect(
+			client.captureWebVital({ name: "LCP", value: 1000 }, "/"),
+		).resolves.toBeUndefined();
+	});
+
+	it("has no identification API and drops errors, generic web_vital events, and unknown events", () => {
 		const client = createUmamiClient();
 		expect(client).not.toHaveProperty("identifyUser");
 		for (const event of ["$exception", "web_vital", "private@example.com"])

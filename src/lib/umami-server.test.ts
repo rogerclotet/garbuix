@@ -155,6 +155,67 @@ describe("Umami proxy", () => {
 		expect(received[0].headers["x-posthog-distinct-id"]).toBeUndefined();
 	});
 
+	it("forwards native performance metrics with only a sanitized path", async () => {
+		const request = browserRequest({
+			type: "performance",
+			payload: {
+				url: "/mini?email=private@example.com#secret",
+				lcp: 1234.5,
+				inp: 80,
+				cls: 0,
+				fcp: 600,
+				ttfb: 150,
+				website: "override",
+				id: "private-user",
+				title: "Private Name",
+				data: { email: "private@example.com" },
+			},
+		});
+		request.headers.set("x-umami-cache", "previous-anonymous-token");
+		const response = await proxyUmamiRequest(request);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ cache: "anonymous-cache-token" });
+		expect(received[0].body).toEqual({
+			type: "performance",
+			payload: {
+				website: websiteId,
+				url: "/mini",
+				lcp: 1234.5,
+				inp: 80,
+				cls: 0,
+				fcp: 600,
+				ttfb: 150,
+			},
+		});
+		expect(received[0].headers["x-umami-cache"]).toBe(
+			"previous-anonymous-token",
+		);
+		expect(received[0].headers.cookie).toBeUndefined();
+		expect(received[0].headers.authorization).toBeUndefined();
+	});
+
+	it.each([
+		{},
+		{ lcp: -1 },
+		{ lcp: 60001 },
+		{ cls: 101 },
+		{ inp: "private@example.com" },
+		{ fcp: null },
+		{ unknown: 123 },
+	])(
+		"rejects invalid or empty performance measurements: %j",
+		async (metrics) => {
+			const response = await proxyUmamiRequest(
+				browserRequest({
+					type: "performance",
+					payload: { url: "/", ...metrics },
+				}),
+			);
+			expect(response.status).toBe(400);
+			expect(received).toHaveLength(0);
+		},
+	);
+
 	it.each(["identify", "performance"])(
 		"rejects %s messages from older clients",
 		async (type) => {

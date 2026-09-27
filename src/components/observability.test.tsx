@@ -3,9 +3,19 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { type ReactNode, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Metric } from "web-vitals";
 import { ObservabilityProvider } from "@/components/observability";
 import type { ObservabilityConfig } from "@/lib/observability-shared";
 import { useObservability } from "@/lib/use-observability";
+
+const webVitals = vi.hoisted(() => ({
+	onCLS: vi.fn(),
+	onFCP: vi.fn(),
+	onINP: vi.fn(),
+	onLCP: vi.fn(),
+	onTTFB: vi.fn(),
+}));
+vi.mock("web-vitals", () => webVitals);
 
 const identify = vi.fn();
 const setPersonPropertiesForFlags = vi.fn();
@@ -86,6 +96,7 @@ vi.mock("@posthog/react", () => ({
 }));
 
 beforeEach(() => {
+	for (const observer of Object.values(webVitals)) observer.mockClear();
 	Object.defineProperty(window, "matchMedia", {
 		writable: true,
 		value: vi.fn().mockImplementation(() => ({
@@ -196,6 +207,63 @@ describe("Umami through ObservabilityProvider", () => {
 			}),
 		);
 	});
+
+	it.each([false, true])(
+		"reports performance with PostHog enabled=%s",
+		async (posthogEnabled) => {
+			observability = posthogEnabled
+				? { ...posthogConfig, umamiEnabled: true }
+				: { umamiEnabled: true };
+			window.history.replaceState({}, "", "/mini");
+			const { rerender, unmount } = render(
+				<ObservabilityProvider>
+					<div>app</div>
+				</ObservabilityProvider>,
+			);
+			await waitFor(() => expect(webVitals.onLCP).toHaveBeenCalledTimes(1));
+			for (const observer of Object.values(webVitals))
+				expect(observer).toHaveBeenCalledTimes(1);
+			const report: (metric: Metric) => void = webVitals.onLCP.mock.calls[0][0];
+			location = { pathname: "/preferencies", searchStr: "" };
+			window.history.replaceState({}, "", "/preferencies");
+			rerender(
+				<ObservabilityProvider>
+					<div>app</div>
+				</ObservabilityProvider>,
+			);
+			const metric: Metric = {
+				name: "LCP",
+				value: 1200,
+				delta: 1200,
+				rating: "good",
+				id: "private-metric-id",
+				navigationType: "navigate",
+				navigationId: 1,
+				entries: [],
+			};
+			report(metric);
+			expect(
+				sentMessages().filter((message) => message.type === "performance"),
+			).toEqual([
+				{ type: "performance", payload: { url: "/mini", lcp: 1200 } },
+			]);
+			if (posthogEnabled)
+				expect(capture).toHaveBeenCalledWith("web_vital", {
+					name: "LCP",
+					value: 1200,
+					delta: 1200,
+					rating: "good",
+					id: "private-metric-id",
+					navigation_type: "navigate",
+				});
+			expect(webVitals.onLCP).toHaveBeenCalledTimes(1);
+			unmount();
+			fetchMock.mockClear();
+			report(metric);
+			expect(fetchMock).not.toHaveBeenCalled();
+			window.history.replaceState({}, "", "/");
+		},
+	);
 
 	it("keeps identification and raw errors in PostHog only", () => {
 		observability = { ...posthogConfig, umamiEnabled: true };

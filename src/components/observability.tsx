@@ -188,7 +188,7 @@ function ObservabilityRuntime({
 		select: (state) => state.location,
 	});
 	const lastIdentifiedUserRef = useRef<IdentifiedUserSnapshot | null>(null);
-	const { captureEvent, identifyUser, resetUser, toWebVitalProperties } =
+	const { captureEvent, identifyUser, resetUser, captureWebVital } =
 		useObservability();
 
 	useEffect(() => {
@@ -300,6 +300,9 @@ function ObservabilityRuntime({
 		}
 
 		let cancelled = false;
+		// Web Vitals describe the document navigation, even if an SPA route
+		// changes before a metric is finalized on page hide.
+		const pathname = window.location.pathname;
 
 		void import("web-vitals").then(({ onCLS, onFCP, onINP, onLCP, onTTFB }) => {
 			if (cancelled) {
@@ -307,7 +310,7 @@ function ObservabilityRuntime({
 			}
 
 			const reportMetric = (metric: Metric) => {
-				captureEvent("web_vital", toWebVitalProperties(metric));
+				if (!cancelled) captureWebVital(metric, pathname);
 			};
 
 			onCLS(reportMetric);
@@ -320,7 +323,7 @@ function ObservabilityRuntime({
 		return () => {
 			cancelled = true;
 		};
-	}, [captureEvent, toWebVitalProperties]);
+	}, [captureWebVital]);
 
 	return null;
 }

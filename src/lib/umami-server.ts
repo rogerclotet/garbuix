@@ -7,17 +7,8 @@ import {
 	toUmamiProperties,
 	umamiEventName,
 } from "@/lib/umami-events";
+import { type UmamiMessage, umamiMessageSchema } from "@/lib/umami-messages";
 
-const umamiMessageSchema = z.object({
-	type: z.literal("event"),
-	payload: z.object({
-		url: z.string(),
-		name: umamiEventName.optional(),
-		data: z.record(z.string(), z.unknown()).optional(),
-	}),
-});
-
-type UmamiMessage = z.infer<typeof umamiMessageSchema>;
 type UmamiConfig = NonNullable<
 	ReturnType<typeof getServerObservabilityConfig>["umami"]
 >;
@@ -48,15 +39,25 @@ async function sendUmamiMessage(
 		redirect: "error",
 		signal: AbortSignal.timeout(5000),
 		body: JSON.stringify({
-			type: "event",
+			type: message.type,
 			payload: {
 				website: config.websiteId,
 				url: toUmamiPath(message.payload.url),
-				name:
-					message.payload.name === ANALYTICS_EVENT.PAGEVIEW
-						? undefined
-						: message.payload.name,
-				data: toUmamiProperties(message.payload.data),
+				...(message.type === "performance"
+					? {
+							lcp: message.payload.lcp,
+							inp: message.payload.inp,
+							cls: message.payload.cls,
+							fcp: message.payload.fcp,
+							ttfb: message.payload.ttfb,
+						}
+					: {
+							name:
+								message.payload.name === ANALYTICS_EVENT.PAGEVIEW
+									? undefined
+									: message.payload.name,
+							data: toUmamiProperties(message.payload.data),
+						}),
 			},
 		}),
 	});
