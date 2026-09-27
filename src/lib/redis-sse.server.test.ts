@@ -68,6 +68,7 @@ describe("Redis SSE lifecycle", () => {
 		const viewers = Array.from({ length: 11 }, () => open());
 		await settle();
 		expect(sub.listenerCount("message")).toBe(1);
+		expect(sub.listenerCount("ready")).toBe(1);
 		expect(sub.subscribe).toHaveBeenCalledExactlyOnceWith("shared");
 		expect(vi.getTimerCount()).toBe(11);
 		await Promise.all(viewers.slice(0, 10).map((stream) => stream.cancel()));
@@ -168,6 +169,70 @@ describe("Redis SSE lifecycle", () => {
 		expect((await reader.read()).done).toBe(true);
 		expect(sub.unsubscribe).toHaveBeenCalledExactlyOnceWith("shared");
 		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("retries failed cleanup on each reconnect and stops once Redis acknowledges it", async () => {
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		vi.mocked(sub.unsubscribe)
+			.mockRejectedValueOnce(new Error("offline"))
+			.mockRejectedValueOnce(new Error("disconnected again"));
+		const stream = open();
+		await settle();
+		await stream.cancel();
+		await settle();
+		sub.emit("ready");
+		await settle();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(2);
+		sub.emit("ready");
+		await settle();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(3);
+		sub.emit("ready");
+		await settle();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(3);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("does not retry abandoned cleanup after a new viewer reclaims the channel", async () => {
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		vi.mocked(sub.unsubscribe).mockRejectedValueOnce(new Error("offline"));
+		const old = open();
+		await settle();
+		await old.cancel();
+		await settle();
+		const replacement = read(open());
+		await settle();
+		sub.emit("ready");
+		await settle();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(1);
+		await replacement.read();
+		sub.emit("message", "shared", "still connected");
+		expect(decoder.decode((await replacement.read()).value)).toContain(
+			"still connected",
+		);
+	});
+
+	it("does not remove a new viewer when an earlier unsubscribe completes late", async () => {
+		const gate = deferred();
+		vi.mocked(sub.unsubscribe).mockImplementationOnce(async () => {
+			await gate.promise;
+			return 0;
+		});
+		const old = open();
+		await settle();
+		await old.cancel();
+		const replacement = read(open());
+		await settle();
+		gate.resolve();
+		await settle();
+		sub.emit("ready");
+		await replacement.read();
+		sub.emit("message", "shared", "still connected");
+		expect(decoder.decode((await replacement.read()).value)).toContain(
+			"still connected",
+		);
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(1);
+		await replacement.cancel();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(2);
 	});
 
 	it("sends the fallback snapshot and keeps live updates when the snapshot fails", async () => {

@@ -9,6 +9,32 @@ type ChannelSubscription = {
 
 const subscribers = new WeakMap<Redis, Map<string, ChannelSubscription>>();
 
+function unsubscribeChannel({
+	sub,
+	subscriptions,
+	channel,
+	subscription,
+}: {
+	sub: Redis;
+	subscriptions: Map<string, ChannelSubscription>;
+	channel: string;
+	subscription: ChannelSubscription;
+}) {
+	// Keep the empty entry until Redis acknowledges removal. If this fails
+	// during an outage, the ready handler retries after auto-resubscription.
+	void sub.unsubscribe(channel).then(
+		() => {
+			// A new viewer may have replaced the entry while this was pending.
+			if (subscriptions.get(channel) === subscription) {
+				subscriptions.delete(channel);
+			}
+		},
+		(error: unknown) => {
+			console.warn("[redis:sse] unsubscribe failed", error);
+		},
+	);
+}
+
 function subscribe(sub: Redis, channels: string[], listener: MessageListener) {
 	let subscriptions = subscribers.get(sub);
 	if (!subscriptions) {
@@ -21,13 +47,27 @@ function subscribe(sub: Redis, channels: string[], listener: MessageListener) {
 				callback(channel, message);
 			}
 		});
+		// ioredis queues auto-resubscriptions before emitting ready. Use one
+		// handler for all abandoned channels, without adding per-viewer listeners.
+		sub.on("ready", () => {
+			for (const [channel, subscription] of byChannel) {
+				if (subscription.listeners.size === 0) {
+					unsubscribeChannel({
+						sub,
+						subscriptions: byChannel,
+						channel,
+						subscription,
+					});
+				}
+			}
+		});
 	}
 
 	const byChannel = subscriptions;
 	const uniqueChannels = [...new Set(channels)];
 	const ready = uniqueChannels.map((channel) => {
 		let subscription = byChannel.get(channel);
-		if (!subscription) {
+		if (!subscription || subscription.listeners.size === 0) {
 			subscription = {
 				listeners: new Set(),
 				ready: sub.subscribe(channel),
@@ -45,11 +85,13 @@ function subscribe(sub: Redis, channels: string[], listener: MessageListener) {
 				const subscription = byChannel.get(channel);
 				if (!subscription?.listeners.delete(listener)) continue;
 				if (subscription.listeners.size > 0) continue;
-				byChannel.delete(channel);
 				// Issue commands immediately so a new viewer's SUBSCRIBE follows
 				// this UNSUBSCRIBE even when the previous command is still pending.
-				void sub.unsubscribe(channel).catch((error: unknown) => {
-					console.warn("[redis:sse] unsubscribe failed", error);
+				unsubscribeChannel({
+					sub,
+					subscriptions: byChannel,
+					channel,
+					subscription,
 				});
 			}
 		},
