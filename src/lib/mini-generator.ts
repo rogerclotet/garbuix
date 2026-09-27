@@ -1,6 +1,7 @@
 import { MINI_WORDS } from "@/data/mini-words";
 import type { Word } from "@/data/types";
-import { SeededRandom, tryGenerateCrossword } from "@/lib/crossword-generator";
+import { tryGenerateCrossword } from "@/lib/crossword/grid-placement";
+import { SeededRandom } from "@/lib/crossword/seeded-random";
 import { dateKeyToSeed } from "@/lib/puzzle-dates";
 import { normalizeWord } from "@/lib/puzzle-text";
 

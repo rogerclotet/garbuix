@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getSlotCellKey } from "@/lib/puzzle-helpers";
 import { hasSeenHowToPlay } from "@/lib/puzzle-local";
-import { getSlotCellKey } from "./daily-helpers";
 import { HowToPlayDialog } from "./how-to-play-dialog";
 import {
 	TUTORIAL_BOARD,

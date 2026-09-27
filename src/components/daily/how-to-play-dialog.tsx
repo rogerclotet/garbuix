@@ -7,14 +7,17 @@ import {
 	useRef,
 	useState,
 } from "react";
+import {
+	PuzzleControls,
+	type TutorialControlTarget,
+} from "@/components/puzzle/puzzle-controls";
+import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_LETTER_LAYOUT } from "@/lib/anon-identity";
+import { getGuessKeyboardAction, getSlotCellKey } from "@/lib/puzzle-helpers";
 import { markHowToPlaySeen, markWelcomeSeen } from "@/lib/puzzle-local";
 import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
-import { DailyControls, type TutorialControlTarget } from "./daily-controls";
-import { DailyGrid } from "./daily-grid";
-import { getGuessKeyboardAction, getSlotCellKey } from "./daily-helpers";
 import { DailyWordList } from "./daily-word-list";
 import {
 	getTutorialStep,
@@ -212,7 +215,7 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 							</span>
 						</div>
 						<div className="flex min-h-0 flex-1 flex-col">
-							<DailyGrid
+							<PuzzleGrid
 								fitHeight
 								puzzle={TUTORIAL_BOARD}
 								revealedCells={new Set(cellLetters.keys())}
@@ -302,7 +305,7 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 				</section>
 				{step !== "complete" ? (
 					<div className="z-10 shrink-0 rounded-t-2xl border-t border-border/60 bg-background px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] lg:self-center lg:rounded-2xl lg:border lg:p-4">
-						<DailyControls
+						<PuzzleControls
 							inline
 							aiClueMode
 							layout={DEFAULT_LETTER_LAYOUT}

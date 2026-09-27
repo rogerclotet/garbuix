@@ -150,16 +150,16 @@ vi.mock("./use-daily-progress", () => ({
 	})),
 }));
 
-vi.mock("./daily-grid", () => ({
-	DailyGrid: vi.fn(() => <div data-testid="daily-grid" />),
+vi.mock("@/components/puzzle/puzzle-grid", () => ({
+	PuzzleGrid: vi.fn(() => <div data-testid="daily-grid" />),
 }));
 
 vi.mock("./share-progress", () => ({
 	shareProgress: vi.fn(),
 }));
 
-vi.mock("./daily-confetti", () => ({
-	DailyConfetti: vi.fn(() => null),
+vi.mock("@/components/puzzle/puzzle-confetti", () => ({
+	PuzzleConfetti: vi.fn(() => null),
 }));
 
 function installMatchMediaMock(matches = false) {

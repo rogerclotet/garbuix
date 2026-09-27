@@ -17,13 +17,13 @@ import type {
 	ClueResponse,
 } from "@/lib/clue-request-types";
 import { clueHelpGivenField, wordRowId } from "@/lib/clue-request-types";
-import type { PuzzleWordSlot } from "@/lib/puzzle-types";
-import type { RespondResult } from "@/lib/use-clue-requests";
 import {
 	getDisplayedSlotWord,
 	getOptimotDefinitionUrl,
 	getSortedWordSlots,
-} from "./daily-helpers";
+} from "@/lib/puzzle-helpers";
+import type { PuzzleWordSlot } from "@/lib/puzzle-types";
+import type { RespondResult } from "@/lib/use-clue-requests";
 
 type DailyWordListProps = {
 	puzzle: { wordSlots: PuzzleWordSlot[] };

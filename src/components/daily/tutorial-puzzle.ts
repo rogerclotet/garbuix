@@ -1,5 +1,5 @@
-import type { PuzzleBoard } from "./daily-grid";
-import { getSlotCellKey } from "./daily-helpers";
+import type { PuzzleBoard } from "@/components/puzzle/puzzle-grid";
+import { getSlotCellKey } from "@/lib/puzzle-helpers";
 
 export const TUTORIAL_LETTERS = ["r", "a", "t", "s", "c", "o"];
 

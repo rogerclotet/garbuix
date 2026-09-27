@@ -26,7 +26,7 @@ type Particle = {
 	isCircle: boolean;
 };
 
-export function DailyConfetti({ fire }: { fire: boolean }) {
+export function PuzzleConfetti({ fire }: { fire: boolean }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
 	useEffect(() => {

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Daily } from "@/components/daily/daily";
-import { DailyLoadingPage } from "@/components/daily/daily-loading";
 import type { DailyData } from "@/components/daily/daily-types";
-import { useDailyRollover } from "@/components/daily/use-daily-rollover";
+import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
+import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
 import {
 	getDailyPuzzlePageData,
 	pollDailyPuzzleReady,
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
 	// Only reached when the read is slow enough for the router's pending delay
 	// to elapse; a normal navigation stays on the current page until the board
 	// is ready to render.
-	pendingComponent: DailyLoadingPage,
+	pendingComponent: PuzzleLoadingPage,
 	component: IndexPage,
 });
 
@@ -51,7 +51,7 @@ function ReadyDailyPage({ initialData }: { initialData: DailyData }) {
 			setReplacement({ source: initialData, data: next });
 	}, [initialData]);
 	const expired = useDailyRollover(data.rolloverAt, refresh);
-	return expired ? <DailyLoadingPage /> : <Daily initialData={data} />;
+	return expired ? <PuzzleLoadingPage /> : <Daily initialData={data} />;
 }
 
 function PuzzleGeneratingPage() {
@@ -90,5 +90,5 @@ function PuzzleGeneratingPage() {
 	}, []);
 
 	if (initialData) return <ReadyDailyPage initialData={initialData} />;
-	return <DailyLoadingPage />;
+	return <PuzzleLoadingPage />;
 }

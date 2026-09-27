@@ -1,7 +1,7 @@
 import { Loader2Icon } from "lucide-react";
 
 // Keep stale game content out of the document while preparing a complete board.
-export function DailyLoadingPage({
+export function PuzzleLoadingPage({
 	synchronizing = false,
 	onRetry,
 }: {

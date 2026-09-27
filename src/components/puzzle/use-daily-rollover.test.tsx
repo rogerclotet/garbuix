@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useDailyRollover } from "./use-daily-rollover";
+import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
 
 beforeEach(() => {
 	vi.useFakeTimers();
