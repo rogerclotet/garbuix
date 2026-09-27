@@ -544,10 +544,7 @@ describe("Daily submit feedback", () => {
 			expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
 		});
 		expect(openHowToPlayMock).toHaveBeenCalledTimes(1);
-		expect(captureEventMock).toHaveBeenCalledWith("how_to_play_shown", {
-			game_mode: "classic",
-			trigger: "first_visit",
-		});
+		expect(captureEventMock).not.toHaveBeenCalled();
 	});
 
 	it("starts new players in practice before showing a welcome dialog", async () => {
@@ -572,12 +569,7 @@ describe("Daily submit feedback", () => {
 
 		renderDaily();
 
-		await waitFor(() => {
-			expect(captureEventMock).toHaveBeenCalledWith(
-				"puzzle_loaded",
-				expect.any(Object),
-			);
-		});
+		expect(captureEventMock).not.toHaveBeenCalled();
 		expect(openHowToPlayMock).not.toHaveBeenCalled();
 		expect(markHowToPlaySeenMock).not.toHaveBeenCalled();
 	});
@@ -592,10 +584,7 @@ describe("Daily submit feedback", () => {
 			expect(markProfilePreferencesTipSeenMock).toHaveBeenCalledTimes(1);
 		});
 		expect(openProfilePreferencesTipMock).toHaveBeenCalledTimes(1);
-		expect(captureEventMock).toHaveBeenCalledWith(
-			"profile_preferences_tip_shown",
-			{ game_mode: "classic", trigger: "return_visit" },
-		);
+		expect(captureEventMock).not.toHaveBeenCalled();
 	});
 
 	it("does not auto-open the profile preferences tip on first visit before how-to-play", async () => {
@@ -616,12 +605,7 @@ describe("Daily submit feedback", () => {
 
 		renderDaily();
 
-		await waitFor(() => {
-			expect(captureEventMock).toHaveBeenCalledWith(
-				"puzzle_loaded",
-				expect.any(Object),
-			);
-		});
+		expect(captureEventMock).not.toHaveBeenCalled();
 		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
 		expect(markProfilePreferencesTipSeenMock).not.toHaveBeenCalled();
 	});

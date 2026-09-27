@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import { createPuzzleEvent } from "@/lib/puzzle-client";
 import {
 	getSlotHintCellKey,
@@ -189,11 +188,7 @@ export function useDailyClues({
 		if (derivedProgress.hintsUsed >= 3) return;
 		if (nextClueWordId == null) return;
 
-		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
-			game_mode: GAME_MODE.CLASSIC,
-			hint_type: HINT_TYPE.TEXT,
-			hints_used_after: derivedProgress.hintsUsed + 1,
-		});
+		captureEvent({ event: "hint_requested", value: "text" });
 		applyLocalEvent(
 			createPuzzleEvent("text_hint_requested", {
 				wordId: nextClueWordId,
@@ -223,12 +218,6 @@ export function useDailyClues({
 
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
-			captureEvent(ANALYTICS_EVENT.PEER_CLUE_REQUESTED, {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: puzzle.dateKey,
-				puzzle_id: puzzle.id,
-				word_id: wordId,
-			});
 			// Tell responders whether this player already unlocked the word's AI
 			// clue, so they know copying it back into a reply wouldn't help.
 			const hasAiClue = derivedProgress.clueWordIds.includes(wordId);
@@ -240,13 +229,7 @@ export function useDailyClues({
 				}
 			});
 		},
-		[
-			captureEvent,
-			derivedProgress.clueWordIds,
-			puzzle.dateKey,
-			puzzle.id,
-			requestClue,
-		],
+		[derivedProgress.clueWordIds, requestClue],
 	);
 
 	// Toast clues as they arrive live. The clue itself is stored in the provider

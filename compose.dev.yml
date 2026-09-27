@@ -28,11 +28,12 @@ services:
       context: .
       target: dev
     image: paraules-app:dev
+    # Allow pnpm to refresh the dependency volume without an interactive prompt.
     command:
       [
         "sh",
         "-lc",
-        "pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm db:migrate && pnpm dev --host 0.0.0.0 --port 3000",
+        "CI=true pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm db:migrate && pnpm dev --host 0.0.0.0 --port 3000",
       ]
     depends_on:
       redis:
@@ -50,9 +51,9 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      ANALYTICS_ENABLED: "${ANALYTICS_ENABLED:-false}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
       GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
       GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
       GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
@@ -76,16 +77,16 @@ services:
       target: dev
     image: paraules-app:dev
     command:
-      ["sh", "-lc", "pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm backfill:puzzles"]
+      ["sh", "-lc", "CI=true pnpm install --frozen-lockfile && pnpm exec tsx scripts/download-catalan-dictionary.ts --if-missing && pnpm backfill:puzzles"]
     environment:
       NODE_ENV: development
       DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      ANALYTICS_ENABLED: "${ANALYTICS_ENABLED:-false}"
       POSTHOG_KEY: "${POSTHOG_KEY:-}"
       POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
       GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
       GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
       GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"

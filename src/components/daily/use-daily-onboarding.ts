@@ -4,7 +4,6 @@ import {
 	openProfilePreferencesTip,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { authClient } from "@/lib/auth-client";
 import {
 	getSortedAnonymousHistoryEntries,
@@ -34,7 +33,7 @@ export function useDailyOnboarding({
 	sharePreviewOpen: boolean;
 	winDialogOpen: boolean;
 }) {
-	const { captureEvent, captureException } = useObservability();
+	const { captureException } = useObservability();
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const [miniAnnouncementOpen, setMiniAnnouncementOpen] = useState(false);
 	const tutorialOpen = useHowToPlayOpen();
@@ -43,23 +42,15 @@ export function useDailyOnboarding({
 	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
 		openHowToPlay();
-		captureEvent(ANALYTICS_EVENT.HOW_TO_PLAY_SHOWN, {
-			game_mode: GAME_MODE.CLASSIC,
-			trigger: "first_visit",
-		});
-	}, [captureEvent]);
+	}, []);
 
 	const openProfilePreferencesTipIfNeeded = useCallback(() => {
 		if (!hasSeenHowToPlay()) return false;
 		if (hasSeenProfilePreferencesTip()) return false;
 		markProfilePreferencesTipSeen();
 		openProfilePreferencesTip();
-		captureEvent(ANALYTICS_EVENT.PROFILE_PREFERENCES_TIP_SHOWN, {
-			game_mode: GAME_MODE.CLASSIC,
-			trigger: "return_visit",
-		});
 		return true;
-	}, [captureEvent]);
+	}, []);
 
 	useEffect(() => {
 		if (!isPresentable || firstVisitChecked.current) return;
@@ -73,10 +64,6 @@ export function useDailyOnboarding({
 		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
 		if (shouldShowWelcome) {
 			setWelcomeOpen(true);
-			captureEvent(ANALYTICS_EVENT.WELCOME_SHOWN, {
-				game_mode: GAME_MODE.CLASSIC,
-				trigger: "first_visit",
-			});
 			return;
 		}
 
@@ -104,7 +91,6 @@ export function useDailyOnboarding({
 		setMiniAnnouncementOpen(true);
 	}, [
 		activeUser,
-		captureEvent,
 		openHowToPlayIfFirstVisit,
 		openProfilePreferencesTipIfNeeded,
 		isPresentable,
@@ -131,20 +117,8 @@ export function useDailyOnboarding({
 		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
 	);
 
-	const handleWelcomeContinueAnonymous = useCallback(() => {
-		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
-			game_mode: GAME_MODE.CLASSIC,
-			choice: "anonymous",
-		});
-	}, [captureEvent]);
-
 	const signInWithGoogle = useCallback(
 		async (source: string) => {
-			captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
-				game_mode: GAME_MODE.CLASSIC,
-				provider: "google",
-				source,
-			});
 			try {
 				await authClient.signIn.social({
 					provider: "google",
@@ -155,18 +129,14 @@ export function useDailyOnboarding({
 				toast.error("No s'ha pogut iniciar la sessió");
 			}
 		},
-		[captureEvent, captureException],
+		[captureException],
 	);
 
 	const handleWelcomeSignIn = useCallback(() => {
-		captureEvent(ANALYTICS_EVENT.WELCOME_DISMISSED, {
-			game_mode: GAME_MODE.CLASSIC,
-			choice: "google",
-		});
 		markWelcomeSeen();
 		setWelcomeOpen(false);
 		void signInWithGoogle("welcome_dialog");
-	}, [captureEvent, signInWithGoogle]);
+	}, [signInWithGoogle]);
 
 	return {
 		welcomeOpen,
@@ -174,7 +144,6 @@ export function useDailyOnboarding({
 		setMiniAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
-		handleWelcomeContinueAnonymous,
 		handleWelcomeSignIn,
 		signInWithGoogle,
 	};

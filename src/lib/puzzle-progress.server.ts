@@ -1,8 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { dailyPuzzles, puzzleWordClues, userPuzzleEvents } from "@/db/schema";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
-import { captureServerEvent } from "@/lib/observability-server";
 import { puzzleClientEventSchema } from "@/lib/puzzle-event-schemas";
 import { publishLeaderboardForUser } from "@/lib/puzzle-leaderboard.server";
 import {
@@ -317,23 +315,6 @@ export async function syncPuzzleEventsForUser(options: {
 			previousCompletedAt,
 		});
 	}
-
-	captureServerEvent({
-		distinctId: userId,
-		event: ANALYTICS_EVENT.PUZZLE_PROGRESS_SYNCED_SERVER,
-		properties: {
-			game_mode: GAME_MODE.CLASSIC,
-			acked_event_count: ackedEventIds.length,
-			completed: Boolean(nextProgress.completedAt),
-			device_id: deviceId,
-			guessed_word_count: nextProgress.guessedWordIds.length,
-			puzzle_id: puzzleId,
-			sanitized_invalid_unlock_token_count:
-				diagnostics.sanitizedInvalidUnlockTokenCount,
-			sanitized_missing_word_count: diagnostics.sanitizedMissingWordCount,
-			received_event_count: events.length,
-		},
-	});
 
 	return {
 		ackedEventIds,

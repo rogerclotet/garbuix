@@ -8,6 +8,7 @@ import {
 	Menu,
 	Moon,
 	Settings,
+	Shield,
 	Sun,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -24,7 +25,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
@@ -50,7 +50,7 @@ function ThemeMenuToggle() {
 				event.preventDefault();
 				const next = isDark ? "light" : "dark";
 				setTheme(next);
-				captureEvent(ANALYTICS_EVENT.THEME_PREFERENCE_CHANGED, { theme: next });
+				captureEvent({ event: "theme_selected", value: next });
 			}}
 		>
 			{isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
@@ -80,9 +80,6 @@ export function UserMenu() {
 	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
 	const handleSignIn = async () => {
-		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
-			provider: "google",
-		});
 		await authClient.signIn.social({
 			provider: "google",
 			callbackURL: window.location.href,
@@ -162,6 +159,7 @@ export function UserMenu() {
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					onSelect={() => {
+						captureEvent({ event: "help_opened" });
 						openHowToPlay();
 					}}
 				>
@@ -172,6 +170,12 @@ export function UserMenu() {
 					<Link to="/sobre-el-joc">
 						<Info className="size-4" />
 						<span>Sobre el joc</span>
+					</Link>
+				</DropdownMenuItem>
+				<DropdownMenuItem asChild>
+					<Link to="/privacitat">
+						<Shield className="size-4" />
+						<span>Privacitat</span>
 					</Link>
 				</DropdownMenuItem>
 				{!mini ? (

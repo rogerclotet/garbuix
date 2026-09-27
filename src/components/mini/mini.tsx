@@ -17,7 +17,6 @@ import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import { Button } from "@/components/ui/button";
-import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import { getMiniPageData } from "@/lib/mini-server-fns";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import {
@@ -50,7 +49,6 @@ export function Mini({ initialData }: { initialData: MiniPageData }) {
 function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 	const { puzzle, userId } = data;
 	const { captureEvent } = useObservability();
-	const loadTracked = useRef(false);
 	const { progress, ready, dispatch, syncFailed } = useMiniProgress({
 		puzzle,
 		initialProgress: data.progress,
@@ -100,24 +98,6 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		puzzle.hintCapsules.some(({ cellKey }) => !revealedCells.has(cellKey));
 	const locateSlot = puzzle.wordSlots.find((slot) => slot.id === locateId);
 
-	useEffect(() => {
-		if (!isPresentable || expired || loadTracked.current) return;
-		loadTracked.current = true;
-		captureEvent(ANALYTICS_EVENT.PUZZLE_LOADED, {
-			game_mode: GAME_MODE.MINI,
-			is_authenticated: Boolean(userId),
-			rows: puzzle.rows,
-			total_words: puzzle.wordSlots.length,
-		});
-	}, [
-		captureEvent,
-		expired,
-		isPresentable,
-		puzzle.rows,
-		puzzle.wordSlots.length,
-		userId,
-	]);
-
 	const appendLetter = useCallback((letter: string) => {
 		setGuess((current) =>
 			current.length < 5 ? current + letter.toUpperCase() : current,
@@ -136,12 +116,6 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		setBusy(true);
 		try {
 			const result = await resolveGuess({ puzzle, progress, guess });
-			captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
-				game_mode: GAME_MODE.MINI,
-				guess_length: guess.length,
-				matched: result.matchedSlotId != null,
-				result_kind: result.kind,
-			});
 			dispatch(
 				createPuzzleEvent("guess_added", {
 					guessHash: result.guessHash,
@@ -155,13 +129,6 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 				setHighlightedWordId(result.matchedSlotId);
 				if (progress.guessedWordIds.length + 1 === puzzle.wordSlots.length) {
 					setCelebrate(true);
-					// Emit on the completing action, not when restoring a finished save.
-					captureEvent(ANALYTICS_EVENT.PUZZLE_COMPLETED, {
-						game_mode: GAME_MODE.MINI,
-						guess_count: progress.guessCount + 1,
-						hints_used: progress.hintsUsed,
-						is_authenticated: Boolean(userId),
-					});
 				}
 			} else if (result.kind === "already_found")
 				setMessage("Aquesta ja l'has trobada. Prova'n una altra!");
@@ -172,16 +139,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 			submitting.current = false;
 			setBusy(false);
 		}
-	}, [
-		captureEvent,
-		dispatch,
-		expired,
-		guess,
-		isPresentable,
-		progress,
-		puzzle,
-		userId,
-	]);
+	}, [dispatch, expired, guess, isPresentable, progress, puzzle]);
 
 	usePuzzleKeyboard({
 		enabled: isPresentable && !expired && !complete,
@@ -210,11 +168,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		const cellKey = getRandomHintCellKey(puzzle, revealedCells);
 		if (!cellKey) return;
 		dispatch(createPuzzleEvent("hint_used", { cellKey }));
-		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
-			game_mode: GAME_MODE.MINI,
-			hint_type: HINT_TYPE.LETTER,
-			hints_used_after: progress.hintsUsed + 1,
-		});
+		captureEvent({ event: "hint_requested", value: "letter" });
 		setMessage("Una lletra més! Mira on ha aparegut.");
 	};
 
@@ -225,9 +179,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 				shuffledLetters: shuffleArray(progress.shuffledLetters),
 			}),
 		);
-		captureEvent(ANALYTICS_EVENT.PUZZLE_LETTERS_SHUFFLED, {
-			game_mode: GAME_MODE.MINI,
-		});
+		captureEvent({ event: "letters_shuffled" });
 	};
 
 	if (!isPresentable) {

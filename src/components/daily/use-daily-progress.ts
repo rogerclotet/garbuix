@@ -8,7 +8,6 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	getOrCreateAnonIdentity,
 	getReportedAnonProgress,
@@ -152,7 +151,7 @@ export function useDailyProgress({
 	const syncEvents = useServerFn(syncUserPuzzleEvents);
 	const fetchUserProgress = useServerFn(getUserPuzzleProgress);
 	const importProgress = useServerFn(importAnonymousProgress);
-	const { captureEvent, captureException } = useObservability();
+	const { captureException } = useObservability();
 	const emptyProgress = useMemo(
 		() => createEmptyProgressState(puzzle),
 		[puzzle],
@@ -337,7 +336,7 @@ export function useDailyProgress({
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					const result = await importProgress({
+					await importProgress({
 						data: {
 							deviceId,
 							payload,
@@ -345,13 +344,6 @@ export function useDailyProgress({
 					});
 					markAnonymousDataImported(activeUserId);
 					if (hasLocalProgress) {
-						captureEvent(ANALYTICS_EVENT.ANONYMOUS_PROGRESS_IMPORTED, {
-							game_mode: GAME_MODE.CLASSIC,
-							active_progress_count: Object.keys(payload.activeProgressByDate)
-								.length,
-							imported_dates: result.importedDates.length,
-							legacy_dates: result.skippedLegacyDates.length,
-						});
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
@@ -376,7 +368,6 @@ export function useDailyProgress({
 		};
 	}, [
 		activeUserId,
-		captureEvent,
 		captureException,
 		deviceId,
 		importProgress,
@@ -538,12 +529,6 @@ export function useDailyProgress({
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
-				captureEvent(ANALYTICS_EVENT.PUZZLE_EVENTS_SYNCED, {
-					game_mode: GAME_MODE.CLASSIC,
-					acked_events: result.ackedEventIds.length,
-					puzzle_id: puzzle.id,
-					queued_events: pendingEvents.length,
-				});
 			})
 			.catch((error) => {
 				if (!scope.active) return;
@@ -593,7 +578,6 @@ export function useDailyProgress({
 			});
 	}, [
 		activeUserId,
-		captureEvent,
 		captureException,
 		deviceId,
 		isOnline,

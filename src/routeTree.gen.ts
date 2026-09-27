@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMonitoringRouteImport } from './routes/api/monitoring'
+import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
 import { Route as PhSplatRouteImport } from './routes/ph/$'
@@ -43,6 +45,11 @@ const PreferenciesRoute = PreferenciesRouteImport.update({
   path: '/preferencies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacitatRoute = PrivacitatRouteImport.update({
+  id: '/privacitat',
+  path: '/privacitat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SobreElJocRoute = SobreElJocRouteImport.update({
   id: '/sobre-el-joc',
   path: '/sobre-el-joc',
@@ -56,6 +63,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const ApiMonitoringRoute = ApiMonitoringRouteImport.update({
   id: '/api/monitoring',
   path: '/api/monitoring',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsageRoute = ApiUsageRouteImport.update({
+  id: '/api/usage',
+  path: '/api/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MiniIndexRoute = MiniIndexRouteImport.update({
@@ -94,9 +106,11 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
+  '/api/usage': typeof ApiUsageRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
@@ -109,9 +123,11 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
+  '/api/usage': typeof ApiUsageRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini': typeof MiniIndexRoute
@@ -125,9 +141,11 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/api/monitoring': typeof ApiMonitoringRoute
+  '/api/usage': typeof ApiUsageRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
@@ -142,9 +160,11 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
+    | '/api/usage'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini/'
@@ -157,9 +177,11 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
+    | '/api/usage'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini'
@@ -172,9 +194,11 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/api/monitoring'
+    | '/api/usage'
     | '/mini/dies-anteriors'
     | '/ph/$'
     | '/mini/'
@@ -188,9 +212,11 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMonitoringRoute: typeof ApiMonitoringRoute
+  ApiUsageRoute: typeof ApiUsageRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
   PhSplatRoute: typeof PhSplatRoute
   MiniIndexRoute: typeof MiniIndexRoute
@@ -229,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreferenciesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacitat': {
+      id: '/privacitat'
+      path: '/privacitat'
+      fullPath: '/privacitat'
+      preLoaderRoute: typeof PrivacitatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sobre-el-joc': {
       id: '/sobre-el-joc'
       path: '/sobre-el-joc'
@@ -248,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/api/monitoring'
       fullPath: '/api/monitoring'
       preLoaderRoute: typeof ApiMonitoringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/usage': {
+      id: '/api/usage'
+      path: '/api/usage'
+      fullPath: '/api/usage'
+      preLoaderRoute: typeof ApiUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mini/': {
@@ -300,9 +340,11 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMonitoringRoute: ApiMonitoringRoute,
+  ApiUsageRoute: ApiUsageRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
   PhSplatRoute: PhSplatRoute,
   MiniIndexRoute: MiniIndexRoute,

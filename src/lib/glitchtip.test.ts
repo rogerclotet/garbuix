@@ -9,6 +9,35 @@ import { scrubGlitchTipEvent } from "./glitchtip-scrub";
 import { proxyGlitchTipRequest } from "./glitchtip-tunnel.server";
 
 describe("GlitchTip configuration", () => {
+	it("removes identity and excludes usage requests from errors and traces", () => {
+		for (const url of [
+			"https://app.test/api/usage",
+			"https://app.test/api/usage/",
+			"https://app.test/ph/e/",
+		]) {
+			expect(
+				scrubGlitchTipEvent({ request: { url }, user: { id: "private" } }),
+			).toBeNull();
+		}
+		expect(
+			scrubGlitchTipEvent({ transaction: "/api/usage", type: "transaction" }),
+		).toBeNull();
+		expect(
+			scrubGlitchTipEvent({
+				transaction: "POST /api/usage",
+				type: "transaction",
+			}),
+		).toBeNull();
+		expect(
+			scrubGlitchTipEvent({
+				user: { id: "private", email: "private@example.com" },
+				breadcrumbs: [
+					{ category: "fetch", data: { url: "/api/usage" } },
+					{ message: "Useful diagnostic" },
+				],
+			}),
+		).toEqual({ breadcrumbs: [{ message: "Useful diagnostic" }] });
+	});
 	it("allows an unconfigured app and validates settings at the boundary", () => {
 		expect(
 			glitchtipEnvSchema.parse({ GLITCHTIP_DSN: "" }).GLITCHTIP_DSN,
@@ -135,7 +164,7 @@ describe("GlitchTip envelope transport", () => {
 		expect(received.length).toBe(before);
 	});
 
-	it("sends real SDK exceptions with release, stack and isolated user context", async () => {
+	it("sends real SDK exceptions with release and stack while stripping user context", async () => {
 		Sentry.init({
 			dsn,
 			release: "garbuix@test",
@@ -160,7 +189,10 @@ describe("GlitchTip envelope transport", () => {
 				.map((line) => JSON.parse(line)),
 		);
 		for (const id of ["alice", "bob"]) {
-			const event = events.find((entry) => entry.user?.id === id);
+			const event = events.find(
+				(entry) => entry.exception?.values[0]?.value === `failure-${id}`,
+			);
+			expect(event).not.toHaveProperty("user");
 			expect(event).toMatchObject({
 				release: "garbuix@test",
 				environment: "test",

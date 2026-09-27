@@ -1,3 +1,5 @@
 # Pre-generate tomorrow's puzzle and AI clues at 23:00 Madrid time,
 # one hour before midnight rollover. The script is idempotent.
 0 23 * * *  /app/scripts/pre-generate.sh
+# Completed days only, in Europe/Madrid. Also purges counters older than 90 days.
+15 0 * * *  cd /app && pnpm analytics:export

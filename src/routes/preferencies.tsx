@@ -19,7 +19,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -165,7 +164,7 @@ function PreferencesPage() {
 	const rootData = rootRoute.useLoaderData();
 	const router = useRouter();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
-	const { captureEvent, resetUser } = useObservability();
+	const { captureEvent } = useObservability();
 	const saveProfile = useServerFn(updateUserProfile);
 	const fetchSessionUser = useServerFn(getSessionUser);
 	const sharePreviewToggleId = useId();
@@ -217,31 +216,34 @@ function PreferencesPage() {
 	const handleToggleSharePreview = (next: boolean) => {
 		setShowSharePreview(next);
 		setSkipSharePreview(!next);
-		captureEvent(ANALYTICS_EVENT.SHARE_PREVIEW_TOGGLED, { skip: !next });
+		captureEvent({
+			event: "share_preview_selected",
+			value: next ? "on" : "off",
+		});
 	};
 
 	const handleToggleVibration = (next: boolean) => {
 		setVibrationEnabled(next);
 		setVibrationPreference(next);
-		captureEvent(ANALYTICS_EVENT.VIBRATION_TOGGLED, { enabled: next });
+		captureEvent({ event: "vibration_selected", value: next ? "on" : "off" });
 	};
 
 	const handleLayoutChange = (next: LetterLayout) => {
 		setLetterLayoutState(next);
 		setLetterLayout(next);
-		captureEvent(ANALYTICS_EVENT.LETTER_LAYOUT_CHANGED, { layout: next });
+		captureEvent({ event: "letter_layout_selected", value: next });
 	};
 
 	const handleToggleBonusClues = (next: boolean) => {
 		setBonusCluesEnabledState(next);
 		setBonusCluesEnabled(next);
-		captureEvent(ANALYTICS_EVENT.BONUS_CLUES_TOGGLED, { enabled: next });
+		captureEvent({ event: "bonus_clues_selected", value: next ? "on" : "off" });
 	};
 
 	const handleThemeChange = (next: string) => {
 		const value = next as ThemePreference;
 		setTheme(value);
-		captureEvent(ANALYTICS_EVENT.THEME_PREFERENCE_CHANGED, { theme: value });
+		captureEvent({ event: "theme_selected", value: value });
 	};
 
 	const handleAvatarPreferenceChange = (next: AvatarPreference) => {
@@ -251,14 +253,12 @@ function PreferencesPage() {
 
 	const handleSignOut = async () => {
 		setSigningOut(true);
-		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_OUT_CLICKED);
 		try {
 			const result = await authClient.signOut();
 			if (result.error) {
 				toast.error("No s'ha pogut tancar la sessió. Torna-ho a provar.");
 				return;
 			}
-			resetUser();
 			await session.refetch();
 			await router.invalidate({ sync: true });
 			await router.navigate({ to: "/" });
@@ -301,10 +301,6 @@ function PreferencesPage() {
 
 		const markProfileSaved = () => {
 			setDisplayName(normalized);
-			captureEvent(ANALYTICS_EVENT.PROFILE_UPDATED, {
-				is_authenticated: Boolean(activeUser),
-				avatar_preference: avatarPreference,
-			});
 			setProfileSaved(true);
 		};
 

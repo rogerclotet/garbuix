@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { isVibrationEnabled } from "@/lib/anon-identity";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import { getRandomHintCellKey, getSlotCellKey } from "@/lib/puzzle-helpers";
@@ -112,14 +111,6 @@ export function useDailyActions({
 		if (!/^[a-zA-ZÀ-ÿçÇ·]+$/.test(guess)) {
 			triggerHaptic(HAPTIC_ERROR_PATTERN);
 			showSubmitFeedback(prettyGuess, "invalid_input");
-			captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: puzzle.dateKey,
-				guess_length: guess.length,
-				matched: false,
-				puzzle_id: puzzle.id,
-				result_kind: "invalid_input",
-			});
 			setCurrentGuess("");
 			return;
 		}
@@ -131,14 +122,6 @@ export function useDailyActions({
 		});
 
 		showSubmitFeedback(prettyGuess, result.kind);
-		captureEvent(ANALYTICS_EVENT.PUZZLE_GUESS_RESULT, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			guess_length: guess.length,
-			matched: result.matchedSlotId != null,
-			puzzle_id: puzzle.id,
-			result_kind: result.kind,
-		});
 
 		const isNewBonusWord =
 			result.kind === "valid_but_not_in_puzzle" && !result.isRepeatGuess;
@@ -181,12 +164,6 @@ export function useDailyActions({
 						createPuzzleEvent("bonus_clue_revealed", { cellKey }),
 					);
 					triggerHaptic(HAPTIC_SUCCESS_PATTERN);
-					captureEvent(ANALYTICS_EVENT.BONUS_CLUE_GRANTED, {
-						game_mode: GAME_MODE.CLASSIC,
-						bonus_words_found: nextBonusCount,
-						date_key: puzzle.dateKey,
-						puzzle_id: puzzle.id,
-					});
 					toast.success("Lletra desbloquejada!", {
 						description: `Has trobat ${WORDS_PER_BONUS_CLUE} paraules vàlides de fora del joc.`,
 					});
@@ -215,7 +192,6 @@ export function useDailyActions({
 	}, [
 		applyLocalEvent,
 		bonusCluesEnabled,
-		captureEvent,
 		cellLetters,
 		currentGuess,
 		derivedProgress,
@@ -246,11 +222,7 @@ export function useDailyActions({
 	const handleShuffle = useCallback(() => {
 		triggerHaptic(HAPTIC_TAP_MS);
 		const shuffledLetters = shuffleArray(derivedProgress.shuffledLetters);
-		captureEvent(ANALYTICS_EVENT.PUZZLE_LETTERS_SHUFFLED, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			puzzle_id: puzzle.id,
-		});
+		captureEvent({ event: "letters_shuffled" });
 		applyLocalEvent(
 			createPuzzleEvent("letters_shuffled", {
 				shuffledLetters,
@@ -260,8 +232,6 @@ export function useDailyActions({
 		applyLocalEvent,
 		captureEvent,
 		derivedProgress.shuffledLetters,
-		puzzle.dateKey,
-		puzzle.id,
 		triggerHaptic,
 	]);
 

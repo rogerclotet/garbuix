@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+	bigint,
 	boolean,
 	date,
 	index,
@@ -9,6 +10,7 @@ import {
 	text,
 	timestamp,
 	uniqueIndex,
+	uuid,
 } from "drizzle-orm/pg-core";
 import { account, session, user, verification } from "@/db/auth-schema";
 import type {
@@ -19,6 +21,28 @@ import type {
 } from "@/lib/puzzle-types";
 
 type StoredPuzzleEventPayload = Record<string, unknown>;
+
+// One row per day/action/page/option. No user, session, or individual event rows.
+export const usageDaily = pgTable(
+	"usage_daily",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		day: date("day").notNull(),
+		event: text("event").notNull(),
+		page: text("page").notNull(),
+		value: text("value").notNull().default(""),
+		count: bigint("count", { mode: "number" }).notNull().default(1),
+		exported: boolean("exported").notNull().default(false),
+	},
+	(table) => [
+		uniqueIndex("usage_daily_bucket_idx").on(
+			table.day,
+			table.event,
+			table.page,
+			table.value,
+		),
+	],
+);
 
 // Separate tables keep Mini out of regular history, imports and leaderboards.
 export const miniPuzzles = pgTable("mini_puzzles", {

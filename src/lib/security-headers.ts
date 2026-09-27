@@ -1,5 +1,5 @@
 // The app served no security headers at all. It renders text other players
-// wrote (peer clues) and proxies a third-party analytics script through its own
+// wrote (peer clues) and receives anonymous usage counters on its own
 // origin, so it is worth constraining what a page may load and who may frame it.
 //
 // Applied in two places, because neither covers everything: Nitro route rules
@@ -12,8 +12,7 @@ const CONTENT_SECURITY_POLICY = [
 	// 'unsafe-inline' is required: the SSR document carries inline hydration
 	// scripts, and per-request nonces would mean threading one through the
 	// renderer. The policy still pins where external scripts may be loaded from,
-	// which is what blocks an injected <script src>. Analytics needs no entry —
-	// it is proxied through /ph on this origin.
+	// which is what blocks an injected <script src>. Usage counting needs no external scripts.
 	"script-src 'self' 'unsafe-inline'",
 	// React sets inline styles through the style attribute across the board and
 	// the keypad, which style-src governs.
@@ -22,7 +21,7 @@ const CONTENT_SECURITY_POLICY = [
 	"img-src 'self' data: https:",
 	"font-src 'self' data:",
 	// Same-origin only: page loads, server functions, both SSE streams and the
-	// analytics proxy all live here.
+	// usage endpoint all live here.
 	"connect-src 'self'",
 	"manifest-src 'self'",
 	"worker-src 'self'",

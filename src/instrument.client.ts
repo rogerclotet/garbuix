@@ -6,6 +6,7 @@ import {
 	glitchtipClientConfigSchema,
 } from "@/lib/glitchtip-config";
 import { scrubGlitchTipEvent } from "@/lib/glitchtip-scrub";
+import { isUsageTelemetryUrl } from "@/lib/telemetry-privacy";
 
 const serialized = document.getElementById(GLITCHTIP_CONFIG_ID)?.textContent;
 const config = glitchtipClientConfigSchema.safeParse(
@@ -19,6 +20,9 @@ if (config.success) {
 		tunnel: GLITCHTIP_TUNNEL_PATH,
 		sendClientReports: false,
 		sendDefaultPii: false,
+		tracePropagationTargets: [],
+		beforeBreadcrumb: (breadcrumb) =>
+			isUsageTelemetryUrl(breadcrumb.data?.url) ? null : breadcrumb,
 		beforeSend: scrubGlitchTipEvent,
 		beforeSendTransaction: scrubGlitchTipEvent,
 		integrations: (defaults) => [

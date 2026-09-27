@@ -13,7 +13,6 @@ import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
@@ -83,7 +82,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);
 	const importAttemptedRef = useRef<string | null>(null);
-	const { captureEvent, captureException } = useObservability();
+	const { captureException } = useObservability();
 	const [accountHistory, setAccountHistory] =
 		useState<AccountHistoryPage | null>(initialData.accountHistory);
 	const [anonymousHistory, setAnonymousHistory] = useState<
@@ -121,7 +120,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					const result = await importProgress({
+					await importProgress({
 						data: {
 							deviceId,
 							payload,
@@ -129,13 +128,6 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					});
 					markAnonymousDataImported(activeUser.id);
 					if (hasLocalProgress) {
-						captureEvent(ANALYTICS_EVENT.ANONYMOUS_HISTORY_IMPORTED, {
-							game_mode: GAME_MODE.CLASSIC,
-							active_progress_count: Object.keys(payload.activeProgressByDate)
-								.length,
-							imported_dates: result.importedDates.length,
-							legacy_dates: result.skippedLegacyDates.length,
-						});
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
@@ -164,14 +156,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		activeUser,
-		captureEvent,
-		captureException,
-		deviceId,
-		fetchHistory,
-		importProgress,
-	]);
+	}, [activeUser, captureException, deviceId, fetchHistory, importProgress]);
 
 	const entries = activeUser
 		? (accountHistory?.entries ?? [])

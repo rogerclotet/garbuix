@@ -181,7 +181,7 @@ it("offers a retry without showing an empty board if saved letters fail to decod
 	});
 });
 
-it("tracks Mini loads, guesses, hints, shuffles, and completion without answer text", async () => {
+it("counts Mini hints and shuffles without tracking guesses or completion", async () => {
 	const { data, words } = await fixture();
 	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 	const router = createRouter({
@@ -197,71 +197,37 @@ it("tracks Mini loads, guesses, hints, shuffles, and completion without answer t
 		wrapper,
 	});
 	await screen.findByRole("group", { name: "Forma una paraula" });
-	expect(captureEvent).toHaveBeenCalledWith("puzzle_loaded", {
-		game_mode: "mini",
-		is_authenticated: false,
-		rows: data.puzzle.rows,
-		total_words: 5,
-	});
+	expect(captureEvent).not.toHaveBeenCalled();
 	rerender(<Mini initialData={data} />);
-	expect(
-		captureEvent.mock.calls.filter(([event]) => event === "puzzle_loaded"),
-	).toHaveLength(1);
+	expect(captureEvent).not.toHaveBeenCalled();
 	fireEvent.click(screen.getByRole("button", { name: "Barrejar" }));
-	expect(captureEvent).toHaveBeenCalledWith("puzzle_letters_shuffled", {
-		game_mode: "mini",
-	});
+	expect(captureEvent).toHaveBeenCalledWith({ event: "letters_shuffled" });
 	fireEvent.click(screen.getByRole("button", { name: "Pista" }));
-	expect(captureEvent).toHaveBeenCalledWith("puzzle_hint_requested", {
-		game_mode: "mini",
-		hint_type: "letter",
-		hints_used_after: 1,
+	expect(captureEvent).toHaveBeenCalledWith({
+		event: "hint_requested",
+		value: "letter",
 	});
 	for (const [index, word] of words.entries()) {
 		for (const letter of word) fireEvent.keyDown(window, { key: letter });
 		fireEvent.keyDown(window, { key: "Enter" });
-		// The submission guard must also prevent duplicated analytics.
+		// Repeated Enter must still submit only one guess.
 		fireEvent.keyDown(window, { key: "Enter" });
-		await waitFor(() =>
-			expect(
-				captureEvent.mock.calls.filter(
-					([event]) => event === "puzzle_guess_result",
-				),
-			).toHaveLength(index + 1),
-		);
 		await screen.findByRole("img", {
 			name: `${index + 1} de 5 paraules trobades`,
 		});
 	}
-	expect(
-		captureEvent.mock.calls.filter(([event]) => event === "puzzle_completed"),
-	).toEqual([
-		[
-			"puzzle_completed",
-			{
-				game_mode: "mini",
-				guess_count: 5,
-				hints_used: 1,
-				is_authenticated: false,
-			},
-		],
+	expect(captureEvent.mock.calls).toEqual([
+		[{ event: "letters_shuffled" }],
+		[{ event: "hint_requested", value: "letter" }],
 	]);
-	for (const [, properties] of captureEvent.mock.calls) {
-		expect(properties.game_mode).toBe("mini");
-		expect(properties).not.toHaveProperty("guess");
-		expect(properties).not.toHaveProperty("word");
-		expect(properties).not.toHaveProperty("user_id");
-	}
 	unmount();
 	captureEvent.mockClear();
 	render(<Mini initialData={data} />, { wrapper });
 	await screen.findByRole("heading", { name: "Les has trobades totes!" });
-	expect(
-		captureEvent.mock.calls.filter(([event]) => event === "puzzle_completed"),
-	).toHaveLength(0);
+	expect(captureEvent).not.toHaveBeenCalled();
 });
 
-it("tracks successful Mini syncs with progress counts and no user ID", async () => {
+it("syncs account progress without emitting analytics", async () => {
 	const { data, progress } = await fixture();
 	data.userId = "private-user";
 	writeMiniSave(data.userId, data.puzzle.dateKey, progress);
@@ -271,15 +237,8 @@ it("tracks successful Mini syncs with progress counts and no user ID", async () 
 		lastSyncedAt: new Date().toISOString(),
 	});
 	render(<Mini initialData={data} />);
-	await waitFor(() =>
-		expect(captureEvent).toHaveBeenCalledWith("puzzle_events_synced", {
-			game_mode: "mini",
-			guessed_word_count: 1,
-			hints_used: 1,
-			completed: false,
-		}),
-	);
-	expect(JSON.stringify(captureEvent.mock.calls)).not.toContain("private-user");
+	await waitFor(() => expect(syncMiniProgress).toHaveBeenCalled());
+	expect(captureEvent).not.toHaveBeenCalled();
 });
 
 it("does not record a successful Mini sync when the request fails", async () => {

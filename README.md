@@ -76,6 +76,10 @@ docker compose -f compose.yml -f compose.dev.yml up --build
 
 The app will be available at `http://localhost:3000` and Postgres at `localhost:5432`.
 
+Container dependencies live in the `app_node_modules` Docker volume, separately
+from your local `node_modules`. Startup installs run noninteractively so pnpm can
+refresh that volume after upgrades without waiting for confirmation.
+
 ### Observability
 
 #### GlitchTip
@@ -103,8 +107,8 @@ The nightly scheduler's puzzle and clue backfill commands preload it too, and
 flush queued reports when those processes exit.
 
 Errors include breadcrumbs, the build release, environment, and a `runtime`
-tag distinguishing `browser` from `server`. Signed-in browser users are
-identified by their account ID only. Request bodies, headers, cookies and
+tag distinguishing `browser` from `server`. Account IDs are not attached to reports. Usage-collection requests and their
+breadcrumbs/spans are excluded. Request bodies, headers, cookies and
 query strings are removed from error/transaction request metadata. Avoid
 putting secrets in error messages, breadcrumbs, custom properties or logs.
 
@@ -180,30 +184,27 @@ HTTP server. Monitor `/` as well if you want failures of the rendered page and
 its database dependencies to count as downtime. Configure project alerts in
 GlitchTip to receive error and downtime notifications.
 
-#### PostHog
+#### Anonymous daily usage
 
-PostHog is optional. To enable it, set these runtime variables in `.env` before starting the app:
+The browser does not load PostHog. It sends an explicit, validated action to
+`/api/usage` without cookies or a referrer. The server increments a daily counter
+without recording individual events, account IDs, browser IDs or session IDs.
+At 00:15 Europe/Madrid the scheduler sends completed daily totals to PostHog.
 
-```bash
-POSTHOG_KEY=phc_xxx
-POSTHOG_HOST=https://us.i.posthog.com
-POSTHOG_UI_HOST=https://us.posthog.com
+Collection is **off by default**, including when old PostHog keys are present.
+To enable daily aggregate collection:
+
+```dotenv
+ANALYTICS_ENABLED=true
+POSTHOG_KEY=phc_aggregate_project_key
+POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
-`POSTHOG_UI_HOST` is optional, but it helps PostHog link events back to the right project UI region.
-
-Feature flag evaluation is disabled. PostHog continues to capture product events,
-pageviews, Web Vitals, user identification, and exceptions.
-
-Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
-`puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,
-`puzzle_letters_shuffled`, `puzzle_hint_requested`, and `puzzle_events_synced`.
-The shared hint event includes `hint_type=text` for Classic and `hint_type=letter`
-for Mini. Mini syncs snapshots, so its sync events report progress counts rather
-than Classic's event-batch counts.
-Puzzle generation, server progress sync, history loads, and game pageviews are
-also tagged with the game mode. The gameplay events contain no submitted guesses
-or answer text.
+Set these variables on both the app and scheduler. Apply migration `0010` first.
+`pnpm analytics:export` retries completed days and purges local counters older
+than 90 days. PostHog retention must also be configured to at most 90 days.
+Charts must sum the `count` property of `daily_usage` events. The user notice
+lives at `/privacitat`; no consent popup is added.
 
 ### Production
 

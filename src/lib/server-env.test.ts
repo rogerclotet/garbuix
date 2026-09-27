@@ -29,6 +29,20 @@ describe("getServerEnv", () => {
 
 		expect(getServerEnv().BETTER_AUTH_SECRET).toBe(DEV_AUTH_SECRET);
 	});
+	it("keeps collection disabled even when legacy PostHog credentials exist", async () => {
+		const getServerEnv = await loadServerEnv({
+			NODE_ENV: "development",
+			POSTHOG_KEY: "phc_old",
+			POSTHOG_HOST: "https://eu.i.posthog.com",
+		});
+		expect(getServerEnv().ANALYTICS_ENABLED).toBe(false);
+	});
+	it("enables collection only with an explicit valid setting", async () => {
+		const enabled = await loadServerEnv({ ANALYTICS_ENABLED: "true" });
+		expect(enabled().ANALYTICS_ENABLED).toBe(true);
+		const invalid = await loadServerEnv({ ANALYTICS_ENABLED: "yes" });
+		expect(invalid).toThrow(/ANALYTICS_ENABLED/);
+	});
 
 	it("refuses to boot in production without a secret", async () => {
 		const getServerEnv = await loadServerEnv({ NODE_ENV: "production" });

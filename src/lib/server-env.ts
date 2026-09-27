@@ -43,9 +43,15 @@ const serverEnvSchema = z.object({
 		.default("postgres://postgres:postgres@localhost:5432/paraules"),
 	GOOGLE_CLIENT_ID: optionalEnvString,
 	GOOGLE_CLIENT_SECRET: optionalEnvString,
-	POSTHOG_HOST: z.string().url().optional(),
+	ANALYTICS_ENABLED: z
+		.enum(["true", "false"])
+		.default("false")
+		.transform((value) => value === "true"),
+	POSTHOG_HOST: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z.string().url().optional(),
+	),
 	POSTHOG_KEY: optionalEnvString,
-	POSTHOG_UI_HOST: z.string().url().optional(),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

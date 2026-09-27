@@ -82,12 +82,12 @@ it("preserves upstream connection resets and still scrubs request secrets", () =
 		"Error: aborted\n    at socketCloseListener (node:_http_client:500:12)";
 	const event: Event = {
 		request: {
-			url: "https://garbuix.app/ph/e/?token=secret",
+			url: "https://garbuix.app/api/clue-requests/test?token=secret",
 			headers: { Cookie: "secret" },
 			data: "private body",
 		},
 	};
 	expect(
 		prepareGlitchTipServerEvent(event, { originalException: error }),
-	).toEqual({ request: { url: "https://garbuix.app/ph/e/" } });
+	).toEqual({ request: { url: "https://garbuix.app/api/clue-requests/test" } });
 });
