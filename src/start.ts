@@ -12,6 +12,14 @@ const securityHeadersMiddleware = createMiddleware({ type: "request" }).server(
 	async ({ next }) => {
 		const result = await next();
 		const headers = getSecurityHeaders(process.env.NODE_ENV === "production");
+		// A reload after a missing route bundle must get the current document,
+		// not cached HTML that still references the previous deployment's assets.
+		if (
+			result.response.headers.get("Content-Type")?.startsWith("text/html") &&
+			!result.response.headers.has("Cache-Control")
+		) {
+			result.response.headers.set("Cache-Control", "no-cache");
+		}
 
 		for (const [name, value] of Object.entries(headers)) {
 			// Never override a header a handler set deliberately.

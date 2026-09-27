@@ -17,9 +17,9 @@ function getServiceWorkerUrl(version: string) {
 }
 
 // Only the service worker's own version gates the update prompt. A release that
-// leaves the worker untouched changes nothing a running client has to act on:
-// navigations are network-first and bundles are content-hashed, so the next full
-// load — the daily rollover reload, a relaunch, a manual refresh — picks it up.
+// leaves the worker untouched needs no proactive reload. Navigations are
+// network-first, and RouterErrorComponent reloads on demand if a deployment
+// removed a route bundle that this tab had not fetched yet.
 async function fetchLatestServiceWorkerVersion() {
 	const response = await fetch(`/version.json?ts=${Date.now()}`, {
 		cache: "no-store",
