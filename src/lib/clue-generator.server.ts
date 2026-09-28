@@ -4,7 +4,6 @@ import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
 import { findLeakingTokens } from "@/lib/clue-fairness";
 import { db } from "@/lib/db";
-import { captureServerException } from "@/lib/observability-server";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
@@ -183,9 +182,6 @@ export async function generateAndStoreCluesForPuzzle(options: {
 			"ANTHROPIC_API_KEY missing; skipping clue generation",
 		);
 		console.warn(`[clue-generator] ${error.message}`);
-		captureServerException(error, {
-			properties: { puzzle_id: options.puzzleId, scope: "clue_generation" },
-		});
 		return;
 	}
 
@@ -239,13 +235,6 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,
 						error,
 					);
-					captureServerException(error, {
-						properties: {
-							puzzle_id: options.puzzleId,
-							scope: "clue_generation",
-							word_id: slot.id,
-						},
-					});
 				}
 			}),
 		);

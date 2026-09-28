@@ -16,7 +16,7 @@ vi.hoisted(() => {
 		"DATABASE_URL",
 		process.env.TEST_DATABASE_URL ?? "postgres://test:test@127.0.0.1:1/unused",
 	);
-	for (const key of ["REDIS_URL", "POSTHOG_KEY", "ANTHROPIC_API_KEY"]) {
+	for (const key of ["REDIS_URL", "ANTHROPIC_API_KEY"]) {
 		vi.stubEnv(key, "");
 	}
 });

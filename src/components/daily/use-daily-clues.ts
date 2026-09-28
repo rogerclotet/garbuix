@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE, HINT_TYPE } from "@/lib/analytics-events";
 import { createPuzzleEvent } from "@/lib/puzzle-client";
 import {
 	getSlotHintCellKey,
@@ -13,7 +12,6 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
-import { useObservability } from "@/lib/use-observability";
 import { useWordClues } from "@/lib/use-word-clues";
 
 const CLUE_FETCH_LETTER_FALLBACK_MS = 8000;
@@ -36,7 +34,6 @@ export function useDailyClues({
 	cellLetters: Map<string, string>;
 	applyLocalEvent: (event: PuzzleClientEvent) => void;
 }) {
-	const { captureEvent } = useObservability();
 	const totalWords = puzzle.wordSlots.length;
 	// Word ids the player just asked a clue for; drained into a toast once the
 	// clue text resolves. Reloads refetch every clue but add nothing here, so
@@ -189,11 +186,6 @@ export function useDailyClues({
 		if (derivedProgress.hintsUsed >= 3) return;
 		if (nextClueWordId == null) return;
 
-		captureEvent(ANALYTICS_EVENT.PUZZLE_HINT_REQUESTED, {
-			game_mode: GAME_MODE.CLASSIC,
-			hint_type: HINT_TYPE.TEXT,
-			hints_used_after: derivedProgress.hintsUsed + 1,
-		});
 		applyLocalEvent(
 			createPuzzleEvent("text_hint_requested", {
 				wordId: nextClueWordId,
@@ -202,12 +194,7 @@ export function useDailyClues({
 		pendingClueToastWordIdsRef.current.add(nextClueWordId);
 		// The grid ring is lit only once the clue text resolves (see the
 		// clue-fetch effect); a letter fallback adds the letter without it.
-	}, [
-		applyLocalEvent,
-		captureEvent,
-		derivedProgress.hintsUsed,
-		nextClueWordId,
-	]);
+	}, [applyLocalEvent, derivedProgress.hintsUsed, nextClueWordId]);
 
 	// Self-serve hint availability: a hint remains in the budget AND there's an
 	// unclued missing word to target.
@@ -223,12 +210,6 @@ export function useDailyClues({
 
 	const handleRequestHelp = useCallback(
 		(wordId: number) => {
-			captureEvent(ANALYTICS_EVENT.PEER_CLUE_REQUESTED, {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: puzzle.dateKey,
-				puzzle_id: puzzle.id,
-				word_id: wordId,
-			});
 			// Tell responders whether this player already unlocked the word's AI
 			// clue, so they know copying it back into a reply wouldn't help.
 			const hasAiClue = derivedProgress.clueWordIds.includes(wordId);
@@ -240,13 +221,7 @@ export function useDailyClues({
 				}
 			});
 		},
-		[
-			captureEvent,
-			derivedProgress.clueWordIds,
-			puzzle.dateKey,
-			puzzle.id,
-			requestClue,
-		],
+		[derivedProgress.clueWordIds, requestClue],
 	);
 
 	// Toast clues as they arrive live. The clue itself is stored in the provider

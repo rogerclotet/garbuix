@@ -45,8 +45,6 @@ services:
     build:
       context: .
       target: production
-      secrets:
-        - glitchtip_env
     image: paraules-app:prod
     depends_on:
       db:
@@ -61,13 +59,6 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      POSTHOG_KEY: "${POSTHOG_KEY:-}"
-      POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     ports:
@@ -78,8 +69,6 @@ services:
     build:
       context: .
       target: scheduler
-      secrets:
-        - glitchtip_env
     image: paraules-scheduler:prod
     depends_on:
       db:
@@ -94,13 +83,6 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      POSTHOG_KEY: "${POSTHOG_KEY:-}"
-      POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     restart: unless-stopped
@@ -109,8 +91,6 @@ services:
     build:
       context: .
       target: production
-      secrets:
-        - glitchtip_env
     image: paraules-app:prod
     command: ["pnpm", "backfill:puzzles"]
     depends_on:
@@ -122,13 +102,6 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      POSTHOG_KEY: "${POSTHOG_KEY:-}"
-      POSTHOG_HOST: "${POSTHOG_HOST:-}"
-      POSTHOG_UI_HOST: "${POSTHOG_UI_HOST:-}"
-      GLITCHTIP_DSN: "${GLITCHTIP_DSN:-}"
-      GLITCHTIP_ENVIRONMENT: "${GLITCHTIP_ENVIRONMENT:-}"
-      GLITCHTIP_TRACES_SAMPLE_RATE: "${GLITCHTIP_TRACES_SAMPLE_RATE:-0.1}"
-      GLITCHTIP_ENABLE_LOGS: "${GLITCHTIP_ENABLE_LOGS:-false}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     profiles: ["ops"]
@@ -137,8 +110,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-
-# Available only during the source-map upload step, never copied into an image.
-secrets:
-  glitchtip_env:
-    file: .env

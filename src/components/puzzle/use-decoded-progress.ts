@@ -5,7 +5,6 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
-import { useObservability } from "@/lib/use-observability";
 
 type DecodedProgress = {
 	identity: string;
@@ -36,7 +35,6 @@ export function useDecodedProgress({
 		progressKey: string;
 	} | null>(null);
 	const [attempt, retry] = useReducer((value: number) => value + 1, 0);
-	const { captureException } = useObservability();
 	const needsDecoding =
 		progress.guessedWordIds.length > 0 || progress.hintedCells.length > 0;
 
@@ -69,13 +67,9 @@ export function useDecodedProgress({
 						: { identity, progressKey, progress, answers, hints },
 				);
 			})
-			.catch((error: unknown) => {
+			.catch(() => {
 				if (!cancelled) {
 					setFailure({ identity, progressKey });
-					captureException(error, {
-						puzzle_date: puzzle.dateKey,
-						scope: "decode_progress",
-					});
 				}
 			});
 		return () => {
@@ -88,7 +82,6 @@ export function useDecodedProgress({
 		progressKey,
 		progress,
 		puzzle,
-		captureException,
 		attempt,
 	]);
 

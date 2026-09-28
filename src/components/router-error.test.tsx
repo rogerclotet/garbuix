@@ -18,11 +18,6 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RouterErrorComponent } from "./router-error";
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-vi.mock("@/lib/use-observability", () => ({
-	useObservability: () => ({ captureException }),
-}));
-
 const reload = vi.fn();
 const error = new TypeError(
 	"Failed to fetch dynamically imported module: https://garbuix.app/assets/classificacio-b2pi-xLG.js",
@@ -56,22 +51,20 @@ afterEach(() => {
 it("reloads a missing route bundle once, including under StrictMode", () => {
 	renderError();
 	expect(reload).toHaveBeenCalledTimes(1);
-	expect(captureException).not.toHaveBeenCalled();
 
 	// A second document with the same failed import must show the error.
 	cleanup();
 	renderError();
 	expect(reload).toHaveBeenCalledTimes(1);
-	expect(captureException).toHaveBeenCalledWith(error, {
-		scope: "router_error_boundary",
-	});
 });
 
 it("does not retry an import TanStack already reloaded for", () => {
 	sessionStorage.setItem(`tanstack_router_reload:${error.message}`, "1");
 	renderError();
 	expect(reload).not.toHaveBeenCalled();
-	expect(captureException).toHaveBeenCalled();
+	expect(
+		screen.getByRole("button", { name: "Recarrega la pàgina" }),
+	).toBeTruthy();
 });
 
 it.each([
@@ -83,21 +76,17 @@ it.each([
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
-it("reports ordinary application errors without reloading", () => {
+it("shows ordinary application errors without reloading", () => {
 	renderError(new Error("Cannot read properties of undefined"));
 	expect(reload).not.toHaveBeenCalled();
-	expect(captureException).toHaveBeenCalled();
 });
 
 it.each([null, "Route failed", { message: error.message }])(
-	"reports a non-Error throw without reloading: %j",
+	"shows a non-Error throw without reloading: %j",
 	(failure) => {
 		renderError(failure);
 		expect(screen.getByText("Hi ha hagut un error")).toBeDefined();
 		expect(reload).not.toHaveBeenCalled();
-		expect(captureException).toHaveBeenCalledWith(failure, {
-			scope: "router_error_boundary",
-		});
 	},
 );
 
@@ -118,9 +107,6 @@ it("keeps the error usable when session storage is blocked", () => {
 	});
 	renderError();
 	expect(reload).not.toHaveBeenCalled();
-	expect(captureException).toHaveBeenCalledWith(error, {
-		scope: "router_error_boundary",
-	});
 });
 
 it("recovers a failed split loader through the actual router error boundary", async () => {

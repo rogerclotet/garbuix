@@ -3,14 +3,9 @@ import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { dailyPuzzles } from "@/db/schema";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
-import {
-	captureServerEvent,
-	captureServerException,
-} from "@/lib/observability-server";
 import { hashText } from "@/lib/puzzle-crypto";
 import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
 import {
@@ -95,9 +90,6 @@ function triggerCluesGeneration(
 				`[puzzle-service] Clue generation failed for puzzle ${puzzleId}:`,
 				error,
 			);
-			captureServerException(error, {
-				properties: { puzzle_id: puzzleId, scope: "clue_generation" },
-			});
 		})
 		.finally(() => {
 			cluesGenerationStarted.delete(puzzleId);
@@ -269,16 +261,6 @@ export async function ensureDailyPuzzleSnapshot(
 		.returning();
 
 	if (inserted[0]) {
-		captureServerEvent({
-			event: ANALYTICS_EVENT.DAILY_PUZZLE_GENERATED,
-			properties: {
-				game_mode: GAME_MODE.CLASSIC,
-				date_key: dateKey,
-				puzzle_id: inserted[0].id,
-				seed,
-				word_count: privateSnapshot.wordSlots.length,
-			},
-		});
 		if (options.generateClues !== false) {
 			triggerCluesGeneration(inserted[0].id, privateSnapshot.wordSlots);
 		}

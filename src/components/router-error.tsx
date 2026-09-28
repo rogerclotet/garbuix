@@ -1,7 +1,6 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { useObservability } from "@/lib/use-observability";
 
 function reloadMissingRouteBundle(error: Error) {
 	const isBundleError =
@@ -26,7 +25,6 @@ function reloadMissingRouteBundle(error: Error) {
 }
 
 export function RouterErrorComponent({ error }: ErrorComponentProps) {
-	const { captureException } = useObservability();
 	const reloadingError = useRef<Error | null>(null);
 
 	useEffect(() => {
@@ -37,10 +35,7 @@ export function RouterErrorComponent({ error }: ErrorComponentProps) {
 				return;
 			}
 		}
-		captureException(error, {
-			scope: "router_error_boundary",
-		});
-	}, [captureException, error]);
+	}, [error]);
 
 	return (
 		<div className="flex min-h-screen items-center justify-center p-6 text-center">

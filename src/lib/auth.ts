@@ -25,7 +25,11 @@ const socialProviders =
 			}
 		: {};
 
+// Better Auth also accepts an environment opt-in, which overrides its options.
+process.env.BETTER_AUTH_TELEMETRY = "false";
+
 export const auth = betterAuth({
+	telemetry: { enabled: false },
 	basePath: "/api/auth",
 	baseURL: isProduction
 		? {

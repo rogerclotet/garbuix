@@ -24,7 +24,6 @@ import {
 	clueResponsesChannel,
 } from "@/lib/clue-request-types";
 import { db } from "@/lib/db";
-import { observeServerAction } from "@/lib/observability-server";
 import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	getUserPuzzleProgressData,
@@ -187,16 +186,10 @@ async function handlePost(request: Request) {
 
 	const response =
 		parsed.kind === "request"
-			? await observeServerAction("clue_request_create", () =>
-					handleCreateRequest(parsed.dateKey, participant, raw),
-				)
+			? await handleCreateRequest(parsed.dateKey, participant, raw)
 			: parsed.kind === "resolve"
-				? await observeServerAction("clue_request_resolve", () =>
-						handleResolve(parsed.dateKey, participant, raw),
-					)
-				: await observeServerAction("clue_request_respond", () =>
-						handleRespond(parsed.dateKey, participant, raw),
-					);
+				? await handleResolve(parsed.dateKey, participant, raw)
+				: await handleRespond(parsed.dateKey, participant, raw);
 
 	return withAnonCookie(response, participant.setCookie ?? null);
 }

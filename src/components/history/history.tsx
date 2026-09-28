@@ -13,7 +13,6 @@ import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
@@ -36,7 +35,6 @@ import {
 	type HistorySummaryEntry,
 } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { useObservability } from "@/lib/use-observability";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -83,7 +81,6 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	const importProgress = useServerFn(importAnonymousProgress);
 	const deviceId = useMemo(() => getDeviceId(), []);
 	const importAttemptedRef = useRef<string | null>(null);
-	const { captureEvent, captureException } = useObservability();
 	const [accountHistory, setAccountHistory] =
 		useState<AccountHistoryPage | null>(initialData.accountHistory);
 	const [anonymousHistory, setAnonymousHistory] = useState<
@@ -121,7 +118,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					const result = await importProgress({
+					await importProgress({
 						data: {
 							deviceId,
 							payload,
@@ -129,20 +126,10 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					});
 					markAnonymousDataImported(activeUser.id);
 					if (hasLocalProgress) {
-						captureEvent(ANALYTICS_EVENT.ANONYMOUS_HISTORY_IMPORTED, {
-							game_mode: GAME_MODE.CLASSIC,
-							active_progress_count: Object.keys(payload.activeProgressByDate)
-								.length,
-							imported_dates: result.importedDates.length,
-							legacy_dates: result.skippedLegacyDates.length,
-						});
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
 					console.error("Failed to import anonymous history", error);
-					captureException(error, {
-						scope: "anonymous_history_import",
-					});
 				}
 			}
 
@@ -153,9 +140,6 @@ export function History({ initialData }: { initialData: HistoryData }) {
 				}
 			} catch (error) {
 				console.error("Failed to load account history", error);
-				captureException(error, {
-					scope: "history_fetch",
-				});
 			}
 		};
 
@@ -164,14 +148,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		activeUser,
-		captureEvent,
-		captureException,
-		deviceId,
-		fetchHistory,
-		importProgress,
-	]);
+	}, [activeUser, deviceId, fetchHistory, importProgress]);
 
 	const entries = activeUser
 		? (accountHistory?.entries ?? [])
@@ -217,9 +194,6 @@ export function History({ initialData }: { initialData: HistoryData }) {
 			);
 		} catch (error) {
 			console.error("Failed to load more history", error);
-			captureException(error, {
-				scope: "history_load_more",
-			});
 			toast.error("No s'han pogut carregar més resultats");
 		} finally {
 			setIsLoadingMore(false);

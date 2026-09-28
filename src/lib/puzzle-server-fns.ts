@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { readAnonDeviceId } from "@/lib/anon-session.server";
-import { observeServerAction } from "@/lib/observability-server";
 import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	anonymousImportPayloadSchema,
@@ -46,93 +45,65 @@ const dateKeyInput = z
 export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"getDailyPuzzlePublic",
-			() => getDailyPuzzlePublicData(data?.dateKey),
-			{
-				properties: {
-					date_key: data?.dateKey,
-				},
-			},
-		);
+		return getDailyPuzzlePublicData(data?.dateKey);
 	});
 
 export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
 	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"getDailyPuzzleDifficulty",
-			() => getDailyPuzzleDifficultyData(data?.dateKey),
-			{
-				properties: {
-					date_key: data?.dateKey,
-				},
-			},
-		);
+		return getDailyPuzzleDifficultyData(data?.dateKey);
 	});
 
 export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
 	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"getDailyPuzzlePageData",
-			async () => {
-				const dateKey = data?.dateKey ?? getTodayDateKey();
-				const puzzleExists = await checkDailyPuzzleExists(dateKey);
+		const dateKey = data?.dateKey ?? getTodayDateKey();
+		const puzzleExists = await checkDailyPuzzleExists(dateKey);
 
-				if (!puzzleExists) {
-					triggerDailyPuzzleGeneration(dateKey);
-					return { status: "generating" as const };
-				}
+		if (!puzzleExists) {
+			triggerDailyPuzzleGeneration(dateKey);
+			return { status: "generating" as const };
+		}
 
-				const dailyData = await getDailyPuzzlePublicData(dateKey);
-				const progress = dailyData.sessionUser
-					? await getUserPuzzleProgressData(
-							dailyData.puzzle.id,
-							dailyData.sessionUser.id,
-						)
-					: null;
+		const dailyData = await getDailyPuzzlePublicData(dateKey);
+		const progress = dailyData.sessionUser
+			? await getUserPuzzleProgressData(
+					dailyData.puzzle.id,
+					dailyData.sessionUser.id,
+				)
+			: null;
 
-				return {
-					status: "ready" as const,
-					...dailyData,
-					progress,
-				};
-			},
-			{
-				properties: {
-					date_key: data?.dateKey,
-				},
-			},
-		);
+		return {
+			status: "ready" as const,
+			...dailyData,
+			progress,
+		};
 	});
 
 export const pollDailyPuzzleReady = createServerFn({ method: "GET" }).handler(
 	async () => {
-		return observeServerAction("pollDailyPuzzleReady", async () => {
-			const dateKey = getTodayDateKey();
-			const puzzleExists = await checkDailyPuzzleExists(dateKey);
+		const dateKey = getTodayDateKey();
+		const puzzleExists = await checkDailyPuzzleExists(dateKey);
 
-			if (!puzzleExists) {
-				triggerDailyPuzzleGeneration(dateKey);
-				return null;
-			}
+		if (!puzzleExists) {
+			triggerDailyPuzzleGeneration(dateKey);
+			return null;
+		}
 
-			const dailyData = await getDailyPuzzlePublicData(dateKey);
-			const progress = dailyData.sessionUser
-				? await getUserPuzzleProgressData(
-						dailyData.puzzle.id,
-						dailyData.sessionUser.id,
-					)
-				: null;
+		const dailyData = await getDailyPuzzlePublicData(dateKey);
+		const progress = dailyData.sessionUser
+			? await getUserPuzzleProgressData(
+					dailyData.puzzle.id,
+					dailyData.sessionUser.id,
+				)
+			: null;
 
-			return { ...dailyData, progress };
-		});
+		return { ...dailyData, progress };
 	},
 );
 
 export const getSessionUser = createServerFn({ method: "POST" }).handler(
-	async () => observeServerAction("getSessionUser", () => getSessionUserData()),
+	async () => getSessionUserData(),
 );
 
 export const getUserPuzzleProgress = createServerFn({ method: "POST" })
@@ -142,22 +113,12 @@ export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"getUserPuzzleProgress",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					return null;
-				}
+		const session = await getAuthSession();
+		if (!session) {
+			return null;
+		}
 
-				return getUserPuzzleProgressData(data.puzzleId, session.user.id);
-			},
-			{
-				properties: {
-					puzzle_id: data.puzzleId,
-				},
-			},
-		);
+		return getUserPuzzleProgressData(data.puzzleId, session.user.id);
 	});
 
 export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
@@ -169,29 +130,17 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"syncUserPuzzleEvents",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					throw new Error("Unauthorized");
-				}
+		const session = await getAuthSession();
+		if (!session) {
+			throw new Error("Unauthorized");
+		}
 
-				return syncPuzzleEventsForUser({
-					puzzleId: data.puzzleId,
-					userId: session.user.id,
-					deviceId: data.deviceId,
-					events: data.events,
-				});
-			},
-			{
-				properties: {
-					device_id: data.deviceId,
-					event_count: data.events.length,
-					puzzle_id: data.puzzleId,
-				},
-			},
-		);
+		return syncPuzzleEventsForUser({
+			puzzleId: data.puzzleId,
+			userId: session.user.id,
+			deviceId: data.deviceId,
+			events: data.events,
+		});
 	});
 
 export const getWordClues = createServerFn({ method: "POST" })
@@ -202,77 +151,56 @@ export const getWordClues = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }): Promise<WordCluesResult> => {
-		return observeServerAction(
-			"getWordClues",
-			async () => {
-				const request = new Request("http://localhost", {
-					headers: new Headers(getRequestHeaders()),
-				});
-				const clientAddress = getClientAddress(request);
-				const session = await getAuthSession();
-				const anonDeviceId = readAnonDeviceId(request);
+		const request = new Request("http://localhost", {
+			headers: new Headers(getRequestHeaders()),
+		});
+		const clientAddress = getClientAddress(request);
+		const session = await getAuthSession();
+		const anonDeviceId = readAnonDeviceId(request);
 
-				const rateLimits = await Promise.all([
-					consumeRateLimit({
-						key: `clues:ip:${clientAddress}`,
-						limit: session ? 120 : 40,
+		const rateLimits = await Promise.all([
+			consumeRateLimit({
+				key: `clues:ip:${clientAddress}`,
+				limit: session ? 120 : 40,
+				windowSeconds: 60 * 60,
+			}),
+			session
+				? consumeRateLimit({
+						key: `clues:user:${session.user.id}`,
+						limit: 60,
 						windowSeconds: 60 * 60,
-					}),
-					session
-						? consumeRateLimit({
-								key: `clues:user:${session.user.id}`,
-								limit: 60,
-								windowSeconds: 60 * 60,
-							})
-						: anonDeviceId
-							? consumeRateLimit({
-									key: `clues:anon:${anonDeviceId}`,
-									limit: 30,
-									windowSeconds: 60 * 60,
-								})
-							: null,
-				]);
-				const retryAfterSeconds = Math.max(
-					0,
-					...rateLimits.map((limit) =>
-						limit != null && !limit.allowed ? limit.retryAfterSeconds : 0,
-					),
-				);
-				if (retryAfterSeconds > 0) {
-					return { kind: "rate_limited", retryAfterSeconds };
-				}
-
-				const clues = await getWordCluesData({
-					puzzleId: data.puzzleId,
-					wordIds: data.wordIds,
-					userId: session?.user.id ?? null,
-				});
-				return { kind: "ok", clues };
-			},
-			{
-				properties: {
-					puzzle_id: data.puzzleId,
-					word_count: data.wordIds.length,
-				},
-			},
+					})
+				: anonDeviceId
+					? consumeRateLimit({
+							key: `clues:anon:${anonDeviceId}`,
+							limit: 30,
+							windowSeconds: 60 * 60,
+						})
+					: null,
+		]);
+		const retryAfterSeconds = Math.max(
+			0,
+			...rateLimits.map((limit) =>
+				limit != null && !limit.allowed ? limit.retryAfterSeconds : 0,
+			),
 		);
+		if (retryAfterSeconds > 0) {
+			return { kind: "rate_limited", retryAfterSeconds };
+		}
+
+		const clues = await getWordCluesData({
+			puzzleId: data.puzzleId,
+			wordIds: data.wordIds,
+			userId: session?.user.id ?? null,
+		});
+		return { kind: "ok", clues };
 	});
 
 export const getHistoryPageData = createServerFn({ method: "POST" })
 	.inputValidator(dateKeyInput)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"getHistoryPageData",
-			async () => {
-				const session = await getAuthSession();
-				return getHistoryPageDataForUser(session?.user.id, data?.dateKey);
-			},
-			{
-				properties: {
-					date_key: data?.dateKey,
-				},
-			},
-		);
+		const session = await getAuthSession();
+		return getHistoryPageDataForUser(session?.user.id, data?.dateKey);
 	});
 
 export const getMoreHistoryEntries = createServerFn({ method: "POST" })
@@ -282,25 +210,15 @@ export const getMoreHistoryEntries = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }): Promise<HistoryEntriesPage> => {
-		return observeServerAction(
-			"getMoreHistoryEntries",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					return { entries: [], hasMore: false };
-				}
+		const session = await getAuthSession();
+		if (!session) {
+			return { entries: [], hasMore: false };
+		}
 
-				return getHistoryEntriesPageForUser(session.user.id, {
-					offset: data.offset,
-					limit: HISTORY_PAGE_SIZE,
-				});
-			},
-			{
-				properties: {
-					offset: data.offset,
-				},
-			},
-		);
+		return getHistoryEntriesPageForUser(session.user.id, {
+			offset: data.offset,
+			limit: HISTORY_PAGE_SIZE,
+		});
 	});
 
 export const importAnonymousProgress = createServerFn({ method: "POST" })
@@ -311,36 +229,23 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"importAnonymousProgress",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					throw new Error("Unauthorized");
-				}
+		const session = await getAuthSession();
+		if (!session) {
+			throw new Error("Unauthorized");
+		}
 
-				return importAnonymousProgressForUser({
-					userId: session.user.id,
-					// Leaderboard entries are keyed by the identity the server minted
-					// for this browser, not by the id the client sends, so the merge
-					// reads it from the signed cookie.
-					anonDeviceId: readAnonDeviceId(
-						new Request("http://localhost", {
-							headers: new Headers(getRequestHeaders()),
-						}),
-					),
-					payload: data.payload,
-				});
-			},
-			{
-				properties: {
-					active_progress_count: Object.keys(data.payload.activeProgressByDate)
-						.length,
-					device_id: data.deviceId,
-					history_entry_count: data.payload.historyEntries.length,
-				},
-			},
-		);
+		return importAnonymousProgressForUser({
+			userId: session.user.id,
+			// Leaderboard entries are keyed by the identity the server minted
+			// for this browser, not by the id the client sends, so the merge
+			// reads it from the signed cookie.
+			anonDeviceId: readAnonDeviceId(
+				new Request("http://localhost", {
+					headers: new Headers(getRequestHeaders()),
+				}),
+			),
+			payload: data.payload,
+		});
 	});
 
 export const updateUserProfile = createServerFn({ method: "POST" })
@@ -351,25 +256,14 @@ export const updateUserProfile = createServerFn({ method: "POST" })
 		}),
 	)
 	.handler(async ({ data }) => {
-		return observeServerAction(
-			"updateUserProfile",
-			async () => {
-				const session = await getAuthSession();
-				if (!session) {
-					throw new Error("Unauthorized");
-				}
+		const session = await getAuthSession();
+		if (!session) {
+			throw new Error("Unauthorized");
+		}
 
-				return updateUserProfileData({
-					userId: session.user.id,
-					displayName: data.displayName,
-					useGoogleAvatar: data.useGoogleAvatar,
-				});
-			},
-			{
-				properties: {
-					has_display_name: data.displayName !== undefined,
-					has_avatar_preference: data.useGoogleAvatar !== undefined,
-				},
-			},
-		);
+		return updateUserProfileData({
+			userId: session.user.id,
+			displayName: data.displayName,
+			useGoogleAvatar: data.useGoogleAvatar,
+		});
 	});

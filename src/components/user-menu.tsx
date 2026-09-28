@@ -24,18 +24,15 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { ANALYTICS_EVENT } from "@/lib/analytics-events";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
-import { useObservability } from "@/lib/use-observability";
 import { initialsFromName } from "@/lib/user-profile";
 
 const rootRoute = getRouteApi("__root__");
 
 function ThemeMenuToggle() {
 	const { resolvedTheme, setTheme } = useTheme();
-	const { captureEvent } = useObservability();
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
@@ -50,7 +47,6 @@ function ThemeMenuToggle() {
 				event.preventDefault();
 				const next = isDark ? "light" : "dark";
 				setTheme(next);
-				captureEvent(ANALYTICS_EVENT.THEME_PREFERENCE_CHANGED, { theme: next });
 			}}
 		>
 			{isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
@@ -69,7 +65,6 @@ export function UserMenu() {
 	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
-	const { captureEvent } = useObservability();
 	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
 	const triggerLabel = activeUser
@@ -80,9 +75,6 @@ export function UserMenu() {
 	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
 	const handleSignIn = async () => {
-		captureEvent(ANALYTICS_EVENT.AUTH_SIGN_IN_STARTED, {
-			provider: "google",
-		});
 		await authClient.signIn.social({
 			provider: "google",
 			callbackURL: window.location.href,

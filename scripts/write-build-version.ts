@@ -14,8 +14,6 @@ const HASHED_FILES = [
 	"pnpm-lock.yaml",
 	"vite.config.ts",
 	"instrument.server.ts",
-	"scripts/glitchtip-build.ts",
-	"scripts/glitchtip-sourcemaps.ts",
 ];
 
 // Build artifacts. Hashing them would make the version depend on whether a

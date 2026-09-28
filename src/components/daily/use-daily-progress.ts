@@ -8,7 +8,6 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	getOrCreateAnonIdentity,
 	getReportedAnonProgress,
@@ -47,7 +46,6 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
-import { useObservability } from "@/lib/use-observability";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
 const SYNC_FAILURE_TOAST_ID = "daily-progress-sync-failure";
@@ -152,7 +150,6 @@ export function useDailyProgress({
 	const syncEvents = useServerFn(syncUserPuzzleEvents);
 	const fetchUserProgress = useServerFn(getUserPuzzleProgress);
 	const importProgress = useServerFn(importAnonymousProgress);
-	const { captureEvent, captureException } = useObservability();
 	const emptyProgress = useMemo(
 		() => createEmptyProgressState(puzzle),
 		[puzzle],
@@ -237,24 +234,10 @@ export function useDailyProgress({
 					? current
 					: next;
 			});
-		} catch (error) {
+		} catch {
 			// Keep the local base and its outbox intact when a read fails.
-			if (scope.active && !isLikelyOfflineOrNetworkError(error)) {
-				captureException(error, {
-					puzzle_date: puzzle.dateKey,
-					puzzle_id: puzzle.id,
-					scope: "puzzle_progress_fetch",
-				});
-			}
 		}
-	}, [
-		activeUserId,
-		captureException,
-		emptyProgress,
-		fetchUserProgress,
-		puzzle,
-		scope,
-	]);
+	}, [activeUserId, emptyProgress, fetchUserProgress, puzzle, scope]);
 
 	// Read this player's local progress before paint. Network reconciliation runs
 	// in the background while new moves are replayed from the persistent outbox.
@@ -337,7 +320,7 @@ export function useDailyProgress({
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					const result = await importProgress({
+					await importProgress({
 						data: {
 							deviceId,
 							payload,
@@ -345,23 +328,10 @@ export function useDailyProgress({
 					});
 					markAnonymousDataImported(activeUserId);
 					if (hasLocalProgress) {
-						captureEvent(ANALYTICS_EVENT.ANONYMOUS_PROGRESS_IMPORTED, {
-							game_mode: GAME_MODE.CLASSIC,
-							active_progress_count: Object.keys(payload.activeProgressByDate)
-								.length,
-							imported_dates: result.importedDates.length,
-							legacy_dates: result.skippedLegacyDates.length,
-						});
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
 					console.error("Failed to import anonymous progress", error);
-					if (!isLikelyOfflineOrNetworkError(error)) {
-						captureException(error, {
-							puzzle_date: puzzle.dateKey,
-							scope: "anonymous_progress_import",
-						});
-					}
 				}
 			}
 			if (!cancelled) {
@@ -374,15 +344,7 @@ export function useDailyProgress({
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		activeUserId,
-		captureEvent,
-		captureException,
-		deviceId,
-		importProgress,
-		puzzle,
-		refreshProgressFromServer,
-	]);
+	}, [activeUserId, deviceId, importProgress, refreshProgressFromServer]);
 
 	useEffect(() => {
 		if (!activeUserId) return;
@@ -538,12 +500,6 @@ export function useDailyProgress({
 				setQueuedEvents((previous) =>
 					previous.filter((event) => !eventIdsToClear.has(event.id)),
 				);
-				captureEvent(ANALYTICS_EVENT.PUZZLE_EVENTS_SYNCED, {
-					game_mode: GAME_MODE.CLASSIC,
-					acked_events: result.ackedEventIds.length,
-					puzzle_id: puzzle.id,
-					queued_events: pendingEvents.length,
-				});
 			})
 			.catch((error) => {
 				if (!scope.active) return;
@@ -578,13 +534,6 @@ export function useDailyProgress({
 						id: SYNC_FAILURE_TOAST_ID,
 					},
 				);
-				captureException(error, {
-					failure_count: failureCount,
-					puzzle_id: puzzle.id,
-					queued_event_count: pendingEvents.length,
-					retry_delay_ms: retryDelayMs,
-					scope: "puzzle_event_sync",
-				});
 			})
 			.finally(() => {
 				scope.syncing = false;
@@ -593,8 +542,6 @@ export function useDailyProgress({
 			});
 	}, [
 		activeUserId,
-		captureEvent,
-		captureException,
 		deviceId,
 		isOnline,
 		nextSyncRetryAt,

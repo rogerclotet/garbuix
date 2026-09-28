@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM node:25.2-slim AS base
 
-# sentry-cli uses the system trust store when uploading GlitchTip source maps.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -18,7 +17,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 
 COPY . .
-RUN --mount=type=secret,id=glitchtip_env pnpm build
+RUN pnpm build
 
 FROM base AS dev
 
@@ -30,7 +29,7 @@ ENV NODE_ENV=production
 # Dependencies are verified in the deps stage; do not reinstall at startup.
 ENV pnpm_config_verify_deps_before_run=false
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json drizzle.config.ts instrument.server.ts ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json drizzle.config.ts ./
 COPY drizzle ./drizzle
 COPY scripts ./scripts
 COPY src ./src

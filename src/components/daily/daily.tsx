@@ -7,7 +7,6 @@ import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import {
 	getBonusCluesEnabled,
 	getLetterLayout,
@@ -18,7 +17,6 @@ import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { useObservability } from "@/lib/use-observability";
 import { DailyFlyingLetters } from "./daily-flying-letters";
 import { DailyStatus } from "./daily-status";
 import type { DailyData, DailySessionUser } from "./daily-types";
@@ -115,7 +113,6 @@ function DailyGame({
 	// rather than assumed: which arrangement the letters use is a preference, and
 	// each one is a different height.
 	const [keypadHeight, setKeypadHeight] = useState<number | null>(null);
-	const { captureEvent } = useObservability();
 	const {
 		applyLocalEvent,
 		derivedProgress: liveProgress,
@@ -149,24 +146,6 @@ function DailyGame({
 	useEffect(() => {
 		setBonusCluesEnabled(getBonusCluesEnabled());
 	}, []);
-
-	useEffect(() => {
-		captureEvent(ANALYTICS_EVENT.PUZZLE_LOADED, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			is_authenticated: Boolean(activeUser),
-			puzzle_id: puzzle.id,
-			rows: puzzle.rows,
-			total_words: totalWords,
-		});
-	}, [
-		activeUser,
-		captureEvent,
-		puzzle.dateKey,
-		puzzle.id,
-		puzzle.rows,
-		totalWords,
-	]);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -211,7 +190,6 @@ function DailyGame({
 		setMiniAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
-		handleWelcomeContinueAnonymous,
 		handleWelcomeSignIn,
 		signInWithGoogle,
 	} = useDailyOnboarding({
@@ -398,7 +376,6 @@ function DailyGame({
 				open={welcomeOpen}
 				onOpenChange={handleWelcomeOpenChange}
 				onSignIn={handleWelcomeSignIn}
-				onContinueAnonymous={handleWelcomeContinueAnonymous}
 			/>
 			<MiniAnnouncementDialog
 				open={miniAnnouncementOpen}
@@ -426,7 +403,7 @@ function DailyGame({
 				currentStreak={streakStats.currentStreak}
 				isAnonymous={!activeUser}
 				onSignIn={() => {
-					void signInWithGoogle("win_dialog");
+					void signInWithGoogle();
 				}}
 			/>
 		</>

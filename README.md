@@ -76,134 +76,13 @@ docker compose -f compose.yml -f compose.dev.yml up --build
 
 The app will be available at `http://localhost:3000` and Postgres at `localhost:5432`.
 
-### Observability
+### Privacy
 
-#### GlitchTip
-
-GlitchTip runs independently of PostHog. Set the project DSN at
-runtime, then restart the app. Docker Compose passes these settings through.
-The public browser configuration is embedded in the SSR document, so changing
-the DSN does not require rebuilding the image.
-
-```dotenv
-GLITCHTIP_DSN=https://PUBLIC_KEY@glitchtip.example.com/1
-GLITCHTIP_ENVIRONMENT=production
-GLITCHTIP_TRACES_SAMPLE_RATE=0.1
-GLITCHTIP_ENABLE_LOGS=false
-```
-
-Leaving the DSN blank disables reporting. The integration captures browser
-exceptions and rejected promises before hydration, React/router errors,
-server-function and API failures, unhandled Node errors, and errors explicitly
-reported through `useObservability()` or `captureServerException()`. Server
-`console.error` calls are captured too, including errors handled internally by
-React's streaming renderer. `pnpm dev` and `pnpm start` preload the SDK before
-application dependencies load. Use `pnpm start` for production instrumentation.
-The nightly scheduler's puzzle and clue backfill commands preload it too, and
-flush queued reports when those processes exit.
-
-Errors include breadcrumbs, the build release, environment, and a `runtime`
-tag distinguishing `browser` from `server`. Signed-in browser users are
-identified by their account ID only. Request bodies, headers, cookies and
-query strings are removed from error/transaction request metadata. Avoid
-putting secrets in error messages, breadcrumbs, custom properties or logs.
-
-Performance sampling defaults to 10%, including page loads, navigations,
-requests, and actions wrapped in `observeServerAction()`. Set the rate to `0`
-to disable traces or `1` while verifying the setup. Error capture is independent
-of this rate. SDK session tracking and client reports are disabled; replay,
-profiling and feedback widgets are not enabled.
-
-[GlitchTip 6.1 and later support structured logs](https://glitchtip.com/blog/2026-03-23-glitchtip-6-1-released/).
-Set `GLITCHTIP_ENABLE_LOGS=true` to send `console.warn`/`console.error` as logs
-and enable explicit structured logging in browser or server code:
-
-```ts
-import { logger } from "@sentry/tanstackstart-react";
-
-logger.info("Puzzle generation completed", { date_key: dateKey });
-```
-
-Browser envelopes use `/api/monitoring`, which only forwards to the configured
-DSN, limits bodies to 1 MiB, and preserves GlitchTip's rate-limit headers. It
-does not forward app cookies or follow upstream redirects. This works with the
-app's existing same-origin Content Security Policy. The app server must be able
-to POST to GlitchTip's `/api/1/envelope/`, using the project ID from the DSN.
-If GlitchTip is behind Pangolin or another login gateway, give that ingest path
-non-interactive access. Source-map upload API calls must also reach GlitchTip
-with their bearer token, rather than redirecting to the gateway's login page.
-
-To upload source maps automatically during `pnpm build`, add:
-
-```dotenv
-GLITCHTIP_URL=https://glitchtip.example.com
-GLITCHTIP_ORG=your-organization-slug
-GLITCHTIP_PROJECT=your-project-slug
-GLITCHTIP_AUTH_TOKEN=your-token
-```
-
-Use a token with `project:releases` and `org:read`. These values are build-only;
-the auth token never enters public runtime configuration. Compose mounts `.env`
-as a BuildKit secret for the upload step instead of copying it into the image.
-For direct Docker builds, pass `--secret id=glitchtip_env,src=.env`.
-
-The build adds matching debug IDs to the deployed JavaScript and maps. It
-composes both stages of server maps back to the original TypeScript. Browser
-maps and copies of their matching JS live in `.output/sourcemaps/client`,
-outside the served `.output/public` directory; server maps stay with the server
-chunks. Without an upload token, builds still prepare these files privately.
-Upload an existing build later with `pnpm glitchtip:upload`. Configured upload
-failures stop the build before the deployment script stops the running app.
-
-Events and uploads use `garbuix@<version>` from `version.json`. If you override
-`APP_VERSION`, give each distinct build a unique value. Keep `.output/server`,
-`.output/sourcemaps`, and `.output/public` from the same build together.
-
-To verify delivery, trigger a browser error with
-`setTimeout(() => { throw new Error("GlitchTip browser test"); }, 0)` in the
-browser console. In GlitchTip, check the event's release, environment and
-`runtime` tag. For source-map verification, temporarily throw from a known
-line in app code, build/upload, and confirm that line resolves to TS/TSX. Remove
-the test throw afterward. A quick server transport check is:
-
-```bash
-node --import ./instrument.server.ts --input-type=module -e '
-  import * as Sentry from "@sentry/tanstackstart-react";
-  Sentry.captureException(new Error("GlitchTip server test"));
-  await Sentry.flush(5000);
-'
-```
-
-In GlitchTip, create a [GET uptime monitor](https://glitchtip.com/documentation/uptime-monitoring/)
-for `https://your-app/api/health`, expecting status 200. This checks the running
-HTTP server. Monitor `/` as well if you want failures of the rendered page and
-its database dependencies to count as downtime. Configure project alerts in
-GlitchTip to receive error and downtime notifications.
-
-#### PostHog
-
-PostHog is optional. To enable it, set these runtime variables in `.env` before starting the app:
-
-```bash
-POSTHOG_KEY=phc_xxx
-POSTHOG_HOST=https://us.i.posthog.com
-POSTHOG_UI_HOST=https://us.posthog.com
-```
-
-`POSTHOG_UI_HOST` is optional, but it helps PostHog link events back to the right project UI region.
-
-Feature flag evaluation is disabled. PostHog continues to capture product events,
-pageviews, Web Vitals, user identification, and exceptions.
-
-Compare the two games with `game_mode=classic` or `game_mode=mini`. Both emit
-`puzzle_loaded`, `puzzle_guess_result`, `puzzle_completed`,
-`puzzle_letters_shuffled`, `puzzle_hint_requested`, and `puzzle_events_synced`.
-The shared hint event includes `hint_type=text` for Classic and `hint_type=letter`
-for Mini. Mini syncs snapshots, so its sync events report progress counts rather
-than Classic's event-batch counts.
-Puzzle generation, server progress sync, history loads, and game pageviews are
-also tagged with the game mode. The gameplay events contain no submitted guesses
-or answer text.
+The app does not send analytics, error reports, session recordings, or performance
+telemetry. Game progress, account sessions, leaderboards, and peer clues still use
+the app server and its database. Google sign-in and avatars contact Google;
+optional AI clue generation sends puzzle words to Anthropic. Fonts are bundled
+locally.
 
 ### Production
 
@@ -365,7 +244,7 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 The menu's **Sobre el joc** page shows the version embedded in the running app.
 Production builds generate a 16-character content hash from the source, public
 assets, and build inputs. Identical inputs produce the same version, with no
-manual version bump. It also identifies the release in GlitchTip.
+manual version bump.
 
 `APP_VERSION` can override the hash at build time. The generated manifest is
 available at `/version.json`; the About page uses the bundled value so an older

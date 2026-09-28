@@ -15,7 +15,6 @@ type WelcomeDialogProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onSignIn: () => void;
-	onContinueAnonymous: () => void;
 };
 
 type Platform = "ios" | "android" | "other";
@@ -47,7 +46,6 @@ export function WelcomeDialog({
 	open,
 	onOpenChange,
 	onSignIn,
-	onContinueAnonymous,
 }: WelcomeDialogProps) {
 	const platform = useMemo(() => detectPlatform(), []);
 	const showPwaTip = useMemo(
@@ -139,9 +137,7 @@ export function WelcomeDialog({
 				) : null}
 
 				<AlertDialogFooter>
-					<AlertDialogCancel onClick={onContinueAnonymous}>
-						Sense compte
-					</AlertDialogCancel>
+					<AlertDialogCancel>Sense compte</AlertDialogCancel>
 					<AlertDialogAction onClick={onSignIn}>
 						<LogIn className="size-4" />
 						Connectar amb Google

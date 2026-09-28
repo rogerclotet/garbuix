@@ -26,11 +26,6 @@ const CACHEABLE_DESTINATIONS = new Set([
 	"manifest",
 ]);
 
-// Mirrors POSTHOG_PROXY_PATH in src/lib/posthog-proxy.ts. Because analytics is
-// same-origin through that proxy, its script-tag requests would otherwise land
-// in the asset cache below.
-const POSTHOG_PROXY_PREFIX = "/ph/";
-
 // Without per-release cache rotation the runtime cache would keep every hashed
 // bundle ever shipped. Cache.keys() yields insertion order and a re-put moves an
 // entry to the end, so dropping from the front evicts the least recently written.
@@ -144,11 +139,6 @@ self.addEventListener("fetch", (event) => {
 	// intercepted the request and encountered an unexpected error" instead of the
 	// clean failure EventSource knows how to reconnect from.
 	if (isEventStreamRequest(request)) {
-		return;
-	}
-
-	// Fetch analytics and SDK configuration directly from the network.
-	if (url.pathname.startsWith(POSTHOG_PROXY_PREFIX)) {
 		return;
 	}
 

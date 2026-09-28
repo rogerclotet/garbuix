@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { getSortedAnonymousHistoryEntries } from "@/lib/puzzle-local";
 import {
@@ -7,7 +6,6 @@ import {
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
-import { useObservability } from "@/lib/use-observability";
 import { getSubmitFeedbackDuration } from "./daily-animation-timing";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
@@ -20,10 +18,8 @@ export function useDailyCompletion({
 	activeUser: DailySessionUser;
 	derivedProgress: PuzzleProgressState;
 }) {
-	const { captureEvent } = useObservability();
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
-	const completionTrackedRef = useRef(false);
 	const justCompletedRef = useRef(false);
 	const completionScheduledRef = useRef(false);
 	const completionTransitionTimerRef = useRef<number | null>(null);
@@ -52,32 +48,6 @@ export function useDailyCompletion({
 
 		setAnonymousHistoryEntries(getSortedAnonymousHistoryEntries());
 	}, [activeUser, initialData.historyEntries]);
-
-	useEffect(() => {
-		const isComplete = derivedProgress.guessedWordIds.length === totalWords;
-		if (!isComplete || completionTrackedRef.current) {
-			return;
-		}
-
-		completionTrackedRef.current = true;
-		captureEvent(ANALYTICS_EVENT.PUZZLE_COMPLETED, {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: puzzle.dateKey,
-			guess_count: derivedProgress.guessCount,
-			hints_used: derivedProgress.hintsUsed,
-			is_authenticated: Boolean(activeUser),
-			puzzle_id: puzzle.id,
-		});
-	}, [
-		activeUser,
-		captureEvent,
-		derivedProgress.guessCount,
-		derivedProgress.guessedWordIds.length,
-		derivedProgress.hintsUsed,
-		puzzle.dateKey,
-		puzzle.id,
-		totalWords,
-	]);
 
 	const streakStats = useMemo(() => {
 		const baseEntries = activeUser
