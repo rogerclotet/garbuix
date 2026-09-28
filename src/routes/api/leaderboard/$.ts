@@ -8,7 +8,6 @@ import {
 	recordProgress,
 	updateLeaderboardProfile,
 } from "@/lib/leaderboard.server";
-import { observeServerAction } from "@/lib/observability-server";
 import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	consumeRateLimit,
@@ -72,11 +71,9 @@ async function handleGet(request: Request) {
 		return new Response("Not Found", { status: 404 });
 	}
 	if (parsed.kind === "snapshot") {
-		return observeServerAction("leaderboard_snapshot", async () => {
-			const snapshot = await getLeaderboard(parsed.dateKey);
-			return Response.json(snapshot, {
-				headers: { "Cache-Control": "no-store" },
-			});
+		const snapshot = await getLeaderboard(parsed.dateKey);
+		return Response.json(snapshot, {
+			headers: { "Cache-Control": "no-store" },
 		});
 	}
 	if (parsed.kind === "stream") {
@@ -116,112 +113,108 @@ async function handlePost(request: Request) {
 		return new Response("Not Found", { status: 404 });
 	}
 
-	return observeServerAction("leaderboard_anon", async () => {
-		const session = resolveAnonSession(request);
-		const participantId = anonParticipantId(session.deviceId);
+	const session = resolveAnonSession(request);
+	const participantId = anonParticipantId(session.deviceId);
 
-		// Two buckets: one per guest, and one per address so discarding the cookie
-		// to get a fresh identity doesn't reset the budget. A player reports after
-		// every guess, so the per-guest limit sits well above real play.
-		const limits = await Promise.all([
-			consumeRateLimit({
-				key: `lb:anon:${participantId}`,
-				limit: 120,
-				windowSeconds: 60,
-			}),
-			consumeRateLimit({
-				key: `lb:anon:ip:${getClientAddress(request)}`,
-				limit: 600,
-				windowSeconds: 60,
-			}),
-		]);
-		const exceeded = limits.find((limit) => !limit.allowed);
-		if (exceeded) {
-			return tooManyRequests(exceeded);
-		}
+	// Two buckets: one per guest, and one per address so discarding the cookie
+	// to get a fresh identity doesn't reset the budget. A player reports after
+	// every guess, so the per-guest limit sits well above real play.
+	const limits = await Promise.all([
+		consumeRateLimit({
+			key: `lb:anon:${participantId}`,
+			limit: 120,
+			windowSeconds: 60,
+		}),
+		consumeRateLimit({
+			key: `lb:anon:ip:${getClientAddress(request)}`,
+			limit: 600,
+			windowSeconds: 60,
+		}),
+	]);
+	const exceeded = limits.find((limit) => !limit.allowed);
+	if (exceeded) {
+		return tooManyRequests(exceeded);
+	}
 
-		let raw: unknown;
-		try {
-			raw = await request.json();
-		} catch {
-			return new Response("Invalid body", { status: 400 });
-		}
-		const result = anonSchema.safeParse(raw);
-		if (!result.success) {
-			return new Response("Invalid body", { status: 400 });
-		}
-		const payload = result.data;
-		const normalizedName = normalizeAnonLeaderboardName(payload.name);
-		if (!normalizedName) {
-			return new Response("Invalid body", { status: 400 });
-		}
-		const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
-		const completedAt =
-			wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;
-		await recordProgress({
-			dateKey: parsed.dateKey,
-			participantId,
-			kind: "anon",
-			name: normalizedName,
-			image: null,
-			wordsFound,
-			totalWords: payload.totalWords,
-			clueCount: payload.clueCount ?? 0,
-			tryCount: payload.tryCount ?? 0,
-			completedAt,
-			previousWordsFound: payload.previousWordsFound,
-			previousCompletedAt: payload.previousCompletedAt ?? null,
-		});
-		// The id is public (it labels the guest's row on every viewer's board);
-		// only the cookie's signature proves ownership of it. Returning it lets
-		// the client highlight its own row without ever holding the credential.
-		return withAnonCookie(
-			Response.json({ recorded: true, participantId }),
-			session.setCookie,
-		);
+	let raw: unknown;
+	try {
+		raw = await request.json();
+	} catch {
+		return new Response("Invalid body", { status: 400 });
+	}
+	const result = anonSchema.safeParse(raw);
+	if (!result.success) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	const payload = result.data;
+	const normalizedName = normalizeAnonLeaderboardName(payload.name);
+	if (!normalizedName) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
+	const completedAt =
+		wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;
+	await recordProgress({
+		dateKey: parsed.dateKey,
+		participantId,
+		kind: "anon",
+		name: normalizedName,
+		image: null,
+		wordsFound,
+		totalWords: payload.totalWords,
+		clueCount: payload.clueCount ?? 0,
+		tryCount: payload.tryCount ?? 0,
+		completedAt,
+		previousWordsFound: payload.previousWordsFound,
+		previousCompletedAt: payload.previousCompletedAt ?? null,
 	});
+	// The id is public (it labels the guest's row on every viewer's board);
+	// only the cookie's signature proves ownership of it. Returning it lets
+	// the client highlight its own row without ever holding the credential.
+	return withAnonCookie(
+		Response.json({ recorded: true, participantId }),
+		session.setCookie,
+	);
 }
 
 async function handleAnonProfilePost(request: Request, dateKey: string) {
-	return observeServerAction("leaderboard_anon_profile", async () => {
-		const session = resolveAnonSession(request);
-		const participantId = anonParticipantId(session.deviceId);
+	const session = resolveAnonSession(request);
+	const participantId = anonParticipantId(session.deviceId);
 
-		const rateLimit = await consumeRateLimit({
-			key: `lb:anon-profile:${participantId}`,
-			limit: 20,
-			windowSeconds: 60,
-		});
-		if (!rateLimit.allowed) {
-			return tooManyRequests(rateLimit);
-		}
-
-		let raw: unknown;
-		try {
-			raw = await request.json();
-		} catch {
-			return new Response("Invalid body", { status: 400 });
-		}
-		const result = anonProfileSchema.safeParse(raw);
-		if (!result.success) {
-			return new Response("Invalid body", { status: 400 });
-		}
-		const payload = result.data;
-		const normalizedName = normalizeAnonLeaderboardName(payload.name);
-		if (!normalizedName) {
-			return new Response("Invalid body", { status: 400 });
-		}
-		await updateLeaderboardProfile({
-			dateKey,
-			participantId,
-			name: normalizedName,
-			image: null,
-		});
-		return withAnonCookie(
-			Response.json({ updated: true, participantId }),
-			session.setCookie,
-		);
+	const rateLimit = await consumeRateLimit({
+		key: `lb:anon-profile:${participantId}`,
+		limit: 20,
+		windowSeconds: 60,
 	});
+	if (!rateLimit.allowed) {
+		return tooManyRequests(rateLimit);
+	}
+
+	let raw: unknown;
+	try {
+		raw = await request.json();
+	} catch {
+		return new Response("Invalid body", { status: 400 });
+	}
+	const result = anonProfileSchema.safeParse(raw);
+	if (!result.success) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	const payload = result.data;
+	const normalizedName = normalizeAnonLeaderboardName(payload.name);
+	if (!normalizedName) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	await updateLeaderboardProfile({
+		dateKey,
+		participantId,
+		name: normalizedName,
+		image: null,
+	});
+	return withAnonCookie(
+		Response.json({ updated: true, participantId }),
+		session.setCookie,
+	);
 }
 
 function openSseStream(dateKey: string): Response {

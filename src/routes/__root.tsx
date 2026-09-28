@@ -13,18 +13,12 @@ import Header from "@/components/header";
 import { LeaderboardRoot } from "@/components/leaderboard/leaderboard-root";
 import { LeaderboardToasts } from "@/components/leaderboard/leaderboard-toast";
 import { links } from "@/components/meta";
-import { ObservabilityProvider } from "@/components/observability";
 import { OrientationLock } from "@/components/orientation-lock";
 import { ServiceWorkerRegister } from "@/components/service-worker";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-	GLITCHTIP_CONFIG_ID,
-	serializeGlitchTipConfig,
-} from "@/lib/glitchtip-config";
 import { materialThemeCss } from "@/lib/material-theme";
-import { getObservabilityConfig } from "@/lib/observability-server-fns";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import { useMiniRoute } from "@/lib/use-mini-route";
@@ -36,11 +30,8 @@ interface MyRouterContext {
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	loader: async () => {
-		const [observability, sessionUser] = await Promise.all([
-			getObservabilityConfig(),
-			getSessionUser(),
-		]);
-		return { observability, sessionUser, dateKey: getTodayDateKey() };
+		const sessionUser = await getSessionUser();
+		return { sessionUser, dateKey: getTodayDateKey() };
 	},
 
 	head: () => ({
@@ -86,7 +77,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
-	const { observability } = Route.useLoaderData();
 	const mini = useMiniRoute();
 	const showDevtools = import.meta.env.DEV;
 
@@ -97,11 +87,6 @@ function RootDocument() {
 			suppressHydrationWarning
 		>
 			<head>
-				{/* Public runtime settings for the browser SDK, available before
-				    React hydration. application/json keeps this block inert. */}
-				<script id={GLITCHTIP_CONFIG_ID} type="application/json">
-					{serializeGlitchTipConfig(observability.glitchtip)}
-				</script>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
 			</head>
@@ -113,43 +98,41 @@ function RootDocument() {
 					enableSystem
 				>
 					<TooltipProvider delayDuration={300}>
-						<ObservabilityProvider>
-							<ThemeMeta mini={mini} />
-							<OrientationLock />
-							<ServiceWorkerRegister />
-							<LeaderboardRoot>
-								<ClueRequestsRoot>
-									<div className="flex h-svh flex-col">
-										<Header />
-										{/* Positioned as well as scrollable: an absolutely
+						<ThemeMeta mini={mini} />
+						<OrientationLock />
+						<ServiceWorkerRegister />
+						<LeaderboardRoot>
+							<ClueRequestsRoot>
+								<div className="flex h-svh flex-col">
+									<Header />
+									{/* Positioned as well as scrollable: an absolutely
 										    positioned descendant with no closer containing block
 										    would otherwise be measured against the document, so a
 										    visually hidden input far down a long page stretches
 										    the page past the viewport and lets the browser scroll
 										    the whole shell, header included, out of view. */}
-										<main className="relative flex-1 min-h-0 overflow-y-auto">
-											<Outlet />
-										</main>
-									</div>
-									<Toaster position="top-center" />
-									{mini ? null : <LeaderboardToasts />}
-								</ClueRequestsRoot>
-							</LeaderboardRoot>
-							{showDevtools ? (
-								<TanStackDevtools
-									config={{
-										position: "bottom-left",
-										hideUntilHover: true,
-									}}
-									plugins={[
-										{
-											name: "Tanstack Router",
-											render: <TanStackRouterDevtoolsPanel />,
-										},
-									]}
-								/>
-							) : null}
-						</ObservabilityProvider>
+									<main className="relative flex-1 min-h-0 overflow-y-auto">
+										<Outlet />
+									</main>
+								</div>
+								<Toaster position="top-center" />
+								{mini ? null : <LeaderboardToasts />}
+							</ClueRequestsRoot>
+						</LeaderboardRoot>
+						{showDevtools ? (
+							<TanStackDevtools
+								config={{
+									position: "bottom-left",
+									hideUntilHover: true,
+								}}
+								plugins={[
+									{
+										name: "Tanstack Router",
+										render: <TanStackRouterDevtoolsPanel />,
+									},
+								]}
+							/>
+						) : null}
 					</TooltipProvider>
 				</ThemeProvider>
 				<Scripts />

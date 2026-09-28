@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { readMiniSaves, writeMiniSave } from "@/lib/mini-local";
 import {
 	applyMiniEvent,
@@ -13,7 +12,6 @@ import type {
 	DailyPuzzlePublic,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
-import { useObservability } from "@/lib/use-observability";
 
 export function useMiniProgress({
 	puzzle,
@@ -24,7 +22,6 @@ export function useMiniProgress({
 	initialProgress: PuzzleProgressState | null;
 	userId: string | null;
 }) {
-	const { captureEvent } = useObservability();
 	const [progress, setProgress] = useState(
 		initialProgress ?? createEmptyProgressState(puzzle),
 	);
@@ -79,12 +76,6 @@ export function useMiniProgress({
 					if (cancelled) return;
 					const synced = await syncMiniProgress({ data: saved });
 					if (cancelled) return;
-					captureEvent(ANALYTICS_EVENT.PUZZLE_EVENTS_SYNCED, {
-						game_mode: GAME_MODE.MINI,
-						guessed_word_count: synced.guessedWordIds.length,
-						hints_used: synced.hintsUsed,
-						completed: Boolean(synced.completedAt),
-					});
 					if (pending.current.get(dateKey) === saved)
 						pending.current.delete(dateKey);
 					if (dateKey === puzzle.dateKey) {
@@ -109,7 +100,7 @@ export function useMiniProgress({
 			clearInterval(timer);
 			window.removeEventListener("online", flush);
 		};
-	}, [captureEvent, persist, puzzle.dateKey, ready, userId]);
+	}, [persist, puzzle.dateKey, ready, userId]);
 
 	const dispatch = useCallback(
 		(event: MiniEvent) => {

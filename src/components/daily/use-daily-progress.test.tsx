@@ -19,19 +19,12 @@ import type {
 import type { DailyData } from "./daily-types";
 import { useDailyProgress } from "./use-daily-progress";
 
-const {
-	fetchUserProgressMock,
-	importProgressMock,
-	syncEventsMock,
-	captureEvent,
-	captureException,
-} = vi.hoisted(() => ({
-	captureEvent: vi.fn(),
-	captureException: vi.fn(),
-	fetchUserProgressMock: vi.fn(),
-	importProgressMock: vi.fn(),
-	syncEventsMock: vi.fn(),
-}));
+const { fetchUserProgressMock, importProgressMock, syncEventsMock } =
+	vi.hoisted(() => ({
+		fetchUserProgressMock: vi.fn(),
+		importProgressMock: vi.fn(),
+		syncEventsMock: vi.fn(),
+	}));
 
 vi.mock("@tanstack/react-start", () => ({
 	useServerFn: (serverFn: unknown) => serverFn,
@@ -41,13 +34,6 @@ vi.mock("@/lib/puzzle-server-fns", () => ({
 	getUserPuzzleProgress: fetchUserProgressMock,
 	importAnonymousProgress: importProgressMock,
 	syncUserPuzzleEvents: syncEventsMock,
-}));
-
-vi.mock("@/lib/use-observability", () => ({
-	useObservability: () => ({
-		captureEvent,
-		captureException,
-	}),
 }));
 
 vi.mock("@/lib/anon-identity", () => ({

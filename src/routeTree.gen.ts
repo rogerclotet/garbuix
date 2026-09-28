@@ -15,10 +15,8 @@ import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
-import { Route as ApiMonitoringRouteImport } from './routes/api/monitoring'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
-import { Route as PhSplatRouteImport } from './routes/ph/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
@@ -53,11 +51,6 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMonitoringRoute = ApiMonitoringRouteImport.update({
-  id: '/api/monitoring',
-  path: '/api/monitoring',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MiniIndexRoute = MiniIndexRouteImport.update({
   id: '/mini/',
   path: '/mini/',
@@ -66,11 +59,6 @@ const MiniIndexRoute = MiniIndexRouteImport.update({
 const MiniDiesAnteriorsRoute = MiniDiesAnteriorsRouteImport.update({
   id: '/mini/dies-anteriors',
   path: '/mini/dies-anteriors',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PhSplatRoute = PhSplatRouteImport.update({
-  id: '/ph/$',
-  path: '/ph/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -96,9 +84,7 @@ export interface FileRoutesByFullPath {
   '/preferencies': typeof PreferenciesRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/monitoring': typeof ApiMonitoringRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -111,9 +97,7 @@ export interface FileRoutesByTo {
   '/preferencies': typeof PreferenciesRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/monitoring': typeof ApiMonitoringRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/ph/$': typeof PhSplatRoute
   '/mini': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -127,9 +111,7 @@ export interface FileRoutesById {
   '/preferencies': typeof PreferenciesRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
-  '/api/monitoring': typeof ApiMonitoringRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/ph/$': typeof PhSplatRoute
   '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -144,9 +126,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/sobre-el-joc'
     | '/api/health'
-    | '/api/monitoring'
     | '/mini/dies-anteriors'
-    | '/ph/$'
     | '/mini/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -159,9 +139,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/sobre-el-joc'
     | '/api/health'
-    | '/api/monitoring'
     | '/mini/dies-anteriors'
-    | '/ph/$'
     | '/mini'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -174,9 +152,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/sobre-el-joc'
     | '/api/health'
-    | '/api/monitoring'
     | '/mini/dies-anteriors'
-    | '/ph/$'
     | '/mini/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -190,9 +166,7 @@ export interface RootRouteChildren {
   PreferenciesRoute: typeof PreferenciesRoute
   SobreElJocRoute: typeof SobreElJocRoute
   ApiHealthRoute: typeof ApiHealthRoute
-  ApiMonitoringRoute: typeof ApiMonitoringRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
-  PhSplatRoute: typeof PhSplatRoute
   MiniIndexRoute: typeof MiniIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
@@ -243,13 +217,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/monitoring': {
-      id: '/api/monitoring'
-      path: '/api/monitoring'
-      fullPath: '/api/monitoring'
-      preLoaderRoute: typeof ApiMonitoringRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/mini/': {
       id: '/mini/'
       path: '/mini'
@@ -262,13 +229,6 @@ declare module '@tanstack/react-router' {
       path: '/mini/dies-anteriors'
       fullPath: '/mini/dies-anteriors'
       preLoaderRoute: typeof MiniDiesAnteriorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ph/$': {
-      id: '/ph/$'
-      path: '/ph/$'
-      fullPath: '/ph/$'
-      preLoaderRoute: typeof PhSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -302,9 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreferenciesRoute: PreferenciesRoute,
   SobreElJocRoute: SobreElJocRoute,
   ApiHealthRoute: ApiHealthRoute,
-  ApiMonitoringRoute: ApiMonitoringRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
-  PhSplatRoute: PhSplatRoute,
   MiniIndexRoute: MiniIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,

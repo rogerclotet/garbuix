@@ -8,9 +8,6 @@ import type {
 } from "@/lib/puzzle-types";
 import { useDailyCompletion } from "./use-daily-completion";
 
-vi.mock("@/lib/use-observability", () => ({
-	useObservability: () => ({ captureEvent: vi.fn() }),
-}));
 vi.mock("@/lib/puzzle-local", () => ({
 	getSortedAnonymousHistoryEntries: () => [],
 }));

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { glitchtipEnvSchema } from "./glitchtip-config";
 
 const optionalEnvString = z.preprocess(
 	(value) =>
@@ -35,7 +34,6 @@ const authSecretSchema = isProduction
 	: z.string().min(1).default(DEV_AUTH_SECRET);
 
 const serverEnvSchema = z.object({
-	...glitchtipEnvSchema.shape,
 	BETTER_AUTH_SECRET: authSecretSchema,
 	DATABASE_URL: z
 		.string()
@@ -43,9 +41,6 @@ const serverEnvSchema = z.object({
 		.default("postgres://postgres:postgres@localhost:5432/paraules"),
 	GOOGLE_CLIENT_ID: optionalEnvString,
 	GOOGLE_CLIENT_SECRET: optionalEnvString,
-	POSTHOG_HOST: z.string().url().optional(),
-	POSTHOG_KEY: optionalEnvString,
-	POSTHOG_UI_HOST: z.string().url().optional(),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

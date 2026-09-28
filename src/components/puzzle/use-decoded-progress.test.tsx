@@ -6,10 +6,6 @@ import { sealAnswerCapsule, sealHintCapsule } from "@/lib/puzzle-crypto";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-vi.mock("@/lib/use-observability", () => ({
-	useObservability: () => ({ captureException }),
-}));
 afterEach(cleanup);
 
 async function fixture(id: string, word: string) {

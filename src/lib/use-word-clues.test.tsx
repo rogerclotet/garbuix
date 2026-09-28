@@ -6,19 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWordClues } from "@/lib/use-word-clues";
 import type { WordCluesResult } from "@/lib/word-clues";
 
-const { fetchClues, captureException } = vi.hoisted(() => ({
+const { fetchClues } = vi.hoisted(() => ({
 	fetchClues:
 		vi.fn<
 			(input: {
 				data: { puzzleId: string; wordIds: number[] };
 			}) => Promise<WordCluesResult>
 		>(),
-	captureException: vi.fn(),
 }));
 vi.mock("@/lib/puzzle-server-fns", () => ({ getWordClues: fetchClues }));
-vi.mock("@/lib/use-observability", () => ({
-	useObservability: () => ({ captureException }),
-}));
 
 const initialProps = {
 	puzzleId: "puzzle-1",
@@ -36,7 +32,6 @@ async function advance(ms = 0) {
 beforeEach(() => {
 	vi.useFakeTimers();
 	fetchClues.mockReset().mockResolvedValue({ kind: "ok", clues: {} });
-	captureException.mockReset();
 });
 afterEach(() => {
 	cleanup();
@@ -60,7 +55,6 @@ describe("useWordClues", () => {
 		await advance(1);
 		expect(result.current).toEqual({ 0: "Recovered" });
 		expect(fetchClues).toHaveBeenCalledTimes(2);
-		expect(captureException).not.toHaveBeenCalled();
 	});
 
 	it("waits for connectivity before fetching clues", async () => {
@@ -91,34 +85,25 @@ describe("useWordClues", () => {
 		expect(result.current).toEqual({ 0: "Recovered" });
 	});
 
-	it("bounds network retries and reports the failure after exhaustion", async () => {
+	it("stops retrying after exhausting the network retry limit", async () => {
 		const failure = new TypeError("Failed to fetch");
 		fetchClues.mockRejectedValue(failure);
 		renderHook(useWordClues, { initialProps });
 		await advance();
 		await advance(5_000);
 		await advance(10_000);
-		expect(captureException).not.toHaveBeenCalled();
 		await advance(20_000);
 		expect(fetchClues).toHaveBeenCalledTimes(4);
-		expect(captureException).toHaveBeenCalledExactlyOnceWith(failure, {
-			puzzle_id: "puzzle-1",
-			scope: "load_word_clues",
-		});
 		fireEvent.online(window);
 		await advance(60_000);
 		expect(fetchClues).toHaveBeenCalledTimes(4);
 	});
 
-	it("reports application failures immediately without retrying", async () => {
+	it("does not retry application failures", async () => {
 		const failure = new TypeError("Cannot read properties of undefined");
 		fetchClues.mockRejectedValue(failure);
 		renderHook(useWordClues, { initialProps });
 		await advance();
-		expect(captureException).toHaveBeenCalledExactlyOnceWith(failure, {
-			puzzle_id: "puzzle-1",
-			scope: "load_word_clues",
-		});
 		await advance(60_000);
 		expect(fetchClues).toHaveBeenCalledTimes(1);
 	});
@@ -178,7 +163,6 @@ describe("useWordClues", () => {
 		fireEvent.online(window);
 		await advance(59_999);
 		expect(fetchClues).toHaveBeenCalledTimes(1);
-		expect(captureException).not.toHaveBeenCalled();
 		await advance(1);
 		expect(fetchClues).toHaveBeenCalledTimes(2);
 		expect(result.current).toEqual({ 0: "Ready", 1: "Also ready" });

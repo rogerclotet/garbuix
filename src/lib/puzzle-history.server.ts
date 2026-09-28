@@ -5,13 +5,11 @@ import {
 	legacyImportedResults,
 	userPuzzleProgress,
 } from "@/db/schema";
-import { ANALYTICS_EVENT, GAME_MODE } from "@/lib/analytics-events";
 import { db } from "@/lib/db";
 import {
 	getLeaderboard,
 	mergeAnonLeaderboardForUser,
 } from "@/lib/leaderboard.server";
-import { captureServerEvent } from "@/lib/observability-server";
 import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import { toPuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import { readDailyPuzzleRow } from "@/lib/puzzle-generation.server";
@@ -266,18 +264,6 @@ export async function getHistoryPageDataForUser(
 		: null;
 	const yesterdayLeaderboard = await getLeaderboard(dateKey);
 
-	captureServerEvent({
-		distinctId: userId,
-		event: ANALYTICS_EVENT.HISTORY_PAGE_LOADED_SERVER,
-		properties: {
-			game_mode: GAME_MODE.CLASSIC,
-			date_key: dateKey,
-			has_account_history: Boolean(accountHistory),
-			history_entry_count: accountHistory?.stats.totalDays ?? 0,
-			yesterday_leaderboard_entry_count: yesterdayLeaderboard.entries.length,
-		},
-	});
-
 	return {
 		accountHistory,
 		yesterdayPuzzle: yesterdayPuzzleRow
@@ -416,18 +402,6 @@ export async function importAnonymousProgressForUser(options: {
 			console.warn("[leaderboard] publish on import failed", error);
 		}
 	}
-
-	captureServerEvent({
-		distinctId: userId,
-		event: ANALYTICS_EVENT.ANONYMOUS_PROGRESS_IMPORTED_SERVER,
-		properties: {
-			game_mode: GAME_MODE.CLASSIC,
-			active_progress_count: Object.keys(payload.activeProgressByDate).length,
-			imported_dates: importedDates.length,
-			legacy_dates: skippedLegacyDates.length,
-			merged_leaderboard_dates: dateKeysForLeaderboardMerge.length,
-		},
-	});
 
 	return {
 		importedDates,

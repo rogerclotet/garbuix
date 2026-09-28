@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { getWordClues } from "@/lib/puzzle-server-fns";
-import { useObservability } from "@/lib/use-observability";
 
 // Retry late generation and transient fetch failures without spending most of
 // the hourly quota on one missing clue.
@@ -38,7 +37,6 @@ export function useWordClues(options: {
 		.sort((a, b) => a - b)
 		.join(",");
 	const canFetch = pendingEventCount === 0;
-	const { captureException } = useObservability();
 	const [revision, refresh] = useReducer((value: number) => value + 1, 0);
 	// The quota spans puzzles. Changing the viewed puzzle must not bypass a
 	// cooldown already returned by the server.
@@ -120,26 +118,18 @@ export function useWordClues(options: {
 					/^(Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.)$/.test(
 						error.message,
 					);
-				let shouldReport = false;
 				for (const wordId of requested) {
 					// A transport failure says nothing about whether a clue exists.
 					if (isNetworkError && scheduleClueRetry(cache, wordId)) continue;
 					cache.unavailable.add(wordId);
 					cache.pending.delete(wordId);
-					shouldReport = true;
-				}
-				if (shouldReport) {
-					captureException(error, {
-						puzzle_id: cache.puzzleId,
-						scope: "load_word_clues",
-					});
 				}
 			})
 			.finally(() => {
 				cache.inFlight = false;
 				refresh();
 			});
-	}, [cache, canFetch, wordIdsKey, captureException, revision]);
+	}, [cache, canFetch, wordIdsKey, revision]);
 
 	return cache.clues;
 }

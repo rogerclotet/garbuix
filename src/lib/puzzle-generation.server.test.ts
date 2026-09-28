@@ -13,10 +13,6 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/clue-generator.server", () => ({
 	generateAndStoreCluesForPuzzle: generateClues,
 }));
-vi.mock("@/lib/observability-server", () => ({
-	captureServerEvent: vi.fn(),
-	captureServerException: vi.fn(),
-}));
 vi.mock("@/lib/crossword-generator", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/crossword-generator")>()),
 	generateDailyCrosswordForSeed: () => ({

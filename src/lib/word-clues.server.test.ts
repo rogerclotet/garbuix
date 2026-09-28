@@ -20,10 +20,6 @@ vi.mock("@tanstack/react-start/server", () => ({
 vi.mock("@/lib/anon-session.server", () => ({
 	readAnonDeviceId: () => "guest-1",
 }));
-vi.mock("@/lib/observability-server", () => ({
-	observeServerAction: (_name: string, action: () => Promise<unknown>) =>
-		action(),
-}));
 vi.mock("@/lib/puzzle-service.server", () => ({
 	getWordCluesData,
 	getAuthSession,
