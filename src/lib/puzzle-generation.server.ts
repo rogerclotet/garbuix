@@ -218,7 +218,10 @@ export function triggerDailyPuzzleGeneration(
 	inProgressGenerations.set(dateKey, promise);
 }
 
-export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
+export async function ensureDailyPuzzleSnapshot(
+	dateKey = getTodayDateKey(),
+	options: { generateClues?: boolean } = {},
+) {
 	const existing = await db.query.dailyPuzzles.findFirst({
 		where: eq(dailyPuzzles.dateKey, dateKey),
 	});
@@ -276,7 +279,9 @@ export async function ensureDailyPuzzleSnapshot(dateKey = getTodayDateKey()) {
 				word_count: privateSnapshot.wordSlots.length,
 			},
 		});
-		triggerCluesGeneration(inserted[0].id, privateSnapshot.wordSlots);
+		if (options.generateClues !== false) {
+			triggerCluesGeneration(inserted[0].id, privateSnapshot.wordSlots);
+		}
 		return inserted[0];
 	}
 

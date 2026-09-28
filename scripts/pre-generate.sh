@@ -13,8 +13,7 @@ TOMORROW=$(node -e "
 echo "[pre-generator] Ensuring puzzle for $TOMORROW"
 pnpm backfill:puzzles --from "$TOMORROW" --to "$TOMORROW"
 
-# Generate AI clues for the puzzle we just ensured. The puzzle backfill only
-# fires clue generation as fire-and-forget, which gets killed when that one-shot
-# process exits; this awaits it to completion. Idempotent: existing clues skip.
+# Puzzle backfill skips background clues because it closes its database pool on
+# exit. Generate clues here and await all writes before closing this process's pool.
 echo "[pre-generator] Ensuring AI clues for $TOMORROW"
 pnpm clues:backfill --from "$TOMORROW" --to "$TOMORROW"
