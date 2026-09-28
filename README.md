@@ -237,6 +237,11 @@ sh scripts/deploy-compose.sh
 Use this script for production updates. A plain `docker compose up` can start the
 clue scheduler before the app finishes migrating the database.
 
+CI serializes production deployments and lets each active deploy finish before
+starting the next one. Parallel deploys can race while replacing the same Compose
+containers, causing a container-name conflict. When deploying manually, wait for
+any CI deployment to finish first.
+
 To pre-generate historical puzzle snapshots:
 
 ```bash

@@ -48,6 +48,11 @@ jobs:
   deploy:
     needs: lint
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Every deploy mutates the same checkout, images, and Compose project.
+    # Finish the active deploy before another job can replace its containers.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     container:
       image: alpine
