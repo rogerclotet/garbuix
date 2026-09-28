@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWordClues } from "@/lib/use-word-clues";
@@ -40,10 +40,89 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.useRealTimers();
 });
 
 describe("useWordClues", () => {
+	it.each([
+		"Failed to fetch",
+		"Load failed",
+		"NetworkError when attempting to fetch resource.",
+	])("recovers clues after a transient %s failure", async (message) => {
+		fetchClues
+			.mockRejectedValueOnce(new TypeError(message))
+			.mockResolvedValue({ kind: "ok", clues: { 0: "Recovered" } });
+		const { result } = renderHook(useWordClues, { initialProps });
+		await advance();
+		await advance(4_999);
+		expect(fetchClues).toHaveBeenCalledTimes(1);
+		await advance(1);
+		expect(result.current).toEqual({ 0: "Recovered" });
+		expect(fetchClues).toHaveBeenCalledTimes(2);
+		expect(captureException).not.toHaveBeenCalled();
+	});
+
+	it("waits for connectivity before fetching clues", async () => {
+		const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+		fetchClues.mockResolvedValue({ kind: "ok", clues: { 0: "Connected" } });
+		const { result } = renderHook(useWordClues, { initialProps });
+		await advance(60_000);
+		expect(fetchClues).not.toHaveBeenCalled();
+		online.mockReturnValue(true);
+		fireEvent.online(window);
+		await advance();
+		expect(result.current).toEqual({ 0: "Connected" });
+	});
+
+	it("preserves a failed request while offline and retries after reconnecting", async () => {
+		const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+		fetchClues
+			.mockRejectedValueOnce(new TypeError("Failed to fetch"))
+			.mockResolvedValue({ kind: "ok", clues: { 0: "Recovered" } });
+		const { result } = renderHook(useWordClues, { initialProps });
+		await advance();
+		online.mockReturnValue(false);
+		await advance(60_000);
+		expect(fetchClues).toHaveBeenCalledTimes(1);
+		online.mockReturnValue(true);
+		fireEvent.online(window);
+		await advance();
+		expect(result.current).toEqual({ 0: "Recovered" });
+	});
+
+	it("bounds network retries and reports the failure after exhaustion", async () => {
+		const failure = new TypeError("Failed to fetch");
+		fetchClues.mockRejectedValue(failure);
+		renderHook(useWordClues, { initialProps });
+		await advance();
+		await advance(5_000);
+		await advance(10_000);
+		expect(captureException).not.toHaveBeenCalled();
+		await advance(20_000);
+		expect(fetchClues).toHaveBeenCalledTimes(4);
+		expect(captureException).toHaveBeenCalledExactlyOnceWith(failure, {
+			puzzle_id: "puzzle-1",
+			scope: "load_word_clues",
+		});
+		fireEvent.online(window);
+		await advance(60_000);
+		expect(fetchClues).toHaveBeenCalledTimes(4);
+	});
+
+	it("reports application failures immediately without retrying", async () => {
+		const failure = new TypeError("Cannot read properties of undefined");
+		fetchClues.mockRejectedValue(failure);
+		renderHook(useWordClues, { initialProps });
+		await advance();
+		expect(captureException).toHaveBeenCalledExactlyOnceWith(failure, {
+			puzzle_id: "puzzle-1",
+			scope: "load_word_clues",
+		});
+		await advance(60_000);
+		expect(fetchClues).toHaveBeenCalledTimes(1);
+	});
+
 	it("deduplicates in-flight requests and then fetches only newly requested words", async () => {
 		const executor =
 			vi.fn<(resolve: (result: WordCluesResult) => void) => void>();
@@ -96,6 +175,7 @@ describe("useWordClues", () => {
 		await advance();
 		rerender({ ...initialProps, pendingEventCount: 1 });
 		rerender({ ...initialProps, puzzleId: "puzzle-2", wordIds: [0, 1] });
+		fireEvent.online(window);
 		await advance(59_999);
 		expect(fetchClues).toHaveBeenCalledTimes(1);
 		expect(captureException).not.toHaveBeenCalled();
@@ -169,6 +249,7 @@ describe("useWordClues", () => {
 		const { unmount } = renderHook(useWordClues, { initialProps });
 		await advance();
 		unmount();
+		fireEvent.online(window);
 		await advance(60_000);
 		expect(fetchClues).toHaveBeenCalledTimes(1);
 	});
