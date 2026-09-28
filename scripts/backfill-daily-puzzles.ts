@@ -1,6 +1,6 @@
 import { sql } from "@/lib/db";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
-import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-service.server";
+import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-generation.server";
 
 function getArg(flag: string) {
 	const index = process.argv.indexOf(flag);
@@ -26,7 +26,9 @@ async function main() {
 
 	let current = from;
 	while (current <= to) {
-		await ensureDailyPuzzleSnapshot(current);
+		// This process closes its database pool on exit. The separate clues:backfill
+		// command owns clue generation and awaits its writes before closing the pool.
+		await ensureDailyPuzzleSnapshot(current, { generateClues: false });
 		console.log(`backfilled ${current}`);
 		current = addOneDay(current);
 	}
