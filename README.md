@@ -82,9 +82,26 @@ For Docker builds, pass the token as a BuildKit secret:
 docker build --target production --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
 ```
 
-The token is only available during the build and is not stored in the image.
-The standard Compose build works without it. The Sentry plugin deletes uploaded
-maps from the build output.
+For the standard Compose deployment, set `SENTRY_AUTH_TOKEN` in the deployment
+server's `.env` file. Compose passes it to the app, scheduler, and backfill builds
+as a BuildKit secret. A GitHub Actions secret alone is not forwarded to the remote
+server by the deployment workflow.
+
+The token is only available during the build and is not stored in the image or
+added to the running containers' environment. Builds without a token still work,
+but skip source-map uploads. The Sentry plugin deletes uploaded maps from the
+build output.
+
+Docker does not invalidate its build cache when secret values change. After
+adding or rotating the token, rebuild once without cache before deploying:
+
+```bash
+docker compose build --no-cache app pre-generator
+sh scripts/deploy-compose.sh
+```
+
+Check the build logs for Sentry's successful upload message; a cached build does
+not rerun the upload.
 
 To check delivery, temporarily add a button whose click handler throws
 `new Error("Sentry Test Error")`, click it in the running app, and check the Sentry
