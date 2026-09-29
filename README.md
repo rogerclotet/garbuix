@@ -76,10 +76,18 @@ legitimate-interest assessment and remaining Sentry account settings to verify.
 
 Source-map uploads are optional. Export `SENTRY_AUTH_TOKEN` before `pnpm build`
 to upload maps. Without a token, uploads and Sentry's map generation are disabled.
-For Docker builds, pass the token as a BuildKit secret:
+Releases use the current commit's short SHA, such as `a1b2c3d4`. The deployment
+script passes it into Docker, and the build records the same release for
+source-map uploads, browser errors, server errors, and the about page. Local builds read Git
+directly. Builds without Git metadata can set `SENTRY_RELEASE`; otherwise they
+use `dev`. The release is saved with the build, so no runtime
+release variable is needed.
+
+For direct Docker builds, pass the release as a build argument and the token as
+a BuildKit secret:
 
 ```bash
-docker build --target production --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
+docker build --target production --build-arg SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
 ```
 
 For the standard Compose deployment, set `SENTRY_AUTH_TOKEN` in the deployment
@@ -96,7 +104,7 @@ Docker does not invalidate its build cache when secret values change. After
 adding or rotating the token, rebuild once without cache before deploying:
 
 ```bash
-docker compose build --no-cache app pre-generator
+SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" docker compose build --no-cache app pre-generator
 sh scripts/deploy-compose.sh
 ```
 
@@ -291,15 +299,13 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 
 ### Build version
 
-The menu's **Sobre el joc** page shows the version embedded in the running app.
-Production builds generate a 16-character content hash from the source, public
-assets, and build inputs. Identical inputs produce the same version, with no
-manual version bump.
+The menu's **Sobre el joc** page shows the same short commit SHA used by Sentry.
+The release is embedded in the app, so an older open tab still shows its own
+version. Builds read `SENTRY_RELEASE` or Git; without either, they use `dev`.
 
-`APP_VERSION` can override the hash at build time. The generated manifest is
-available at `/version.json`; the About page uses the bundled value so an older
-open tab still shows its own version. Without a generated manifest, local
-development shows `dev`.
+The generated `/version.json` manifest also contains a separate hash of the
+service worker and its precached assets. Only changes to those files trigger
+the service-worker update prompt; ordinary app releases do not.
 
 ### Database integration tests
 

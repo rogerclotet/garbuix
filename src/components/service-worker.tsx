@@ -8,7 +8,6 @@ const UPDATE_TOAST_ID = "app-update-available";
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 type VersionManifest = {
-	version: string;
 	serviceWorkerVersion: string;
 };
 

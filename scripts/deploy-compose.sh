@@ -3,6 +3,10 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+# Docker excludes .git, so resolve the release before sending the build context.
+SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)"
+export SENTRY_RELEASE
+
 # Finish building before interrupting the running release.
 docker compose build app pre-generator
 docker compose up -d --wait db redis

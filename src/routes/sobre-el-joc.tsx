@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Logo } from "@/components/logo";
-import { APP_VERSION } from "@/lib/app-version";
+import { APP_RELEASE } from "@/lib/app-version";
 
 export const Route = createFileRoute("/sobre-el-joc")({
 	head: () => ({
@@ -67,7 +67,7 @@ function AboutPage() {
 					</p>
 				</div>
 				<p className="text-xs">
-					Versió <code className="break-all select-all">{APP_VERSION}</code>
+					Versió <code className="break-all select-all">{APP_RELEASE}</code>
 				</p>
 			</footer>
 		</div>

@@ -1,7 +1,7 @@
-declare const __APP_VERSION__: string;
 declare const __APP_SERVICE_WORKER_VERSION__: string;
+declare const __SENTRY_RELEASE__: string | undefined;
 
-export const APP_VERSION = __APP_VERSION__;
+export const APP_RELEASE = __SENTRY_RELEASE__ ?? "dev";
 
 // Changes only when the service worker or its precache does. Missing route
 // bundles from ordinary releases are recovered by RouterErrorComponent.
