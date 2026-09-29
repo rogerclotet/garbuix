@@ -45,6 +45,8 @@ services:
     build:
       context: .
       target: production
+      secrets:
+        - SENTRY_AUTH_TOKEN
     image: paraules-app:prod
     depends_on:
       db:
@@ -69,6 +71,8 @@ services:
     build:
       context: .
       target: scheduler
+      secrets:
+        - SENTRY_AUTH_TOKEN
     image: paraules-scheduler:prod
     depends_on:
       db:
@@ -91,6 +95,8 @@ services:
     build:
       context: .
       target: production
+      secrets:
+        - SENTRY_AUTH_TOKEN
     image: paraules-app:prod
     command: ["pnpm", "backfill:puzzles"]
     depends_on:
@@ -106,6 +112,10 @@ services:
     init: true
     profiles: ["ops"]
     restart: "no"
+
+secrets:
+  SENTRY_AUTH_TOKEN:
+    environment: SENTRY_AUTH_TOKEN
 
 volumes:
   postgres_data:
