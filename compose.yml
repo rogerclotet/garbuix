@@ -45,6 +45,8 @@ services:
     build:
       context: .
       target: production
+      args:
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       secrets:
         - SENTRY_AUTH_TOKEN
     image: paraules-app:prod
@@ -71,6 +73,8 @@ services:
     build:
       context: .
       target: scheduler
+      args:
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       secrets:
         - SENTRY_AUTH_TOKEN
     image: paraules-scheduler:prod
@@ -95,6 +99,8 @@ services:
     build:
       context: .
       target: production
+      args:
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       secrets:
         - SENTRY_AUTH_TOKEN
     image: paraules-app:prod

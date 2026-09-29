@@ -14,16 +14,16 @@ function readBuildVersions() {
 	try {
 		const manifestPath = resolve(process.cwd(), "public/version.json");
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-			version?: string;
 			serviceWorkerVersion?: string;
+			sentryRelease?: string;
 		};
 
 		return {
-			version: manifest.version ?? "dev",
+			sentryRelease: manifest.sentryRelease,
 			serviceWorkerVersion: manifest.serviceWorkerVersion ?? "dev",
 		};
 	} catch {
-		return { version: "dev", serviceWorkerVersion: "dev" };
+		return { serviceWorkerVersion: "dev", sentryRelease: undefined };
 	}
 }
 
@@ -54,6 +54,7 @@ const config = defineConfig(({ mode }) => {
 					project: "garbuix",
 					telemetry: false,
 					authToken: process.env.SENTRY_AUTH_TOKEN,
+					release: { name: buildVersions.sentryRelease },
 					sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
 				}),
 			];
@@ -65,7 +66,7 @@ const config = defineConfig(({ mode }) => {
 			},
 		},
 		define: {
-			__APP_VERSION__: JSON.stringify(buildVersions.version),
+			__SENTRY_RELEASE__: JSON.stringify(buildVersions.sentryRelease) ?? "undefined",
 			__APP_SERVICE_WORKER_VERSION__: JSON.stringify(
 				buildVersions.serviceWorkerVersion,
 			),
