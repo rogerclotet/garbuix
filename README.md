@@ -58,6 +58,39 @@ pnpm dev
 
 The app will be available at `http://localhost:3000`
 
+### Error tracking
+
+Sentry captures browser errors, caught router errors, server request errors, and
+server function errors in the `clotet/garbuix` project. The client initializes
+before hydration. `pnpm dev` and `pnpm start` preload the server SDK, and
+`pnpm build` copies its configuration into the Nitro output. Events use the
+development or production environment. Both SDKs share `sentry-privacy.ts`, which
+removes request data, personal context, attachments and free-form error messages.
+Reports keep the error class and code locations for diagnosis. Breadcrumbs,
+automatic session reports, logs and metrics are disabled; replay and tracing are
+not enabled. This limits diagnostic detail and does not hide the network source IP.
+
+The Catalan privacy policy is available from the menu at `/privacitat`.
+See [privacy operations](docs/privacy-operations.md) for the proposed
+legitimate-interest assessment and remaining Sentry account settings to verify.
+
+Source-map uploads are optional. Export `SENTRY_AUTH_TOKEN` before `pnpm build`
+to upload maps. Without a token, uploads and Sentry's map generation are disabled.
+For Docker builds, pass the token as a BuildKit secret:
+
+```bash
+docker build --target production --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
+```
+
+The token is only available during the build and is not stored in the image.
+The standard Compose build works without it. The Sentry plugin deletes uploaded
+maps from the build output.
+
+To check delivery, temporarily add a button whose click handler throws
+`new Error("Sentry Test Error")`, click it in the running app, and check the Sentry
+issues feed. Remove the button after verification. Errors thrown directly in the
+browser console do not exercise the same capture path.
+
 ## Docker Compose
 
 Copy the example env first:

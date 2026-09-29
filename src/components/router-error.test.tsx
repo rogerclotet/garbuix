@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import * as Sentry from "@sentry/tanstackstart-react";
 import {
 	createMemoryHistory,
 	createRootRoute,
@@ -79,6 +80,30 @@ it.each([
 it("shows ordinary application errors without reloading", () => {
 	renderError(new Error("Cannot read properties of undefined"));
 	expect(reload).not.toHaveBeenCalled();
+});
+
+it("reports a caught route error to Sentry while keeping the recovery UI", async () => {
+	const events: Sentry.ErrorEvent[] = [];
+	const client = Sentry.init({
+		dsn: "https://public@example.com/1",
+		defaultIntegrations: false,
+		beforeSend(event) {
+			events.push(event);
+			return null;
+		},
+	});
+	try {
+		renderError(new Error("Sentry route boundary test"));
+		await Sentry.flush();
+		expect(events).toHaveLength(1);
+		expect(events[0]?.exception?.values?.[0]?.value).toBe(
+			"Sentry route boundary test",
+		);
+		expect(screen.getByText("Hi ha hagut un error")).toBeDefined();
+		expect(reload).not.toHaveBeenCalled();
+	} finally {
+		await client?.close();
+	}
 });
 
 it.each([null, "Route failed", { message: error.message }])(

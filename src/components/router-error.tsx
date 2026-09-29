@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function RouterErrorComponent({ error }: ErrorComponentProps) {
 	const reloadingError = useRef<Error | null>(null);
 
 	useEffect(() => {
+		captureException(error);
 		if (error instanceof Error) {
 			if (reloadingError.current === error) return;
 			if (reloadMissingRouteBundle(error)) {

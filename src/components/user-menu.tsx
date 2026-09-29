@@ -8,6 +8,7 @@ import {
 	Menu,
 	Moon,
 	Settings,
+	ShieldCheck,
 	Sun,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -164,6 +165,12 @@ export function UserMenu() {
 					<Link to="/sobre-el-joc">
 						<Info className="size-4" />
 						<span>Sobre el joc</span>
+					</Link>
+				</DropdownMenuItem>
+				<DropdownMenuItem asChild>
+					<Link to="/privacitat">
+						<ShieldCheck className="size-4" />
+						<span>Privacitat</span>
 					</Link>
 				</DropdownMenuItem>
 				{!mini ? (
