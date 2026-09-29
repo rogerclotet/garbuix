@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { sentryTanstackStart } from "@sentry/tanstackstart-react/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -48,6 +49,13 @@ const config = defineConfig(({ mode }) => {
 				}),
 				viteReact(),
 				babel({ presets: [reactCompilerPreset()] }),
+				sentryTanstackStart({
+					org: "clotet",
+					project: "garbuix",
+					telemetry: false,
+					authToken: process.env.SENTRY_AUTH_TOKEN,
+					sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+				}),
 			];
 
 	return {

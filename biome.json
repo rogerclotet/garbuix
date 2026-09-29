@@ -12,6 +12,8 @@
 			"**/public/**/*",
 			"**/scripts/**/*",
 			"**/package.json",
+			"**/sentry-privacy.ts",
+			"**/instrument.server.mjs",
 			"**/vite.config.js",
 			"!**/.output",
 			"!**/dist",

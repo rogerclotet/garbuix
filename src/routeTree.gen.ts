@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
+import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
@@ -39,6 +40,11 @@ const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
 const PreferenciesRoute = PreferenciesRouteImport.update({
   id: '/preferencies',
   path: '/preferencies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacitatRoute = PrivacitatRouteImport.update({
+  id: '/privacitat',
+  path: '/privacitat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SobreElJocRoute = SobreElJocRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
+  '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/mini/dies-anteriors'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/mini/dies-anteriors'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/classificacio'
     | '/dies-anteriors'
     | '/preferencies'
+    | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
     | '/mini/dies-anteriors'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
+  PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
   ApiHealthRoute: typeof ApiHealthRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/preferencies'
       fullPath: '/preferencies'
       preLoaderRoute: typeof PreferenciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacitat': {
+      id: '/privacitat'
+      path: '/privacitat'
+      fullPath: '/privacitat'
+      preLoaderRoute: typeof PrivacitatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sobre-el-joc': {
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
+  PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
   ApiHealthRoute: ApiHealthRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,

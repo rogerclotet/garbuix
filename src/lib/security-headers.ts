@@ -19,8 +19,8 @@ const CONTENT_SECURITY_POLICY = [
 	// https: covers Google account avatars; fonts are bundled, not fetched.
 	"img-src 'self' data: https:",
 	"font-src 'self' data:",
-	// Page loads, server functions, and both SSE streams use the same origin.
-	"connect-src 'self'",
+	// App requests use the same origin; browser errors go to our Sentry project.
+	"connect-src 'self' https://o4507313162485760.ingest.de.sentry.io",
 	"manifest-src 'self'",
 	"worker-src 'self'",
 	"object-src 'none'",

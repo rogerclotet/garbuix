@@ -30,6 +30,7 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 	"/dies-anteriors": "Dies anteriors",
 	"/preferencies": "Preferències",
 	"/sobre-el-joc": "Sobre el joc",
+	"/privacitat": "Privacitat",
 	"/mini/dies-anteriors": "Historial mini",
 };
 

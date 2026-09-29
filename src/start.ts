@@ -1,3 +1,7 @@
+import {
+	sentryGlobalFunctionMiddleware,
+	sentryGlobalRequestMiddleware,
+} from "@sentry/tanstackstart-react";
 import { createMiddleware, createStart } from "@tanstack/react-start";
 import { getSecurityHeaders } from "@/lib/security-headers";
 
@@ -29,5 +33,6 @@ const securityHeadersMiddleware = createMiddleware({ type: "request" }).server(
 );
 
 export const startInstance = createStart(() => ({
-	requestMiddleware: [securityHeadersMiddleware],
+	requestMiddleware: [sentryGlobalRequestMiddleware, securityHeadersMiddleware],
+	functionMiddleware: [sentryGlobalFunctionMiddleware],
 }));
