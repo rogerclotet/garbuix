@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { captureException } from "@sentry/tanstackstart-react";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
@@ -231,6 +232,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						`[clue-generator] puzzle ${options.puzzleId}: stored clue for "${slot.displayWord}" (${completedWords}/${totalWords})`,
 					);
 				} catch (error) {
+					captureException(error);
 					console.error(
 						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,
 						error,

@@ -3,6 +3,7 @@ import { dailyPuzzles } from "@/db/schema";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 import { db, sql as postgresClient } from "@/lib/db";
 import { addDaysToDateKey, getTodayDateKey } from "@/lib/puzzle-dates";
+import { runMonitoredJob } from "./lib/run-monitored-job";
 
 function getArg(flag: string) {
 	const index = process.argv.indexOf(flag);
@@ -95,11 +96,7 @@ async function main() {
 	}
 }
 
-main()
-	.catch((error) => {
-		console.error("Failed to backfill clues:", error);
-		process.exitCode = 1;
-	})
-	.finally(async () => {
-		await postgresClient.end();
-	});
+process.exitCode = await runMonitoredJob({
+	run: main,
+	cleanup: () => postgresClient.end(),
+});

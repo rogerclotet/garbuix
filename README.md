@@ -70,6 +70,18 @@ Reports keep the error class and code locations for diagnosis. Breadcrumbs,
 automatic session reports, logs and metrics are disabled; replay and tracing are
 not enabled. This limits diagnostic detail and does not hide the network source IP.
 
+Caught background generation, leaderboard, history, and progress failures are
+reported explicitly. Progress retries report the first failure in an outage;
+Redis connection errors report once until the connection recovers. React root
+errors and recoverable hydration errors are also captured. Exception handled
+status is retained for alert rules without retaining mechanism data.
+
+The scheduled `backfill:puzzles` and `clues:backfill` commands preload the same
+server SDK and release as the web app. They report job and cleanup failures and
+wait up to five seconds for pending reports before exiting, including errors
+caught inside otherwise successful jobs. A job that never starts cannot report
+an exception; monitor scheduler availability separately.
+
 The Catalan privacy policy is available from the menu at `/privacitat`.
 See [privacy operations](docs/privacy-operations.md) for the proposed
 legitimate-interest assessment and remaining Sentry account settings to verify.
@@ -111,10 +123,34 @@ sh scripts/deploy-compose.sh
 Check the build logs for Sentry's successful upload message; a cached build does
 not rerun the upload.
 
-To check delivery, temporarily add a button whose click handler throws
-`new Error("Sentry Test Error")`, click it in the running app, and check the Sentry
-issues feed. Remove the button after verification. Errors thrown directly in the
-browser console do not exercise the same capture path.
+To verify delivery after a deployment, exercise an error from a real browser
+interaction and one from a server request/function. Confirm both events in
+`clotet/garbuix`, with the production environment, expected release and original
+source locations. The privacy filter replaces messages with
+`Error details omitted for privacy`; identify reports by time, event ID and stack
+location instead of searching for the original message. Message-only events from
+`captureMessage` are intentionally dropped.
+
+Configure production alerts for new issues and resolved issues that recur, and
+verify the intended recipient actually receives the test notification. Repeating
+an unresolved issue does not trigger a new-issue alert. Check Sentry's quota and
+inbound filters if reports are missing; a successful build or local test does not
+prove ingestion or notification delivery. Browser blockers and network failures
+can prevent client delivery. Errors thrown directly in the browser console do
+not exercise the normal application capture path.
+
+#### Temporary error-test page
+
+Visit `/error-test` directly. It is unlinked and marked `noindex, nofollow`, but
+anyone with the URL can access it. Each button runs once per page load:
+
+- **Navegador** throws from a real click handler to test automatic browser capture.
+- **Servidor** calls a POST server function that throws through Sentry middleware.
+  The page catches its rejected response without creating a duplicate browser report.
+
+The page does not confirm delivery. Check both events and your notifications in
+Sentry. Merge the separate removal PR once verification is complete; permanent
+reporting fixes and the verification guidance above should remain.
 
 ## Docker Compose
 

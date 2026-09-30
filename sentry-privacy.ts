@@ -32,6 +32,10 @@ export function minimizeSentryEvent(
 					? exception.type
 					: "Error",
 				value: "Error details omitted for privacy",
+				// Alert rules need this boolean, but mechanism data can contain PII.
+				mechanism: exception.mechanism
+					? { type: "generic", handled: exception.mechanism.handled }
+					: undefined,
 				stacktrace: exception.stacktrace
 					? {
 							frames: exception.stacktrace.frames?.map((frame) => ({

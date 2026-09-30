@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/tanstackstart-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { dailyPuzzles } from "@/db/schema";
 
@@ -51,6 +52,31 @@ beforeEach(() => {
 });
 
 describe("puzzle generation clue lifecycle", () => {
+	it("reports background clue failures that cannot reach request middleware", async () => {
+		const events: Sentry.ErrorEvent[] = [];
+		const client = Sentry.init({
+			dsn: "https://public@example.com/1",
+			defaultIntegrations: false,
+			beforeSend(event) {
+				events.push(event);
+				return null;
+			},
+		});
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		generateClues.mockRejectedValueOnce(new Error("background clues failed"));
+		try {
+			await ensureDailyPuzzleSnapshot("2026-03-12");
+			await vi.waitFor(() => expect(log).toHaveBeenCalled());
+			await Sentry.flush();
+			expect(events).toHaveLength(1);
+			expect(events[0]?.exception?.values?.[0]?.value).toBe(
+				"background clues failed",
+			);
+		} finally {
+			log.mockRestore();
+			await client?.close();
+		}
+	});
 	it("lets one-shot backfills persist a puzzle without starting background clues", async () => {
 		const puzzle = await ensureDailyPuzzleSnapshot("2026-03-10", {
 			generateClues: false,

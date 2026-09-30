@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -129,6 +130,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
+					captureException(error);
 					console.error("Failed to import anonymous history", error);
 				}
 			}
@@ -139,6 +141,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					setAccountHistory(data.accountHistory);
 				}
 			} catch (error) {
+				captureException(error);
 				console.error("Failed to load account history", error);
 			}
 		};
@@ -193,6 +196,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					: current,
 			);
 		} catch (error) {
+			captureException(error);
 			console.error("Failed to load more history", error);
 			toast.error("No s'han pogut carregar més resultats");
 		} finally {

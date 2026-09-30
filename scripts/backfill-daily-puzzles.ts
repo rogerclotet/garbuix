@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-generation.server";
+import { runMonitoredJob } from "./lib/run-monitored-job";
 
 function getArg(flag: string) {
 	const index = process.argv.indexOf(flag);
@@ -34,11 +35,7 @@ async function main() {
 	}
 }
 
-main()
-	.catch((error) => {
-		console.error(error);
-		process.exitCode = 1;
-	})
-	.finally(async () => {
-		await sql.end();
-	});
+process.exitCode = await runMonitoredJob({
+	run: main,
+	cleanup: () => sql.end(),
+});

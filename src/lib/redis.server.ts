@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { Redis, type RedisOptions } from "ioredis";
 import { getServerEnv } from "@/lib/server-env";
 
@@ -18,7 +19,16 @@ function buildClient(role: "publisher" | "subscriber"): Redis | null {
 	};
 
 	const client = new Redis(url, options);
+	let reportedOutage = false;
+	client.on("ready", () => {
+		reportedOutage = false;
+	});
 	client.on("error", (error) => {
+		// ioredis retries indefinitely. Report once until the connection recovers.
+		if (!reportedOutage) {
+			captureException(error);
+			reportedOutage = true;
+		}
 		console.warn(`[redis:${role}] error`, error.message);
 	});
 	return client;
