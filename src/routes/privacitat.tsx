@@ -81,10 +81,10 @@ function PrivacyPage() {
 				</h2>
 				<p>
 					Fem servir Sentry per detectar fallades i reparar-les. Els informes
-					contenen el tipus d'error, els fitxers i les línies de codi afectades,
-					la versió de l'aplicació i el moment de l'error. Excloem els missatges
-					lliures de l'error, les dades del compte, les galetes, el contingut de
-					les peticions i l'historial d'interaccions.
+					contenen el tipus i el missatge d'error, els fitxers i les línies de
+					codi afectades, la versió de l'aplicació i el moment de l'error.
+					Excloem les dades del compte, les galetes, les capçaleres i el
+					contingut de les peticions, i l'historial d'interaccions.
 				</p>
 				<p>
 					No activem gravacions de sessió ni seguiment de comportament amb

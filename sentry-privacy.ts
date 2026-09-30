@@ -13,8 +13,8 @@ export function minimizeSentryEvent(
 	hint.attachments = [];
 	if (!event.exception?.values?.length) return null;
 
-	// Build an allowlist instead of trying to recognize personal data in every
-	// possible error message, request, context, attachment, or custom tag.
+	// Keep exception messages for diagnosis, but allowlist the surrounding
+	// metadata to exclude request data, personal context, and custom tags.
 	return {
 		type: undefined,
 		event_id: event.event_id,
@@ -31,7 +31,7 @@ export function minimizeSentryEvent(
 				)
 					? exception.type
 					: "Error",
-				value: "Error details omitted for privacy",
+				value: exception.value,
 				// Alert rules need this boolean, but mechanism data can contain PII.
 				mechanism: exception.mechanism
 					? { type: "generic", handled: exception.mechanism.handled }

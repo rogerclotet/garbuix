@@ -25,18 +25,25 @@ it("delivers job and cleanup failures before returning a failing exit code", asy
 	try {
 		const exitCode = await runMonitoredJob({
 			run: async () => {
-				throw new Error("private job failure");
+				Sentry.setUser({ email: "player@example.com" });
+				Sentry.setExtra("session", "private-session-token");
+				throw new Error("job failure");
 			},
 			cleanup: async () => {
-				throw new Error("private cleanup failure");
+				throw new Error("cleanup failure");
 			},
 		});
 		expect(exitCode).toBe(1);
 		expect(envelopes).toHaveLength(2);
 		expect(flushed).toBe(true);
-		expect(JSON.stringify(envelopes)).not.toContain("private job failure");
-		expect(JSON.stringify(envelopes)).not.toContain("private cleanup failure");
+		const serialized = JSON.stringify(envelopes);
+		expect(serialized).toContain("job failure");
+		expect(serialized).toContain("cleanup failure");
+		expect(serialized).not.toContain("player@example.com");
+		expect(serialized).not.toContain("private-session-token");
 	} finally {
+		Sentry.setUser(null);
+		Sentry.setExtra("session", undefined);
 		log.mockRestore();
 		await client?.close();
 	}

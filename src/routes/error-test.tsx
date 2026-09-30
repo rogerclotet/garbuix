@@ -99,10 +99,9 @@ function ErrorTestPage() {
 				</div>
 			</div>
 			<p className="mt-6 text-xs leading-relaxed text-muted-foreground">
-				Per privacitat, el missatge de l'informe serà «Error details omitted for
-				privacy». Identifica'l per l'hora, la versió i el punt del codi. Aquesta
-				pàgina no confirma la recepció de l'informe. Recarrega-la per repetir
-				les proves.
+				Busca «Sentry browser verification» o «Sentry server verification» a
+				Sentry. Aquesta pàgina no confirma la recepció de l'informe.
+				Recarrega-la per repetir les proves.
 			</p>
 		</section>
 	);
