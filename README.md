@@ -65,8 +65,9 @@ server function errors in the `clotet/garbuix` project. The client initializes
 before hydration. `pnpm dev` and `pnpm start` preload the server SDK, and
 `pnpm build` copies its configuration into the Nitro output. Events use the
 development or production environment. Both SDKs share `sentry-privacy.ts`, which
-removes request data, personal context, attachments and free-form error messages.
-Reports keep the error class and code locations for diagnosis. Breadcrumbs,
+removes request data, personal context and attachments.
+Reports keep exception messages, error classes and code locations for diagnosis.
+Do not include credentials or player data in exception messages. Breadcrumbs,
 automatic session reports, logs and metrics are disabled; replay and tracing are
 not enabled. This limits diagnostic detail and does not hide the network source IP.
 
@@ -126,10 +127,9 @@ not rerun the upload.
 To verify delivery after a deployment, exercise an error from a real browser
 interaction and one from a server request/function. Confirm both events in
 `clotet/garbuix`, with the production environment, expected release and original
-source locations. The privacy filter replaces messages with
-`Error details omitted for privacy`; identify reports by time, event ID and stack
-location instead of searching for the original message. Message-only events from
-`captureMessage` are intentionally dropped.
+source locations. Exception messages are preserved, so search for the original
+message and use the event ID, time and stack location to identify each report.
+Message-only events from `captureMessage` are intentionally dropped.
 
 Configure production alerts for new issues and resolved issues that recur, and
 verify the intended recipient actually receives the test notification. Repeating

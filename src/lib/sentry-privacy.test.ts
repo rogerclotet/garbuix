@@ -33,7 +33,7 @@ it.each([true, false])(
 	},
 );
 
-it("keeps stack locations but removes personal data and attachments", () => {
+it("keeps error messages and stack locations but removes private context and attachments", () => {
 	const hint: Sentry.EventHint = {
 		attachments: [{ filename: "private.txt", data: "private body" }],
 	};
@@ -47,6 +47,11 @@ it("keeps stack locations but removes personal data and attachments", () => {
 			request: {
 				url: "https://app.example/?token=secret",
 				data: "private body",
+				cookies: { session: "private-cookie" },
+				headers: {
+					Cookie: "session=private-cookie",
+					Authorization: "Bearer private-token",
+				},
 			},
 			extra: { name: "Private Player" },
 			tags: { email: "player@example.com" },
@@ -57,7 +62,7 @@ it("keeps stack locations but removes personal data and attachments", () => {
 				values: [
 					{
 						type: "TypeError",
-						value: "Private Player player@example.com secret",
+						value: "Cannot read properties of undefined (reading 'id')",
 						stacktrace: {
 							frames: [
 								{
@@ -93,10 +98,16 @@ it("keeps stack locations but removes personal data and attachments", () => {
 		"192.0.2.1",
 		"secret",
 		"private body",
+		"private-cookie",
+		"private-token",
 	]) {
 		expect(serialized).not.toContain(secret);
 	}
 	expect(hint.attachments).toEqual([]);
+	expect(result?.request).toBeUndefined();
+	expect(result?.exception?.values?.[0]?.value).toBe(
+		"Cannot read properties of undefined (reading 'id')",
+	);
 	expect(result?.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
 		filename: "app.js",
 		function: "submitGuess",
@@ -143,12 +154,13 @@ it("applies the privacy hook to real SDK envelopes", async () => {
 			scope.setUser({ email: "player@example.com" });
 			scope.setExtra("secret", "private body");
 			scope.addAttachment({ filename: "private.txt", data: "private body" });
-			Sentry.captureException(new Error("player@example.com private body"));
+			Sentry.captureException(new Error("Sentry server verification"));
 		});
 		await Sentry.flush();
 		expect(envelopes).toHaveLength(1);
 		const serialized = JSON.stringify(envelopes);
-		expect(serialized).toContain("Error details omitted for privacy");
+		expect(serialized).toContain("Sentry server verification");
+		expect(serialized).not.toContain("Error details omitted for privacy");
 		expect(serialized).not.toContain("player@example.com");
 		expect(serialized).not.toContain("private body");
 		expect(serialized).not.toContain("private.txt");

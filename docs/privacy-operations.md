@@ -14,9 +14,10 @@ The shared `sentry-privacy.ts` configuration disables automatic collection of
 identity, cookies, headers, bodies, query parameters, database values, AI content,
 local variables and source context. It disables breadcrumbs and automatic session
 reporting. Tracing and replay are not installed/enabled. Log and metric submissions
-are dropped. The final error hook admits only technical error metadata and strips
-attachments. Free-form messages are replaced, which limits diagnostic detail in
-exchange for avoiding names, email addresses and player-supplied text.
+are dropped. The final error hook admits exception messages and technical error
+metadata and strips attachments. Exception messages are preserved for diagnosis;
+they are not scrubbed for personal data. Keep credentials, names, email addresses
+and player-supplied text out of exception messages.
 
 This is a proposed legitimate-interests assessment, not a completed legal review.
 Players reasonably expect broken gameplay to be repaired, but would not expect
