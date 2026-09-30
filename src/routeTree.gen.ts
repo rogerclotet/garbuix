@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
-import { Route as ErrorTestRouteImport } from './routes/error-test'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
@@ -36,11 +35,6 @@ const ClassificacioRoute = ClassificacioRouteImport.update({
 const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
   id: '/dies-anteriors',
   path: '/dies-anteriors',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ErrorTestRoute = ErrorTestRouteImport.update({
-  id: '/error-test',
-  path: '/error-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreferenciesRoute = PreferenciesRouteImport.update({
@@ -93,7 +87,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
-  '/error-test': typeof ErrorTestRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
@@ -108,7 +101,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
-  '/error-test': typeof ErrorTestRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
@@ -124,7 +116,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
-  '/error-test': typeof ErrorTestRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
@@ -141,7 +132,6 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
-    | '/error-test'
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
@@ -156,7 +146,6 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
-    | '/error-test'
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
@@ -171,7 +160,6 @@ export interface FileRouteTypes {
     | '/'
     | '/classificacio'
     | '/dies-anteriors'
-    | '/error-test'
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
@@ -187,7 +175,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClassificacioRoute: typeof ClassificacioRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
-  ErrorTestRoute: typeof ErrorTestRoute
   PreferenciesRoute: typeof PreferenciesRoute
   PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
@@ -220,13 +207,6 @@ declare module '@tanstack/react-router' {
       path: '/dies-anteriors'
       fullPath: '/dies-anteriors'
       preLoaderRoute: typeof DiesAnteriorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/error-test': {
-      id: '/error-test'
-      path: '/error-test'
-      fullPath: '/error-test'
-      preLoaderRoute: typeof ErrorTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preferencies': {
@@ -299,7 +279,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClassificacioRoute: ClassificacioRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
-  ErrorTestRoute: ErrorTestRoute,
   PreferenciesRoute: PreferenciesRoute,
   PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
