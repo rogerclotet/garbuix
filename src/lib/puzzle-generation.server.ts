@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { eq } from "drizzle-orm";
 import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
@@ -86,6 +87,7 @@ function triggerCluesGeneration(
 
 	void generateAndStoreCluesForPuzzle({ puzzleId, wordSlots })
 		.catch((error: unknown) => {
+			captureException(error);
 			console.error(
 				`[puzzle-service] Clue generation failed for puzzle ${puzzleId}:`,
 				error,
@@ -198,6 +200,7 @@ export function triggerDailyPuzzleGeneration(
 	const promise = ensureDailyPuzzleSnapshot(dateKey)
 		.then(() => {})
 		.catch((err: unknown) => {
+			captureException(err);
 			console.error(
 				`[puzzle-service] Puzzle generation failed for ${dateKey}:`,
 				err,

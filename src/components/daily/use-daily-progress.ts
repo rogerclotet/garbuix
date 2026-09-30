@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { useServerFn } from "@tanstack/react-start";
 import {
 	useCallback,
@@ -331,6 +332,7 @@ export function useDailyProgress({
 						toast.success("S'han sincronitzat els resultats locals");
 					}
 				} catch (error) {
+					captureException(error);
 					console.error("Failed to import anonymous progress", error);
 				}
 			}
@@ -503,6 +505,10 @@ export function useDailyProgress({
 			})
 			.catch((error) => {
 				if (!scope.active) return;
+				// Report the first failure, not every retry during an outage.
+				if (syncFailureCountRef.current === 0 && navigator.onLine) {
+					captureException(error);
+				}
 				console.error("Failed to sync puzzle events", error);
 				const failureCount = syncFailureCountRef.current + 1;
 				const retryDelayMs = Math.min(
@@ -588,6 +594,7 @@ export function useDailyProgress({
 					});
 				})
 				.catch((error) => {
+					captureException(error);
 					console.error(
 						"Failed to sync stale puzzle events for",
 						dateKey,

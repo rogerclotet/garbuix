@@ -36,6 +36,8 @@ COPY scripts ./scripts
 COPY src ./src
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.output ./.output
+# CLI jobs use the same instrumentation and release as the web server.
+COPY --from=builder /app/.output/server/instrument.server.mjs /app/.output/server/sentry-privacy.ts /app/.output/server/version.json ./
 COPY --from=builder /app/src/data/catalan-words.json ./src/data/catalan-words.json
 COPY --from=builder /app/src/data/catalan-guess-words.json ./src/data/catalan-guess-words.json
 

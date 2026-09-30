@@ -5,6 +5,34 @@ import {
 	sentryPrivacyOptions,
 } from "../../sentry-privacy.ts";
 
+it.each([true, false])(
+	"preserves handled=%s for alert rules without mechanism data",
+	(handled) => {
+		const result = minimizeSentryEvent(
+			{
+				type: undefined,
+				exception: {
+					values: [
+						{
+							type: "Error",
+							mechanism: {
+								type: "private custom mechanism",
+								handled,
+								data: { email: "player@example.com" },
+							},
+						},
+					],
+				},
+			},
+			{},
+		);
+		expect(result?.exception?.values?.[0]?.mechanism).toEqual({
+			type: "generic",
+			handled,
+		});
+	},
+);
+
 it("keeps stack locations but removes personal data and attachments", () => {
 	const hint: Sentry.EventHint = {
 		attachments: [{ filename: "private.txt", data: "private body" }],

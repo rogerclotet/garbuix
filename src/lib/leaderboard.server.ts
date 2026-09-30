@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import {
 	anonParticipantId,
 	type LeaderboardEntry,
@@ -157,6 +158,7 @@ export async function recordProgress(
 	try {
 		await pipeline.exec();
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] failed to record progress", error);
 		return { recorded: false, entry: null, delta };
 	}
@@ -174,6 +176,7 @@ export async function recordProgress(
 	try {
 		await redis.publish(channel(input.dateKey), JSON.stringify(event));
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] failed to publish event", error);
 	}
 
@@ -199,6 +202,7 @@ export async function updateLeaderboardProfile(input: {
 	try {
 		hash = await redis.hgetall(meta);
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] profile read failed", error);
 		return false;
 	}
@@ -223,6 +227,7 @@ export async function updateLeaderboardProfile(input: {
 	try {
 		await pipeline.exec();
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] profile update failed", error);
 		return false;
 	}
@@ -236,6 +241,7 @@ export async function updateLeaderboardProfile(input: {
 	try {
 		await redis.publish(channel(input.dateKey), JSON.stringify(event));
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] profile publish failed", error);
 	}
 
@@ -291,6 +297,7 @@ export async function getLeaderboard(
 	try {
 		participantIds = await redis.zrevrange(scoresKey(dateKey), 0, -1);
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] zrevrange failed", error);
 		return { dateKey, entries: [] };
 	}
@@ -309,6 +316,7 @@ export async function getLeaderboard(
 		const execResult = (await pipeline.exec()) ?? [];
 		results = execResult as [Error | null, Record<string, string>][];
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] hgetall pipeline failed", error);
 		return { dateKey, entries: [] };
 	}
@@ -435,6 +443,7 @@ export async function mergeAnonLeaderboardEntry(options: {
 		writeLeaderboardEntry(writePipeline, options.dateKey, mergedEntry);
 		await writePipeline.exec();
 	} catch (error) {
+		captureException(error);
 		console.warn("[leaderboard] mergeAnonLeaderboardEntry failed", error);
 	}
 }
