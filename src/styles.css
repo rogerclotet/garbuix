@@ -347,43 +347,22 @@ code {
 	opacity: 0;
 }
 
-/* Tap-to-locate: flash a word's grid cells in an off-white teal that fades back
-   to the cell's normal colors, so the player can find the word on the grid. */
-@keyframes grid-locate-flash {
-	0% {
-		background-color: color-mix(
-			in srgb,
-			var(--locate-color, var(--color-teal-200)) 75%,
-			var(--color-background)
-		);
-	}
-
-	100% {
-		background-color: transparent;
-	}
-}
-
+/* Tap-to-locate outlines the word without changing revealed tile fills or
+   letter contrast, especially in dark mode. */
 @keyframes grid-locate-ring {
-	0% {
-		opacity: 1;
-	}
+	0%,
 	100% {
 		opacity: 0;
 	}
-}
-
-.grid-locate-cell {
-	animation: grid-locate-flash 1300ms ease-out both;
+	12%,
+	35% {
+		opacity: 1;
+	}
 }
 
 .grid-locate-cell::after {
 	inset: 0;
-	border: 1px solid
-		color-mix(
-			in srgb,
-			var(--locate-color, var(--color-teal-400)) 60%,
-			transparent
-		);
+	border: 1px solid color-mix(in srgb, var(--color-primary) 65%, transparent);
 	animation: grid-locate-ring 1300ms ease-out both;
 }
 
@@ -410,17 +389,12 @@ code {
 		animation: none;
 	}
 
-	.grid-locate-cell {
-		animation: none;
-	}
-
-	.grid-word-just-guessed-cell::after,
-	.grid-locate-cell::after {
+	.grid-word-just-guessed-cell::after {
 		content: none;
 	}
 
-	.tutorial-puzzle .grid-locate-cell::after {
-		content: "";
+	.grid-locate-cell::after {
+		animation: none;
 	}
 
 	.daily-submit-feedback {

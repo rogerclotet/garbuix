@@ -34,7 +34,7 @@ export function useDailyAnimations(puzzle: DailyPuzzlePublic) {
 	} | null>(null);
 	const [submitFeedback, setSubmitFeedback] =
 		useState<PuzzleSubmitFeedback | null>(null);
-	// Transient teal flash on a word's grid cells when its list row is tapped.
+	// Transient outline on a word's grid cells when its list row is tapped.
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
@@ -223,7 +223,7 @@ export function useDailyAnimations(puzzle: DailyPuzzlePublic) {
 		[finishFlyingLettersFallback, puzzle.wordSlots],
 	);
 
-	// Tapping an incomplete word flashes its grid cells in off-white teal so the
+	// Tapping an incomplete word outlines its grid cells so the
 	// player can locate it, scrolling the grid into view on mobile when needed.
 	const handleLocateWord = useCallback(
 		(wordId: number) => {
