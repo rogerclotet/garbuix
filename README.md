@@ -139,19 +139,6 @@ prove ingestion or notification delivery. Browser blockers and network failures
 can prevent client delivery. Errors thrown directly in the browser console do
 not exercise the normal application capture path.
 
-#### Temporary error-test page
-
-Visit `/error-test` directly. It is unlinked and marked `noindex, nofollow`, but
-anyone with the URL can access it. Each button runs once per page load:
-
-- **Navegador** throws from a real click handler to test automatic browser capture.
-- **Servidor** calls a POST server function that throws through Sentry middleware.
-  The page catches its rejected response without creating a duplicate browser report.
-
-The page does not confirm delivery. Check both events and your notifications in
-Sentry. Merge the separate removal PR once verification is complete; permanent
-reporting fixes and the verification guidance above should remain.
-
 ## Docker Compose
 
 Copy the example env first:
