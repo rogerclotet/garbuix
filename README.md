@@ -76,6 +76,10 @@ reported explicitly. Progress retries report the first failure in an outage;
 Redis connection errors report once until the connection recovers. React root
 errors and recoverable hydration errors are also captured. Exception handled
 status is retained for alert rules without retaining mechanism data.
+Known Node/srvx incoming-request disconnects are filtered before privacy
+scrubbing, using their error messages and transport stack frames. Other aborts,
+timeouts, outgoing connection failures, and errors wrapping a disconnect are
+still reported.
 
 The scheduled `backfill:puzzles` and `clues:backfill` commands preload the same
 server SDK and release as the web app. They report job and cleanup failures and

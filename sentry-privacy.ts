@@ -6,12 +6,52 @@ function codeFilename(filename: string | undefined) {
 	return filename?.split(/[?#]/, 1)[0]?.split(/[\\/]/).pop();
 }
 
+function isIncomingRequestDisconnect(event: ErrorEvent): boolean {
+	if (event.platform !== "node") return false;
+
+	// Match the transport's origin as well as the message. Outgoing fetches,
+	// database connections, and application timeouts must still be reported.
+	return (
+		event.exception?.values?.every((exception) => {
+			const frames = exception.stacktrace?.frames ?? [];
+			if (exception.type === "Error" && exception.value === "aborted") {
+				return frames.some(
+					(frame) =>
+						frame.filename === "node:_http_server" &&
+						frame.function === "abortIncoming",
+				);
+			}
+			if (
+				!["AbortError", "Error"].includes(exception.type ?? "") ||
+				exception.value !== "This operation was aborted"
+			)
+				return false;
+
+			return frames.some(
+				(frame) =>
+					frame.function === "ServerResponse.onClose" &&
+					(codeFilename(frame.filename) === "h3+rou3+srvx.mjs" ||
+						frame.filename
+							?.replaceAll("\\", "/")
+							.endsWith("/srvx/dist/adapters/node.mjs")) &&
+					frames.some(
+						(origin) =>
+							origin.function === "abort" && origin.filename === frame.filename,
+					),
+			);
+		}) ?? false
+	);
+}
+
 export function minimizeSentryEvent(
 	event: ErrorEvent,
 	hint: EventHint,
 ): ErrorEvent | null {
 	hint.attachments = [];
 	if (!event.exception?.values?.length) return null;
+	// Inspect full paths and exception types before the privacy scrub below.
+	// Keep an event if any exception in its cause chain is an actual failure.
+	if (isIncomingRequestDisconnect(event)) return null;
 
 	// Keep exception messages for diagnosis, but allowlist the surrounding
 	// metadata to exclude request data, personal context, and custom tags.
