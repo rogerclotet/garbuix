@@ -1,6 +1,9 @@
 import { eq } from "drizzle-orm";
 import { dailyPuzzles } from "@/db/schema";
-import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
+import {
+	CLUE_MODEL_ID,
+	generateAndStoreCluesForPuzzle,
+} from "@/lib/clue-generator.server";
 import { db, sql as postgresClient } from "@/lib/db";
 import { addDaysToDateKey, getTodayDateKey } from "@/lib/puzzle-dates";
 import { runMonitoredJob } from "./lib/run-monitored-job";
@@ -18,16 +21,18 @@ function printUsage() {
 	console.log(
 		[
 			"Generate and store AI word clues for already-created puzzles.",
-			"Idempotent: clues that already exist are skipped. Requires ANTHROPIC_API_KEY.",
+			"Existing clues are preserved unless --force is used. Requires ANTHROPIC_API_KEY.",
 			"",
 			"Usage:",
 			"  pnpm clues:backfill -- --date YYYY-MM-DD",
+			"  pnpm clues:backfill -- --date YYYY-MM-DD --force",
 			"  pnpm clues:backfill -- --from YYYY-MM-DD --to YYYY-MM-DD",
 			"",
 			"Flags:",
 			"  --date   Single puzzle date key.",
 			"  --from   Range start (inclusive). Defaults to today.",
 			"  --to     Range end (inclusive). Defaults to --from.",
+			"  --force  Replace existing clues after successful generation.",
 			"  --help   Show this message.",
 		].join("\n"),
 	);
@@ -58,7 +63,7 @@ function resolveRange(): { from: string; to: string } {
 	return { from, to };
 }
 
-async function backfillDate(dateKey: string) {
+async function backfillDate(dateKey: string, replaceExisting: boolean) {
 	const rows = await db
 		.select({
 			id: dailyPuzzles.id,
@@ -77,7 +82,11 @@ async function backfillDate(dateKey: string) {
 		console.log(
 			`${dateKey}: generating clues for puzzle ${row.id} (${wordSlots.length} words)…`,
 		);
-		await generateAndStoreCluesForPuzzle({ puzzleId: row.id, wordSlots });
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: row.id,
+			wordSlots,
+			replaceExisting,
+		});
 		console.log(`${dateKey}: done (${row.id})`);
 	}
 }
@@ -89,9 +98,13 @@ async function main() {
 	}
 
 	const { from, to } = resolveRange();
+	const replaceExisting = hasFlag("--force");
+	console.info(
+		`[clue-backfill] model=${CLUE_MODEL_ID}, replaceExisting=${replaceExisting}`,
+	);
 	let current = from;
 	while (current <= to) {
-		await backfillDate(current);
+		await backfillDate(current, replaceExisting);
 		current = addDaysToDateKey(current, 1);
 	}
 }

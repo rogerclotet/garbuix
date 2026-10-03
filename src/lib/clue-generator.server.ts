@@ -1,15 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { captureException } from "@sentry/tanstackstart-react";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
 import { findLeakingTokens } from "@/lib/clue-fairness";
+import {
+	CLUE_MODEL_ID,
+	type ClueUsage,
+	readClueUsage,
+} from "@/lib/clue-generation-usage";
 import { db } from "@/lib/db";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
 
-export const CLUE_MODEL_ID = "claude-sonnet-5-5";
+export { CLUE_MODEL_ID } from "@/lib/clue-generation-usage";
 
 export type GeneratedWordClue = {
 	model: string;
@@ -87,10 +92,14 @@ async function callModel(options: {
 	displayWord: string;
 	areatematica: string;
 	extraInstruction?: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
 	const message = await getAnthropicClient().messages.create({
 		model: options.modelId,
 		max_tokens: CLUE_MAX_TOKENS,
+		// Match the published rates used by the puzzle cost summary.
+		service_tier: "standard_only",
+		inference_geo: "global",
 		// Without tools, this skips upfront thinking and reserves the budget for the clue.
 		thinking: { type: "between_tools" },
 		output_config: { effort: "low" },
@@ -112,6 +121,9 @@ async function callModel(options: {
 			},
 		],
 	});
+
+	// Record every response before retries or persistence can fail.
+	options.onUsage?.(readClueUsage(message.usage));
 
 	return message.content
 		.filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -137,11 +149,13 @@ async function generateClueForModel(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
 	let clue = await callModel({
 		modelId: options.modelId,
 		displayWord: options.displayWord,
 		areatematica: options.areatematica,
+		onUsage: options.onUsage,
 	});
 
 	if (findLeakingTokens(clue, options.normalizedWord).length > 0) {
@@ -150,6 +164,7 @@ async function generateClueForModel(options: {
 			displayWord: options.displayWord,
 			areatematica: options.areatematica,
 			extraInstruction: RETRY_REMINDER,
+			onUsage: options.onUsage,
 		});
 	}
 
@@ -161,6 +176,7 @@ export async function generateWordClue(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<GeneratedWordClue> {
 	const clue = await generateClueForModel({
 		...options,
@@ -174,12 +190,12 @@ export async function generateWordClue(options: {
 // requests at once and hit rate limits.
 const CLUE_GENERATION_BATCH_SIZE = 4;
 
-// Generates a clue for every word slot and stores it. Idempotent: the unique
-// (puzzleId, wordId) index means re-runs skip already-stored clues. Per-word
-// failures are logged and skipped so one bad word can't abort the rest.
+// Generates each clue before writing it. Existing rows are preserved unless
+// replacement is requested, so a failed regeneration keeps the previous clue.
 export async function generateAndStoreCluesForPuzzle(options: {
 	puzzleId: string;
 	wordSlots: DailyPuzzlePrivateWord[];
+	replaceExisting?: boolean;
 }): Promise<void> {
 	if (!getServerEnv().ANTHROPIC_API_KEY) {
 		const error = new Error(
@@ -191,6 +207,25 @@ export async function generateAndStoreCluesForPuzzle(options: {
 
 	const totalWords = options.wordSlots.length;
 	let completedWords = 0;
+	let failedWords = 0;
+	let apiResponses = 0;
+	const usage: ClueUsage = {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheWrite5mTokens: 0,
+		cacheWrite1hTokens: 0,
+		cacheReadTokens: 0,
+		estimatedCostUsd: 0,
+	};
+	const recordUsage = (requestUsage: ClueUsage) => {
+		apiResponses += 1;
+		usage.inputTokens += requestUsage.inputTokens;
+		usage.outputTokens += requestUsage.outputTokens;
+		usage.cacheWrite5mTokens += requestUsage.cacheWrite5mTokens;
+		usage.cacheWrite1hTokens += requestUsage.cacheWrite1hTokens;
+		usage.cacheReadTokens += requestUsage.cacheReadTokens;
+		usage.estimatedCostUsd += requestUsage.estimatedCostUsd;
+	};
 
 	for (
 		let offset = 0;
@@ -209,39 +244,78 @@ export async function generateAndStoreCluesForPuzzle(options: {
 
 		await Promise.all(
 			batch.map(async (slot) => {
+				let failureStage: "generation" | "storage" = "generation";
 				try {
 					const generated = await generateWordClue({
 						displayWord: slot.displayWord,
 						normalizedWord: slot.normalizedWord,
 						areatematica: getWordCategory(slot.displayWord),
+						onUsage: recordUsage,
 					});
 
-					await db
-						.insert(puzzleWordClues)
-						.values({
-							id: crypto.randomUUID(),
-							puzzleId: options.puzzleId,
-							wordId: slot.id,
-							normalizedWord: slot.normalizedWord,
-							sonnetModel: generated.model,
-							sonnetClue: generated.clue,
-						})
-						.onConflictDoNothing({
+					failureStage = "storage";
+					const insert = db.insert(puzzleWordClues).values({
+						id: crypto.randomUUID(),
+						puzzleId: options.puzzleId,
+						wordId: slot.id,
+						normalizedWord: slot.normalizedWord,
+						sonnetModel: generated.model,
+						sonnetClue: generated.clue,
+					});
+					if (options.replaceExisting) {
+						await insert.onConflictDoUpdate({
+							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
+							set: {
+								normalizedWord: slot.normalizedWord,
+								sonnetModel: generated.model,
+								sonnetClue: generated.clue,
+								createdAt: new Date(),
+							},
+						});
+					} else {
+						await insert.onConflictDoNothing({
 							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
 						});
+					}
 
 					completedWords += 1;
-					console.log(
-						`[clue-generator] puzzle ${options.puzzleId}: stored clue for "${slot.displayWord}" (${completedWords}/${totalWords})`,
+					console.info(
+						`[clue-generator] puzzle ${options.puzzleId}: processed clue for slot ${slot.id} (${completedWords}/${totalWords})`,
 					);
 				} catch (error) {
-					captureException(error);
-					console.error(
-						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,
-						error,
-					);
+					failedWords += 1;
+					// Raw API/SQL errors may contain answers, clues, or query parameters.
+					const details = {
+						event: "puzzle_clue_generation_failed",
+						puzzleId: options.puzzleId,
+						wordId: slot.id,
+						failureStage,
+						...(error instanceof APIError
+							? { status: error.status, requestId: error.requestID }
+							: {}),
+					};
+					captureException(new Error("Puzzle clue generation failed"), {
+						extra: details,
+					});
+					console.error(JSON.stringify(details));
 				}
 			}),
 		);
 	}
+
+	// Usage is unavailable for failed HTTP attempts, including hidden SDK retries.
+	console.info(
+		JSON.stringify({
+			event: "puzzle_clue_generation_cost",
+			puzzleId: options.puzzleId,
+			model: CLUE_MODEL_ID,
+			totalWords,
+			completedWords,
+			failedWords,
+			apiResponses,
+			costBasis: "reported_usage_at_standard_rates",
+			...usage,
+			estimatedCostUsd: Number(usage.estimatedCostUsd.toFixed(8)),
+		}),
+	);
 }

@@ -1,14 +1,19 @@
 #!/bin/sh
 set -e
 
-# Use Madrid timezone for date computation (matches the app's puzzle date keys)
-MADRID_TZ="Europe/Madrid"
-TOMORROW=$(node -e "
-  const f = new Intl.DateTimeFormat('en-CA', { timeZone: '$MADRID_TZ', year: 'numeric', month: '2-digit', day: '2-digit' });
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1);
-  process.stdout.write(f.format(d));
+# Both startup and cron invocations use the app's Madrid pre-generation window.
+TOMORROW=$(node --import tsx --input-type=module -e "
+  import { addDaysToDateKey, getDateKeyForDate, isWithinPregenerationWindow } from './src/lib/puzzle-dates.ts';
+  const now = new Date();
+  if (isWithinPregenerationWindow(undefined, now)) {
+    process.stdout.write(addDaysToDateKey(getDateKeyForDate(now), 1));
+  }
 ")
+
+if [ -z "$TOMORROW" ]; then
+  echo "[pre-generator] Outside the 23:00-midnight Europe/Madrid window; skipping generation"
+  exit 0
+fi
 
 echo "[pre-generator] Ensuring puzzle for $TOMORROW"
 pnpm backfill:puzzles --from "$TOMORROW" --to "$TOMORROW"
