@@ -60,8 +60,9 @@ The app will be available at `http://localhost:3000`
 
 ### Error tracking
 
-Sentry captures browser errors, caught router errors, server request errors, and
-server function errors in the `clotet/garbuix` project. The client initializes
+The Sentry SDK sends browser errors, caught router errors, server request errors,
+and server function errors to the configured Sentry-compatible service. Production
+uses our self-hosted GlitchTip at `https://glitchtip.clotet.dev/`. The client initializes
 before hydration. `pnpm dev` and `pnpm start` preload the server SDK, and
 `pnpm build` copies its configuration into the Nitro output. Events use the
 development or production environment. Both SDKs share `sentry-privacy.ts`, which
@@ -89,10 +90,29 @@ an exception; monitor scheduler availability separately.
 
 The Catalan privacy policy is available from the menu at `/privacitat`.
 See [privacy operations](docs/privacy-operations.md) for the proposed
-legitimate-interest assessment and remaining Sentry account settings to verify.
+legitimate-interest assessment and monitoring configuration to verify.
 
-Source-map uploads are optional. Export `SENTRY_AUTH_TOKEN` before `pnpm build`
-to upload maps. Without a token, uploads and Sentry's map generation are disabled.
+Set these values in `.env` or the deployment environment:
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_SENTRY_DSN` | Browser project DSN, embedded at build time. Also determines the allowed reporting origin in the CSP for static assets and SSR responses. |
+| `SENTRY_DSN` | Server and background-job project DSN, read at process startup. |
+| `SENTRY_URL` | Source-map API base URL, `https://glitchtip.clotet.dev/` for our instance. Defaults to `https://sentry.io/` if omitted. |
+| `SENTRY_ORG` | Organization slug on that instance: `clotetdev`. |
+| `SENTRY_PROJECT` | Project slug on that instance: `garbuix`. This is not the numeric project ID in the DSN. |
+| `SENTRY_AUTH_TOKEN` | API token issued by that instance, used only to upload source maps during builds. Never prefix this with `VITE_`. |
+
+`.env.example` contains our public GlitchTip DSN. Set both DSN variables to it to
+report browser and server errors to the same project. An empty or absent DSN
+disables reporting for that runtime. Local `pnpm dev` loads `.env` before the
+server SDK starts. Rebuild after changing `VITE_SENTRY_DSN`; changing a running
+container's environment cannot change the browser bundle or its CSP.
+
+Source-map uploads are optional. Local builds read the upload settings from
+`.env` or exported variables. Supplying a token requires both organization and
+project slugs. Without a token, uploads and the plugin's map generation are disabled.
+Use a GlitchTip API token when targeting GlitchTip; a Sentry token will not work.
 Releases use the current commit's short SHA, such as `a1b2c3d4`. The deployment
 script passes it into Docker, and the build records the same release for
 source-map uploads, browser errors, server errors, and the about page. Local builds read Git
@@ -100,16 +120,22 @@ directly. Builds without Git metadata can set `SENTRY_RELEASE`; otherwise they
 use `dev`. The release is saved with the build, so no runtime
 release variable is needed.
 
-For direct Docker builds, pass the release as a build argument and the token as
-a BuildKit secret:
+For direct Docker builds, export the variables above, pass the public settings
+as build arguments and the token as a BuildKit secret. Pass `SENTRY_DSN` to the
+running container separately:
 
 ```bash
-docker build --target production --build-arg SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
+docker build --target production \
+  --build-arg SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" \
+  --build-arg VITE_SENTRY_DSN --build-arg SENTRY_URL \
+  --build-arg SENTRY_ORG --build-arg SENTRY_PROJECT \
+  --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
 ```
 
-For the standard Compose deployment, set `SENTRY_AUTH_TOKEN` in the deployment
-server's `.env` file. Compose passes it to the app, scheduler, and backfill builds
-as a BuildKit secret. A GitHub Actions secret alone is not forwarded to the remote
+For the standard Compose deployment, set the variables above in the deployment
+server's `.env` file. Compose passes the browser DSN and upload settings as build
+arguments, the token as a BuildKit secret, and the server DSN to the app, scheduler,
+and backfill containers. A GitHub Actions secret alone is not forwarded to the remote
 server by the deployment workflow.
 
 The token is only available during the build and is not stored in the image or
@@ -125,19 +151,19 @@ SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" docker compose build --no-cache
 sh scripts/deploy-compose.sh
 ```
 
-Check the build logs for Sentry's successful upload message; a cached build does
+Check the build logs for the upload plugin's successful upload message; a cached build does
 not rerun the upload.
 
 To verify delivery after a deployment, exercise an error from a real browser
 interaction and one from a server request/function. Confirm both events in
-`clotet/garbuix`, with the production environment, expected release and original
+the configured GlitchTip project, with the production environment, expected release and original
 source locations. Exception messages are preserved, so search for the original
 message and use the event ID, time and stack location to identify each report.
 Message-only events from `captureMessage` are intentionally dropped.
 
 Configure production alerts for new issues and resolved issues that recur, and
 verify the intended recipient actually receives the test notification. Repeating
-an unresolved issue does not trigger a new-issue alert. Check Sentry's quota and
+an unresolved issue does not trigger a new-issue alert. Check GlitchTip's event limits and
 inbound filters if reports are missing; a successful build or local test does not
 prove ingestion or notification delivery. Browser blockers and network failures
 can prevent client delivery. Errors thrown directly in the browser console do
@@ -326,7 +352,7 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 
 ### Build version
 
-The menu's **Sobre el joc** page shows the same short commit SHA used by Sentry.
+The menu's **Sobre el joc** page shows the same short commit SHA used in error reports.
 The release is embedded in the app, so an older open tab still shows its own
 version. Builds read `SENTRY_RELEASE` or Git; without either, they use `dev`.
 

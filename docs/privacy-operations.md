@@ -28,26 +28,48 @@ network layer. Disabling SDK identity collection does not make delivery anonymou
 Confirm the actual browser storage/network behavior and applicable device-access
 rules before concluding that consent is unnecessary.
 
-## Confirmed Sentry account details
+## Previous Sentry account details
 
 The operator confirmed on 29 September 2026:
 
 - Sentry's Data Processing Addendum has been reviewed and accepted.
 - The organization uses the Free plan, with 30-day error-event retention.
 
-The public notice states this retention period. Retention is determined by the
-plan, not configured in the SDK. Recheck the notice when changing plans. This
-period describes error events, not every category of provider data or backups.
+These details apply to the former Sentry service, not to GlitchTip.
+
+## GlitchTip migration
+
+On 3 October 2026, the operator selected a self-hosted GlitchTip instance at
+`https://glitchtip.clotet.dev/`, project ID `1`. Browser and server DSNs are
+configured independently through `VITE_SENTRY_DSN` and `SENTRY_DSN`. The SDK and
+privacy filters stay the same. Source-map uploads use the instance URL and its
+own organization/project slugs, `clotetdev/garbuix`, and API token.
+
+The operator reports using unchanged retention defaults. The public notice now
+states GlitchTip's documented default of 90 days for error events. This is based
+on the operator's report and upstream documentation; the running server's
+effective settings and cleanup jobs have not been inspected.
+
+Retention is configured on the GlitchTip server, not in Garbuix. Current versions
+use `GLITCHTIP_EVENT_RETENTION_DAYS`, which inherits `GLITCHTIP_RETENTION_DAYS`
+(default 90). Older versions use `GLITCHTIP_MAX_EVENT_LIFE_DAYS`, also defaulting
+to 90. See [GlitchTip retention configuration](https://glitchtip.com/documentation/install/#data-retention)
+and the [older configuration documentation](https://glitchtip.com/blog/2022-11-30-glitchtip-3-0/).
+
+Hosting location, processor terms and backup retention still depend on the actual
+deployment. The former Sentry plan and EU ingestion endpoint do not establish
+these details for GlitchTip.
 
 ## Remaining operator follow-up
 
 These have not been verified or changed through this repository:
 
-- Review Sentry's subprocessors and international transfer arrangements.
-- Verify EU project storage. The configured DSN is an EU ingestion endpoint,
-  which alone does not establish that every processing operation stays in the EU.
-- Review Sentry's IP storage and server-side data-scrubbing settings as an
-  additional control, including reports received before these changes.
+- Verify the GlitchTip host's location, processor terms and any international
+  transfer arrangements.
+- Verify GlitchTip's IP storage and server-side data-scrubbing settings.
+- Verify effective retention and cleanup on the running GlitchTip server, and
+  keep the public notice in sync if the default changes.
+- Account for reports still retained by the former Sentry service.
 - Identify the hosting provider and its retention, backups and processor terms.
 - Approve the legitimate-interest/device-access
   assessment, accounting for children using Mini.

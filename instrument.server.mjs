@@ -9,7 +9,8 @@ const release = existsSync(manifestUrl)
 	: undefined;
 
 Sentry.init({
-	dsn: "https://4baeb18080b08bcb9089563ce2183016@o4507313162485760.ingest.de.sentry.io/4512166638190672",
+	dsn: process.env.SENTRY_DSN || undefined,
+	enabled: Boolean(process.env.SENTRY_DSN),
 	environment: process.env.NODE_ENV ?? "development",
 	release,
 	...sentryPrivacyOptions,
