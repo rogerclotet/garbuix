@@ -11,7 +11,7 @@ const { consumeRateLimit, getWordCluesData, getAuthSession } = vi.hoisted(
 vi.mock("@tanstack/react-start", () => ({
 	createServerFn: () => ({
 		handler: (handler: unknown) => handler,
-		inputValidator: () => ({ handler: (handler: unknown) => handler }),
+		validator: () => ({ handler: (handler: unknown) => handler }),
 	}),
 }));
 vi.mock("@tanstack/react-start/server", () => ({

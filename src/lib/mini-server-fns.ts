@@ -26,7 +26,7 @@ export const getMiniPageData = createServerFn({ method: "GET" }).handler(
 );
 
 export const syncMiniProgress = createServerFn({ method: "POST" })
-	.inputValidator(progressStateSchema)
+	.validator(progressStateSchema)
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
 		if (!session) throw new Error("Unauthorized");

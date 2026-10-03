@@ -6,7 +6,7 @@ import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 const dateKeySchema = z.object({ dateKey: z.string().optional() }).optional();
 
 export const getLeaderboardSnapshot = createServerFn({ method: "GET" })
-	.inputValidator(dateKeySchema)
+	.validator(dateKeySchema)
 	.handler(async ({ data }) => {
 		const dateKey = data?.dateKey ?? getTodayDateKey();
 		return getLeaderboard(dateKey);
