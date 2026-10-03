@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useBeforeAppReload } from "@/lib/app-reload";
 import { readMiniSaves, writeMiniSave } from "@/lib/mini-local";
 import {
 	applyMiniEvent,
@@ -114,6 +115,14 @@ export function useMiniProgress({
 		},
 		[persist, puzzle, ready],
 	);
+
+	useBeforeAppReload(() => {
+		if (!ready) throw new Error("Progress is still loading");
+		for (const [dateKey, saved] of pending.current) {
+			writeMiniSave(userId, dateKey, saved);
+		}
+		writeMiniSave(userId, puzzle.dateKey, current.current);
+	});
 
 	return { progress, ready, dispatch, syncFailed };
 }

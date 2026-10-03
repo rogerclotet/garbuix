@@ -1,3 +1,6 @@
+// App-only updates refresh on launch or foreground return. Changing this worker
+// also enables the in-session update prompt, reserved for hotfixes. This change
+// lets clients running the previous update policy discover the new one.
 // The `v` this worker is registered under tracks the worker and its precache,
 // not the app release, so cache names now survive ordinary deploys instead of
 // rotating on each one. See RUNTIME_CACHE_MAX_ENTRIES for the eviction that

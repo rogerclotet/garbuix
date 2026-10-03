@@ -48,7 +48,8 @@ function readPrecachedPaths(source: string): string[] {
 // itself, or one of the assets it precaches and then serves without
 // revalidation, changes. Everything else reaches the client through the
 // worker's network-first navigation on the next full load, so hashing this
-// separately is what lets the app skip the update prompt for ordinary releases.
+// separately limits active-play update prompts to worker/precache changes.
+// The app release is checked separately on launch and background return.
 async function computeServiceWorkerHash(): Promise<string> {
 	const source = await readFile(
 		resolve(process.cwd(), SERVICE_WORKER_PATH),

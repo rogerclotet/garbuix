@@ -4,8 +4,10 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { prepareAppReload } from "@/lib/app-reload";
 import {
 	getAccountPuzzleCache,
+	getAnonymousProgress,
 	saveAccountPuzzleCache,
 	saveAnonymousProgress,
 } from "@/lib/puzzle-local";
@@ -662,5 +664,67 @@ describe("useDailyProgress local state", () => {
 			root.unmount();
 		});
 		container.remove();
+	});
+	it("checkpoints the account outbox before refresh and replays it on remount", async () => {
+		const activeUser = {
+			id: USER_ID,
+			name: "Roger",
+			email: "roger@example.com",
+		};
+		const props = {
+			activeUser,
+			deviceId: "device-1",
+			initialData: INITIAL_DATA,
+		};
+		syncEventsMock.mockReturnValue(new Promise(() => {}));
+		const first = renderHook(() => useDailyProgress(props));
+		await waitFor(() => expect(first.result.current.isReady).toBe(true));
+		const event: PuzzleClientEvent = {
+			id: "pending-before-update",
+			type: "guess_added",
+			at: "2026-06-11T12:00:00.000Z",
+			payload: { guessHash: "guess-one", matchedWordId: 1, unlockToken: null },
+		};
+		act(() => {
+			first.result.current.applyLocalEvent(event);
+			prepareAppReload();
+			expect(getAccountPuzzleCache(USER_ID, DATE_KEY)?.queuedEvents).toEqual([
+				event,
+			]);
+		});
+		expect(getAccountPuzzleCache(USER_ID, DATE_KEY)?.queuedEvents).toEqual([
+			event,
+		]);
+		first.unmount();
+		const returning = renderHook(() => useDailyProgress(props));
+		await waitFor(() => expect(returning.result.current.isReady).toBe(true));
+		expect(returning.result.current.derivedProgress.guessedWordIds).toContain(
+			1,
+		);
+		expect(returning.result.current.pendingEventCount).toBe(1);
+	});
+	it("checkpoints an anonymous move before React commits it", async () => {
+		const first = renderHook(() =>
+			useDailyProgress({
+				activeUser: null,
+				deviceId: "device-1",
+				initialData: INITIAL_DATA,
+			}),
+		);
+		await waitFor(() => expect(first.result.current.isReady).toBe(true));
+		act(() => {
+			first.result.current.applyLocalEvent({
+				id: "guest-before-refresh",
+				at: "2026-06-11T12:00:00.000Z",
+				type: "guess_added",
+				payload: {
+					guessHash: "guest-guess",
+					matchedWordId: 1,
+					unlockToken: null,
+				},
+			});
+			prepareAppReload();
+			expect(getAnonymousProgress(DATE_KEY)?.guessedWordIds).toEqual([1]);
+		});
 	});
 });
