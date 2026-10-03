@@ -43,19 +43,19 @@ const dateKeyInput = z
 	.optional();
 
 export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
-	.inputValidator(dateKeyInput)
+	.validator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return getDailyPuzzlePublicData(data?.dateKey);
 	});
 
 export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
-	.inputValidator(dateKeyInput)
+	.validator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return getDailyPuzzleDifficultyData(data?.dateKey);
 	});
 
 export const getDailyPuzzlePageData = createServerFn({ method: "POST" })
-	.inputValidator(dateKeyInput)
+	.validator(dateKeyInput)
 	.handler(async ({ data }) => {
 		const dateKey = data?.dateKey ?? getTodayDateKey();
 		const puzzleExists = await checkDailyPuzzleExists(dateKey);
@@ -107,7 +107,7 @@ export const getSessionUser = createServerFn({ method: "POST" }).handler(
 );
 
 export const getUserPuzzleProgress = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			puzzleId: z.string(),
 		}),
@@ -122,7 +122,7 @@ export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 	});
 
 export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			puzzleId: z.string().min(1).max(64),
 			deviceId: z.string().min(1).max(128),
@@ -144,7 +144,7 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 	});
 
 export const getWordClues = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			puzzleId: z.string().min(1).max(64),
 			wordIds: z.array(z.number().int().min(0).max(10_000)).max(20),
@@ -197,14 +197,14 @@ export const getWordClues = createServerFn({ method: "POST" })
 	});
 
 export const getHistoryPageData = createServerFn({ method: "POST" })
-	.inputValidator(dateKeyInput)
+	.validator(dateKeyInput)
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
 		return getHistoryPageDataForUser(session?.user.id, data?.dateKey);
 	});
 
 export const getMoreHistoryEntries = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			offset: z.number().int().nonnegative(),
 		}),
@@ -222,7 +222,7 @@ export const getMoreHistoryEntries = createServerFn({ method: "POST" })
 	});
 
 export const importAnonymousProgress = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			deviceId: z.string().min(1).max(128),
 			payload: anonymousImportPayloadSchema,
@@ -249,7 +249,7 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 	});
 
 export const updateUserProfile = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		z.object({
 			displayName: z.string().optional(),
 			useGoogleAvatar: z.boolean().optional(),
