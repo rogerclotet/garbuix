@@ -16,6 +16,7 @@ import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -57,6 +58,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReadyRoute = ApiReadyRouteImport.update({
+  id: '/api/ready',
+  path: '/api/ready',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MiniIndexRoute = MiniIndexRouteImport.update({
   id: '/mini/',
   path: '/mini/',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/mini': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
+    | '/api/ready'
     | '/mini/dies-anteriors'
     | '/mini/'
     | '/api/auth/$'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
+    | '/api/ready'
     | '/mini/dies-anteriors'
     | '/mini'
     | '/api/auth/$'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/privacitat'
     | '/sobre-el-joc'
     | '/api/health'
+    | '/api/ready'
     | '/mini/dies-anteriors'
     | '/mini/'
     | '/api/auth/$'
@@ -179,6 +191,7 @@ export interface RootRouteChildren {
   PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
   MiniIndexRoute: typeof MiniIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ready': {
+      id: '/api/ready'
+      path: '/api/ready'
+      fullPath: '/api/ready'
+      preLoaderRoute: typeof ApiReadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mini/': {
       id: '/mini/'
       path: '/mini'
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
   MiniIndexRoute: MiniIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
