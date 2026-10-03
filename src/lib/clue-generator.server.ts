@@ -9,7 +9,7 @@ import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
 
-export const CLUE_MODEL_ID = "claude-sonnet-4-6";
+export const CLUE_MODEL_ID = "claude-sonnet-5-5";
 
 export type GeneratedWordClue = {
 	model: string;
@@ -91,6 +91,9 @@ async function callModel(options: {
 	const message = await getAnthropicClient().messages.create({
 		model: options.modelId,
 		max_tokens: CLUE_MAX_TOKENS,
+		// Without tools, this skips upfront thinking and reserves the budget for the clue.
+		thinking: { type: "between_tools" },
+		output_config: { effort: "low" },
 		system: [
 			{
 				type: "text",
