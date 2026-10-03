@@ -165,7 +165,7 @@ export function PuzzleControls({
 		if (!canUseHint || isComplete) return;
 		if (event.pointerType === "mouse" && event.button !== 0) return;
 		event.preventDefault();
-		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		event.currentTarget.setPointerCapture(event.pointerId);
 
 		const startTime = performance.now();
 
@@ -311,13 +311,13 @@ export function PuzzleControls({
 			</Button>
 			<Button
 				variant="ghost"
-				onPointerDown={mini ? undefined : handleHintPointerDown}
+				onPointerDown={handleHintPointerDown}
 				onPointerUp={cancelHintHold}
 				onPointerLeave={cancelHintHold}
 				onPointerCancel={cancelHintHold}
 				onClick={(event) => {
 					// Keyboard and assistive-technology activation has no pointer hold.
-					if ((mini || event.detail === 0) && canUseHint) onHint();
+					if (event.detail === 0 && canUseHint) onHint();
 				}}
 				onContextMenu={(e) => e.preventDefault()}
 				className={cn(
@@ -329,7 +329,7 @@ export function PuzzleControls({
 				size="lg"
 				aria-description={
 					mini
-						? "Toca per revelar una lletra. Pistes il·limitades."
+						? "Mantén premut per revelar una lletra. Pistes il·limitades."
 						: aiClueMode
 							? "Mantén premut per rebre una pista de la IA"
 							: "Mantén premut per revelar una lletra"
@@ -445,8 +445,11 @@ export function PuzzleControls({
 
 	const submitFeedbackToneClass =
 		submitFeedback?.kind === "new_word"
-			? "text-primary"
-			: submitFeedback?.kind === "valid_but_not_in_puzzle"
+			? mini
+				? "text-teal-600 dark:text-teal-400"
+				: "text-primary"
+			: submitFeedback?.kind === "valid_but_not_in_puzzle" ||
+					(mini && submitFeedback?.kind === "already_found")
 				? "text-muted-foreground opacity-65"
 				: submitFeedback?.kind === "not_in_dictionary" ||
 						submitFeedback?.kind === "invalid_input"

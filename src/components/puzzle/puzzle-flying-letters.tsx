@@ -69,7 +69,7 @@ export type FlyingLettersAnimation = {
 	paths: FlyingLetterPath[];
 };
 
-type DailyFlyingLettersProps = {
+type PuzzleFlyingLettersProps = {
 	animation: FlyingLettersAnimation | null;
 	onLetterLand?: (cellKey: string) => void;
 	onComplete: () => void;
@@ -215,11 +215,11 @@ export function getWordCellKeysInOrder(slot: DailyPuzzleWordSlot): string[] {
 	);
 }
 
-export function DailyFlyingLetters({
+export function PuzzleFlyingLetters({
 	animation,
 	onLetterLand,
 	onComplete,
-}: DailyFlyingLettersProps) {
+}: PuzzleFlyingLettersProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const onCompleteRef = useRef(onComplete);
 	const onLetterLandRef = useRef(onLetterLand);

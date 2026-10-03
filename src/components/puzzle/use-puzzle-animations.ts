@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PuzzleSubmitFeedback } from "@/components/puzzle/puzzle-types";
-import { getWordCellKeys } from "@/lib/puzzle-helpers";
-import { getPlayableWordLetters } from "@/lib/puzzle-text";
-import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
-import { getSubmitFeedbackDuration } from "./daily-animation-timing";
+import { getSubmitFeedbackDuration } from "@/components/puzzle/puzzle-animation-timing";
 import {
 	buildFlyingLetterPaths,
 	type FlyingLettersAnimation,
 	GRID_GUESS_BOUNCE_MS,
 	getWordCellKeysInOrder,
 	HIGHLIGHT_AFTER_LAND_MS,
-} from "./daily-flying-letters";
+} from "@/components/puzzle/puzzle-flying-letters";
+import type { PuzzleSubmitFeedback } from "@/components/puzzle/puzzle-types";
+import { getWordCellKeys } from "@/lib/puzzle-helpers";
+import { getPlayableWordLetters } from "@/lib/puzzle-text";
+import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
 const LOCATE_FLASH_MS = 1300;
-export function useDailyAnimations(puzzle: DailyPuzzlePublic) {
+export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
 	);

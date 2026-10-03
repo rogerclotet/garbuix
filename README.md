@@ -19,7 +19,7 @@ A responsive web application for a Catalan crossword-style word game.
 `/mini` is a separate daily game for early readers, also available in the menu.
 Each board has five connected words drawn from the curated Catalan vocabulary in
 `src/data/mini-words.ts`. All words have 3–5 letters. Hints reveal one hidden cell
-per tap, with no limit, descriptive clues, or leaderboard.
+after holding Pista for 600 ms, with no limit, descriptive clues, or leaderboard.
 
 Mini has a purple theme, separate browser saves and account progress, and its own
 history at `/mini/dies-anteriors`, including yesterday's completed board. Guest

@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { MiniAnnouncementDialog } from "@/components/mini/mini-announcement-dialog";
 import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
 import { PuzzleControls } from "@/components/puzzle/puzzle-controls";
+import { PuzzleFlyingLetters } from "@/components/puzzle/puzzle-flying-letters";
 import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
+import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import {
 	getBonusCluesEnabled,
@@ -17,13 +19,11 @@ import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { DailyFlyingLetters } from "./daily-flying-letters";
 import { DailyStatus } from "./daily-status";
 import type { DailyData, DailySessionUser } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
 import { SharePreviewDialog } from "./share-preview-dialog";
 import { useDailyActions } from "./use-daily-actions";
-import { useDailyAnimations } from "./use-daily-animations";
 import { useDailyClues } from "./use-daily-clues";
 import { useDailyCompletion } from "./use-daily-completion";
 import { useDailyOnboarding } from "./use-daily-onboarding";
@@ -166,7 +166,7 @@ function DailyGame({
 		clearSubmitFeedback,
 		triggerFlyingLetters,
 		handleLocateWord,
-	} = useDailyAnimations(puzzle);
+	} = usePuzzleAnimations(puzzle);
 	const {
 		isComplete,
 		displayComplete,
@@ -270,7 +270,7 @@ function DailyGame({
 	return (
 		<>
 			<PuzzleConfetti fire={shouldFireConfetti} />
-			<DailyFlyingLetters {...flyingLettersProps} />
+			<PuzzleFlyingLetters {...flyingLettersProps} />
 			<div
 				// h-full, not min-h-full: the word list below the fold overflows this
 				// box on purpose, so the board above it can be sized against the room

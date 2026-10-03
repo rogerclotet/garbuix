@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { isVibrationEnabled } from "@/lib/anon-identity";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import { getRandomHintCellKey, getSlotCellKey } from "@/lib/puzzle-helpers";
@@ -11,7 +12,6 @@ import {
 	WORDS_PER_BONUS_CLUE,
 } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
-import type { useDailyAnimations } from "./use-daily-animations";
 
 const POINTER_CLICK_DEDUP_MS = 350;
 const HAPTIC_TAP_MS = 14;
@@ -41,7 +41,7 @@ export function useDailyActions({
 	bonusCluesEnabled: boolean;
 	markCompleting: () => void;
 } & Pick<
-	ReturnType<typeof useDailyAnimations>,
+	ReturnType<typeof usePuzzleAnimations>,
 	"showSubmitFeedback" | "clearSubmitFeedback" | "triggerFlyingLetters"
 >) {
 	const totalWords = puzzle.wordSlots.length;

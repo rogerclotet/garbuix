@@ -29,8 +29,8 @@ export function MiniHelpDialog({
 								vegada.
 							</p>
 							<p>
-								Si necessites ajuda, toca Pista. Apareixerà una lletra al
-								tauler. Pots demanar tantes pistes com vulguis!
+								Si necessites ajuda, mantén premut Pista. Apareixerà una lletra
+								al tauler. Pots demanar tantes pistes com vulguis!
 							</p>
 							<p>
 								Les paraules es creuen: les lletres que trobis t'ajudaran a
