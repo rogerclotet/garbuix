@@ -38,7 +38,7 @@ it.each([undefined, "abc12345"])(
 				JSON.parse(readFileSync(join(checkout, "public/version.json"), "utf8")),
 			).toEqual({
 				serviceWorkerVersion: expect.stringMatching(/^[a-f0-9]{16}$/),
-				sentryRelease: release ?? "dev",
+				sentryRelease: `garbuix@${release ?? "dev"}`,
 			});
 		} finally {
 			rmSync(checkout, { recursive: true, force: true });

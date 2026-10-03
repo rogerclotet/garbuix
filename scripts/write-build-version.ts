@@ -71,7 +71,7 @@ async function computeServiceWorkerHash(): Promise<string> {
 	return hash.digest("hex").slice(0, 16);
 }
 
-function resolveSentryRelease(): string {
+function resolveBuildVersion(): string {
 	const configured = process.env.SENTRY_RELEASE?.trim();
 	if (configured) return configured;
 
@@ -87,7 +87,7 @@ function resolveSentryRelease(): string {
 }
 
 const serviceWorkerVersion = await computeServiceWorkerHash();
-const sentryRelease = resolveSentryRelease();
+const sentryRelease = `garbuix@${resolveBuildVersion()}`;
 const manifestPath = resolve(process.cwd(), "public/version.json");
 
 await mkdir(dirname(manifestPath), { recursive: true });
