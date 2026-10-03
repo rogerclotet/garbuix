@@ -5,7 +5,6 @@ import {
 	useRouterState,
 } from "@tanstack/react-router";
 import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
 import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
@@ -22,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
+import { getGameHistory } from "@/lib/game-history";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useMiniRoute } from "@/lib/use-mini-route";
 
@@ -37,16 +37,9 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 export default function Header() {
 	const mini = useMiniRoute();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
-	const historyIndex = useRouterState({
-		select: (s) => s.location.state.__TSR_index,
-	});
-	const homeHistoryIndexRef = useRef<number | null>(null);
-
-	useLayoutEffect(() => {
-		if (pathname === "/" && typeof historyIndex === "number") {
-			homeHistoryIndexRef.current = historyIndex;
-		}
-	}, [pathname, historyIndex]);
+	const location = useRouterState({ select: (s) => s.location });
+	const historyIndex = location.state.__TSR_index;
+	const gameHistoryIndices = getGameHistory(location);
 
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
@@ -81,24 +74,17 @@ export default function Header() {
 		});
 	};
 
-	const goHome = () => {
-		if (mini) {
-			void navigate({ to: "/mini" });
-			return;
-		}
-		const homeHistoryIndex = homeHistoryIndexRef.current;
+	const returnToGame = (to: "/" | "/mini") => {
+		const gameHistoryIndex = gameHistoryIndices[to];
 
-		// Rewind to the last game entry, dropping every inner page visited since.
-		if (
-			typeof homeHistoryIndex === "number" &&
-			typeof historyIndex === "number" &&
-			historyIndex > homeHistoryIndex
-		) {
-			router.history.go(homeHistoryIndex - historyIndex);
+		// Reuse the game entry so Back cannot revisit the pages we're leaving.
+		if (gameHistoryIndex !== undefined && historyIndex > gameHistoryIndex) {
+			router.history.go(gameHistoryIndex - historyIndex);
 			return;
 		}
 
-		void navigate({ to: "/", replace: true });
+		// A direct link has no known game entry to rewind to.
+		void navigate({ to, replace: true });
 	};
 
 	// Share / trophy / help badge / avatar. The share action is the one the
@@ -147,7 +133,7 @@ export default function Header() {
 					</span>
 				</Button>
 			) : null}
-			<UserMenu />
+			<UserMenu onReturnToGarbuix={() => returnToGame("/")} />
 		</div>
 	);
 
@@ -174,7 +160,7 @@ export default function Header() {
 							<Button
 								variant="ghost"
 								size="icon-lg"
-								onClick={goHome}
+								onClick={() => returnToGame(mini ? "/mini" : "/")}
 								className="size-11 -ml-2 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9 sm:-ml-1"
 								aria-label="Tornar"
 							>
@@ -187,6 +173,7 @@ export default function Header() {
 					) : (
 						<Link
 							to={mini ? "/mini" : "/"}
+							replace
 							className="flex items-center gap-3 hover:opacity-80 transition-opacity"
 						>
 							<Logo
