@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getSubmitFeedbackDuration } from "@/components/puzzle/puzzle-animation-timing";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { getSortedAnonymousHistoryEntries } from "@/lib/puzzle-local";
 import {
@@ -6,7 +7,6 @@ import {
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
-import { getSubmitFeedbackDuration } from "./daily-animation-timing";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
 export function useDailyCompletion({
