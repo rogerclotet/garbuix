@@ -77,6 +77,19 @@ describe("puzzle-dates", () => {
 			nextRollover.getTime(),
 		);
 	});
+	it("opens the pre-generation window at exactly 23:00 Madrid time", () => {
+		const scheduled = new Date("2026-10-03T21:00:00.000Z");
+		expect(getNextRolloverAt("Europe/Madrid", scheduled).toISOString()).toBe(
+			"2026-10-03T22:00:00.000Z",
+		);
+		expect(isWithinPregenerationWindow("Europe/Madrid", scheduled)).toBe(true);
+		expect(
+			isWithinPregenerationWindow(
+				"Europe/Madrid",
+				new Date(scheduled.getTime() - 1),
+			),
+		).toBe(false);
+	});
 	it("accepts well-formed date keys", () => {
 		expect(isValidDateKey("2026-03-10")).toBe(true);
 		expect(isValidDateKey("2024-02-29")).toBe(true);

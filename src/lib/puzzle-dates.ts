@@ -93,7 +93,8 @@ export function getNextRolloverAt(
 	let low = now.getTime();
 	let high = low + 48 * 60 * 60 * 1000;
 
-	while (high - low > 1_000) {
+	// Keep the exact boundary so a cron run at 23:00 is inside the one-hour window.
+	while (high - low > 1) {
 		const mid = Math.floor((low + high) / 2);
 		const midDateKey = getDateKeyForDate(new Date(mid), timeZone);
 

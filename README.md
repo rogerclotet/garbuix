@@ -265,6 +265,10 @@ starting the next one. Parallel deploys can race while replacing the same Compos
 containers, causing a container-name conflict. When deploying manually, wait for
 any CI deployment to finish first.
 
+The pre-generator runs daily at 23:00 Europe/Madrid. On container startup, it
+generates tomorrow's puzzle and clues only between 23:00 and midnight Madrid
+time; earlier deployments skip generation and wait for the scheduled run.
+
 To pre-generate historical puzzle snapshots:
 
 ```bash
