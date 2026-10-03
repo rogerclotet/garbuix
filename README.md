@@ -111,11 +111,13 @@ Source-map uploads are optional. Local builds read the upload settings from
 `.env` or exported variables. Supplying a token requires both organization and
 project slugs. Without a token, uploads and the plugin's map generation are disabled.
 Use a GlitchTip API token when targeting GlitchTip; a Sentry token will not work.
-Releases use the current commit's short SHA, such as `a1b2c3d4`. The deployment
+Releases use `garbuix@<version>`, such as `garbuix@a1b2c3d4`, with the current
+commit's short SHA as the version. The deployment
 script passes it into Docker, and the build records the same release for
 source-map uploads, browser errors, server errors, and the about page. Local builds read Git
-directly. Builds without Git metadata can set `SENTRY_RELEASE`; otherwise they
-use `dev`. The release is saved with the build, so no runtime
+directly. Builds without Git metadata can set `SENTRY_RELEASE` to the version
+without the `garbuix@` prefix; otherwise they use `garbuix@dev`.
+The release is saved with the build, so no runtime
 release variable is needed.
 
 For direct Docker builds, export the variables above, pass the public settings
@@ -350,9 +352,10 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 
 ### Build version
 
-The menu's **Sobre el joc** page shows the same short commit SHA used in error reports.
+The menu's **Sobre el joc** page shows the same `garbuix@<version>` release used in error reports.
 The release is embedded in the app, so an older open tab still shows its own
-version. Builds read `SENTRY_RELEASE` or Git; without either, they use `dev`.
+version. Builds prefix the version from `SENTRY_RELEASE` or Git with `garbuix@`;
+without either, they use `garbuix@dev`.
 
 The generated `/version.json` manifest also contains a separate hash of the
 service worker and its precached assets. Only changes to those files trigger
