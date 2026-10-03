@@ -1,37 +1,34 @@
 import { RefreshCw, X } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { APP_SERVICE_WORKER_VERSION } from "@/lib/app-version";
+import { prepareAppReload } from "@/lib/app-reload";
+import { APP_RELEASE, APP_SERVICE_WORKER_VERSION } from "@/lib/app-version";
 
 const UPDATE_TOAST_ID = "app-update-available";
-const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const RELOAD_TARGET_KEY = "app-update-reload-target";
+const RELOAD_TIME_KEY = "app-update-reload-time";
+const RELOAD_COOLDOWN_MS = 60_000;
 
-type VersionManifest = {
-	serviceWorkerVersion: string;
-};
+const versionManifestSchema = z.object({
+	serviceWorkerVersion: z.string().min(1),
+	sentryRelease: z.string().min(1),
+});
 
 function getServiceWorkerUrl(version: string) {
 	return `/sw.js?v=${encodeURIComponent(version)}`;
 }
 
-// Only the service worker's own version gates the update prompt. A release that
-// leaves the worker untouched needs no proactive reload. Navigations are
-// network-first, and RouterErrorComponent reloads on demand if a deployment
-// removed a route bundle that this tab had not fetched yet.
-async function fetchLatestServiceWorkerVersion() {
+async function fetchLatestVersion(signal: AbortSignal) {
 	const response = await fetch(`/version.json?ts=${Date.now()}`, {
 		cache: "no-store",
+		signal,
 	});
-
 	if (!response.ok) {
 		throw new Error(`Version check failed with status ${response.status}`);
 	}
-
-	const manifest = (await response.json()) as Partial<VersionManifest>;
-	return typeof manifest.serviceWorkerVersion === "string"
-		? manifest.serviceWorkerVersion
-		: null;
+	return versionManifestSchema.parse(await response.json());
 }
 
 function waitForWaitingWorker(registration: ServiceWorkerRegistration) {
@@ -82,23 +79,19 @@ function waitForWaitingWorker(registration: ServiceWorkerRegistration) {
 			watchInstallingWorker(registration.installing);
 		};
 
-		registration.addEventListener("updatefound", onUpdateFound);
-		onUpdateFound();
-
 		timeoutId = window.setTimeout(() => {
 			cleanup();
 			resolve(registration.waiting ?? null);
 		}, 10_000);
+		registration.addEventListener("updatefound", onUpdateFound);
+		onUpdateFound();
 	});
 }
 
 export function ServiceWorkerRegister() {
 	useEffect(() => {
-		if (!("serviceWorker" in navigator)) {
-			return;
-		}
-
 		if (import.meta.env.DEV) {
+			if (!("serviceWorker" in navigator)) return;
 			void (async () => {
 				const registrations = await navigator.serviceWorker.getRegistrations();
 				if (registrations.length === 0) {
@@ -116,18 +109,30 @@ export function ServiceWorkerRegister() {
 
 		let registration: ServiceWorkerRegistration | null = null;
 		let cleanupRegistrationListeners: (() => void) | null = null;
-		let shouldReloadOnControllerChange = false;
+		const workers =
+			"serviceWorker" in navigator ? navigator.serviceWorker : null;
+		let versionRequest: AbortController | null = null;
+		let disposed = false;
+		let reloadRequested = false;
+		let pendingReload: (() => void) | null = null;
+		let activationTimeout = 0;
+		let isActivating = false;
+		let interactionRevision = 0;
+		let wasBackgrounded = document.visibilityState === "hidden";
+		let pendingReturnRevision: number | null = null;
 		let isCheckingForUpdates = false;
-		let latestServiceWorkerVersion = APP_SERVICE_WORKER_VERSION;
+		let latestVersion = {
+			serviceWorkerVersion: APP_SERVICE_WORKER_VERSION,
+			sentryRelease: APP_RELEASE,
+		};
 		let updateToastVisible = false;
-		let autoActivatedInitialWaiting = false;
 
 		const resetUpdateToast = () => {
 			updateToastVisible = false;
 		};
 
 		const showUpdateToast = () => {
-			if (updateToastVisible) {
+			if (disposed || reloadRequested || updateToastVisible || isActivating) {
 				return;
 			}
 
@@ -186,12 +191,14 @@ export function ServiceWorkerRegister() {
 		};
 
 		const onControllerChange = () => {
-			if (!shouldReloadOnControllerChange) {
-				return;
-			}
-
-			shouldReloadOnControllerChange = false;
-			window.location.reload();
+			const reload = pendingReload;
+			if (!reload) return;
+			pendingReload = null;
+			window.clearTimeout(activationTimeout);
+			isActivating = false;
+			reload();
+			if (!reloadRequested) showUpdateToast();
+			drainPendingReturn();
 		};
 
 		const observeRegistration = (
@@ -227,11 +234,7 @@ export function ServiceWorkerRegister() {
 			nextRegistration.addEventListener("updatefound", onUpdateFound);
 			onUpdateFound();
 
-			if (
-				nextRegistration.waiting &&
-				navigator.serviceWorker.controller &&
-				!autoActivatedInitialWaiting
-			) {
+			if (nextRegistration.waiting && navigator.serviceWorker.controller) {
 				showUpdateToast();
 			}
 
@@ -256,134 +259,224 @@ export function ServiceWorkerRegister() {
 		};
 
 		const registerVersion = async (version: string) => {
-			const nextRegistration = await navigator.serviceWorker.register(
+			if (!workers) throw new Error("Service workers are unavailable");
+			const nextRegistration = await workers.register(
 				getServiceWorkerUrl(version),
 			);
-			setRegistration(nextRegistration);
+			if (!disposed) setRegistration(nextRegistration);
 			return nextRegistration;
 		};
 
-		const prepareUpdate = async (version: string) => {
-			const nextRegistration = await registerVersion(version);
-			await nextRegistration.update();
-			await waitForWaitingWorker(nextRegistration).catch((error) => {
-				console.warn("Service worker update preparation failed", error);
-				return null;
-			});
-			return nextRegistration;
-		};
-
-		const activateUpdate = async () => {
+		const canReloadAutomatically = (target: string, revision: number) => {
+			if (
+				disposed ||
+				reloadRequested ||
+				document.visibilityState !== "visible" ||
+				interactionRevision !== revision ||
+				!navigator.onLine
+			)
+				return false;
 			try {
-				const nextRegistration = await prepareUpdate(
-					latestServiceWorkerVersion,
+				// Remember attempts across document loads. The cooldown also prevents
+				// alternating servers during a rolling deployment from causing a loop.
+				return (
+					sessionStorage.getItem(RELOAD_TARGET_KEY) !== target &&
+					Date.now() - Number(sessionStorage.getItem(RELOAD_TIME_KEY) ?? 0) >
+						RELOAD_COOLDOWN_MS
 				);
-				const waitingWorker = nextRegistration.waiting;
-
-				if (waitingWorker) {
-					shouldReloadOnControllerChange = true;
-					toast.dismiss(UPDATE_TOAST_ID);
-					waitingWorker.postMessage({ type: "SKIP_WAITING" });
-					return;
-				}
-
-				window.location.reload();
-			} catch (error) {
-				console.warn("Failed to activate updated service worker", error);
-				resetUpdateToast();
-				toast.error("No s'ha pogut actualitzar l'aplicacio.");
-			}
-		};
-
-		const checkForUpdates = async () => {
-			if (isCheckingForUpdates) {
-				return;
-			}
-
-			isCheckingForUpdates = true;
-
-			try {
-				registration ??= await registerVersion(APP_SERVICE_WORKER_VERSION);
-				await registration.update();
-
-				const nextVersion = await fetchLatestServiceWorkerVersion();
-				if (!nextVersion || nextVersion === APP_SERVICE_WORKER_VERSION) {
-					return;
-				}
-
-				latestServiceWorkerVersion = nextVersion;
-				showUpdateToast();
-				await prepareUpdate(nextVersion);
-			} catch (error) {
-				console.warn("Service worker update check failed", error);
-			} finally {
-				isCheckingForUpdates = false;
-			}
-		};
-
-		const autoActivateExistingWaitingWorker = async () => {
-			try {
-				const existing = await navigator.serviceWorker.getRegistration();
-				const waiting = existing?.waiting;
-				if (!waiting || !navigator.serviceWorker.controller) {
-					return false;
-				}
-
-				autoActivatedInitialWaiting = true;
-				shouldReloadOnControllerChange = true;
-				waiting.postMessage({ type: "SKIP_WAITING" });
-				return true;
-			} catch (error) {
-				console.warn("Failed to inspect existing service worker", error);
+			} catch {
 				return false;
 			}
 		};
 
-		const onVisibilityChange = () => {
-			if (document.visibilityState === "visible") {
+		const activateUpdate = async (
+			request: { kind: "manual" } | { kind: "automatic"; revision: number } = {
+				kind: "manual",
+			},
+		) => {
+			if (disposed || reloadRequested || isActivating) return;
+			const automatic = request.kind === "automatic";
+			const revision =
+				request.kind === "automatic" ? request.revision : interactionRevision;
+			const version = latestVersion;
+			const target = JSON.stringify(version);
+			if (automatic && !canReloadAutomatically(target, revision)) return;
+			isActivating = true;
+
+			const finishReload = () => {
+				if (disposed) return;
+				if (automatic && !canReloadAutomatically(target, revision)) return;
+				try {
+					prepareAppReload();
+					if (automatic) {
+						sessionStorage.setItem(RELOAD_TARGET_KEY, target);
+						sessionStorage.setItem(RELOAD_TIME_KEY, String(Date.now()));
+					}
+					reloadRequested = true;
+					toast.dismiss(UPDATE_TOAST_ID);
+					window.location.reload();
+				} catch (error) {
+					console.warn("Could not preserve progress before updating", error);
+					if (!automatic)
+						toast.error("No s'ha pogut desar el progrés. Torna-ho a provar.");
+				}
+			};
+
+			try {
+				let preparedWorker: ServiceWorker | null = null;
+				if (
+					workers &&
+					version.serviceWorkerVersion !== APP_SERVICE_WORKER_VERSION
+				) {
+					const nextRegistration = await registerVersion(
+						version.serviceWorkerVersion,
+					);
+					if (disposed) return;
+					if (nextRegistration.installing || nextRegistration.waiting) {
+						preparedWorker = await waitForWaitingWorker(nextRegistration);
+					}
+					// Do not refresh into an installation that failed or timed out.
+					if (
+						!preparedWorker &&
+						!nextRegistration.waiting &&
+						new URL(
+							nextRegistration.active?.scriptURL ?? location.href,
+						).searchParams.get("v") !== version.serviceWorkerVersion
+					) {
+						throw new Error("Updated service worker is not ready");
+					}
+				}
+				if (disposed) return;
+				if (automatic && !canReloadAutomatically(target, revision)) return;
+				if (preparedWorker?.state === "redundant")
+					throw new Error("Updated service worker became redundant");
+				const waitingWorker =
+					registration?.waiting ??
+					(preparedWorker?.state !== "activated" ? preparedWorker : null);
+				if (waitingWorker) {
+					prepareAppReload();
+					pendingReload = finishReload;
+					activationTimeout = window.setTimeout(() => {
+						pendingReload = null;
+						isActivating = false;
+						showUpdateToast();
+						drainPendingReturn();
+					}, 10_000);
+					waitingWorker.postMessage({ type: "SKIP_WAITING" });
+				} else {
+					finishReload();
+				}
+			} catch (error) {
+				console.warn("Failed to activate app update", error);
+				if (!automatic) toast.error("No s'ha pogut actualitzar l'aplicació.");
+			} finally {
+				if (!pendingReload) isActivating = false;
+				if (!disposed && registration?.waiting && !pendingReload)
+					showUpdateToast();
+			}
+		};
+
+		const checkForUpdates = async (revision = interactionRevision) => {
+			if (disposed || reloadRequested || document.visibilityState !== "visible")
+				return;
+			if (isCheckingForUpdates || isActivating) {
+				pendingReturnRevision = revision;
+				return;
+			}
+			isCheckingForUpdates = true;
+			versionRequest = new AbortController();
+			const request = versionRequest;
+			const requestTimeout = window.setTimeout(() => request.abort(), 10_000);
+			try {
+				latestVersion = await fetchLatestVersion(request.signal);
+				window.clearTimeout(requestTimeout);
+				if (disposed) return;
+				if (workers && !registration) {
+					const existing = await workers.getRegistration();
+					if (disposed) return;
+					if (existing) setRegistration(existing);
+					else await registerVersion(latestVersion.serviceWorkerVersion);
+				}
+				if (disposed) return;
+				const workerChanged =
+					latestVersion.serviceWorkerVersion !== APP_SERVICE_WORKER_VERSION;
+				const releaseChanged =
+					APP_RELEASE !== "dev" &&
+					latestVersion.sentryRelease !== "dev" &&
+					latestVersion.sentryRelease !== APP_RELEASE;
+				if (releaseChanged || workerChanged || registration?.waiting) {
+					await activateUpdate({ kind: "automatic", revision });
+					if (workerChanged) showUpdateToast();
+				} else {
+					await registration?.update();
+				}
+			} catch (error) {
+				if (!disposed) console.warn("App update check failed", error);
+			} finally {
+				window.clearTimeout(requestTimeout);
+				isCheckingForUpdates = false;
+				drainPendingReturn();
+			}
+		};
+
+		const drainPendingReturn = () => {
+			if (
+				pendingReturnRevision === null ||
+				isActivating ||
+				isCheckingForUpdates
+			)
+				return;
+			const revision = pendingReturnRevision;
+			pendingReturnRevision = null;
+			void checkForUpdates(revision);
+		};
+
+		const onInteraction = () => {
+			interactionRevision += 1;
+		};
+		const onPageHide = () => {
+			wasBackgrounded = true;
+			// An earlier check must not reload after this document is hidden.
+			interactionRevision += 1;
+		};
+		const onReturn = () => {
+			if (document.visibilityState === "visible" && wasBackgrounded) {
+				wasBackgrounded = false;
 				void checkForUpdates();
 			}
 		};
-
-		const onWindowFocus = () => {
-			void checkForUpdates();
+		const onVisibilityChange = () => {
+			if (document.visibilityState === "hidden") onPageHide();
+			else onReturn();
+		};
+		const onPageShow = (event: PageTransitionEvent) => {
+			if (event.persisted) wasBackgrounded = true;
+			onReturn();
 		};
 
-		const onPageShow = () => {
-			void checkForUpdates();
-		};
-
-		navigator.serviceWorker.addEventListener(
-			"controllerchange",
-			onControllerChange,
-		);
-		void (async () => {
-			const autoActivated = await autoActivateExistingWaitingWorker();
-			if (autoActivated) {
-				return;
-			}
-			await checkForUpdates();
-		})();
-
-		window.addEventListener("focus", onWindowFocus);
+		workers?.addEventListener("controllerchange", onControllerChange);
+		window.addEventListener("pagehide", onPageHide);
 		window.addEventListener("pageshow", onPageShow);
 		document.addEventListener("visibilitychange", onVisibilityChange);
-		const intervalId = window.setInterval(() => {
-			void checkForUpdates();
-		}, UPDATE_CHECK_INTERVAL_MS);
+		document.addEventListener("pointerdown", onInteraction, true);
+		document.addEventListener("keydown", onInteraction, true);
+		document.addEventListener("input", onInteraction, true);
+		void checkForUpdates();
 
 		return () => {
+			disposed = true;
+			versionRequest?.abort();
+			pendingReload = null;
+			window.clearTimeout(activationTimeout);
 			toast.dismiss(UPDATE_TOAST_ID);
-			resetUpdateToast();
-			window.clearInterval(intervalId);
 			cleanupRegistrationListeners?.();
-			navigator.serviceWorker.removeEventListener(
-				"controllerchange",
-				onControllerChange,
-			);
-			window.removeEventListener("focus", onWindowFocus);
+			workers?.removeEventListener("controllerchange", onControllerChange);
+			window.removeEventListener("pagehide", onPageHide);
 			window.removeEventListener("pageshow", onPageShow);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
+			document.removeEventListener("pointerdown", onInteraction, true);
+			document.removeEventListener("keydown", onInteraction, true);
+			document.removeEventListener("input", onInteraction, true);
 		};
 	}, []);
 

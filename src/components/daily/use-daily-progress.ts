@@ -15,6 +15,7 @@ import {
 	setReportedAnonProgress,
 } from "@/lib/anon-identity";
 import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
+import { useBeforeAppReload } from "@/lib/app-reload";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import {
 	buildAnonymousImportPayload,
@@ -381,39 +382,43 @@ export function useDailyProgress({
 		};
 	}, [activeUserId, refreshProgressFromServer, scope]);
 
-	useEffect(() => {
-		// Writing before the local read would overwrite the stored progress with
-		// the placeholder the first render started from.
-		if (!hasLoadedLocalState) {
-			return;
-		}
+	// Keep newly dispatched moves available to a reload checkpoint even before
+	// React commits them. Server acknowledgments may be replayed safely from the
+	// stored outbox, so a checkpoint never needs to wait for the network.
+	const checkpointState = useRef({ baseProgress, queuedEvents });
+	useIsomorphicLayoutEffect(() => {
+		checkpointState.current = { baseProgress, queuedEvents };
+	}, [baseProgress, queuedEvents]);
 
-		if (activeUserId) {
-			saveAccountPuzzleCache(activeUserId, puzzle.dateKey, {
-				puzzleId: puzzle.id,
-				baseProgress,
-				queuedEvents,
-			});
-			return;
-		}
-
-		if (logoutTransitionRef.current) {
-			if (hasMeaningfulProgress(derivedProgress)) {
+	const persistProgress = useCallback(
+		(snapshot = { baseProgress, queuedEvents }) => {
+			// Writing before the local read would overwrite the stored progress with
+			// the placeholder the first render started from.
+			if (!hasLoadedLocalState) return;
+			if (activeUserId) {
+				saveAccountPuzzleCache(activeUserId, puzzle.dateKey, {
+					puzzleId: puzzle.id,
+					...snapshot,
+				});
 				return;
 			}
-			logoutTransitionRef.current = false;
-		}
+			if (logoutTransitionRef.current) {
+				if (hasMeaningfulProgress(snapshot.baseProgress)) return;
+				logoutTransitionRef.current = false;
+			}
+			saveAnonymousProgress(puzzle.dateKey, snapshot.baseProgress);
+			saveAnonymousHistoryEntry(
+				buildHistoryEntry(puzzle, snapshot.baseProgress),
+			);
+		},
+		[activeUserId, baseProgress, hasLoadedLocalState, puzzle, queuedEvents],
+	);
 
-		saveAnonymousProgress(puzzle.dateKey, derivedProgress);
-		saveAnonymousHistoryEntry(buildHistoryEntry(puzzle, derivedProgress));
-	}, [
-		activeUserId,
-		baseProgress,
-		derivedProgress,
-		hasLoadedLocalState,
-		puzzle,
-		queuedEvents,
-	]);
+	useEffect(() => persistProgress(), [persistProgress]);
+	useBeforeAppReload(() => {
+		if (!hasLoadedLocalState) throw new Error("Progress is still loading");
+		persistProgress(checkpointState.current);
+	});
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -714,10 +719,22 @@ export function useDailyProgress({
 	const applyLocalEvent = (event: PuzzleClientEvent) => {
 		if (!scope.active || !hasLoadedLocalState) return;
 		if (activeUser) {
+			checkpointState.current = {
+				...checkpointState.current,
+				queuedEvents: [...checkpointState.current.queuedEvents, event],
+			};
 			setQueuedEvents((previous) => [...previous, event]);
 			return;
 		}
 
+		checkpointState.current = {
+			...checkpointState.current,
+			baseProgress: applyPuzzleEvent(
+				checkpointState.current.baseProgress,
+				event,
+				totalWords,
+			),
+		};
 		setBaseProgress((previous) =>
 			applyPuzzleEvent(previous, event, totalWords),
 		);

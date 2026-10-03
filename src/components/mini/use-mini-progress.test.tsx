@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { prepareAppReload } from "@/lib/app-reload";
 import { generateMiniCrossword } from "@/lib/mini-generator";
 import { readMiniSaves, writeMiniSave } from "@/lib/mini-local";
 import { createPuzzleEvent } from "@/lib/puzzle-client";
@@ -102,4 +103,45 @@ it("imports guest progress into Mini for a signed-in parent", async () => {
 	await waitFor(() => expect(sync).toHaveBeenCalled());
 	expect(result.current.progress.hintsUsed).toBe(4);
 	expect(readMiniSaves("parent")[puzzle.dateKey].hintsUsed).toBe(4);
+});
+
+it("checkpoints unsynced progress for replay after an app refresh", async () => {
+	const puzzle = await fixture();
+	sync.mockRejectedValue(new TypeError("Offline"));
+	const props = { puzzle, userId: "parent", initialProgress: null };
+	const first = renderHook(() => useMiniProgress(props));
+	await waitFor(() => expect(first.result.current.ready).toBe(true));
+	act(() =>
+		first.result.current.dispatch(
+			createPuzzleEvent("hint_used", {
+				cellKey: puzzle.hintCapsules[0].cellKey,
+			}),
+		),
+	);
+	act(() => prepareAppReload());
+	first.unmount();
+	sync.mockImplementation(
+		async ({ data }: { data: PuzzleProgressState }) => data,
+	);
+	const returning = renderHook(() => useMiniProgress(props));
+	await waitFor(() => expect(returning.result.current.ready).toBe(true));
+	expect(returning.result.current.progress.hintsUsed).toBe(1);
+	await waitFor(() =>
+		expect(sync).toHaveBeenCalledWith({
+			data: expect.objectContaining({ hintsUsed: 1 }),
+		}),
+	);
+});
+
+it("refuses an update checkpoint if Mini progress cannot be saved", async () => {
+	const puzzle = await fixture();
+	const game = renderHook(() =>
+		useMiniProgress({ puzzle, userId: null, initialProgress: null }),
+	);
+	await waitFor(() => expect(game.result.current.ready).toBe(true));
+	const write = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+		throw new Error("Storage full");
+	});
+	expect(() => prepareAppReload()).toThrow("Storage full");
+	write.mockRestore();
 });
