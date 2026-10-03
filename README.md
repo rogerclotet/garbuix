@@ -214,8 +214,9 @@ if duplicates remain. Use `sh scripts/deploy-compose.sh` to stop the old writers
 apply the migration, and start the updated app together. See the
 [Better Auth upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide#account-identity-keeps-the-provider-key).
 
-Build both production images, stop the app and clue scheduler, apply migrations,
-then recreate both services from the new images. Stopping both writers before
+Build both production images, keep existing PostgreSQL and Redis containers,
+stop the app and clue scheduler, apply migrations, then recreate both application
+services from the new images and wait for app readiness. Stopping both writers before
 migrating prevents old code from querying removed columns. The app is briefly
 unavailable during migration and restart. If migration fails, both services stay
 stopped so the failure can be resolved before restarting.
@@ -223,6 +224,38 @@ stopped so the failure can be resolved before restarting.
 ```bash
 sh scripts/deploy-compose.sh
 ```
+
+Routine deployments deliberately defer PostgreSQL and Redis image/configuration
+changes. To apply those changes, use the explicit dependency maintenance mode:
+
+```bash
+sh scripts/deploy-compose.sh --update-dependencies
+```
+
+This builds the application images first, stops both writers, pulls the configured
+dependency images, updates PostgreSQL and Redis, waits for their healthchecks,
+then migrates and starts the application. Take a database backup before database
+upgrades; changing PostgreSQL major versions requires a separate data migration.
+If dependency maintenance or migration fails, both writers remain stopped.
+Resolve the failure and rerun the maintenance command.
+
+Dependency and application readiness waits each have a 120-second limit. A failed
+app readiness check fails the deployment; inspect `docker compose ps` and
+`docker compose logs app db redis` before retrying. It does not automatically roll
+back schema changes or restart unhealthy containers.
+
+`/api/health` remains a cheap liveness check. `/api/ready` returns 200 only when
+PostgreSQL answers a query and configured Redis answers a ping, or 503 on failure
+or a two-second timeout. Both endpoints support GET and HEAD and disable caching.
+The app's Compose healthcheck uses `/api/ready`. Redis is optional when REDIS_URL
+is unset; the production Compose configuration sets it by default.
+
+For external uptime monitoring, use `/api/ready` to include dependency failures.
+Configure two or three consecutive failures before alerting, or a bounded
+maintenance window covering deployment, to tolerate the planned migration gap.
+Monitor configuration lives outside this repository. Readiness checks verify
+recovery; they do not eliminate downtime. Application Redis failures continue to
+be reported to GlitchTip once per outage.
 
 Use this script for production updates. A plain `docker compose up` can start the
 clue scheduler before the app finishes migrating the database.
