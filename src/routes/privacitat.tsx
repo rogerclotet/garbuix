@@ -128,9 +128,9 @@ function PrivacyPage() {
 					perfil del jugador per generar-les.
 				</p>
 				<p>
-					Els informes d'errors s'envien a la nostra instància de GlitchTip,
-					allotjada a glitchtip.clotet.dev. Pots demanar-nos informació sobre
-					l'allotjament i el tractament d'aquestes dades per correu.
+					Els informes d'errors s'envien a la nostra instància de GlitchTip.
+					Pots demanar-nos informació sobre l'allotjament i el tractament
+					d'aquestes dades per correu.
 				</p>
 			</section>
 

@@ -61,9 +61,9 @@ The app will be available at `http://localhost:3000`
 ### Error tracking
 
 The Sentry SDK sends browser errors, caught router errors, server request errors,
-and server function errors to the configured Sentry-compatible service. Production
-uses our self-hosted GlitchTip at `https://glitchtip.clotet.dev/`. The client initializes
-before hydration. `pnpm dev` and `pnpm start` preload the server SDK, and
+and server function errors to the configured Sentry-compatible service, such as
+self-hosted GlitchTip. The client initializes before hydration. `pnpm dev` and
+`pnpm start` preload the server SDK, and
 `pnpm build` copies its configuration into the Nitro output. Events use the
 development or production environment. Both SDKs share `sentry-privacy.ts`, which
 removes request data, personal context and attachments.
@@ -89,8 +89,6 @@ caught inside otherwise successful jobs. A job that never starts cannot report
 an exception; monitor scheduler availability separately.
 
 The Catalan privacy policy is available from the menu at `/privacitat`.
-See [privacy operations](docs/privacy-operations.md) for the proposed
-legitimate-interest assessment and monitoring configuration to verify.
 
 Set these values in `.env` or the deployment environment:
 
@@ -98,15 +96,15 @@ Set these values in `.env` or the deployment environment:
 | --- | --- |
 | `VITE_SENTRY_DSN` | Browser project DSN, embedded at build time. Also determines the allowed reporting origin in the CSP for static assets and SSR responses. |
 | `SENTRY_DSN` | Server and background-job project DSN, read at process startup. |
-| `SENTRY_URL` | Source-map API base URL, `https://glitchtip.clotet.dev/` for our instance. Defaults to `https://sentry.io/` if omitted. |
-| `SENTRY_ORG` | Organization slug on that instance: `clotetdev`. |
-| `SENTRY_PROJECT` | Project slug on that instance: `garbuix`. This is not the numeric project ID in the DSN. |
+| `SENTRY_URL` | Source-map API base URL, for example `https://glitchtip.example.com/`. Defaults to `https://sentry.io/` if omitted. |
+| `SENTRY_ORG` | Organization slug on that instance, for example `my-org`. |
+| `SENTRY_PROJECT` | Project slug on that instance, for example `my-project`. This is not the numeric project ID in the DSN. |
 | `SENTRY_AUTH_TOKEN` | API token issued by that instance, used only to upload source maps during builds. Never prefix this with `VITE_`. |
 
-`.env.example` contains our public GlitchTip DSN. Set both DSN variables to it to
-report browser and server errors to the same project. An empty or absent DSN
-disables reporting for that runtime. Local `pnpm dev` loads `.env` before the
-server SDK starts. Rebuild after changing `VITE_SENTRY_DSN`; changing a running
+`.env.example` leaves reporting disabled and includes generic examples. Set both
+DSN variables to your project DSN to report browser and server errors to the same
+project. An empty or absent DSN disables reporting for that runtime. Local
+`pnpm dev` loads `.env` before the server SDK starts. Rebuild after changing `VITE_SENTRY_DSN`; changing a running
 container's environment cannot change the browser bundle or its CSP.
 
 Source-map uploads are optional. Local builds read the upload settings from

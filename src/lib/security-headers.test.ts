@@ -14,7 +14,7 @@ describe("error reporting CSP", () => {
 	});
 
 	it.each([
-		["https://public@glitchtip.clotet.dev/1", "https://glitchtip.clotet.dev"],
+		["https://public@glitchtip.example.com/1", "https://glitchtip.example.com"],
 		[
 			"https://public@o123.ingest.de.sentry.io/456",
 			"https://o123.ingest.de.sentry.io",
