@@ -4,12 +4,17 @@ import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
 import { findLeakingTokens } from "@/lib/clue-fairness";
+import {
+	CLUE_MODEL_ID,
+	type ClueUsage,
+	readClueUsage,
+} from "@/lib/clue-generation-usage";
 import { db } from "@/lib/db";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
 
-export const CLUE_MODEL_ID = "claude-sonnet-5-5";
+export { CLUE_MODEL_ID } from "@/lib/clue-generation-usage";
 
 export type GeneratedWordClue = {
 	model: string;
@@ -87,10 +92,14 @@ async function callModel(options: {
 	displayWord: string;
 	areatematica: string;
 	extraInstruction?: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
 	const message = await getAnthropicClient().messages.create({
 		model: options.modelId,
 		max_tokens: CLUE_MAX_TOKENS,
+		// Match the published rates used by the puzzle cost summary.
+		service_tier: "standard_only",
+		inference_geo: "global",
 		// Without tools, this skips upfront thinking and reserves the budget for the clue.
 		thinking: { type: "between_tools" },
 		output_config: { effort: "low" },
@@ -112,6 +121,9 @@ async function callModel(options: {
 			},
 		],
 	});
+
+	// Record every response before retries or persistence can fail.
+	options.onUsage?.(readClueUsage(message.usage));
 
 	return message.content
 		.filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -137,11 +149,13 @@ async function generateClueForModel(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
 	let clue = await callModel({
 		modelId: options.modelId,
 		displayWord: options.displayWord,
 		areatematica: options.areatematica,
+		onUsage: options.onUsage,
 	});
 
 	if (findLeakingTokens(clue, options.normalizedWord).length > 0) {
@@ -150,6 +164,7 @@ async function generateClueForModel(options: {
 			displayWord: options.displayWord,
 			areatematica: options.areatematica,
 			extraInstruction: RETRY_REMINDER,
+			onUsage: options.onUsage,
 		});
 	}
 
@@ -161,6 +176,7 @@ export async function generateWordClue(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	onUsage?: (usage: ClueUsage) => void;
 }): Promise<GeneratedWordClue> {
 	const clue = await generateClueForModel({
 		...options,
@@ -191,6 +207,25 @@ export async function generateAndStoreCluesForPuzzle(options: {
 
 	const totalWords = options.wordSlots.length;
 	let completedWords = 0;
+	let failedWords = 0;
+	let apiResponses = 0;
+	const usage: ClueUsage = {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheWrite5mTokens: 0,
+		cacheWrite1hTokens: 0,
+		cacheReadTokens: 0,
+		estimatedCostUsd: 0,
+	};
+	const recordUsage = (requestUsage: ClueUsage) => {
+		apiResponses += 1;
+		usage.inputTokens += requestUsage.inputTokens;
+		usage.outputTokens += requestUsage.outputTokens;
+		usage.cacheWrite5mTokens += requestUsage.cacheWrite5mTokens;
+		usage.cacheWrite1hTokens += requestUsage.cacheWrite1hTokens;
+		usage.cacheReadTokens += requestUsage.cacheReadTokens;
+		usage.estimatedCostUsd += requestUsage.estimatedCostUsd;
+	};
 
 	for (
 		let offset = 0;
@@ -214,6 +249,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						displayWord: slot.displayWord,
 						normalizedWord: slot.normalizedWord,
 						areatematica: getWordCategory(slot.displayWord),
+						onUsage: recordUsage,
 					});
 
 					await db
@@ -235,6 +271,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						`[clue-generator] puzzle ${options.puzzleId}: stored clue for "${slot.displayWord}" (${completedWords}/${totalWords})`,
 					);
 				} catch (error) {
+					failedWords += 1;
 					captureException(error);
 					console.error(
 						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,
@@ -244,4 +281,20 @@ export async function generateAndStoreCluesForPuzzle(options: {
 			}),
 		);
 	}
+
+	// Usage is unavailable for failed HTTP attempts, including hidden SDK retries.
+	console.info(
+		JSON.stringify({
+			event: "puzzle_clue_generation_cost",
+			puzzleId: options.puzzleId,
+			model: CLUE_MODEL_ID,
+			totalWords,
+			completedWords,
+			failedWords,
+			apiResponses,
+			costBasis: "reported_usage_at_standard_rates",
+			...usage,
+			estimatedCostUsd: Number(usage.estimatedCostUsd.toFixed(8)),
+		}),
+	);
 }
