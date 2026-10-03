@@ -26,7 +26,7 @@ function PrivacyPage() {
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzada el 29 de setembre de 2026
+					Actualitzada el 3 d'octubre de 2026
 				</p>
 			</header>
 
@@ -77,18 +77,19 @@ function PrivacyPage() {
 
 			<section className="space-y-3" aria-labelledby="errors">
 				<h2 id="errors" className="text-base font-semibold">
-					Detecció d'errors amb Sentry
+					Detecció d'errors amb GlitchTip
 				</h2>
 				<p>
-					Fem servir Sentry per detectar fallades i reparar-les. Els informes
-					contenen el tipus i el missatge d'error, els fitxers i les línies de
-					codi afectades, la versió de l'aplicació i el moment de l'error.
-					Excloem les dades del compte, les galetes, les capçaleres i el
-					contingut de les peticions, i l'historial d'interaccions.
+					Fem servir una instància pròpia de GlitchTip per detectar fallades i
+					reparar-les. Els informes contenen el tipus i el missatge d'error, els
+					fitxers i les línies de codi afectades, la versió de l'aplicació i el
+					moment de l'error. Excloem les dades del compte, les galetes, les
+					capçaleres i el contingut de les peticions, i l'historial
+					d'interaccions.
 				</p>
 				<p>
 					No activem gravacions de sessió ni seguiment de comportament amb
-					Sentry. Tot i que no afegim l'adreça IP als informes, el servei pot
+					GlitchTip. Tot i que no afegim l'adreça IP als informes, el servei pot
 					veure-la en rebre la connexió del navegador. Per això no considerem
 					que aquests enviaments siguin completament anònims.
 				</p>
@@ -121,20 +122,15 @@ function PrivacyPage() {
 					Proveïdors i transferències
 				</h2>
 				<p>
-					Els proveïdors d'allotjament i Sentry intervenen en el funcionament
-					del servei. Google intervé quan tries iniciar-hi sessió. Fem servir
-					Anthropic per generar pistes a partir de paraules del diccionari; no
-					hi enviem el perfil del jugador per generar-les.
+					Els proveïdors d'allotjament intervenen en el funcionament del servei.
+					Google intervé quan tries iniciar-hi sessió. Fem servir Anthropic per
+					generar pistes a partir de paraules del diccionari; no hi enviem el
+					perfil del jugador per generar-les.
 				</p>
 				<p>
-					Els informes s'envien al punt d'entrada europeu de Sentry. Això no
-					exclou que els proveïdors o els seus subcontractistes tractin dades
-					fora de l'Espai Econòmic Europeu. Pots consultar les garanties de
-					transferència i les condicions del servei a la{" "}
-					<a href="https://sentry.io/privacy/" className={linkClass}>
-						política de privacitat de Sentry
-					</a>
-					, i demanar-nos més informació per correu.
+					Els informes d'errors s'envien a la nostra instància de GlitchTip.
+					Pots demanar-nos informació sobre l'allotjament i el tractament
+					d'aquestes dades per correu.
 				</p>
 			</section>
 
@@ -152,8 +148,8 @@ function PrivacyPage() {
 					Les dades de classificació en temps real caduquen 48 hores després de
 					l'última actualització. Les pistes compartides i els registres de
 					peticions tenen un termini de caducitat de 24 hores. Els informes
-					d'errors de Sentry tenen un termini de retenció de 30 dies amb el pla
-					gratuït que utilitzem actualment.
+					d'errors tenen un termini de retenció de 90 dies, segons la
+					configuració predeterminada de GlitchTip que utilitzem.
 				</p>
 			</section>
 

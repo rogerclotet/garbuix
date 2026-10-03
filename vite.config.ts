@@ -7,8 +7,8 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import babel from "@rolldown/plugin-babel";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
-import { defineConfig } from "vite";
-import { getSecurityHeaders } from "./src/lib/security-headers";
+import { defineConfig, loadEnv } from "vite";
+import { getSecurityHeaders } from "./src/lib/security-headers.ts";
 
 function readBuildVersions() {
 	try {
@@ -27,7 +27,16 @@ function readBuildVersions() {
 	}
 }
 
-const config = defineConfig(({ mode }) => {
+const config = defineConfig(({ mode, command }) => {
+	const buildEnv = loadEnv(mode, process.cwd(), ["SENTRY_", "VITE_"]);
+	const uploadSourceMaps = Boolean(buildEnv.SENTRY_AUTH_TOKEN);
+	if (
+		command === "build" &&
+		uploadSourceMaps &&
+		(!buildEnv.SENTRY_ORG || !buildEnv.SENTRY_PROJECT)
+	) {
+		throw new Error("Source-map uploads require SENTRY_ORG and SENTRY_PROJECT");
+	}
 	const port = Number(process.env.PORT ?? 3000);
 	const isDockerDev = process.env.DOCKER_DEV === "true";
 	const buildVersions = readBuildVersions();
@@ -50,19 +59,25 @@ const config = defineConfig(({ mode }) => {
 				viteReact(),
 				babel({ presets: [reactCompilerPreset()] }),
 				sentryTanstackStart({
-					org: "clotet",
-					project: "garbuix",
+					org: buildEnv.SENTRY_ORG,
+					project: buildEnv.SENTRY_PROJECT,
+					sentryUrl: buildEnv.SENTRY_URL || "https://sentry.io/",
 					telemetry: false,
-					authToken: process.env.SENTRY_AUTH_TOKEN,
+					authToken: buildEnv.SENTRY_AUTH_TOKEN,
 					release: { name: buildVersions.sentryRelease },
-					sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+					sourcemaps: { disable: !uploadSourceMaps },
 				}),
 			];
 
 	return {
 		nitro: {
 			routeRules: {
-				"/**": { headers: getSecurityHeaders(mode === "production") },
+				"/**": {
+					headers: getSecurityHeaders(
+						mode === "production",
+						buildEnv.VITE_SENTRY_DSN,
+					),
+				},
 			},
 		},
 		define: {

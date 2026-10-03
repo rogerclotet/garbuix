@@ -39,6 +39,7 @@ services:
         condition: service_healthy
     environment:
       DOCKER_DEV: "true"
+      VITE_SENTRY_DSN: "${VITE_SENTRY_DSN:-}"
       NODE_ENV: development
       PORT: 3000
       CHOKIDAR_USEPOLLING: "true"

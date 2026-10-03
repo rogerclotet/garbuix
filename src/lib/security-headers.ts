@@ -6,29 +6,38 @@
 // middleware (see src/start.ts) reaches SSR documents, server functions and the
 // API routes.
 
-const CONTENT_SECURITY_POLICY = [
-	"default-src 'self'",
-	// 'unsafe-inline' is required: the SSR document carries inline hydration
-	// scripts, and per-request nonces would mean threading one through the
-	// renderer. The policy still pins where external scripts may be loaded from,
-	// which is what blocks an injected <script src>.
-	"script-src 'self' 'unsafe-inline'",
-	// React sets inline styles through the style attribute across the board and
-	// the keypad, which style-src governs.
-	"style-src 'self' 'unsafe-inline'",
-	// https: covers Google account avatars; fonts are bundled, not fetched.
-	"img-src 'self' data: https:",
-	"font-src 'self' data:",
-	// App requests use the same origin; browser errors go to our Sentry project.
-	"connect-src 'self' https://o4507313162485760.ingest.de.sentry.io",
-	"manifest-src 'self'",
-	"worker-src 'self'",
-	"object-src 'none'",
-	"base-uri 'self'",
-	"form-action 'self'",
-	"frame-ancestors 'none'",
-	"upgrade-insecure-requests",
-].join("; ");
+function getContentSecurityPolicy(browserDsn?: string): string {
+	const reportingOrigin = browserDsn ? new URL(browserDsn) : undefined;
+	if (
+		reportingOrigin &&
+		!["https:", "http:"].includes(reportingOrigin.protocol)
+	) {
+		throw new Error("VITE_SENTRY_DSN must use HTTP or HTTPS");
+	}
+	return [
+		"default-src 'self'",
+		// 'unsafe-inline' is required: the SSR document carries inline hydration
+		// scripts, and per-request nonces would mean threading one through the
+		// renderer. The policy still pins where external scripts may be loaded from,
+		// which is what blocks an injected <script src>.
+		"script-src 'self' 'unsafe-inline'",
+		// React sets inline styles through the style attribute across the board and
+		// the keypad, which style-src governs.
+		"style-src 'self' 'unsafe-inline'",
+		// https: covers Google account avatars; fonts are bundled, not fetched.
+		"img-src 'self' data: https:",
+		"font-src 'self' data:",
+		// Allow only the configured reporting origin, never DSN credentials or paths.
+		`connect-src 'self'${reportingOrigin ? ` ${reportingOrigin.origin}` : ""}`,
+		"manifest-src 'self'",
+		"worker-src 'self'",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"form-action 'self'",
+		"frame-ancestors 'none'",
+		"upgrade-insecure-requests",
+	].join("; ");
+}
 
 const PERMISSIONS_POLICY = [
 	"accelerometer=()",
@@ -42,9 +51,10 @@ const PERMISSIONS_POLICY = [
 
 export function getSecurityHeaders(
 	isProduction: boolean,
+	browserDsn?: string,
 ): Record<string, string> {
 	return {
-		"Content-Security-Policy": CONTENT_SECURITY_POLICY,
+		"Content-Security-Policy": getContentSecurityPolicy(browserDsn),
 		"X-Content-Type-Options": "nosniff",
 		// Companion to frame-ancestors for browsers predating CSP level 2.
 		"X-Frame-Options": "DENY",

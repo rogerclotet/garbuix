@@ -3,6 +3,7 @@ import {
 	sentryGlobalRequestMiddleware,
 } from "@sentry/tanstackstart-react";
 import { createMiddleware, createStart } from "@tanstack/react-start";
+import { env } from "@/env";
 import { getSecurityHeaders } from "@/lib/security-headers";
 
 // Runs for every request Start handles — SSR documents, server functions and
@@ -11,7 +12,10 @@ import { getSecurityHeaders } from "@/lib/security-headers";
 const securityHeadersMiddleware = createMiddleware({ type: "request" }).server(
 	async ({ next }) => {
 		const result = await next();
-		const headers = getSecurityHeaders(process.env.NODE_ENV === "production");
+		const headers = getSecurityHeaders(
+			process.env.NODE_ENV === "production",
+			env.VITE_SENTRY_DSN,
+		);
 		// A reload after a missing route bundle must get the current document,
 		// not cached HTML that still references the previous deployment's assets.
 		if (
