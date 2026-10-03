@@ -1,6 +1,7 @@
-import { createRouter } from "@tanstack/react-router";
+import { createBrowserHistory, createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { RouterErrorComponent } from "@/components/router-error";
+import { withGameHistory } from "@/lib/game-history";
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
 // Import the generated route tree
@@ -12,6 +13,10 @@ export const getRouter = () => {
 
 	const router = createRouter({
 		routeTree,
+		history:
+			typeof window === "undefined"
+				? undefined
+				: withGameHistory(createBrowserHistory()),
 		context: {
 			...rqContext,
 		},

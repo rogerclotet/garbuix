@@ -62,10 +62,15 @@ function ThemeMenuToggle() {
 	);
 }
 
-export function UserMenu() {
+export function UserMenu({
+	onReturnToGarbuix,
+}: {
+	onReturnToGarbuix: () => void;
+}) {
 	const mini = useMiniRoute();
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
+	const [open, setOpen] = useState(false);
 	const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
 
 	const triggerLabel = activeUser
@@ -83,7 +88,7 @@ export function UserMenu() {
 	};
 
 	return (
-		<DropdownMenu>
+		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<DropdownMenuTrigger asChild>
 				<Button
 					variant="ghost"
@@ -184,7 +189,23 @@ export function UserMenu() {
 				<ThemeMenuToggle />
 				<DropdownMenuSeparator />
 				<DropdownMenuItem asChild>
-					<Link to={mini ? "/" : "/mini"}>
+					<Link
+						to={mini ? "/" : "/mini"}
+						onClick={(event) => {
+							if (
+								mini &&
+								event.button === 0 &&
+								!event.metaKey &&
+								!event.ctrlKey &&
+								!event.shiftKey &&
+								!event.altKey
+							) {
+								event.preventDefault();
+								setOpen(false);
+								onReturnToGarbuix();
+							}
+						}}
+					>
 						<Logo className="size-4" aria-hidden />
 						<span>{mini ? "Garbuix!" : "Garbuix mini"}</span>
 					</Link>
