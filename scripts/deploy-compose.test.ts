@@ -7,6 +7,17 @@ import { expect, it } from "vitest";
 function deploy(args: string[] = [], failure = "") {
 	const directory = mkdtempSync(join(tmpdir(), "garbuix-deploy-"));
 	const log = join(directory, "calls");
+	writeFileSync(log, "");
+	// CI uses a source archive in a slim image without Git. Release discovery
+	// is independent of the deployment ordering under test.
+	writeFileSync(
+		join(directory, "git"),
+		`#!/bin/sh
+test "$*" = "rev-parse --short=8 HEAD" || exit 1
+echo 1234abcd
+`,
+		{ mode: 0o755 },
+	);
 	// Run the actual deployment shell. Docker is the external boundary; reject
 	// dependency replacement with live writers, as happened in production.
 	writeFileSync(
@@ -43,7 +54,12 @@ esac
 				encoding: "utf8",
 			},
 		);
-		return { status: result.status, calls: readFileSync(log, "utf8") };
+		if (result.error) throw result.error;
+		return {
+			status: result.status,
+			stderr: result.stderr,
+			calls: readFileSync(log, "utf8"),
+		};
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -51,7 +67,7 @@ esac
 
 it("keeps dependencies running during routine deployments and waits for app readiness", () => {
 	const result = deploy();
-	expect(result.status).toBe(0);
+	expect(result.status, result.stderr).toBe(0);
 	const startup = result.calls
 		.split("\n")
 		.find((line) => line.includes("--force-recreate"));
@@ -61,16 +77,17 @@ it("keeps dependencies running during routine deployments and waits for app read
 
 it("stops writers before explicitly updating dependencies", () => {
 	const result = deploy(["--update-dependencies"]);
-	expect(result.status).toBe(0);
+	expect(result.status, result.stderr).toBe(0);
 	expect(result.calls).toContain("--pull always");
 });
 
 it("leaves writers stopped if migrations fail", () => {
 	const result = deploy([], "migration");
-	expect(result.status).toBe(43);
+	expect(result.status, result.stderr).toBe(43);
 	expect(result.calls).not.toContain("--force-recreate");
 });
 
 it("fails the deployment when the app never becomes ready", () => {
-	expect(deploy([], "readiness").status).toBe(44);
+	const result = deploy([], "readiness");
+	expect(result.status, result.stderr).toBe(44);
 });
