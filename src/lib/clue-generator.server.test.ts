@@ -1,14 +1,20 @@
+import { format } from "node:util";
 import type Anthropic from "@anthropic-ai/sdk";
+import { APIError } from "@anthropic-ai/sdk";
+import { captureException } from "@sentry/tanstackstart-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { puzzleWordClues } from "@/db/schema";
 import { readClueUsage } from "@/lib/clue-generation-usage";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 
-const { create, save } = vi.hoisted(() => ({
+const { create, save, replace } = vi.hoisted(() => ({
 	create: vi.fn<() => Promise<Pick<Anthropic.Message, "content" | "usage">>>(),
 	save: vi.fn<() => Promise<void>>(),
+	replace: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
-vi.mock("@anthropic-ai/sdk", () => ({
+vi.mock("@anthropic-ai/sdk", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@anthropic-ai/sdk")>()),
 	default: class {
 		messages = { create };
 	},
@@ -19,7 +25,10 @@ vi.mock("@/lib/server-env", () => ({
 vi.mock("@/lib/db", () => ({
 	db: {
 		insert: () => ({
-			values: () => ({ onConflictDoNothing: save }),
+			values: () => ({
+				onConflictDoNothing: save,
+				onConflictDoUpdate: replace,
+			}),
 		}),
 	},
 }));
@@ -62,11 +71,61 @@ function response(
 beforeEach(() => {
 	create.mockReset().mockResolvedValue(response());
 	save.mockReset().mockResolvedValue(undefined);
+	replace.mockReset().mockResolvedValue(undefined);
 	vi.spyOn(console, "log").mockImplementation(() => {});
 	vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("clue generation log privacy", () => {
+	it.each(["success", "api", "database"])(
+		"does not expose answers or clues on %s",
+		async (outcome) => {
+			const logs = [
+				vi.spyOn(console, "log").mockImplementation(() => {}),
+				vi.spyOn(console, "error").mockImplementation(() => {}),
+				vi.spyOn(console, "info").mockImplementation(() => {}),
+			];
+			vi.mocked(captureException).mockClear();
+			const clue = "Es desplega quan plou.";
+			const error = new Error(
+				`Request parameters: ${word.displayWord}; ${clue}`,
+			);
+			if (outcome === "api") {
+				create.mockRejectedValueOnce(
+					new APIError(
+						400,
+						{ error: { message: error.message } },
+						undefined,
+						new Headers({ "request-id": "request-test" }),
+					),
+				);
+			}
+			if (outcome === "database") save.mockRejectedValueOnce(error);
+
+			await generateAndStoreCluesForPuzzle({
+				puzzleId: "private-puzzle",
+				wordSlots: [word],
+			});
+
+			const output = [
+				...logs.flatMap((log) => log.mock.calls.map((args) => format(...args))),
+				...vi
+					.mocked(captureException)
+					.mock.calls.map((args) => format(...args)),
+			].join("\n");
+			expect(output).not.toContain(word.displayWord);
+			expect(output).not.toContain(word.normalizedWord);
+			expect(output).not.toContain(clue);
+			expect(output).toContain("private-puzzle");
+			if (outcome === "api") {
+				expect(output).toContain('"status":400');
+				expect(output).toContain("request-test");
+			}
+		},
+	);
+});
 
 describe("clue generation cost", () => {
 	it("prices cache writes and reads separately and counts thinking only once", () => {
@@ -113,7 +172,7 @@ describe("clue generation cost", () => {
 			wordSlots: [word],
 		});
 
-		expect(log).toHaveBeenCalledExactlyOnceWith(
+		expect(log).toHaveBeenCalledWith(
 			JSON.stringify({
 				event: "puzzle_clue_generation_cost",
 				puzzleId: "retry",
@@ -172,7 +231,11 @@ describe("clue generation cost", () => {
 			}),
 		]);
 
-		expect(log).toHaveBeenCalledTimes(2);
+		expect(
+			log.mock.calls.filter(([line]) =>
+				line.includes('"event":"puzzle_clue_generation_cost"'),
+			),
+		).toHaveLength(2);
 		expect(log).toHaveBeenCalledWith(
 			expect.stringMatching(
 				/"puzzleId":"small".*"apiResponses":1.*"estimatedCostUsd":0.0003/,
@@ -197,5 +260,48 @@ describe("clue generation cost", () => {
 				/"failedWords":1,"apiResponses":0.*"estimatedCostUsd":0/,
 			),
 		);
+	});
+});
+
+describe("clue regeneration", () => {
+	it("replaces an existing clue and model only when requested", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: "regenerate",
+			wordSlots: [word],
+			replaceExisting: true,
+		});
+		expect(replace).toHaveBeenCalledExactlyOnceWith({
+			target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
+			set: {
+				normalizedWord: word.normalizedWord,
+				sonnetModel: "claude-sonnet-5-5",
+				sonnetClue: "Es desplega quan plou.",
+				createdAt: expect.any(Date),
+			},
+		});
+		expect(save).not.toHaveBeenCalled();
+	});
+
+	it("preserves stored clues by default", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: "preserve",
+			wordSlots: [word],
+		});
+		expect(save).toHaveBeenCalledOnce();
+		expect(replace).not.toHaveBeenCalled();
+	});
+
+	it("leaves the old clue untouched if forced regeneration fails", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		create.mockRejectedValueOnce(new Error("API unavailable"));
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: "preserve-on-failure",
+			wordSlots: [word],
+			replaceExisting: true,
+		});
+		expect(replace).not.toHaveBeenCalled();
+		expect(save).not.toHaveBeenCalled();
 	});
 });

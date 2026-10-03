@@ -271,6 +271,21 @@ To pre-generate historical puzzle snapshots:
 docker compose --profile ops run --rm backfill
 ```
 
+To regenerate AI clues for an existing puzzle using the deployed model, after
+deploying the latest scheduler image:
+
+```bash
+docker compose run --rm --no-deps pre-generator pnpm clues:backfill --date YYYY-MM-DD --force
+```
+
+This replaces each stored clue only after its new generation succeeds. It leaves
+the puzzle layout and player progress intact. Without `--force`, existing clues
+are preserved. The command prints the model at startup and a
+`puzzle_clue_generation_cost` summary with `estimatedCostUsd` and `failedWords`
+at completion. Costs use reported token usage at published rates; requests that
+fail without returning usage cannot be included. Logs contain slot IDs, not
+answers or clue text.
+
 ## Available Scripts
 
 - `pnpm run dev` - Start development server on port 3000

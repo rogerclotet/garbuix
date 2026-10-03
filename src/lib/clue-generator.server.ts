@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { captureException } from "@sentry/tanstackstart-react";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
@@ -190,12 +190,12 @@ export async function generateWordClue(options: {
 // requests at once and hit rate limits.
 const CLUE_GENERATION_BATCH_SIZE = 4;
 
-// Generates a clue for every word slot and stores it. Idempotent: the unique
-// (puzzleId, wordId) index means re-runs skip already-stored clues. Per-word
-// failures are logged and skipped so one bad word can't abort the rest.
+// Generates each clue before writing it. Existing rows are preserved unless
+// replacement is requested, so a failed regeneration keeps the previous clue.
 export async function generateAndStoreCluesForPuzzle(options: {
 	puzzleId: string;
 	wordSlots: DailyPuzzlePrivateWord[];
+	replaceExisting?: boolean;
 }): Promise<void> {
 	if (!getServerEnv().ANTHROPIC_API_KEY) {
 		const error = new Error(
@@ -244,6 +244,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 
 		await Promise.all(
 			batch.map(async (slot) => {
+				let failureStage: "generation" | "storage" = "generation";
 				try {
 					const generated = await generateWordClue({
 						displayWord: slot.displayWord,
@@ -252,31 +253,51 @@ export async function generateAndStoreCluesForPuzzle(options: {
 						onUsage: recordUsage,
 					});
 
-					await db
-						.insert(puzzleWordClues)
-						.values({
-							id: crypto.randomUUID(),
-							puzzleId: options.puzzleId,
-							wordId: slot.id,
-							normalizedWord: slot.normalizedWord,
-							sonnetModel: generated.model,
-							sonnetClue: generated.clue,
-						})
-						.onConflictDoNothing({
+					failureStage = "storage";
+					const insert = db.insert(puzzleWordClues).values({
+						id: crypto.randomUUID(),
+						puzzleId: options.puzzleId,
+						wordId: slot.id,
+						normalizedWord: slot.normalizedWord,
+						sonnetModel: generated.model,
+						sonnetClue: generated.clue,
+					});
+					if (options.replaceExisting) {
+						await insert.onConflictDoUpdate({
+							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
+							set: {
+								normalizedWord: slot.normalizedWord,
+								sonnetModel: generated.model,
+								sonnetClue: generated.clue,
+								createdAt: new Date(),
+							},
+						});
+					} else {
+						await insert.onConflictDoNothing({
 							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
 						});
+					}
 
 					completedWords += 1;
-					console.log(
-						`[clue-generator] puzzle ${options.puzzleId}: stored clue for "${slot.displayWord}" (${completedWords}/${totalWords})`,
+					console.info(
+						`[clue-generator] puzzle ${options.puzzleId}: processed clue for slot ${slot.id} (${completedWords}/${totalWords})`,
 					);
 				} catch (error) {
 					failedWords += 1;
-					captureException(error);
-					console.error(
-						`[clue-generator] Failed to generate/store clue for word ${slot.id} (${slot.displayWord}):`,
-						error,
-					);
+					// Raw API/SQL errors may contain answers, clues, or query parameters.
+					const details = {
+						event: "puzzle_clue_generation_failed",
+						puzzleId: options.puzzleId,
+						wordId: slot.id,
+						failureStage,
+						...(error instanceof APIError
+							? { status: error.status, requestId: error.requestID }
+							: {}),
+					};
+					captureException(new Error("Puzzle clue generation failed"), {
+						extra: details,
+					});
+					console.error(JSON.stringify(details));
 				}
 			}),
 		);
