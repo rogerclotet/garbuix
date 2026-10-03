@@ -15,6 +15,8 @@ function buildClient(role: "publisher" | "subscriber"): Redis | null {
 		lazyConnect: false,
 		maxRetriesPerRequest: 3,
 		enableOfflineQueue: role === "publisher",
+		// INFO is invalid if SUBSCRIBE races with the connection readiness check.
+		enableReadyCheck: role === "publisher",
 		connectionName: `paraules-${role}`,
 	};
 
