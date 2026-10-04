@@ -14,6 +14,8 @@ import {
 import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_LETTER_LAYOUT } from "@/lib/anon-identity";
+import { validateClueText } from "@/lib/clue-fairness";
+import type { ClueRequest } from "@/lib/clue-request-types";
 import { getGuessKeyboardAction, getSlotCellKey } from "@/lib/puzzle-helpers";
 import { markHowToPlaySeen, markWelcomeSeen } from "@/lib/puzzle-local";
 import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
@@ -27,6 +29,19 @@ import {
 	TUTORIAL_WORDS,
 	tutorialReducer,
 } from "./tutorial-puzzle";
+
+const TUTORIAL_HELP_WORD = TUTORIAL_WORDS[1];
+const TUTORIAL_HELP_REQUEST: ClueRequest = {
+	id: "tutorial-help",
+	dateKey: "tutorial",
+	puzzleId: "tutorial",
+	wordId: TUTORIAL_HELP_WORD.id,
+	wordLength: TUTORIAL_HELP_WORD.answer.length,
+	requesterId: "tutorial-marta",
+	requesterName: "la Marta",
+	createdAt: "",
+	requesterHasAiClue: false,
+};
 
 type HowToPlayDialogProps = {
 	open: boolean;
@@ -73,12 +88,20 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 	const [locatedWordId, setLocatedWordId] = useState<number | null>(null);
 	const step = getTutorialStep(state);
 	useEffect(() => {
-		if (step === "complete" && scrollRef.current)
-			scrollRef.current.scrollTop = 0;
+		if (step === "help" || step === "complete") {
+			if (scrollRef.current) scrollRef.current.scrollTop = 0;
+			rootRef.current?.focus({ preventScroll: true });
+		}
 	}, [step]);
 	const nextLetter = "casa"[state.guess.length] ?? "c";
 	const stepNumber =
-		step === "spell" || step === "submit" ? 1 : step === "clue" ? 2 : 3;
+		step === "spell" || step === "submit"
+			? 1
+			: step === "clue"
+				? 2
+				: step === "finish"
+					? 3
+					: 4;
 	const target: TutorialControlTarget | undefined =
 		step === "spell"
 			? { kind: "letter", letter: nextLetter }
@@ -133,7 +156,10 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 			event.metaKey ||
 			event.ctrlKey ||
 			event.altKey ||
-			event.defaultPrevented
+			event.defaultPrevented ||
+			(event.target instanceof HTMLElement &&
+				(event.target.isContentEditable ||
+					event.target.closest("input, textarea, select")))
 		)
 			return;
 		const action = getGuessKeyboardAction(event.key, letters, event.code);
@@ -157,11 +183,13 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 	const title =
 		step === "complete"
 			? "Ja saps jugar a Garbuix!"
-			: step === "clue"
-				? "Una pista per continuar"
-				: step === "finish"
-					? "Ara, acaba el teu primer garbuix"
-					: "Comencem amb CASA";
+			: step === "help"
+				? "Ajuda altres jugadors"
+				: step === "clue"
+					? "Una pista per continuar"
+					: step === "finish"
+						? "Ara, acaba el teu primer garbuix"
+						: "Comencem amb CASA";
 	const instruction =
 		step === "spell"
 			? `Toca la ${nextLetter.toUpperCase()}${state.guess.length === 3 ? " una altra vegada. Pots repetir les lletres!" : " per formar CASA. També pots fer servir el teclat."}`
@@ -171,7 +199,9 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 					? "CASA ja és a la quadrícula. Mantén premut el botó Pista per descobrir una altra paraula."
 					: step === "finish"
 						? `Troba ${TUTORIAL_WORDS.length - state.foundWordIds.length === 1 ? "la paraula que falta" : `les ${TUTORIAL_WORDS.length - state.foundWordIds.length} paraules que falten`} amb les mateixes lletres. Les lletres que es creuen i les pistes t'ajudaran.`
-						: "Has trobat les 5 paraules. El repte d'avui t'espera!";
+						: step === "help"
+							? "Quan algú necessita una paraula que ja has trobat, pots ajudar-lo. Toca Ajuda la Marta: pots fer servir la definició o la pista que ja tens, o escriure qualsevol cosa que la pugui ajudar, sense dir la resposta."
+							: "Has trobat les 5 paraules i has practicat com ajudar algú. El repte d'avui t'espera!";
 
 	return (
 		<div
@@ -198,14 +228,16 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 				</Button>
 			</div>
 			<div
-				className={`mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col lg:px-8 lg:pb-6 ${step !== "complete" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6" : ""}`}
+				className={`mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col lg:px-8 lg:pb-6 ${step !== "complete" && step !== "help" ? "lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6" : ""}`}
 			>
 				<section
 					ref={scrollRef}
-					className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8 lg:px-0"
+					className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8 lg:px-0 ${step === "help" ? "mx-auto w-full max-w-xl" : ""}`}
 					aria-label="Quadrícula i paraules del tutorial"
 				>
-					<div className="flex h-full min-h-72 flex-col gap-3 py-3 sm:py-4">
+					<div
+						className={`flex flex-col gap-3 py-3 sm:py-4 ${step === "help" ? "" : "h-full min-h-72"}`}
+					>
 						<div className="flex shrink-0 items-center justify-between text-xs font-semibold font-ui">
 							<span className="uppercase tracking-wider text-muted-foreground">
 								El teu primer garbuix
@@ -214,16 +246,18 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 								{state.foundWordIds.length} / 5 paraules
 							</span>
 						</div>
-						<div className="flex min-h-0 flex-1 flex-col">
-							<PuzzleGrid
-								fitHeight
-								puzzle={TUTORIAL_BOARD}
-								revealedCells={new Set(cellLetters.keys())}
-								cellLetters={cellLetters}
-								highlightedWordId={null}
-								locateCells={locateCells}
-							/>
-						</div>
+						{step !== "help" ? (
+							<div className="flex min-h-0 flex-1 flex-col">
+								<PuzzleGrid
+									fitHeight
+									puzzle={TUTORIAL_BOARD}
+									revealedCells={new Set(cellLetters.keys())}
+									cellLetters={cellLetters}
+									highlightedWordId={null}
+									locateCells={locateCells}
+								/>
+							</div>
+						) : null}
 						<div
 							className="shrink-0 space-y-2"
 							aria-live="polite"
@@ -233,10 +267,10 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 								{step === "complete" ? (
 									<Check className="size-4" />
 								) : (
-									<span>Pas {stepNumber} de 3</span>
+									<span>Pas {stepNumber} de 4</span>
 								)}
 								<div className="flex gap-1" aria-hidden>
-									{[1, 2, 3].map((number) => (
+									{[1, 2, 3, 4].map((number) => (
 										<span
 											key={number}
 											className={`h-1 w-6 rounded-full ${number <= stepNumber ? "bg-primary" : "bg-muted"}`}
@@ -262,22 +296,24 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 								Jugar al repte d'avui <ArrowRight className="size-4" />
 							</Button>
 						) : null}
-						<Button
-							variant="ghost"
-							size="sm"
-							className="shrink-0 gap-2 self-center text-muted-foreground font-ui"
-							onClick={() =>
-								wordListRef.current?.scrollIntoView({
-									behavior: "smooth",
-									block: "start",
-								})
-							}
-						>
-							<ArrowDown className="size-4" />
-							{activeClue
-								? "Baixa per llegir la pista"
-								: "Baixa per veure la llista de paraules"}
-						</Button>
+						{step !== "help" ? (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="shrink-0 gap-2 self-center text-muted-foreground font-ui"
+								onClick={() =>
+									wordListRef.current?.scrollIntoView({
+										behavior: "smooth",
+										block: "start",
+									})
+								}
+							>
+								<ArrowDown className="size-4" />
+								{activeClue
+									? "Baixa per llegir la pista"
+									: "Baixa per veure la llista de paraules"}
+							</Button>
+						) : null}
 					</div>
 					<section
 						ref={wordListRef}
@@ -293,17 +329,29 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 							clueWordIds={state.clueWordIds}
 							clueTextsByWordId={clueTextsByWordId}
 							foundClueTextsByWordId={clueTextsByWordId}
+							incomingRequests={step === "help" ? [TUTORIAL_HELP_REQUEST] : []}
+							onRespondToClue={async (_requestId, text) => {
+								const result = validateClueText(
+									text,
+									TUTORIAL_HELP_WORD.answer,
+								);
+								if (result.ok) dispatch({ type: "help_sent" });
+								return result;
+							}}
 							onWordTap={(wordId) => {
 								setLocatedWordId(wordId);
 								scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 							}}
 						/>
 						<p className="mt-4 text-center text-xs text-muted-foreground font-ui">
-							Partida de pràctica. El teu progrés d'avui comença després.
+							Partida de pràctica.{" "}
+							{step === "help"
+								? "La Marta és un exemple: aquesta pista no s’envia a ningú."
+								: "El teu progrés d’avui comença després."}
 						</p>
 					</section>
 				</section>
-				{step !== "complete" ? (
+				{step !== "complete" && step !== "help" ? (
 					<div className="z-10 shrink-0 rounded-t-2xl border-t border-border/60 bg-background px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] lg:self-center lg:rounded-2xl lg:border lg:p-4">
 						<PuzzleControls
 							inline

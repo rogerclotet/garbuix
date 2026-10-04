@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 describe("guided tutorial", () => {
-	it("guides the first word, requires a clue, and lets the player finish all five words", () => {
+	it("guides the puzzle and lets the player help by reusing a clue", async () => {
 		render(<Tutorial />);
 		expect(hasSeenHowToPlay()).toBe(false);
 		expect(
@@ -96,13 +96,44 @@ describe("guided tutorial", () => {
 		typeWord("osta");
 		for (const word of ["carta", "rosa", "tros"]) typeWord(word);
 		expect(screen.getByText("5 / 5 paraules")).toBeTruthy();
-		expect(screen.getByText("Ja saps jugar a Garbuix!")).toBeTruthy();
+		expect(screen.getByText("Pas 4 de 4")).toBeTruthy();
+		expect(screen.getByText("Ajuda altres jugadors")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Ajuda la Marta" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Fes servir aquesta pista" }),
+		);
+		expect(
+			screen.getByDisplayValue("La part de la terra que toca el mar."),
+		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+		expect(await screen.findByText("Ja saps jugar a Garbuix!")).toBeTruthy();
 		expect(hasSeenHowToPlay()).toBe(false);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Jugar al repte d'avui" }),
 		);
 		expect(hasSeenHowToPlay()).toBe(true);
 		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it("lets the player write a useful clue and correct a spoiler", async () => {
+		render(<Tutorial />);
+		typeWord("casa");
+		fireEvent.click(screen.getByRole("button", { name: "Pista (3)" }));
+		for (const word of ["costa", "carta", "rosa", "tros"]) typeWord(word);
+		fireEvent.click(screen.getByRole("button", { name: "Ajuda la Marta" }));
+		const input = screen.getByRole("textbox");
+		expect(fireEvent.keyDown(input, { key: "c" })).toBe(true);
+		expect(document.activeElement).toBe(input);
+		fireEvent.change(input, { target: { value: "costa" } });
+		fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+		expect(
+			await screen.findByText("La pista s'assembla massa a la paraula"),
+		).toBeTruthy();
+		fireEvent.change(input, {
+			target: { value: "Hi ha platges i penya-segats." },
+		});
+		fireEvent.keyDown(input, { key: "Enter" });
+		expect(await screen.findByText("Ja saps jugar a Garbuix!")).toBeTruthy();
 	});
 
 	it("skips at any step and starts a fresh practice puzzle when reopened", () => {
