@@ -20,6 +20,7 @@ import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { CompletionWordList } from "./completion-word-list";
 import { DailyStatus } from "./daily-status";
 import type { DailyData, DailySessionUser } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -297,6 +298,15 @@ function DailyGame({
 								currentStreak={streakStats.currentStreak}
 								bonusCluesEnabled={bonusCluesEnabled}
 							/>
+							{displayComplete ? (
+								<div className="mt-3">
+									<CompletionWordList
+										puzzle={puzzle}
+										guessHashes={derivedProgress.guessHashes}
+										revealedAnswers={revealedAnswers}
+									/>
+								</div>
+							) : null}
 						</div>
 
 						<div
@@ -397,9 +407,6 @@ function DailyGame({
 				}}
 			/>
 			<WinDialog
-				puzzle={puzzle}
-				guessHashes={derivedProgress.guessHashes}
-				revealedAnswers={revealedAnswers}
 				open={winDialogOpen}
 				onOpenChange={setWinDialogOpen}
 				guessCount={derivedProgress.guessCount}

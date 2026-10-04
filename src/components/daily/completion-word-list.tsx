@@ -28,7 +28,7 @@ export function CompletionWordList(
 
 	return (
 		<section aria-label="Paraules trobades" className="min-w-0">
-			<div className="mb-2 flex items-baseline justify-between gap-2 font-ui text-xs">
+			<div className="mb-1 flex items-baseline justify-between gap-2 font-ui text-xs">
 				<h3 className="font-semibold uppercase tracking-wider text-muted-foreground">
 					Paraules trobades
 				</h3>
@@ -51,23 +51,23 @@ export function CompletionWordList(
 				</div>
 			) : (
 				<>
-					<p className="mb-3 flex items-center gap-1 text-xs text-muted-foreground font-ui">
+					<p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground font-ui">
 						<Check className="size-3.5 text-primary" aria-hidden="true" />
 						Les destacades són del joc
 					</p>
-					<ul className="flex flex-wrap gap-1.5">
+					<ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
 						{words.map(({ word, isInPuzzle }) => (
 							<li
 								key={word}
 								className={cn(
-									"flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-sm tracking-wide",
+									"flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-xs",
 									isInPuzzle
 										? "border-primary/25 bg-primary/10 font-semibold text-primary"
 										: "border-border/60 bg-muted/40 text-muted-foreground",
 								)}
 							>
 								{isInPuzzle ? (
-									<Check className="size-3.5 shrink-0" aria-hidden="true" />
+									<Check className="size-3 shrink-0" aria-hidden="true" />
 								) : null}
 								<span className="min-w-0 wrap-anywhere">
 									{word.toUpperCase()}
