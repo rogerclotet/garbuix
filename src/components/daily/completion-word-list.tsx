@@ -49,7 +49,7 @@ export function CompletionWordList({
 						<li
 							key={word}
 							className={cn(
-								"max-w-full text-xs leading-4",
+								"max-w-full text-[13px] leading-4",
 								isInPuzzle
 									? "font-semibold text-primary"
 									: "text-muted-foreground",
