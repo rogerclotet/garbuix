@@ -107,7 +107,7 @@ it("reports a caught route error to Sentry while keeping the recovery UI", async
 	}
 });
 
-it("separates a recovery attempt from a failed retry in privacy-filtered events", async () => {
+it("retries silently and reports only a bundle that still fails after reload", async () => {
 	const events: Sentry.ErrorEvent[] = [];
 	const client = Sentry.init({
 		dsn: "https://public@example.com/1",
@@ -121,23 +121,56 @@ it("separates a recovery attempt from a failed retry in privacy-filtered events"
 	try {
 		renderError(new TypeError(error.message));
 		await Sentry.flush();
-		expect(events).toHaveLength(1);
-		expect(events[0]?.level).toBe("warning");
-		expect(events[0]?.tags).toEqual({ bundle_recovery: "attempted" });
+		expect(events).toHaveLength(0);
 		expect(reload).toHaveBeenCalledTimes(1);
 
 		cleanup();
 		renderError(new TypeError(error.message));
 		await Sentry.flush();
-		expect(events).toHaveLength(2);
-		expect(events[1]?.level).toBe("error");
-		expect(events[1]?.tags).toEqual({ bundle_recovery: "retry_failed" });
-		expect(events[1]?.fingerprint).not.toEqual(events[0]?.fingerprint);
+		expect(events).toHaveLength(1);
+		expect(events[0]?.level).toBe("error");
+		expect(events[0]?.exception?.values?.[0]?.value).toBe(error.message);
 		expect(reload).toHaveBeenCalledTimes(1);
 	} finally {
 		await client?.close();
 	}
 });
+
+it.each(["offline", "storage blocked"])(
+	"does not report an initial bundle failure when %s",
+	async (reason) => {
+		if (reason === "offline") {
+			vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+		} else {
+			vi.stubGlobal("sessionStorage", {
+				getItem: () => null,
+				setItem: () => {
+					throw new DOMException("Storage blocked", "SecurityError");
+				},
+			});
+		}
+		const events: Sentry.ErrorEvent[] = [];
+		const client = Sentry.init({
+			dsn: "https://public@example.com/1",
+			defaultIntegrations: false,
+			beforeSend(event) {
+				events.push(event);
+				return null;
+			},
+		});
+		try {
+			renderError(new TypeError(error.message));
+			await Sentry.flush();
+			expect(events).toHaveLength(0);
+			expect(reload).not.toHaveBeenCalled();
+			expect(
+				screen.getByRole("button", { name: "Recarrega la pàgina" }),
+			).toBeTruthy();
+		} finally {
+			await client?.close();
+		}
+	},
+);
 
 it.each([null, "Route failed", { message: error.message }])(
 	"shows a non-Error throw without reloading: %j",

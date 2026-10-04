@@ -1,17 +1,37 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { getBundleRecovery } from "@/lib/bundle-recovery";
-import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 
 export function RouterErrorComponent({ error }: ErrorComponentProps) {
-	const reported = useRef<{ error: unknown } | null>(null);
+	const handled = useRef<{ error: unknown } | null>(null);
 
-	// Invalidate recovery before the router acknowledges this error UI's render.
-	useIsomorphicLayoutEffect(() => {
-		if (reported.current && Object.is(reported.current.error, error)) return;
-		reported.current = { error };
-		getBundleRecovery().handleError(error);
+	useEffect(() => {
+		// StrictMode repeats effects; that must not count as a failed reload.
+		if (handled.current && Object.is(handled.current.error, error)) return;
+		handled.current = { error };
+		if (
+			!(error instanceof Error) ||
+			!/^(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS for )/.test(
+				error.message,
+			)
+		) {
+			captureException(error);
+			return;
+		}
+
+		try {
+			// Share TanStack's guard, including component imports it already retried.
+			const key = `tanstack_router_reload:${error.message}`;
+			if (sessionStorage.getItem(key)) {
+				captureException(error);
+			} else if (navigator.onLine) {
+				sessionStorage.setItem(key, "1");
+				window.location.reload();
+			}
+		} catch {
+			// Without storage, keep manual recovery and avoid an automatic loop.
+		}
 	}, [error]);
 
 	return (

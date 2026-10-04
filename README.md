@@ -77,24 +77,13 @@ reported explicitly. Progress retries report the first failure in an outage;
 Redis connection errors report once until the connection recovers. React root
 errors and recoverable hydration errors are also captured. Exception handled
 status is retained for alert rules without retaining mechanism data.
-Route bundle recovery events use the allowlisted `bundle_recovery` tag and
-separate fingerprints for each outcome:
 
-| Status | Level | Meaning |
-| --- | --- | --- |
-| `attempted` | warning | One guarded reload was requested. |
-| `recovered` | info | The next document rendered the same route successfully. |
-| `retry_failed` | error | The bundle still failed with its reload guard already set. |
-| `unavailable` | error | Automatic recovery was unavailable, for example offline or blocked session storage. |
-
-The reload guard is shared with TanStack Router and retained for the tab's
-session. TanStack's own component retries are observed on `pagehide`; background
-preload failures do not trigger reloads or recovery-attempt events. A short-lived
-session-storage marker links the next document to the attempt. Recovery reports
-require the same pathname within five minutes and a successful route render;
-rendering an error screen does not count. The pathname stays in session storage
-and is not added to telemetry. Attempt and success counts are best effort because
-navigation, browser shutdown, network failures, and blockers can prevent delivery.
+Route bundle failures retry once silently using the reload guard shared with
+TanStack Router. They are reported only if the same error reaches the boundary
+with that guard already set. Initial failures while offline or with blocked
+session storage keep the manual reload button without sending a report.
+There are no attempt or recovery-success events, and other application errors
+are still reported immediately.
 
 Known Node/srvx incoming-request disconnects are filtered before privacy
 scrubbing, using their error messages and transport stack frames. Other aborts,
@@ -178,8 +167,7 @@ interaction and one from a server request/function. Confirm both events in
 the configured GlitchTip project, with the production environment, expected release and original
 source locations. Exception messages are preserved, so search for the original
 message and use the event ID, time and stack location to identify each report.
-Message-only events from `captureMessage` are dropped except the fixed
-`Route bundle recovery succeeded` message with its validated recovery tag.
+Message-only events from `captureMessage` are intentionally dropped.
 
 Configure production alerts for new issues and resolved issues that recur, and
 verify the intended recipient actually receives the test notification. Repeating
@@ -188,14 +176,6 @@ inbound filters if reports are missing; a successful build or local test does no
 prove ingestion or notification delivery. Browser blockers and network failures
 can prevent client delivery. Errors thrown directly in the browser console do
 not exercise the normal application capture path.
-
-For bundle recovery, keep immediate notifications for `retry_failed` and
-`unavailable`, and use `attempted` counts to detect spikes over a time window.
-`attempted` and `recovered` should not page on individual occurrences. These are
-separate issue groups so low-priority activity cannot consume the new-issue alert
-for a failed retry. Configure and verify this policy in the deployed GlitchTip
-project; changing event levels in the app does not itself change project alert
-rules. Use the filters supported by that installation or its webhook recipient.
 
 ## Docker Compose
 
