@@ -99,17 +99,18 @@ export function ClueResponder({
 					}
 				}}
 				placeholder="Escriu una pista (sense dir la paraula!)"
-				className="min-h-12 text-sm"
+				className="min-h-12 rounded-sm border-border bg-background text-sm hover:border-primary/60 focus-visible:border-primary focus-visible:ring-primary/20 dark:bg-background aria-invalid:hover:border-destructive"
+				aria-label={`Pista per a ${request.requesterName}`}
 				aria-invalid={error != null}
 			/>
 			{error ? <p className="text-xs text-destructive">{error}</p> : null}
 			<div className="flex items-center justify-end gap-2">
-				<Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>
+				<Button variant="text" size="sm" onClick={onDone} disabled={pending}>
 					Ara no
 				</Button>
 				<Button
 					size="sm"
-					className="gap-1.5"
+					className="gap-1.5 hover:bg-primary/85"
 					onClick={() => void submit()}
 					disabled={pending || text.trim().length === 0}
 				>

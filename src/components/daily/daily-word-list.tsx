@@ -194,9 +194,9 @@ export function DailyWordList({
 						<Button
 							key={request.id}
 							type="button"
-							variant="ghost"
+							variant="text"
 							size="sm"
-							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 px-0 py-2 text-left text-xs whitespace-normal font-ui text-primary hover:bg-transparent hover:text-primary hover:underline lg:min-h-9"
+							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 py-2 text-left text-xs whitespace-normal font-ui text-primary lg:min-h-9"
 							onClick={() => openComposer(request.id, "")}
 						>
 							<HelpingHand className="size-3.5" />
@@ -251,9 +251,9 @@ export function DailyWordList({
 			{isComposingForWord(wordId) && onRespondToClue ? (
 				<Button
 					type="button"
-					variant="ghost"
+					variant="text"
 					size="icon"
-					className="size-11 shrink-0 text-muted-foreground hover:text-foreground lg:size-9"
+					className="size-11 shrink-0 text-muted-foreground hover:text-primary lg:size-9"
 					aria-label="Fes servir aquesta pista"
 					title="Fes servir aquesta pista"
 					onClick={() => handleUseClue(wordId, clueText)}
@@ -366,9 +366,9 @@ export function DailyWordList({
 								<div className="pl-7">
 									<Button
 										type="button"
-										variant="ghost"
+										variant="text"
 										size="sm"
-										className="h-auto min-h-11 max-w-full gap-1.5 px-0 py-2 text-xs whitespace-normal font-ui text-primary hover:bg-transparent hover:text-primary hover:underline disabled:text-muted-foreground disabled:opacity-100 lg:min-h-9"
+										className="h-auto min-h-11 max-w-full gap-1.5 py-2 text-xs whitespace-normal font-ui text-primary disabled:text-muted-foreground disabled:opacity-100 lg:min-h-9"
 										disabled={isWaitingForHelp}
 										onClick={() => onRequestHelp?.(slot.id)}
 									>

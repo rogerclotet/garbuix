@@ -77,6 +77,7 @@ export type TutorialState = {
 	foundWordIds: number[];
 	clueWordIds: number[];
 	message: string;
+	helpSent: boolean;
 };
 
 export const INITIAL_TUTORIAL_STATE: TutorialState = {
@@ -84,10 +85,12 @@ export const INITIAL_TUTORIAL_STATE: TutorialState = {
 	foundWordIds: [],
 	clueWordIds: [],
 	message: "",
+	helpSent: false,
 };
 
 export function getTutorialStep(state: TutorialState) {
-	if (state.foundWordIds.length === TUTORIAL_WORDS.length) return "complete";
+	if (state.foundWordIds.length === TUTORIAL_WORDS.length)
+		return state.helpSent ? "complete" : "help";
 	if (!state.foundWordIds.includes(0))
 		return state.guess === "casa" ? "submit" : "spell";
 	if (state.clueWordIds.length === 0) return "clue";
@@ -98,7 +101,8 @@ type TutorialAction =
 	| { type: "letter"; letter: string }
 	| { type: "backspace" }
 	| { type: "submit" }
-	| { type: "clue" };
+	| { type: "clue" }
+	| { type: "help_sent" };
 
 export function tutorialReducer(
 	state: TutorialState,
@@ -106,7 +110,11 @@ export function tutorialReducer(
 ): TutorialState {
 	const step = getTutorialStep(state);
 	if (step === "complete") return state;
+	if (step === "help")
+		return action.type === "help_sent" ? { ...state, helpSent: true } : state;
 	switch (action.type) {
+		case "help_sent":
+			return state;
 		case "letter": {
 			if (step === "clue")
 				return { ...state, message: "Prova primer el botó Pista." };
