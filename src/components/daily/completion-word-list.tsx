@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolveFoundWords } from "@/lib/puzzle-client";
 import { cn } from "@/lib/utils";
@@ -50,33 +49,24 @@ export function CompletionWordList(
 					</Button>
 				</div>
 			) : (
-				<>
-					<p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground font-ui">
-						<Check className="size-3.5 text-primary" aria-hidden="true" />
-						Les destacades són del joc
-					</p>
-					<ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
-						{words.map(({ word, isInPuzzle }) => (
-							<li
-								key={word}
-								className={cn(
-									"flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-xs",
-									isInPuzzle
-										? "border-primary/25 bg-primary/10 font-semibold text-primary"
-										: "border-border/60 bg-muted/40 text-muted-foreground",
-								)}
-							>
-								{isInPuzzle ? (
-									<Check className="size-3 shrink-0" aria-hidden="true" />
-								) : null}
-								<span className="min-w-0 wrap-anywhere">
-									{word.toUpperCase()}
-								</span>
-								{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
-							</li>
-						))}
-					</ul>
-				</>
+				<ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+					{words.map(({ word, isInPuzzle }) => (
+						<li
+							key={word}
+							className={cn(
+								"flex max-w-full items-center rounded border px-1.5 py-0.5 text-xs",
+								isInPuzzle
+									? "border-primary/25 bg-primary/10 font-semibold text-primary"
+									: "border-border/60 bg-muted/40 text-muted-foreground",
+							)}
+						>
+							<span className="min-w-0 wrap-anywhere">
+								{word.toUpperCase()}
+							</span>
+							{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
+						</li>
+					))}
+				</ul>
 			)}
 		</section>
 	);
