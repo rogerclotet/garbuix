@@ -77,6 +77,14 @@ reported explicitly. Progress retries report the first failure in an outage;
 Redis connection errors report once until the connection recovers. React root
 errors and recoverable hydration errors are also captured. Exception handled
 status is retained for alert rules without retaining mechanism data.
+
+Route bundle failures retry once silently using the reload guard shared with
+TanStack Router. They are reported only if the same error reaches the boundary
+with that guard already set. Initial failures while offline or with blocked
+session storage keep the manual reload button without sending a report.
+There are no attempt or recovery-success events, and other application errors
+are still reported immediately.
+
 Known Node/srvx incoming-request disconnects are filtered before privacy
 scrubbing, using their error messages and transport stack frames. Other aborts,
 timeouts, outgoing connection failures, and errors wrapping a disconnect are

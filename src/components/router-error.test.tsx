@@ -17,6 +17,7 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { minimizeSentryEvent } from "../../sentry-privacy";
 import { RouterErrorComponent } from "./router-error";
 
 const reload = vi.fn();
@@ -105,6 +106,71 @@ it("reports a caught route error to Sentry while keeping the recovery UI", async
 		await client?.close();
 	}
 });
+
+it("retries silently and reports only a bundle that still fails after reload", async () => {
+	const events: Sentry.ErrorEvent[] = [];
+	const client = Sentry.init({
+		dsn: "https://public@example.com/1",
+		defaultIntegrations: false,
+		beforeSend(event, hint) {
+			const filtered = minimizeSentryEvent(event, hint);
+			if (filtered) events.push(filtered);
+			return null;
+		},
+	});
+	try {
+		renderError(new TypeError(error.message));
+		await Sentry.flush();
+		expect(events).toHaveLength(0);
+		expect(reload).toHaveBeenCalledTimes(1);
+
+		cleanup();
+		renderError(new TypeError(error.message));
+		await Sentry.flush();
+		expect(events).toHaveLength(1);
+		expect(events[0]?.level).toBe("error");
+		expect(events[0]?.exception?.values?.[0]?.value).toBe(error.message);
+		expect(reload).toHaveBeenCalledTimes(1);
+	} finally {
+		await client?.close();
+	}
+});
+
+it.each(["offline", "storage blocked"])(
+	"does not report an initial bundle failure when %s",
+	async (reason) => {
+		if (reason === "offline") {
+			vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+		} else {
+			vi.stubGlobal("sessionStorage", {
+				getItem: () => null,
+				setItem: () => {
+					throw new DOMException("Storage blocked", "SecurityError");
+				},
+			});
+		}
+		const events: Sentry.ErrorEvent[] = [];
+		const client = Sentry.init({
+			dsn: "https://public@example.com/1",
+			defaultIntegrations: false,
+			beforeSend(event) {
+				events.push(event);
+				return null;
+			},
+		});
+		try {
+			renderError(new TypeError(error.message));
+			await Sentry.flush();
+			expect(events).toHaveLength(0);
+			expect(reload).not.toHaveBeenCalled();
+			expect(
+				screen.getByRole("button", { name: "Recarrega la pàgina" }),
+			).toBeTruthy();
+		} finally {
+			await client?.close();
+		}
+	},
+);
 
 it.each([null, "Route failed", { message: error.message }])(
 	"shows a non-Error throw without reloading: %j",

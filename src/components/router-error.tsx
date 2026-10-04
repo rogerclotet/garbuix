@@ -3,39 +3,34 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
-function reloadMissingRouteBundle(error: Error) {
-	const isBundleError =
-		/^(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS for )/.test(
-			error.message,
-		);
-	if (!isBundleError || !navigator.onLine) return false;
-
-	// lazyRouteComponent already retries component imports. Split loaders and
-	// route options can fail here instead, so share its guard to avoid a second
-	// reload when the component retry has already failed.
-	const key = `tanstack_router_reload:${error.message}`;
-	try {
-		if (sessionStorage.getItem(key)) return false;
-		sessionStorage.setItem(key, "1");
-	} catch {
-		// Without a persistent guard, automatic reloads could loop.
-		return false;
-	}
-	window.location.reload();
-	return true;
-}
-
 export function RouterErrorComponent({ error }: ErrorComponentProps) {
-	const reloadingError = useRef<Error | null>(null);
+	const handled = useRef<{ error: unknown } | null>(null);
 
 	useEffect(() => {
-		captureException(error);
-		if (error instanceof Error) {
-			if (reloadingError.current === error) return;
-			if (reloadMissingRouteBundle(error)) {
-				reloadingError.current = error;
-				return;
+		// StrictMode repeats effects; that must not count as a failed reload.
+		if (handled.current && Object.is(handled.current.error, error)) return;
+		handled.current = { error };
+		if (
+			!(error instanceof Error) ||
+			!/^(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS for )/.test(
+				error.message,
+			)
+		) {
+			captureException(error);
+			return;
+		}
+
+		try {
+			// Share TanStack's guard, including component imports it already retried.
+			const key = `tanstack_router_reload:${error.message}`;
+			if (sessionStorage.getItem(key)) {
+				captureException(error);
+			} else if (navigator.onLine) {
+				sessionStorage.setItem(key, "1");
+				window.location.reload();
 			}
+		} catch {
+			// Without storage, keep manual recovery and avoid an automatic loop.
 		}
 	}, [error]);
 
