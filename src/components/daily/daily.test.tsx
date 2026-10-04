@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	createMemoryHistory,
 	createRootRoute,
@@ -14,8 +15,10 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { decodeRevealedAnswers } from "@/lib/puzzle-client";
 import {
 	getSortedAnonymousHistoryEntries,
 	hasSeenMiniAnnouncement,
@@ -209,54 +212,60 @@ function installVibrateMock() {
 	return window.navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
 }
 
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false } },
+});
+
 function dailyView() {
 	return (
-		<Daily
-			initialData={{
-				historyEntries: null,
-				puzzle: {
-					id: "puzzle-1",
-					dateKey: "2026-04-11",
-					seed: 260411,
-					algorithmVersion: "1",
-					rows: 1,
-					cols: 4,
-					gridMask: [
-						[
-							{ wordIds: [0] },
-							{ wordIds: [0] },
-							{ wordIds: [0] },
-							{ wordIds: [0] },
+		<QueryClientProvider client={queryClient}>
+			<Daily
+				initialData={{
+					historyEntries: null,
+					puzzle: {
+						id: "puzzle-1",
+						dateKey: "2026-04-11",
+						seed: 260411,
+						algorithmVersion: "1",
+						rows: 1,
+						cols: 4,
+						gridMask: [
+							[
+								{ wordIds: [0] },
+								{ wordIds: [0] },
+								{ wordIds: [0] },
+								{ wordIds: [0] },
+							],
 						],
-					],
-					letters: ["c", "o", "s", "a"],
-					initialShuffledLetters: ["c", "o", "s", "a"],
-					validNormalizedGuesses: ["cosa", "saco"],
-					wordSlots: [
-						{
-							id: 0,
-							startRow: 0,
-							startCol: 0,
-							direction: "horizontal",
-							length: 4,
-							slotSalt: "slot-0",
-							answerHash: "hash-0",
-							answerCapsule: "capsule-0",
-						},
-					],
-					hintCapsules: [
-						{
-							cellKey: "0,0",
-							hintSalt: "hint-salt",
-							hintCapsule: "hint-capsule",
-						},
-					],
-				},
-				progress: null,
-				rolloverAt: new Date(Date.now() + 86_400_000).toISOString(),
-				sessionUser: null,
-			}}
-		/>
+						letters: ["c", "o", "s", "a"],
+						initialShuffledLetters: ["c", "o", "s", "a"],
+						validNormalizedGuesses: ["cosa", "saco"],
+						wordSlots: [
+							{
+								id: 0,
+								startRow: 0,
+								startCol: 0,
+								direction: "horizontal",
+								length: 4,
+								slotSalt: "slot-0",
+								answerHash: "hash-0",
+								answerCapsule: "capsule-0",
+							},
+						],
+						hintCapsules: [
+							{
+								cellKey: "0,0",
+								hintSalt: "hint-salt",
+								hintCapsule: "hint-capsule",
+							},
+						],
+					},
+					progress: null,
+					rolloverAt: new Date(Date.now() + 86_400_000).toISOString(),
+					sessionUser: null,
+				}}
+			/>
+		</QueryClientProvider>
 	);
 }
 
@@ -340,6 +349,27 @@ describe("Daily submit feedback", () => {
 
 	afterEach(() => {
 		cleanup();
+		queryClient.clear();
+		vi.mocked(decodeRevealedAnswers).mockResolvedValue({});
+	});
+
+	it("shows found words on the page when reopening a completed game without a dialog", async () => {
+		progressState.guessedWordIds = [0];
+		vi.mocked(decodeRevealedAnswers).mockResolvedValue({ 0: "cosa" });
+		renderDaily();
+
+		await screen.findByRole("heading", { name: "Has completat el joc" });
+		const words = await screen.findByRole("region", {
+			name: "Paraules trobades",
+		});
+		expect(await within(words).findByText("COSA")).toBeTruthy();
+		expect(screen.getByText("1 paraula trobada")).toBeTruthy();
+		expect(within(words).queryByRole("heading")).toBeNull();
+		expect(
+			screen.getByTestId("daily-grid").compareDocumentPosition(words) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(screen.queryByRole("alertdialog")).toBeNull();
 	});
 
 	it("keeps loaded clues through unrelated progress syncs", async () => {
