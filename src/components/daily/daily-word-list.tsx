@@ -196,7 +196,7 @@ export function DailyWordList({
 							type="button"
 							variant="text"
 							size="sm"
-							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 py-2 text-left text-xs whitespace-normal font-ui text-primary lg:min-h-9"
+							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 border-0 px-0 py-2 text-left text-sm font-normal whitespace-normal font-ui text-primary lg:min-h-9"
 							onClick={() => openComposer(request.id, "")}
 						>
 							<HelpingHand className="size-3.5" />
