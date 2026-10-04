@@ -17,6 +17,7 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { minimizeSentryEvent } from "../../sentry-privacy";
 import { RouterErrorComponent } from "./router-error";
 
 const reload = vi.fn();
@@ -101,6 +102,38 @@ it("reports a caught route error to Sentry while keeping the recovery UI", async
 		);
 		expect(screen.getByText("Hi ha hagut un error")).toBeDefined();
 		expect(reload).not.toHaveBeenCalled();
+	} finally {
+		await client?.close();
+	}
+});
+
+it("separates a recovery attempt from a failed retry in privacy-filtered events", async () => {
+	const events: Sentry.ErrorEvent[] = [];
+	const client = Sentry.init({
+		dsn: "https://public@example.com/1",
+		defaultIntegrations: false,
+		beforeSend(event, hint) {
+			const filtered = minimizeSentryEvent(event, hint);
+			if (filtered) events.push(filtered);
+			return null;
+		},
+	});
+	try {
+		renderError(new TypeError(error.message));
+		await Sentry.flush();
+		expect(events).toHaveLength(1);
+		expect(events[0]?.level).toBe("warning");
+		expect(events[0]?.tags).toEqual({ bundle_recovery: "attempted" });
+		expect(reload).toHaveBeenCalledTimes(1);
+
+		cleanup();
+		renderError(new TypeError(error.message));
+		await Sentry.flush();
+		expect(events).toHaveLength(2);
+		expect(events[1]?.level).toBe("error");
+		expect(events[1]?.tags).toEqual({ bundle_recovery: "retry_failed" });
+		expect(events[1]?.fingerprint).not.toEqual(events[0]?.fingerprint);
+		expect(reload).toHaveBeenCalledTimes(1);
 	} finally {
 		await client?.close();
 	}

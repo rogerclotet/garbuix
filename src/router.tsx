@@ -1,6 +1,7 @@
 import { createBrowserHistory, createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { RouterErrorComponent } from "@/components/router-error";
+import { getBundleRecovery } from "@/lib/bundle-recovery";
 import { withGameHistory } from "@/lib/game-history";
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
@@ -29,6 +30,10 @@ export const getRouter = () => {
 		router,
 		queryClient: rqContext.queryClient,
 	});
+
+	if (typeof window !== "undefined") {
+		getBundleRecovery().watchRouter(router);
+	}
 
 	return router;
 };

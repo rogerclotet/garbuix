@@ -1,5 +1,20 @@
 import type { ErrorEvent, EventHint, init } from "@sentry/tanstackstart-react";
 
+export const BUNDLE_RECOVERY_SUCCESS_MESSAGE =
+	"Route bundle recovery succeeded";
+
+function bundleRecoveryStatus(value: unknown) {
+	switch (value) {
+		case "attempted":
+		case "recovered":
+		case "retry_failed":
+		case "unavailable":
+			return value;
+		default:
+			return undefined;
+	}
+}
+
 // Keep code locations useful for debugging, without URL credentials, query
 // parameters, fragments, or local directory names.
 function codeFilename(filename: string | undefined) {
@@ -48,7 +63,14 @@ export function minimizeSentryEvent(
 	hint: EventHint,
 ): ErrorEvent | null {
 	hint.attachments = [];
-	if (!event.exception?.values?.length) return null;
+	const recovery = bundleRecoveryStatus(event.tags?.bundle_recovery);
+	// Only this fixed message is allowed through without an exception. Never
+	// retain arbitrary captureMessage text, tags, or caller-supplied fingerprints.
+	const recovered =
+		recovery === "recovered" &&
+		event.message === BUNDLE_RECOVERY_SUCCESS_MESSAGE &&
+		!event.exception?.values?.length;
+	if (!event.exception?.values?.length && !recovered) return null;
 	// Inspect full paths and exception types before the privacy scrub below.
 	// Keep an event if any exception in its cause chain is an actual failure.
 	if (isIncomingRequestDisconnect(event)) return null;
@@ -60,35 +82,40 @@ export function minimizeSentryEvent(
 		event_id: event.event_id,
 		timestamp: event.timestamp,
 		platform: event.platform,
-		level: event.level,
+		level: recovered ? "info" : event.level,
+		message: recovered ? BUNDLE_RECOVERY_SUCCESS_MESSAGE : undefined,
+		tags: recovery ? { bundle_recovery: recovery } : undefined,
+		fingerprint: recovery ? ["route-bundle-recovery", recovery] : undefined,
 		release: event.release,
 		environment: event.environment,
 		sdk: event.sdk,
-		exception: {
-			values: event.exception.values.map((exception) => ({
-				type: /^(Error|TypeError|RangeError|ReferenceError|SyntaxError|URIError|EvalError|AggregateError)$/.test(
-					exception.type ?? "",
-				)
-					? exception.type
-					: "Error",
-				value: exception.value,
-				// Alert rules need this boolean, but mechanism data can contain PII.
-				mechanism: exception.mechanism
-					? { type: "generic", handled: exception.mechanism.handled }
-					: undefined,
-				stacktrace: exception.stacktrace
-					? {
-							frames: exception.stacktrace.frames?.map((frame) => ({
-								filename: codeFilename(frame.filename),
-								function: frame.function,
-								lineno: frame.lineno,
-								colno: frame.colno,
-								in_app: frame.in_app,
-							})),
-						}
-					: undefined,
-			})),
-		},
+		exception: recovered
+			? undefined
+			: {
+					values: event.exception?.values?.map((exception) => ({
+						type: /^(Error|TypeError|RangeError|ReferenceError|SyntaxError|URIError|EvalError|AggregateError)$/.test(
+							exception.type ?? "",
+						)
+							? exception.type
+							: "Error",
+						value: exception.value,
+						// Alert rules need this boolean, but mechanism data can contain PII.
+						mechanism: exception.mechanism
+							? { type: "generic", handled: exception.mechanism.handled }
+							: undefined,
+						stacktrace: exception.stacktrace
+							? {
+									frames: exception.stacktrace.frames?.map((frame) => ({
+										filename: codeFilename(frame.filename),
+										function: frame.function,
+										lineno: frame.lineno,
+										colno: frame.colno,
+										in_app: frame.in_app,
+									})),
+								}
+							: undefined,
+					})),
+				},
 		debug_meta: event.debug_meta
 			? {
 					images: event.debug_meta.images

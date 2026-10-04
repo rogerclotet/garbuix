@@ -1,9 +1,61 @@
 import * as Sentry from "@sentry/tanstackstart-react";
 import { expect, it } from "vitest";
 import {
+	BUNDLE_RECOVERY_SUCCESS_MESSAGE,
 	minimizeSentryEvent,
 	sentryPrivacyOptions,
 } from "../../sentry-privacy.ts";
+
+it("allows only the fixed recovery message and its enumerated status", () => {
+	const result = minimizeSentryEvent(
+		{
+			type: undefined,
+			message: BUNDLE_RECOVERY_SUCCESS_MESSAGE,
+			level: "error",
+			tags: { bundle_recovery: "recovered", player: "private player" },
+			fingerprint: ["private fingerprint"],
+			request: { url: "https://example.com/private-path" },
+		},
+		{},
+	);
+	expect(result?.message).toBe(BUNDLE_RECOVERY_SUCCESS_MESSAGE);
+	expect(result?.level).toBe("info");
+	expect(result?.tags).toEqual({ bundle_recovery: "recovered" });
+	expect(result?.fingerprint).toEqual(["route-bundle-recovery", "recovered"]);
+	expect(result?.exception).toBeUndefined();
+	expect(JSON.stringify(result)).not.toContain("private");
+	expect(
+		minimizeSentryEvent(
+			{
+				type: undefined,
+				message: "private player",
+				tags: { bundle_recovery: "recovered" },
+			},
+			{},
+		),
+	).toBeNull();
+	expect(
+		minimizeSentryEvent(
+			{
+				type: undefined,
+				message: BUNDLE_RECOVERY_SUCCESS_MESSAGE,
+				tags: { bundle_recovery: "private player" },
+			},
+			{},
+		),
+	).toBeNull();
+	expect(
+		minimizeSentryEvent(
+			{
+				type: undefined,
+				exception: { values: [{ type: "Error", value: "Failure" }] },
+				tags: { bundle_recovery: "private player" },
+				fingerprint: ["private fingerprint"],
+			},
+			{},
+		)?.tags,
+	).toBeUndefined();
+});
 
 it.each([true, false])(
 	"preserves handled=%s for alert rules without mechanism data",
