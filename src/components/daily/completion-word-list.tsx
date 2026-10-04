@@ -1,0 +1,83 @@
+import { useQuery } from "@tanstack/react-query";
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { resolveFoundWords } from "@/lib/puzzle-client";
+import { cn } from "@/lib/utils";
+
+export function CompletionWordList(
+	props: Parameters<typeof resolveFoundWords>[0],
+) {
+	const {
+		data: words,
+		isPending,
+		isError,
+		refetch,
+	} = useQuery({
+		queryKey: [
+			"completion-words",
+			props.puzzle.id,
+			props.puzzle.validNormalizedGuesses,
+			props.guessHashes,
+			props.revealedAnswers,
+		],
+		queryFn: () => resolveFoundWords(props),
+		staleTime: Infinity,
+		// These words are recovered locally and remain available offline.
+		networkMode: "always",
+	});
+
+	return (
+		<section aria-label="Paraules trobades" className="min-w-0">
+			<div className="mb-2 flex items-baseline justify-between gap-2 font-ui text-xs">
+				<h3 className="font-semibold uppercase tracking-wider text-muted-foreground">
+					Paraules trobades
+				</h3>
+				{words ? (
+					<span className="tabular-nums text-muted-foreground">
+						{words.length}
+					</span>
+				) : null}
+			</div>
+			{isPending ? (
+				<p role="status" className="text-sm text-muted-foreground font-ui">
+					Carregant les paraules…
+				</p>
+			) : isError ? (
+				<div className="text-sm font-ui">
+					<p>No s'han pogut carregar les paraules.</p>
+					<Button variant="text" size="sm" onClick={() => void refetch()}>
+						Torna-ho a provar
+					</Button>
+				</div>
+			) : (
+				<>
+					<p className="mb-3 flex items-center gap-1 text-xs text-muted-foreground font-ui">
+						<Check className="size-3.5 text-primary" aria-hidden="true" />
+						Les destacades són del joc
+					</p>
+					<ul className="flex flex-wrap gap-1.5">
+						{words.map(({ word, isInPuzzle }) => (
+							<li
+								key={word}
+								className={cn(
+									"flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-sm tracking-wide",
+									isInPuzzle
+										? "border-primary/25 bg-primary/10 font-semibold text-primary"
+										: "border-border/60 bg-muted/40 text-muted-foreground",
+								)}
+							>
+								{isInPuzzle ? (
+									<Check className="size-3.5 shrink-0" aria-hidden="true" />
+								) : null}
+								<span className="min-w-0 wrap-anywhere">
+									{word.toUpperCase()}
+								</span>
+								{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
+							</li>
+						))}
+					</ul>
+				</>
+			)}
+		</section>
+	);
+}

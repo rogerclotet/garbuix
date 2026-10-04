@@ -10,10 +10,12 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import type { resolveFoundWords } from "@/lib/puzzle-client";
 import { formatMadridTime } from "@/lib/puzzle-dates";
 import { useLeaderboard } from "@/lib/use-leaderboard";
+import { CompletionWordList } from "./completion-word-list";
 
-type WinDialogProps = {
+type WinDialogProps = Parameters<typeof resolveFoundWords>[0] & {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	guessCount: number;
@@ -46,6 +48,9 @@ export function WinDialog({
 	currentStreak,
 	isAnonymous,
 	onSignIn,
+	puzzle,
+	guessHashes,
+	revealedAnswers,
 }: WinDialogProps) {
 	// Read here rather than in Daily: the leaderboard stream ticks on every
 	// player's progress, and the board above shouldn't re-render for it.
@@ -55,7 +60,7 @@ export function WinDialog({
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
+			<AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-lg">
 						Felicitats! 🎉
@@ -89,6 +94,14 @@ export function WinDialog({
 					highlightTries={guessCount}
 					selfParticipantId={localParticipantId}
 				/>
+
+				{open ? (
+					<CompletionWordList
+						puzzle={puzzle}
+						guessHashes={guessHashes}
+						revealedAnswers={revealedAnswers}
+					/>
+				) : null}
 
 				{isAnonymous ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">

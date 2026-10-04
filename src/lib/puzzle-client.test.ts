@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGuess } from "@/lib/puzzle-client";
+import { resolveFoundWords, resolveGuess } from "@/lib/puzzle-client";
 import { createGuessHash, createUnlockToken } from "@/lib/puzzle-crypto";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
@@ -44,6 +44,53 @@ async function buildTestPuzzle() {
 		validNormalizedGuesses: ["cosa", "saco"],
 	};
 }
+
+describe("resolveFoundWords", () => {
+	it("recovers saved valid guesses, preserves puzzle spelling and excludes invalid or unguessed words", async () => {
+		const puzzle = {
+			id: "saved-puzzle",
+			validNormalizedGuesses: [
+				"cosa",
+				"saco",
+				"saco",
+				"ossos",
+				"cami",
+				"colla",
+			],
+		};
+		const guessHashes = await Promise.all(
+			["cosa", "saco", "cami", "colla", "xxxx", "saco"].map((word) =>
+				createGuessHash(puzzle.id, word),
+			),
+		);
+		expect(
+			await resolveFoundWords({
+				puzzle,
+				guessHashes,
+				revealedAnswers: { 0: "cosa", 1: "camí", 2: "col·la" },
+			}),
+		).toEqual([
+			{ word: "camí", isInPuzzle: true },
+			{ word: "col·la", isInPuzzle: true },
+			{ word: "cosa", isInPuzzle: true },
+			{ word: "saco", isInPuzzle: false },
+		]);
+	});
+
+	it("does not carry words across puzzles or after progress is reset", async () => {
+		const puzzle = { id: "new-puzzle", validNormalizedGuesses: ["cosa"] };
+		expect(
+			await resolveFoundWords({
+				puzzle,
+				guessHashes: [await createGuessHash("old-puzzle", "cosa")],
+				revealedAnswers: {},
+			}),
+		).toEqual([]);
+		expect(
+			await resolveFoundWords({ puzzle, guessHashes: [], revealedAnswers: {} }),
+		).toEqual([]);
+	});
+});
 
 describe("resolveGuess", () => {
 	it("classifies a newly found puzzle word", async () => {

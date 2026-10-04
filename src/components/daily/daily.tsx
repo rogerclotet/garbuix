@@ -397,6 +397,9 @@ function DailyGame({
 				}}
 			/>
 			<WinDialog
+				puzzle={puzzle}
+				guessHashes={derivedProgress.guessHashes}
+				revealedAnswers={revealedAnswers}
 				open={winDialogOpen}
 				onOpenChange={setWinDialogOpen}
 				guessCount={derivedProgress.guessCount}

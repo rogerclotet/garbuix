@@ -166,6 +166,38 @@ export async function decodeHintLetters(
 	return Object.fromEntries(hintedEntries);
 }
 
+export async function resolveFoundWords({
+	puzzle,
+	guessHashes,
+	revealedAnswers,
+}: {
+	puzzle: Pick<DailyPuzzlePublic, "id" | "validNormalizedGuesses">;
+	guessHashes: PuzzleProgressState["guessHashes"];
+	revealedAnswers: Record<number, string>;
+}) {
+	const puzzleWords = new Map(
+		Object.values(revealedAnswers).map((word) => [normalizeWord(word), word]),
+	);
+	const guessedHashes = new Set(guessHashes);
+	const candidates = [...new Set(puzzle.validNormalizedGuesses)].filter(
+		(word) => !puzzleWords.has(word),
+	);
+	// Recover valid guesses from existing progress, including games saved before
+	// the completion word list was added. Invalid guesses never enter the list.
+	const bonusWords = await Promise.all(
+		candidates.map(async (word) => ({
+			word,
+			found: guessedHashes.has(await createGuessHash(puzzle.id, word)),
+		})),
+	);
+	return [
+		...Array.from(puzzleWords.values(), (word) => ({ word, isInPuzzle: true })),
+		...bonusWords
+			.filter(({ found }) => found)
+			.map(({ word }) => ({ word, isInPuzzle: false })),
+	].sort((left, right) => left.word.localeCompare(right.word, "ca"));
+}
+
 export function createPuzzleEvent<T extends PuzzleClientEvent["type"]>(
 	type: T,
 	payload: Extract<PuzzleClientEvent, { type: T }>["payload"],
