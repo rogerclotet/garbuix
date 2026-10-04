@@ -44,7 +44,7 @@ export function CompletionWordList({
 					</Button>
 				</div>
 			) : (
-				<ul className="flex max-h-32 flex-wrap gap-x-2 gap-y-0.5 overflow-y-auto">
+				<ul className="flex max-h-32 flex-wrap justify-center gap-x-2 gap-y-0.5 overflow-y-auto">
 					{words.map(({ word, isInPuzzle }) => (
 						<li
 							key={word}
