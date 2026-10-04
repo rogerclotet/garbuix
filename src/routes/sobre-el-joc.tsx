@@ -47,6 +47,16 @@ function AboutPage() {
 					També pots demanar pistes a altres jugadors.
 				</p>
 			</section>
+			<p className="text-sm leading-relaxed">
+				Garbuix és un joc de codi obert. Pots consultar el codi font a{" "}
+				<a
+					href="https://github.com/rogerclotet/garbuix"
+					className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+				>
+					GitHub
+				</a>
+				.
+			</p>
 			<footer className="space-y-4 border-t border-border/40 pt-5 text-muted-foreground">
 				<div className="space-y-2 text-sm text-foreground/80">
 					<p className="font-medium">Un joc de Roger Clotet</p>
