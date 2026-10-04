@@ -21,7 +21,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
 	DEFAULT_LETTER_LAYOUT,
-	getBonusCluesEnabled,
 	getLetterLayout,
 	getOrCreateAnonIdentity,
 	getSkipSharePreview,
@@ -29,14 +28,12 @@ import {
 	type LetterLayout,
 	refreshAnonLeaderboardName,
 	setAnonDisplayName,
-	setBonusCluesEnabled,
 	setLetterLayout,
 	setSkipSharePreview,
 	setVibrationPreference,
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
-import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import {
 	DISPLAY_NAME_MAX_LENGTH,
@@ -169,7 +166,6 @@ function PreferencesPage() {
 	const sharePreviewToggleId = useId();
 	const vibrationToggleId = useId();
 	const letterLayoutGroupId = useId();
-	const bonusCluesToggleId = useId();
 	const themeSelectId = useId();
 	const displayNameInputId = useId();
 	const avatarPreferenceGroupId = useId();
@@ -179,7 +175,6 @@ function PreferencesPage() {
 	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>(
 		DEFAULT_LETTER_LAYOUT,
 	);
-	const [bonusCluesEnabled, setBonusCluesEnabledState] = useState(true);
 	const [displayName, setDisplayName] = useState("");
 	const [avatarPreference, setAvatarPreferenceState] =
 		useState<AvatarPreference>("initials");
@@ -193,7 +188,6 @@ function PreferencesPage() {
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
 		setLetterLayoutState(getLetterLayout());
-		setBonusCluesEnabledState(getBonusCluesEnabled());
 		setMounted(true);
 	}, []);
 
@@ -227,11 +221,6 @@ function PreferencesPage() {
 	const handleLayoutChange = (next: LetterLayout) => {
 		setLetterLayoutState(next);
 		setLetterLayout(next);
-	};
-
-	const handleToggleBonusClues = (next: boolean) => {
-		setBonusCluesEnabledState(next);
-		setBonusCluesEnabled(next);
 	};
 
 	const handleThemeChange = (next: string) => {
@@ -553,24 +542,6 @@ function PreferencesPage() {
 						})}
 					</fieldset>
 				</div>
-				<label
-					htmlFor={bonusCluesToggleId}
-					className="flex items-start justify-between gap-4 p-4 sm:p-5 cursor-pointer"
-				>
-					<div className="space-y-1">
-						<div className="font-medium">Lletres per paraules extra</div>
-						<p className="text-sm text-muted-foreground font-ui">
-							Cada {WORDS_PER_BONUS_CLUE} paraules vàlides que no siguin del
-							trencaclosques, et revelem una lletra a l'atzar. Desactiva-ho per
-							a una experiència més difícil.
-						</p>
-					</div>
-					<Switch
-						id={bonusCluesToggleId}
-						checked={bonusCluesEnabled}
-						onCheckedChange={handleToggleBonusClues}
-					/>
-				</label>
 			</section>
 			{activeUser ? (
 				<section className="flex flex-col gap-4 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">

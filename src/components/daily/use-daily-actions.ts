@@ -27,7 +27,6 @@ export function useDailyActions({
 	applyLocalEvent,
 	cellLetters,
 	revealedCells,
-	bonusCluesEnabled,
 	showSubmitFeedback,
 	clearSubmitFeedback,
 	triggerFlyingLetters,
@@ -38,7 +37,6 @@ export function useDailyActions({
 	applyLocalEvent: (event: PuzzleClientEvent) => void;
 	cellLetters: Map<string, string>;
 	revealedCells: Set<string>;
-	bonusCluesEnabled: boolean;
 	markCompleting: () => void;
 } & Pick<
 	ReturnType<typeof usePuzzleAnimations>,
@@ -153,7 +151,7 @@ export function useDailyActions({
 		// Every WORDS_PER_BONUS_CLUE-th valid off-puzzle word grants a free random
 		// letter reveal. The counter updates asynchronously via the event above, so
 		// we look one ahead.
-		if (isNewBonusWord && bonusCluesEnabled) {
+		if (isNewBonusWord) {
 			const nextBonusCount = derivedProgress.bonusWordsFound + 1;
 			if (nextBonusCount % WORDS_PER_BONUS_CLUE === 0) {
 				const cellKey = getRandomHintCellKey(puzzle, revealedCells);
@@ -189,7 +187,6 @@ export function useDailyActions({
 		setCurrentGuess("");
 	}, [
 		applyLocalEvent,
-		bonusCluesEnabled,
 		cellLetters,
 		currentGuess,
 		derivedProgress,
