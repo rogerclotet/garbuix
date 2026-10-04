@@ -44,15 +44,15 @@ export function CompletionWordList({
 					</Button>
 				</div>
 			) : (
-				<ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+				<ul className="flex max-h-32 flex-wrap gap-x-2 gap-y-0.5 overflow-y-auto">
 					{words.map(({ word, isInPuzzle }) => (
 						<li
 							key={word}
 							className={cn(
-								"flex max-w-full items-center rounded border px-1.5 py-0.5 text-xs",
+								"max-w-full text-xs leading-4",
 								isInPuzzle
-									? "border-primary/25 bg-primary/10 font-semibold text-primary"
-									: "border-border/60 bg-muted/40 text-muted-foreground",
+									? "font-semibold text-primary"
+									: "text-muted-foreground",
 							)}
 						>
 							<span className="min-w-0 wrap-anywhere">
