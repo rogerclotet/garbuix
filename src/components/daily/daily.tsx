@@ -20,7 +20,7 @@ import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { CompletionWordList } from "./completion-word-list";
+import { CompletionWordList, useCompletionWords } from "./completion-word-list";
 import { DailyStatus } from "./daily-status";
 import type { DailyData, DailySessionUser } from "./daily-types";
 import { DailyWordList } from "./daily-word-list";
@@ -180,6 +180,12 @@ function DailyGame({
 		completionStats,
 		markCompleting,
 	} = useDailyCompletion({ initialData, activeUser, derivedProgress });
+	const completionWords = useCompletionWords({
+		puzzle,
+		guessHashes: derivedProgress.guessHashes,
+		revealedAnswers,
+		enabled: displayComplete,
+	});
 	const { sharePreviewOpen, setSharePreviewOpen, handleShare } = useDailyShare({
 		puzzle,
 		revealedCells,
@@ -267,8 +273,11 @@ function DailyGame({
 		);
 	}
 
-	const keypadHeightCss =
-		keypadHeight == null ? CLASSIC_KEYPAD_FALLBACK_HEIGHT : `${keypadHeight}px`;
+	const keypadHeightCss = displayComplete
+		? "0px"
+		: keypadHeight == null
+			? CLASSIC_KEYPAD_FALLBACK_HEIGHT
+			: `${keypadHeight}px`;
 
 	return (
 		<>
@@ -297,6 +306,7 @@ function DailyGame({
 								displayComplete={displayComplete}
 								currentStreak={streakStats.currentStreak}
 								bonusCluesEnabled={bonusCluesEnabled}
+								foundWordCount={completionWords.data?.length}
 							/>
 						</div>
 
@@ -314,17 +324,12 @@ function DailyGame({
 								clueCellsFading={clueGridFading}
 							/>
 						</div>
+						{displayComplete ? (
+							<div className="shrink-0 pt-2 pb-2 lg:col-start-1 lg:row-start-3">
+								<CompletionWordList query={completionWords} />
+							</div>
+						) : null}
 					</div>
-
-					{displayComplete ? (
-						<div className="mt-4 pb-2 lg:col-start-1 lg:row-start-3">
-							<CompletionWordList
-								puzzle={puzzle}
-								guessHashes={derivedProgress.guessHashes}
-								revealedAnswers={revealedAnswers}
-							/>
-						</div>
-					) : null}
 
 					<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
 						<PuzzleControls

@@ -3,15 +3,11 @@ import { Button } from "@/components/ui/button";
 import { resolveFoundWords } from "@/lib/puzzle-client";
 import { cn } from "@/lib/utils";
 
-export function CompletionWordList(
-	props: Parameters<typeof resolveFoundWords>[0],
-) {
-	const {
-		data: words,
-		isPending,
-		isError,
-		refetch,
-	} = useQuery({
+export function useCompletionWords({
+	enabled,
+	...props
+}: Parameters<typeof resolveFoundWords>[0] & { enabled: boolean }) {
+	return useQuery({
 		queryKey: [
 			"completion-words",
 			props.puzzle.id,
@@ -20,23 +16,22 @@ export function CompletionWordList(
 			props.revealedAnswers,
 		],
 		queryFn: () => resolveFoundWords(props),
+		enabled,
 		staleTime: Infinity,
 		// These words are recovered locally and remain available offline.
 		networkMode: "always",
 	});
+}
+
+export function CompletionWordList({
+	query,
+}: {
+	query: ReturnType<typeof useCompletionWords>;
+}) {
+	const { data: words, isPending, isError, refetch } = query;
 
 	return (
 		<section aria-label="Paraules trobades" className="min-w-0">
-			<div className="mb-1 flex items-baseline justify-between gap-2 font-ui text-xs">
-				<h3 className="font-semibold uppercase tracking-wider text-muted-foreground">
-					Paraules trobades
-				</h3>
-				{words ? (
-					<span className="tabular-nums text-muted-foreground">
-						{words.length}
-					</span>
-				) : null}
-			</div>
 			{isPending ? (
 				<p role="status" className="text-sm text-muted-foreground font-ui">
 					Carregant les paraules…

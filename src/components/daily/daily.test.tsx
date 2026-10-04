@@ -363,6 +363,8 @@ describe("Daily submit feedback", () => {
 			name: "Paraules trobades",
 		});
 		expect(await within(words).findByText("COSA")).toBeTruthy();
+		expect(screen.getByText("1 paraula trobada")).toBeTruthy();
+		expect(within(words).queryByRole("heading")).toBeNull();
 		expect(
 			screen.getByTestId("daily-grid").compareDocumentPosition(words) &
 				Node.DOCUMENT_POSITION_FOLLOWING,

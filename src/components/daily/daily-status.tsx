@@ -9,12 +9,14 @@ export function DailyStatus({
 	displayComplete,
 	currentStreak,
 	bonusCluesEnabled,
+	foundWordCount,
 }: {
 	progress: PuzzleProgressState;
 	totalWords: number;
 	displayComplete: boolean;
 	currentStreak: number;
 	bonusCluesEnabled: boolean;
+	foundWordCount: number | undefined;
 }) {
 	if (displayComplete)
 		return (
@@ -35,6 +37,13 @@ export function DailyStatus({
 							? `${progress.hintsUsed} pista`
 							: `${progress.hintsUsed} pistes`}
 					</span>
+					{foundWordCount !== undefined ? (
+						<span>
+							{foundWordCount === 1
+								? "1 paraula trobada"
+								: `${foundWordCount} paraules trobades`}
+						</span>
+					) : null}
 					{currentStreak >= 3 ? (
 						<span>Ratxa: {currentStreak} dies 🔥</span>
 					) : null}
