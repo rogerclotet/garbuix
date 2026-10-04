@@ -1,6 +1,29 @@
 const MADRID_TIME_ZONE = "Europe/Madrid";
 const ONE_HOUR_IN_MS = 60 * 60 * 1000;
 
+const CATALAN_MONTH_LABELS = [
+	"de gener",
+	"de febrer",
+	"de març",
+	"d’abril",
+	"de maig",
+	"de juny",
+	"de juliol",
+	"d’agost",
+	"de setembre",
+	"d’octubre",
+	"de novembre",
+	"de desembre",
+];
+
+// Puzzle keys are calendar dates, not instants. Keep their Catalan labels
+// independent of both the device time zone and the runtime's ICU locale data
+// so server HTML and the first browser render contain exactly the same text.
+export function formatPuzzleDate(dateKey: string) {
+	const [year, month, day] = dateKey.split("-");
+	return `${Number(day)} ${CATALAN_MONTH_LABELS[Number(month) - 1]} del ${year}`;
+}
+
 function getDateParts(date: Date, timeZone = MADRID_TIME_ZONE) {
 	const formatter = new Intl.DateTimeFormat("en-CA", {
 		timeZone,
