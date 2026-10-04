@@ -11,7 +11,6 @@ import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import {
 	DEFAULT_LETTER_LAYOUT,
-	getBonusCluesEnabled,
 	getLetterLayout,
 	type LetterLayout,
 } from "@/lib/anon-identity";
@@ -109,9 +108,6 @@ function DailyGame({
 	// side column, so a seven-across row falls back to the grid.
 	const effectiveLetterLayout: LetterLayout =
 		letterLayout === "line" && isDesktopLayout ? "grid" : letterLayout;
-	// Bonus clues for valid off-puzzle words (default on; off = hardcore mode).
-	// Read from localStorage on mount, so SSR renders the default first.
-	const [bonusCluesEnabled, setBonusCluesEnabled] = useState(true);
 	// Height of the keypad pinned to the bottom of the classic board. Measured
 	// rather than assumed: which arrangement the letters use is a preference, and
 	// each one is a different height.
@@ -145,10 +141,6 @@ function DailyGame({
 	const revealedAnswers = decoded?.answers ?? {};
 	const hintLetters = decoded?.hints ?? {};
 	const isPresentable = decoded !== null;
-
-	useEffect(() => {
-		setBonusCluesEnabled(getBonusCluesEnabled());
-	}, []);
 
 	const revealedCells = useMemo(
 		() => buildRevealedCells(puzzle, derivedProgress),
@@ -245,7 +237,6 @@ function DailyGame({
 		applyLocalEvent,
 		cellLetters,
 		revealedCells,
-		bonusCluesEnabled,
 		showSubmitFeedback,
 		clearSubmitFeedback,
 		triggerFlyingLetters,
@@ -305,7 +296,6 @@ function DailyGame({
 								totalWords={totalWords}
 								displayComplete={displayComplete}
 								currentStreak={streakStats.currentStreak}
-								bonusCluesEnabled={bonusCluesEnabled}
 								foundWordCount={completionWords.data?.length}
 							/>
 						</div>

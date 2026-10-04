@@ -8,14 +8,12 @@ export function DailyStatus({
 	totalWords,
 	displayComplete,
 	currentStreak,
-	bonusCluesEnabled,
 	foundWordCount,
 }: {
 	progress: PuzzleProgressState;
 	totalWords: number;
 	displayComplete: boolean;
 	currentStreak: number;
-	bonusCluesEnabled: boolean;
 	foundWordCount: number | undefined;
 }) {
 	if (displayComplete)
@@ -94,34 +92,32 @@ export function DailyStatus({
 					</span>
 				</div>
 			</div>
-			{bonusCluesEnabled ? (
+			<div
+				className="relative h-6 overflow-hidden bg-blue-500/10 dark:bg-blue-400/10"
+				role="progressbar"
+				aria-valuenow={bonusInCycle}
+				aria-valuemin={0}
+				aria-valuemax={WORDS_PER_BONUS_CLUE}
+				aria-label="Paraules vàlides de fora del joc"
+			>
 				<div
-					className="relative h-6 overflow-hidden bg-blue-500/10 dark:bg-blue-400/10"
-					role="progressbar"
-					aria-valuenow={bonusInCycle}
-					aria-valuemin={0}
-					aria-valuemax={WORDS_PER_BONUS_CLUE}
-					aria-label="Paraules vàlides de fora del joc"
-				>
-					<div
-						className="absolute inset-y-0 left-0 bg-blue-500/25 transition-[width] duration-500 ease-out"
-						style={{ width: `${bonusPercent}%` }}
-					/>
-					<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-						<span className="flex items-baseline gap-1">
-							<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
-								{bonusCount}
-							</span>
-							<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
-								paraules extra
-							</span>
+					className="absolute inset-y-0 left-0 bg-blue-500/25 transition-[width] duration-500 ease-out"
+					style={{ width: `${bonusPercent}%` }}
+				/>
+				<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+					<span className="flex items-baseline gap-1">
+						<span className="tabular-nums text-xs text-blue-700 dark:text-blue-300">
+							{bonusCount}
 						</span>
-						<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
-							{wordsToNextClue} per a una lletra
+						<span className="ml-1 hidden text-blue-700/70 dark:text-blue-300/70 sm:inline">
+							paraules extra
 						</span>
-					</div>
+					</span>
+					<span className="tabular-nums text-blue-700/70 dark:text-blue-300/70">
+						{wordsToNextClue} per a una lletra
+					</span>
 				</div>
-			) : null}
+			</div>
 		</div>
 	);
 }

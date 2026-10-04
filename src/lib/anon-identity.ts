@@ -9,7 +9,6 @@ const ANON_LB_REPORTED_KEY = "paraules-anon-leaderboard-reported-v1";
 const SKIP_SHARE_PREVIEW_KEY = "paraules-skip-share-preview-v1";
 const VIBRATION_KEY = "paraules-vibration-v1";
 const LETTER_LAYOUT_KEY = "paraules-letter-layout-v1";
-const BONUS_CLUES_KEY = "paraules-bonus-clues-v1";
 
 // What was last reported to the leaderboard for this device, so a reload
 // doesn't replay it. Carries every field the score is built from, not just the
@@ -214,31 +213,6 @@ export function setLetterLayout(layout: LetterLayout): void {
 	if (typeof window === "undefined") return;
 	try {
 		window.localStorage.setItem(LETTER_LAYOUT_KEY, layout);
-	} catch {
-		// Best-effort persistence; ignore storage failures.
-	}
-}
-
-// Bonus clues are enabled by default; turning them off is the "hardcore" mode.
-// Absence of the key means enabled, so only the disabled state is persisted.
-export function getBonusCluesEnabled(): boolean {
-	if (typeof window === "undefined") return true;
-	try {
-		return window.localStorage.getItem(BONUS_CLUES_KEY) !== "0";
-	} catch {
-		// Storage can be unavailable (private mode, disabled cookies); default on.
-		return true;
-	}
-}
-
-export function setBonusCluesEnabled(enabled: boolean): void {
-	if (typeof window === "undefined") return;
-	try {
-		if (enabled) {
-			window.localStorage.removeItem(BONUS_CLUES_KEY);
-		} else {
-			window.localStorage.setItem(BONUS_CLUES_KEY, "0");
-		}
 	} catch {
 		// Best-effort persistence; ignore storage failures.
 	}
