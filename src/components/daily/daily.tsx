@@ -298,15 +298,6 @@ function DailyGame({
 								currentStreak={streakStats.currentStreak}
 								bonusCluesEnabled={bonusCluesEnabled}
 							/>
-							{displayComplete ? (
-								<div className="mt-3">
-									<CompletionWordList
-										puzzle={puzzle}
-										guessHashes={derivedProgress.guessHashes}
-										revealedAnswers={revealedAnswers}
-									/>
-								</div>
-							) : null}
 						</div>
 
 						<div
@@ -324,6 +315,16 @@ function DailyGame({
 							/>
 						</div>
 					</div>
+
+					{displayComplete ? (
+						<div className="mt-4 pb-2 lg:col-start-1 lg:row-start-3">
+							<CompletionWordList
+								puzzle={puzzle}
+								guessHashes={derivedProgress.guessHashes}
+								revealedAnswers={revealedAnswers}
+							/>
+						</div>
+					) : null}
 
 					<div className="mt-6 flex min-h-0 flex-col gap-6 lg:col-start-2 lg:row-start-2 lg:mt-0 lg:h-full lg:min-h-0">
 						<PuzzleControls

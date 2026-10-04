@@ -363,6 +363,10 @@ describe("Daily submit feedback", () => {
 			name: "Paraules trobades",
 		});
 		expect(await within(words).findByText("COSA")).toBeTruthy();
+		expect(
+			screen.getByTestId("daily-grid").compareDocumentPosition(words) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 	});
 
