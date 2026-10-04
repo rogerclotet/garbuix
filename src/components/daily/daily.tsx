@@ -10,6 +10,7 @@ import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import {
+	DEFAULT_LETTER_LAYOUT,
 	getBonusCluesEnabled,
 	getLetterLayout,
 	type LetterLayout,
@@ -32,9 +33,8 @@ import { useDailyShare } from "./use-daily-share";
 import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
 
-// Room the classic keypad claims until it has reported its real height: roughly
-// the circle arrangement, which is what the server renders. Only the first
-// paint uses it, and only the board's size depends on it.
+// Room the classic keypad claims until it has reported its real height.
+// Only the first paint uses it, and only the board's size depends on it.
 const CLASSIC_KEYPAD_FALLBACK_HEIGHT = "17rem";
 // The width at which the board switches to its two-column desktop layout,
 // where the keypad lives in a narrow side column. Matches the `lg:` breakpoint
@@ -98,7 +98,9 @@ function DailyGame({
 	// A player can opt into any of the three arrangements via /preferencies.
 	// Initialise to the default so SSR markup is deterministic, then read the
 	// stored choice after mount.
-	const [letterLayout, setLetterLayout] = useState<LetterLayout>("circle");
+	const [letterLayout, setLetterLayout] = useState<LetterLayout>(
+		DEFAULT_LETTER_LAYOUT,
+	);
 	useEffect(() => {
 		setLetterLayout(getLetterLayout());
 	}, []);
