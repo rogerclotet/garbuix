@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+	DEFAULT_LETTER_LAYOUT,
 	getBonusCluesEnabled,
 	getLetterLayout,
 	getOrCreateAnonIdentity,
@@ -175,7 +176,9 @@ function PreferencesPage() {
 	const { theme, setTheme } = useTheme();
 	const [showSharePreview, setShowSharePreview] = useState(true);
 	const [vibrationEnabled, setVibrationEnabled] = useState(true);
-	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>("circle");
+	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>(
+		DEFAULT_LETTER_LAYOUT,
+	);
 	const [bonusCluesEnabled, setBonusCluesEnabledState] = useState(true);
 	const [displayName, setDisplayName] = useState("");
 	const [avatarPreference, setAvatarPreferenceState] =
