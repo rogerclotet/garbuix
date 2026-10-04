@@ -3,6 +3,7 @@ import {
 	addDaysToDateKey,
 	dateKeyToSeed,
 	formatMadridTime,
+	formatPuzzleDate,
 	getDateKeyForDate,
 	getNextPregenerationAt,
 	getNextRolloverAt,
@@ -17,6 +18,23 @@ import {
 } from "@/lib/puzzle-dates";
 
 describe("puzzle-dates", () => {
+	it.each([
+		["2026-01-01", "1 de gener del 2026"],
+		["2024-02-29", "29 de febrer del 2024"],
+		["2026-03-29", "29 de març del 2026"],
+		["2026-04-01", "1 d’abril del 2026"],
+		["2026-05-01", "1 de maig del 2026"],
+		["2026-06-01", "1 de juny del 2026"],
+		["2026-07-01", "1 de juliol del 2026"],
+		["2026-08-01", "1 d’agost del 2026"],
+		["2026-09-01", "1 de setembre del 2026"],
+		["2026-10-25", "25 d’octubre del 2026"],
+		["2026-11-01", "1 de novembre del 2026"],
+		["2026-12-31", "31 de desembre del 2026"],
+	])("formats puzzle date %s in Catalan", (dateKey, expected) => {
+		expect(formatPuzzleDate(dateKey)).toBe(expected);
+	});
+
 	it("round trips seeds and date keys", () => {
 		expect(seedToDateKey(dateKeyToSeed("2026-03-10"))).toBe("2026-03-10");
 	});

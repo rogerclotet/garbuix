@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
+import { formatPuzzleDate } from "@/lib/puzzle-dates";
 import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	buildAnonymousImportPayload,
@@ -38,12 +39,6 @@ import {
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 
 const rootRoute = getRouteApi("__root__");
-
-const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
-	day: "numeric",
-	month: "long",
-	year: "numeric",
-});
 
 type AccountHistoryPage = {
 	entries: HistorySummaryEntry[];
@@ -309,9 +304,7 @@ export function HistoryView({
 									<h3 className="text-base font-semibold">Resultats recents</h3>
 									<div className="space-y-4">
 										{entries.map((entry) => {
-											const dateLabel = dateFormatter.format(
-												new Date(`${entry.dateKey}T12:00:00.000Z`),
-											);
+											const dateLabel = formatPuzzleDate(entry.dateKey);
 											const progressLabel = `${entry.guessedWords} / ${entry.totalWords}`;
 
 											return (
@@ -383,9 +376,7 @@ export function HistoryView({
 										<h3 className="text-base font-semibold">Resultat d'ahir</h3>
 										<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 											<span className="text-sm text-muted-foreground font-ui">
-												{dateFormatter.format(
-													new Date(`${yesterdayPuzzle.dateKey}T12:00:00.000Z`),
-												)}
+												{formatPuzzleDate(yesterdayPuzzle.dateKey)}
 											</span>
 											{yesterdayPuzzle.difficulty ? (
 												<DifficultyBars

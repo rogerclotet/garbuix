@@ -5,15 +5,9 @@ import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
 import { getLeaderboardSnapshot } from "@/lib/leaderboard-server-fns";
-import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { formatPuzzleDate, getTodayDateKey } from "@/lib/puzzle-dates";
 import { getDailyPuzzleDifficulty } from "@/lib/puzzle-server-fns";
 import { useLeaderboard } from "@/lib/use-leaderboard";
-
-const dateFormatter = new Intl.DateTimeFormat("ca-ES", {
-	day: "numeric",
-	month: "long",
-	year: "numeric",
-});
 
 export const Route = createFileRoute("/classificacio")({
 	loader: async () => {
@@ -71,7 +65,7 @@ function LeaderboardPage() {
 		<div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 sm:py-10">
 			<header className="flex items-center justify-between gap-3">
 				<p className="text-muted-foreground text-sm">
-					{dateFormatter.format(new Date(`${dateKey}T00:00:00`))}
+					{formatPuzzleDate(dateKey)}
 				</p>
 				<DifficultyBars difficulty={difficulty} label="phrase" />
 			</header>
