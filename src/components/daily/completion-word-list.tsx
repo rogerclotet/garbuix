@@ -46,12 +46,14 @@ export function CompletionWordList({
 					</Button>
 				</div>
 			) : (
-				<ul className="flex max-h-32 flex-wrap justify-center gap-x-2 gap-y-0.5 overflow-y-auto">
+				// Nunito's glyph box at 13px is ~17.7px tall, so any tighter line height
+				// spills a pixel past the last row and the list scrolls for nothing.
+				<ul className="flex max-h-32 flex-wrap justify-center gap-x-2 overflow-y-auto">
 					{words.map(({ word, isInPuzzle }) => (
 						<li
 							key={word}
 							className={cn(
-								"max-w-full text-[13px] leading-4",
+								"max-w-full text-[13px] leading-[18px]",
 								isInPuzzle
 									? "font-semibold text-primary"
 									: "text-muted-foreground",
