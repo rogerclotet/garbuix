@@ -238,17 +238,28 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 			<div
 				className={`flex min-h-0 flex-1 flex-col gap-2 ${displayComplete ? "" : "lg:grid lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-8"}`}
 			>
-				<div
-					ref={gridRef}
-					className="mx-auto flex min-h-0 w-full max-w-sm flex-1 lg:h-full lg:max-w-md"
-				>
-					<PuzzleGrid
-						fitHeight
-						puzzle={puzzle}
-						revealedCells={new Set(cellLetters.keys())}
-						cellLetters={cellLetters}
-						{...gridEffects}
-					/>
+				<div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:h-full">
+					<div
+						ref={gridRef}
+						className="mx-auto flex min-h-0 w-full max-w-xs flex-1 lg:max-w-sm"
+					>
+						<PuzzleGrid
+							fitHeight
+							puzzle={puzzle}
+							revealedCells={new Set(cellLetters.keys())}
+							cellLetters={cellLetters}
+							{...gridEffects}
+						/>
+					</div>
+					{/* Above the input panel so it stays visible on short phones. */}
+					{displayComplete ? null : (
+						<SimpleWordList
+							wordSlots={puzzle.wordSlots}
+							guessedWordIds={visibleProgress.guessedWordIds}
+							cellLetters={cellLetters}
+							onWordTap={handleLocateWord}
+						/>
+					)}
 				</div>
 				{!displayComplete ? (
 					<div className="-mx-4 w-[calc(100%+2rem)] shrink-0 touch-none space-y-1 rounded-t-2xl border-t border-border/60 bg-background px-4 pt-2 lg:mx-0 lg:w-full lg:max-w-sm lg:touch-auto lg:space-y-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
@@ -290,14 +301,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 					revealedAnswers={snapshot.answers}
 					displayWords={puzzle.displayWords}
 				/>
-			) : (
-				<SimpleWordList
-					wordSlots={puzzle.wordSlots}
-					guessedWordIds={visibleProgress.guessedWordIds}
-					cellLetters={cellLetters}
-					onWordTap={handleLocateWord}
-				/>
-			)}
+			) : null}
 		</div>
 	);
 }
