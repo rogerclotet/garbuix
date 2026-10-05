@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-export function MiniHelpDialog({
+export function SyllableHelpDialog({
 	open,
 	onOpenChange,
 }: {
@@ -19,27 +19,28 @@ export function MiniHelpDialog({
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Com es juga a Garbuixmini?</AlertDialogTitle>
+					<AlertDialogTitle>Com es juga a Garbuix síl·labes?</AlertDialogTitle>
 					<AlertDialogDescription asChild>
 						<div className="space-y-3 text-left">
-							<p>Cada dia hi ha cinc paraules curtes per trobar.</p>
 							<p>
-								Toca les lletres per escriure una paraula i prem el botó de la
-								fletxa per comprovar-la. Pots fer servir una lletra més d'una
-								vegada.
+								Cada dia hi ha cinc paraules per trobar. Cada casella del tauler
+								és una síl·laba.
 							</p>
 							<p>
-								També compten les paraules de 3 a 5 lletres que no surten al
-								tauler. Les veuràs al final, en un altre color.
+								Toca les síl·labes per formar una paraula i prem la fletxa per
+								comprovar-la. Pots repetir una síl·laba: CO + CO fa COCO.
 							</p>
 							<p>
-								Si necessites ajuda, mantén premut Pista. Apareixerà una lletra
-								al tauler. Pots demanar tantes pistes com vulguis!
+								No cal posar accents. Al tauler veuràs les paraules ben
+								escrites.
 							</p>
 							<p>
-								Les paraules es creuen: les lletres que trobis t'ajudaran a
-								descobrir les altres. També pots escriure amb el teclat i prémer
-								Enter.
+								Si necessites ajuda, mantén premut Pista per descobrir una
+								síl·laba. Pots demanar tantes pistes com vulguis!
+							</p>
+							<p>
+								Les paraules que no són al tauler també compten com a extres.
+								Les veuràs quan hagis trobat les cinc paraules del joc.
 							</p>
 						</div>
 					</AlertDialogDescription>

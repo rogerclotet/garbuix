@@ -12,6 +12,7 @@ const GUESS_MIN_FREQUENCY = 1;
 const DATA_DIR = join(process.cwd(), "src", "data");
 const OUTPUT_FILE = join(DATA_DIR, "catalan-words.json");
 const GUESS_OUTPUT_FILE = join(DATA_DIR, "catalan-guess-words.json");
+const SYLLABLE_OUTPUT_FILE = join(DATA_DIR, "catalan-syllable-words.json");
 const SOURCE_BASE_URL =
 	"https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/master";
 
@@ -59,7 +60,8 @@ async function main() {
 	if (
 		ONLY_IF_MISSING &&
 		existsSync(OUTPUT_FILE) &&
-		existsSync(GUESS_OUTPUT_FILE)
+		existsSync(GUESS_OUTPUT_FILE) &&
+		existsSync(SYLLABLE_OUTPUT_FILE)
 	) {
 		console.log(`📚 Using existing dictionaries at ${DATA_DIR}`);
 		return;
@@ -121,10 +123,14 @@ async function main() {
 		);
 
 	const generationWords = entries.filter(
-		(word) => word.frequency >= GENERATION_MIN_FREQUENCY,
+		(word) =>
+			word.name.length >= MIN_LENGTH &&
+			word.frequency >= GENERATION_MIN_FREQUENCY,
 	);
 	// Guesses only need the word names; metadata stays in the generation file.
-	const guessWordNames = entries.map((word) => word.name);
+	const guessWordNames = entries
+		.filter((word) => word.name.length >= MIN_LENGTH)
+		.map((word) => word.name);
 
 	mkdirSync(DATA_DIR, { recursive: true });
 	writeFileSync(
@@ -134,6 +140,11 @@ async function main() {
 	writeFileSync(
 		GUESS_OUTPUT_FILE,
 		JSON.stringify(guessWordNames satisfies string[], null, 2),
+	);
+	// Syllable extras also accept short words such as pa, mà, and all.
+	writeFileSync(
+		SYLLABLE_OUTPUT_FILE,
+		JSON.stringify(entries.map((word) => word.name)),
 	);
 
 	console.log(
@@ -220,9 +231,7 @@ function isSourceWordLowercase(word: string): boolean {
 
 function isValidWord(word: string): boolean {
 	return (
-		word.length >= MIN_LENGTH &&
-		word.length <= MAX_LENGTH &&
-		VALID_WORD_REGEX.test(word)
+		word.length >= 1 && word.length <= MAX_LENGTH && VALID_WORD_REGEX.test(word)
 	);
 }
 

@@ -30,6 +30,7 @@ import {
 	dailyPuzzles,
 	miniPuzzles,
 	puzzleWordClues,
+	syllablePuzzles,
 	userPuzzleEvents,
 	userPuzzleProgress,
 } from "@/db/schema";
@@ -40,7 +41,12 @@ import {
 	getMiniProgress,
 	saveMiniProgress,
 } from "@/lib/mini.server";
-import { createUnlockToken, hashText } from "@/lib/puzzle-crypto";
+import { getMiniDictionary } from "@/lib/mini-dictionary.server";
+import {
+	createGuessHash,
+	createUnlockToken,
+	hashText,
+} from "@/lib/puzzle-crypto";
 import { getHistoryEntriesForUser } from "@/lib/puzzle-history.server";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import {
@@ -55,6 +61,12 @@ import type {
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import {
+	ensureSyllablePuzzle,
+	getSyllableHistory,
+	getSyllableProgress,
+	saveSyllableProgress,
+} from "@/lib/syllable.server";
 
 describe.skipIf(!process.env.TEST_DATABASE_URL)(
 	"PostgreSQL puzzle persistence",
@@ -499,7 +511,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				}),
 			).toHaveLength(4);
 		});
-		it("merges Mini across devices without touching regular progress or history", async () => {
+		it("merges Mini extras across devices, validates their counts, and freezes completed games", async () => {
 			const fixture = await createFixture();
 			const [mini, sameMini] = await Promise.all([
 				ensureMiniPuzzle("2026-03-09"),
@@ -510,6 +522,26 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				const puzzle = mini.publicSnapshotJson;
 				const empty = createEmptyProgressState(puzzle);
 				const before = await getHistoryEntriesForUser(fixture.id);
+				const targets = new Set(
+					mini.privateSnapshotJson.wordSlots.map((word) => word.normalizedWord),
+				);
+				const extras = getMiniDictionary(
+					puzzle.letters,
+				).validNormalizedGuesses.filter((word) => !targets.has(word));
+				const shortExtra = extras.find((word) => word.length === 3);
+				const longExtra = extras.find((word) => word.length === 5);
+				if (!shortExtra || !longExtra)
+					throw new Error("Missing Mini test extras");
+				const firstExtraHash = await createGuessHash(puzzle.id, shortExtra);
+				const secondExtraHash = await createGuessHash(puzzle.id, longExtra);
+				const tooShortHash = await createGuessHash(
+					puzzle.id,
+					puzzle.letters[0].repeat(2),
+				);
+				const tooLongHash = await createGuessHash(
+					puzzle.id,
+					puzzle.letters[0].repeat(6),
+				);
 				const answers = await Promise.all(
 					puzzle.wordSlots.map(async (slot) => {
 						const answer = mini.privateSnapshotJson.wordSlots.find(
@@ -527,7 +559,15 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 						...empty,
 						guessedWordIds: [0, 1],
 						revealedWordTokens: Object.fromEntries(answers.slice(0, 2)),
-						guessHashes: ["first", "second"],
+						guessHashes: [
+							"first",
+							"second",
+							firstExtraHash,
+							firstExtraHash,
+							tooShortHash,
+							tooLongHash,
+						],
+						bonusWordsFound: 999,
 						hintedCells: puzzle.hintCapsules
 							.slice(0, 5)
 							.map((cell) => cell.cellKey),
@@ -536,7 +576,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 						...empty,
 						guessedWordIds: [2, 3, 4],
 						revealedWordTokens: Object.fromEntries(answers.slice(2)),
-						guessHashes: ["third", "fourth", "fifth"],
+						guessHashes: ["third", "fourth", "fifth", secondExtraHash],
 						hintedCells: puzzle.hintCapsules
 							.slice(3, 7)
 							.map((cell) => cell.cellKey),
@@ -544,7 +584,14 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				]);
 				const saved = await getMiniProgress(fixture.id, puzzle.id);
 				expect(saved?.guessedWordIds).toHaveLength(5);
-				expect(saved?.guessCount).toBe(5);
+				expect(saved?.guessCount).toBe(9);
+				expect(saved?.bonusWordsFound).toBe(2);
+				expect(
+					await saveMiniProgress(fixture.id, {
+						...empty,
+						guessHashes: ["late-extra"],
+					}),
+				).toEqual(saved);
 				expect(saved?.hintsUsed).toBe(7);
 				expect(saved?.completedAt).not.toBeNull();
 				expect(await getMiniHistory(fixture.id)).toEqual([
@@ -562,6 +609,95 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				).rejects.toThrow("Mini puzzle not found");
 			} finally {
 				await db.delete(miniPuzzles).where(eq(miniPuzzles.id, mini.id));
+			}
+		});
+		it("merges Syllable across devices without touching Mini or regular history, and freezes completed games", async () => {
+			const fixture = await createFixture();
+			const [syllable, sameSyllable] = await Promise.all([
+				ensureSyllablePuzzle("2026-03-09"),
+				ensureSyllablePuzzle("2026-03-09"),
+			]);
+			expect(syllable.publicSnapshotJson).toEqual(
+				sameSyllable.publicSnapshotJson,
+			);
+			try {
+				const puzzle = syllable.publicSnapshotJson;
+				const empty = createEmptyProgressState(puzzle);
+				const before = await getHistoryEntriesForUser(fixture.id);
+				const miniBefore = await getMiniHistory(fixture.id);
+				const targetWords = new Set(
+					syllable.privateSnapshotJson.wordSlots.map(
+						(word) => word.normalizedWord,
+					),
+				);
+				const extra = puzzle.validNormalizedGuesses.find(
+					(word) => !targetWords.has(word),
+				);
+				if (!extra) throw new Error("Missing test extra");
+				const bonusHash = await createGuessHash(puzzle.id, extra);
+				const answers = await Promise.all(
+					puzzle.wordSlots.map(async (slot) => {
+						const answer = syllable.privateSnapshotJson.wordSlots.find(
+							(word) => word.id === slot.id,
+						);
+						if (!answer) throw new Error("Missing test answer");
+						return [
+							String(slot.id),
+							await createUnlockToken(slot.slotSalt, answer.normalizedWord),
+						] as const;
+					}),
+				);
+				await Promise.all([
+					saveSyllableProgress(fixture.id, {
+						...empty,
+						guessedWordIds: [0, 1],
+						revealedWordTokens: Object.fromEntries(answers.slice(0, 2)),
+						guessHashes: ["first", "second", bonusHash],
+						bonusWordsFound: 999,
+						hintedCells: puzzle.hintCapsules
+							.slice(0, 5)
+							.map((cell) => cell.cellKey),
+					}),
+					saveSyllableProgress(fixture.id, {
+						...empty,
+						guessedWordIds: [2, 3, 4],
+						revealedWordTokens: Object.fromEntries(answers.slice(2)),
+						guessHashes: ["third", "fourth", "fifth"],
+						hintedCells: puzzle.hintCapsules
+							.slice(3, 7)
+							.map((cell) => cell.cellKey),
+					}),
+				]);
+				const saved = await getSyllableProgress(fixture.id, puzzle.id);
+				expect(saved?.guessedWordIds).toHaveLength(5);
+				expect(saved?.guessCount).toBe(6);
+				expect(saved?.bonusWordsFound).toBe(1);
+				expect(await getMiniHistory(fixture.id)).toEqual(miniBefore);
+				expect(
+					await saveSyllableProgress(fixture.id, {
+						...empty,
+						guessHashes: ["late-guess"],
+					}),
+				).toEqual(saved);
+				expect(saved?.hintsUsed).toBe(7);
+				expect(saved?.completedAt).not.toBeNull();
+				expect(await getSyllableHistory(fixture.id)).toEqual([
+					expect.objectContaining({
+						totalWords: 5,
+						guessedWords: 5,
+						hintsUsed: 7,
+						completed: true,
+					}),
+				]);
+				expect(await getHistoryEntriesForUser(fixture.id)).toEqual(before);
+				expect(await getSyllableProgress("another-user", puzzle.id)).toBeNull();
+				await expect(
+					saveSyllableProgress(fixture.id, { ...empty, puzzleId: fixture.id }),
+				).rejects.toThrow("Syllable puzzle not found");
+			} finally {
+				await db
+					.delete(syllablePuzzles)
+					.where(eq(syllablePuzzles.id, syllable.id));
 			}
 		});
 	},

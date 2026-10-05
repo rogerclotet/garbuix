@@ -1,26 +1,32 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { miniProgress, miniPuzzles } from "@/db/schema";
+import { syllableProgress, syllablePuzzles } from "@/db/schema";
 import { db } from "@/lib/db";
-import { getMiniDictionary } from "@/lib/mini-dictionary.server";
-import {
-	generateMiniCrossword,
-	MINI_ALGORITHM_VERSION,
-} from "@/lib/mini-generator";
-import { mergeMiniProgress } from "@/lib/mini-progress";
 import { createGuessHash, createUnlockToken } from "@/lib/puzzle-crypto";
-import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
+import {
+	dateKeyToSeed,
+	getTodayDateKey,
+	isPlayableDateKey,
+} from "@/lib/puzzle-dates";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import { getSyllableDictionary } from "@/lib/syllable-dictionary.server";
+import {
+	generateSyllableCrossword,
+	getSyllableCells,
+	SYLLABLE_ALGORITHM_VERSION,
+} from "@/lib/syllable-generator";
+import { mergeSyllableProgress } from "@/lib/syllable-progress";
 
-export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
-	const existing = await db.query.miniPuzzles.findFirst({
-		where: eq(miniPuzzles.dateKey, dateKey),
+export async function ensureSyllablePuzzle(dateKey = getTodayDateKey()) {
+	if (!isPlayableDateKey(dateKey)) throw new Error("Invalid puzzle date");
+	const existing = await db.query.syllablePuzzles.findFirst({
+		where: eq(syllablePuzzles.dateKey, dateKey),
 	});
 	if (existing) return existing;
 	const { crossword, letters, shuffledLetters } =
-		generateMiniCrossword(dateKey);
-	const id = `mini:${dateKey}`;
+		generateSyllableCrossword(dateKey);
+	const id = `syllable:${dateKey}`;
 	const { publicSnapshot, privateSnapshot } = await buildPuzzleSnapshots({
 		crossword,
 		letters,
@@ -28,61 +34,69 @@ export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 		dateKey,
 		seed: dateKeyToSeed(dateKey),
 		puzzleId: id,
-		algorithmVersion: MINI_ALGORITHM_VERSION,
+		algorithmVersion: SYLLABLE_ALGORITHM_VERSION,
 		availableWordCount: 5,
+		getCells: getSyllableCells,
 	});
 	await db
-		.insert(miniPuzzles)
+		.insert(syllablePuzzles)
 		.values({
 			id,
 			dateKey,
-			publicSnapshotJson: { ...publicSnapshot, difficulty: null },
+			publicSnapshotJson: {
+				...publicSnapshot,
+				...getSyllableDictionary(letters),
+				difficulty: null,
+			},
 			privateSnapshotJson: privateSnapshot,
 		})
 		.onConflictDoNothing();
 	// Read the winner of a concurrent generation, including its capsule salts.
-	const saved = await db.query.miniPuzzles.findFirst({
-		where: eq(miniPuzzles.dateKey, dateKey),
+	const saved = await db.query.syllablePuzzles.findFirst({
+		where: eq(syllablePuzzles.dateKey, dateKey),
 	});
-	if (!saved) throw new Error("Mini puzzle was not saved");
+	if (!saved) throw new Error("Syllable puzzle was not saved");
 	return saved;
 }
 
-export async function getMiniProgress(userId: string, puzzleId: string) {
-	const row = await db.query.miniProgress.findFirst({
+export async function getSyllableProgress(userId: string, puzzleId: string) {
+	const row = await db.query.syllableProgress.findFirst({
 		where: and(
-			eq(miniProgress.userId, userId),
-			eq(miniProgress.puzzleId, puzzleId),
+			eq(syllableProgress.userId, userId),
+			eq(syllableProgress.puzzleId, puzzleId),
 		),
 	});
 	return row?.progressJson ?? null;
 }
 
-export async function getMiniHistory(userId: string) {
+export async function getSyllableHistory(userId: string) {
 	const rows = await db
 		.select({
-			puzzle: miniPuzzles.publicSnapshotJson,
-			progress: miniProgress.progressJson,
+			puzzle: syllablePuzzles.publicSnapshotJson,
+			progress: syllableProgress.progressJson,
 		})
-		.from(miniProgress)
-		.innerJoin(miniPuzzles, eq(miniProgress.puzzleId, miniPuzzles.id))
-		.where(eq(miniProgress.userId, userId))
-		.orderBy(desc(miniPuzzles.dateKey));
+		.from(syllableProgress)
+		.innerJoin(
+			syllablePuzzles,
+			eq(syllableProgress.puzzleId, syllablePuzzles.id),
+		)
+		.where(eq(syllableProgress.userId, userId))
+		.orderBy(desc(syllablePuzzles.dateKey));
 	return rows.map(({ puzzle, progress }) => ({
 		...buildHistoryEntry(puzzle, progress),
 		lastUpdated: progress.lastSyncedAt ?? new Date().toISOString(),
 	}));
 }
 
-export async function saveMiniProgress(
+export async function saveSyllableProgress(
 	userId: string,
 	incoming: PuzzleProgressState,
 ) {
-	const row = await db.query.miniPuzzles.findFirst({
-		where: eq(miniPuzzles.id, incoming.puzzleId),
+	const row = await db.query.syllablePuzzles.findFirst({
+		where: eq(syllablePuzzles.id, incoming.puzzleId),
 	});
 	if (!row || row.dateKey > getTodayDateKey())
-		throw new Error("Mini puzzle not found");
+		throw new Error("Syllable puzzle not found");
 	const puzzle = row.publicSnapshotJson;
 	// Validate claims at the storage boundary, using the persisted answers.
 	const tokens: Record<string, string> = {};
@@ -101,8 +115,8 @@ export async function saveMiniProgress(
 		puzzle.hintCapsules.some((capsule) => capsule.cellKey === key),
 	);
 	const validLetters =
-		[...incoming.shuffledLetters].sort().join("") ===
-		[...puzzle.letters].sort().join("");
+		[...incoming.shuffledLetters].sort().join("|") ===
+		[...puzzle.letters].sort().join("|");
 	const sanitized: PuzzleProgressState = {
 		...incoming,
 		guessedWordIds,
@@ -120,31 +134,33 @@ export async function saveMiniProgress(
 	};
 	const saved = await db.transaction(async (transaction) => {
 		await transaction.execute(
-			sql`select pg_advisory_xact_lock(hashtextextended(${`mini:${userId}:${puzzle.id}`}, 0))`,
+			sql`select pg_advisory_xact_lock(hashtextextended(${`syllable:${userId}:${puzzle.id}`}, 0))`,
 		);
-		const existing = await transaction.query.miniProgress.findFirst({
+		const existing = await transaction.query.syllableProgress.findFirst({
 			where: and(
-				eq(miniProgress.userId, userId),
-				eq(miniProgress.puzzleId, puzzle.id),
+				eq(syllableProgress.userId, userId),
+				eq(syllableProgress.puzzleId, puzzle.id),
 			),
 		});
 		if (existing?.progressJson.completedAt) return existing.progressJson;
-		const merged = mergeMiniProgress(existing?.progressJson ?? null, sanitized);
+		const merged = mergeSyllableProgress(
+			existing?.progressJson ?? null,
+			sanitized,
+		);
 		const targetWords = new Set(
 			row.privateSnapshotJson.wordSlots.map((word) => word.normalizedWord),
 		);
-		const { validNormalizedGuesses } = getMiniDictionary(puzzle.letters);
 		const bonusHashes = await Promise.all(
-			validNormalizedGuesses
+			puzzle.validNormalizedGuesses
 				.filter((word) => !targetWords.has(word))
 				.map((word) => createGuessHash(puzzle.id, word)),
 		);
-		const guessedHashes = new Set(merged.guessHashes);
 		const now = new Date().toISOString();
 		const progress = {
 			...merged,
-			bonusWordsFound: bonusHashes.filter((hash) => guessedHashes.has(hash))
-				.length,
+			bonusWordsFound: bonusHashes.filter((hash) =>
+				merged.guessHashes.includes(hash),
+			).length,
 			completedAt:
 				merged.guessedWordIds.length === puzzle.wordSlots.length
 					? (existing?.progressJson.completedAt ?? now)
@@ -152,7 +168,7 @@ export async function saveMiniProgress(
 			lastSyncedAt: now,
 		};
 		await transaction
-			.insert(miniProgress)
+			.insert(syllableProgress)
 			.values({
 				id: crypto.randomUUID(),
 				userId,
@@ -160,7 +176,7 @@ export async function saveMiniProgress(
 				progressJson: progress,
 			})
 			.onConflictDoUpdate({
-				target: [miniProgress.userId, miniProgress.puzzleId],
+				target: [syllableProgress.userId, syllableProgress.puzzleId],
 				set: { progressJson: progress },
 			});
 		return progress;

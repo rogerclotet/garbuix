@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { MINI_WORDS } from "@/data/mini-words";
+import { getMiniDictionary } from "@/lib/mini-dictionary.server";
 import { generateMiniCrossword } from "@/lib/mini-generator";
 import { applyMiniEvent, mergeMiniProgress } from "@/lib/mini-progress";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
+	resolveFoundWords,
 	resolveGuess,
 } from "@/lib/puzzle-client";
+import { createGuessHash } from "@/lib/puzzle-crypto";
 import { addDaysToDateKey } from "@/lib/puzzle-dates";
 import { buildRevealedCells, getRandomHintCellKey } from "@/lib/puzzle-helpers";
 import {
@@ -30,6 +33,52 @@ async function fixture() {
 }
 
 describe("Mini puzzles", () => {
+	it("validates only dictionary extras of three to five letters from the bank", async () => {
+		const { publicSnapshot } = await fixture();
+		const letters = ["a", "c", "l", "o", "p", "s"];
+		const dictionary = getMiniDictionary(letters);
+		const puzzle = { ...publicSnapshot, letters, ...dictionary };
+		let progress = createEmptyProgressState(puzzle);
+		for (const word of ["sol", "casa", "salsa"]) {
+			const result = await resolveGuess({ puzzle, progress, guess: word });
+			expect(result.kind).toBe("valid_but_not_in_puzzle");
+			const event = createPuzzleEvent("guess_added", {
+				guessHash: result.guessHash,
+				matchedWordId: result.matchedSlotId,
+				unlockToken: result.unlockToken,
+				validNotInPuzzle: true,
+			});
+			progress = applyMiniEvent(puzzle, progress, event);
+			expect(applyMiniEvent(puzzle, progress, event)).toBe(progress);
+		}
+		expect(progress.bonusWordsFound).toBe(3);
+		expect(progress.completedAt).toBeNull();
+		expect(mergeMiniProgress(null, progress).bonusWordsFound).toBe(3);
+		for (const word of ["pa", "cassola", "avió", "sss"]) {
+			expect((await resolveGuess({ puzzle, progress, guess: word })).kind).toBe(
+				"not_in_dictionary",
+			);
+		}
+		expect(
+			dictionary.validNormalizedGuesses.every(
+				(word) => word.length >= 3 && word.length <= 5,
+			),
+		).toBe(true);
+		const found = await resolveFoundWords({
+			puzzle,
+			guessHashes: [
+				...progress.guessHashes,
+				await createGuessHash(puzzle.id, "pa"),
+				await createGuessHash(puzzle.id, "cassola"),
+			],
+			revealedAnswers: {},
+		});
+		expect(found.map(({ word }) => word)).toEqual(["casa", "salsa", "sol"]);
+		const accented = getMiniDictionary(["a", "v", "i", "o", "n", "e"]);
+		expect(accented.validNormalizedGuesses).toContain("avio");
+		expect(accented.displayWords.avio).toBe("avió");
+	});
+
 	it("generates five connected, familiar short words for every day of a year", () => {
 		const seenWords = new Set<string>();
 		const boards = new Set<string>();

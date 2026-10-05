@@ -409,3 +409,13 @@ code {
 		transform: none;
 	}
 }
+
+/* Whole syllables need room for up to four characters in each crossword cell. */
+:root[data-game="syllables"] [data-cell-key] {
+	font-size: clamp(
+		0.5rem,
+		calc(80cqi / var(--cols) / max(2, var(--cell-characters))),
+		1.5rem
+	);
+	border-radius: 20%;
+}

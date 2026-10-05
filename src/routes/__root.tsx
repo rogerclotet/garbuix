@@ -22,6 +22,7 @@ import { materialThemeCss } from "@/lib/material-theme";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import { useMiniRoute } from "@/lib/use-mini-route";
+import { useSyllableRoute } from "@/lib/use-syllable-route";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -78,12 +79,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
 	const mini = useMiniRoute();
+	const syllables = useSyllableRoute();
 	const showDevtools = import.meta.env.DEV;
 
 	return (
 		<html
 			lang="ca"
-			data-game={mini ? "mini" : "regular"}
+			data-game={syllables ? "syllables" : mini ? "mini" : "regular"}
 			suppressHydrationWarning
 		>
 			<head>
@@ -98,7 +100,7 @@ function RootDocument() {
 					enableSystem
 				>
 					<TooltipProvider delayDuration={300}>
-						<ThemeMeta mini={mini} />
+						<ThemeMeta mini={mini} syllables={syllables} />
 						<OrientationLock />
 						<ServiceWorkerRegister />
 						<LeaderboardRoot>
@@ -116,7 +118,7 @@ function RootDocument() {
 									</main>
 								</div>
 								<Toaster position="top-center" />
-								{mini ? null : <LeaderboardToasts />}
+								{mini || syllables ? null : <LeaderboardToasts />}
 							</ClueRequestsRoot>
 						</LeaderboardRoot>
 						{showDevtools ? (

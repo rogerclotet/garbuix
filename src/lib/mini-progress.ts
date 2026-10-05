@@ -41,6 +41,5 @@ export function mergeMiniProgress(
 		...merged,
 		hintsUsed: merged.hintedCells.length,
 		clueWordIds: [],
-		bonusWordsFound: 0,
 	};
 }

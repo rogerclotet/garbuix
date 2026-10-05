@@ -46,6 +46,7 @@ export type TutorialControlTarget =
 	| { kind: "hint" };
 
 type PuzzleControlsProps = {
+	canSubmit?: boolean;
 	mini?: boolean;
 	inline?: boolean;
 	tutorialTarget?: TutorialControlTarget;
@@ -78,6 +79,7 @@ type PuzzleControlsProps = {
 };
 
 export function PuzzleControls({
+	canSubmit,
 	mini = false,
 	inline = false,
 	tutorialTarget,
@@ -279,7 +281,11 @@ export function PuzzleControls({
 					"ring-2 ring-primary ring-offset-4 ring-offset-background",
 			)}
 			style={submitStyle}
-			disabled={currentGuess.length < (mini ? 3 : 4)}
+			disabled={
+				canSubmit === undefined
+					? currentGuess.length < (mini ? 3 : 4)
+					: !canSubmit
+			}
 			aria-label="Comprovar"
 		>
 			<CornerDownLeft

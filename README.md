@@ -14,12 +14,49 @@ A responsive web application for a Catalan crossword-style word game.
 
 ## How to Play
 
+### Garbuix síl·labes
+
+`/sillabes` is a daily game for early readers, available alongside Garbuix and
+Mini in the menu. Five connected words share whole syllables, with exactly six
+different syllables on the keypad. Tap syllables in order and submit a word;
+syllables can repeat within a word. Input ignores accents, while the crossword
+shows the correct spelling. Hold Pista to reveal a whole syllable, with no limit.
+
+Valid words outside the crossword are accepted as extras and shown in muted text
+alongside the five target words after completion. Completion ends play for the day. There
+is no leaderboard or audio. The orange theme supports light and dark mode.
+Browser saves, account sync, guest imports, and `/sillabes/dies-anteriors` history
+are separate from both other modes. Daily rollover uses Europe/Madrid.
+
+The target vocabulary and reviewed divisions live in `src/data/syllable-words.ts`.
+Extra words use Softcatalà's dictionary, including words shorter than four letters.
+The existing dictionary has no syllable field. `scripts/build-syllable-dictionary.ts`
+applies the Catalan patterns from [Jaume Ortolà's hyphen-ca](https://github.com/jaumeortola/hyphen-ca),
+the source linked by [Softcatalà's separator](https://www.softcatala.org/sillabes/).
+The pattern revision is pinned in the script; downloaded JavaScript is parsed
+as data, never executed. Patterns are GPL-3.0. Generated word divisions are
+written to the gitignored `src/data/catalan-syllables.json` and bundled on the
+server, so play requires no external syllabification service. Guess validation
+checks the chosen syllable boundaries, not only the concatenated letters.
+
+`pnpm download-dict` rebuilds all dictionaries, including syllable divisions.
+Run it after changing the curated vocabulary. Builds and `pnpm ensure-dict`
+generate missing files automatically. Apply migration `0010_syllables.sql`
+with `pnpm db:migrate` before running this mode.
+
 ### Garbuix mini
 
 `/mini` is a separate daily game for early readers, also available in the menu.
 Each board has five connected words drawn from the curated Catalan vocabulary in
 `src/data/mini-words.ts`. All words have 3–5 letters. Hints reveal one hidden cell
 after holding Pista for 600 ms, with no limit, descriptive clues, or leaderboard.
+
+Mini accepts dictionary words of 3–5 letters formed from the day's letters,
+including words outside the five-word crossword. Input is capped at five letters,
+and submission stays disabled until there are at least three. Extras are saved
+locally and synced to accounts, then appear in muted text in the combined list
+after completion. The five targets still come from the curated Mini vocabulary.
+Existing daily boards receive the extra-word dictionary when loaded.
 
 Mini has a purple theme, separate browser saves and account progress, and its own
 history at `/mini/dies-anteriors`, including yesterday's completed board. Guest

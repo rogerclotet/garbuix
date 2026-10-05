@@ -3,10 +3,21 @@ import { useEffect, useState } from "react";
 import {
 	materialThemeMetaColors,
 	miniThemeMetaColors,
+	syllableThemeMetaColors,
 } from "@/lib/material-theme";
 
-export function ThemeMeta({ mini = false }: { mini?: boolean }) {
-	const colors = mini ? miniThemeMetaColors : materialThemeMetaColors;
+export function ThemeMeta({
+	mini = false,
+	syllables = false,
+}: {
+	mini?: boolean;
+	syllables?: boolean;
+}) {
+	const colors = syllables
+		? syllableThemeMetaColors
+		: mini
+			? miniThemeMetaColors
+			: materialThemeMetaColors;
 	const { theme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 

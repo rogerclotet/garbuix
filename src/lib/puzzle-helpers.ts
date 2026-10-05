@@ -72,7 +72,14 @@ export function buildCellLetters(
 	for (const slot of wordSlots) {
 		const answer = revealedAnswers[slot.id];
 		if (!answer) continue;
-		const displayLetters = getPlayableWordLetters(answer);
+		let offset = 0;
+		const displayLetters = slot.cellLengths
+			? slot.cellLengths.map((length) => {
+					const cell = answer.slice(offset, offset + length);
+					offset += length;
+					return cell;
+				})
+			: getPlayableWordLetters(answer);
 
 		for (let index = 0; index < displayLetters.length; index += 1) {
 			letters.set(getSlotCellKey(slot, index), displayLetters[index] ?? "");
