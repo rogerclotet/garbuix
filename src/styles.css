@@ -423,5 +423,4 @@ code {
 		calc(80cqi / var(--cols) / max(2, var(--cell-characters))),
 		1.5rem
 	);
-	border-radius: 20%;
 }

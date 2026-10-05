@@ -478,15 +478,6 @@ export function PuzzleControls({
 						: "rounded-t-2xl rounded-b-none border-t border-border/60 bg-background shadow-[0_-2px_12px_rgb(0,0,0,0.06)] dark:shadow-[0_-2px_12px_rgb(0,0,0,0.25)] pb-[env(safe-area-inset-bottom)] select-none lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none lg:dark:shadow-none lg:pb-0 lg:select-auto"
 				}
 			>
-				<div className={inline ? "hidden" : "hidden lg:block lg:text-left"}>
-					<h2 className="font-semibold leading-none tracking-tight">
-						Endevina una paraula
-					</h2>
-					<p className="text-sm text-muted-foreground font-ui mt-2">
-						Escriu amb el teclat, esborra amb retrocés i envia amb Enter o
-						espai.
-					</p>
-				</div>
 				<div className="p-2 lg:px-0 lg:pt-2">
 					<div className="flex flex-col items-center gap-3 lg:gap-6">
 						<div className="relative w-full overflow-hidden h-9 sm:h-12 border-b-2 border-primary/60">
