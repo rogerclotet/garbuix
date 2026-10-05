@@ -223,8 +223,10 @@ apply the migration, and start the updated app together. See the
 [Better Auth upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide#account-identity-keeps-the-provider-key).
 
 Build both production images, keep existing PostgreSQL and Redis containers,
-stop the app and clue scheduler, apply migrations, then recreate both application
-services from the new images and wait for app readiness. Stopping both writers before
+stop the clue scheduler while the app still serves requests, then stop the app,
+apply migrations, recreate both application services from the new images and wait
+for app readiness. The app starts Node directly without repeating migrations or
+launching pnpm. Stopping both writers before
 migrating prevents old code from querying removed columns. The app is briefly
 unavailable during migration and restart. If migration fails, both services stay
 stopped so the failure can be resolved before restarting.
@@ -265,8 +267,9 @@ Monitor configuration lives outside this repository. Readiness checks verify
 recovery; they do not eliminate downtime. Application Redis failures continue to
 be reported to GlitchTip once per outage.
 
-Use this script for production updates. A plain `docker compose up` can start the
-clue scheduler before the app finishes migrating the database.
+Use this script for production updates. Production containers do not run migrations
+on startup. A plain `docker compose up` or `docker run` requires the database to
+have already been migrated with both old writers stopped.
 
 CI serializes production deployments and lets each active deploy finish before
 starting the next one. Parallel deploys can race while replacing the same Compose

@@ -25,15 +25,20 @@ echo 1234abcd
 		`#!/bin/sh
 echo "$*" >> "$DEPLOY_TEST_LOG"
 case "$*" in
-  "compose stop app pre-generator") touch "$DEPLOY_TEST_STOPPED" ;;
+  "compose stop app pre-generator")
+    touch "$DEPLOY_TEST_STOPPED.app" "$DEPLOY_TEST_STOPPED.scheduler" ;;
+  "compose stop pre-generator") touch "$DEPLOY_TEST_STOPPED.scheduler" ;;
+  "compose stop app") touch "$DEPLOY_TEST_STOPPED.app" ;;
   *" db redis")
     case "$*" in
       *--no-recreate*) ;;
-      *) test -f "$DEPLOY_TEST_STOPPED" || exit 42 ;;
+      *) test -f "$DEPLOY_TEST_STOPPED.app" && test -f "$DEPLOY_TEST_STOPPED.scheduler" || exit 42 ;;
     esac ;;
 esac
 case "$*" in
-  *db:migrate*) test "$DEPLOY_TEST_FAILURE" != migration || exit 43 ;;
+  *db:migrate*)
+    test -f "$DEPLOY_TEST_STOPPED.app" && test -f "$DEPLOY_TEST_STOPPED.scheduler" || exit 42
+    test "$DEPLOY_TEST_FAILURE" != migration || exit 43 ;;
   *--force-recreate*) test "$DEPLOY_TEST_FAILURE" != readiness || exit 44 ;;
 esac
 `,
@@ -80,6 +85,22 @@ it("stops writers before explicitly updating dependencies", () => {
 	expect(result.status, result.stderr).toBe(0);
 	expect(result.calls).toContain("--pull always");
 });
+
+it.each([
+	{ mode: "routine", args: [] },
+	{ mode: "dependency maintenance", args: ["--update-dependencies"] },
+])(
+	"keeps the app serving until the scheduler has stopped during $mode",
+	({ args }) => {
+		const result = deploy(args);
+		expect(result.status, result.stderr).toBe(0);
+		const calls = result.calls.trim().split("\n");
+		const schedulerStop = calls.indexOf("compose stop pre-generator");
+		const appStop = calls.indexOf("compose stop app");
+		expect(schedulerStop).toBeGreaterThan(-1);
+		expect(appStop).toBeGreaterThan(schedulerStop);
+	},
+);
 
 it("leaves writers stopped if migrations fail", () => {
 	const result = deploy([], "migration");

@@ -47,7 +47,9 @@ COPY --from=builder /app/src/data/catalan-guess-words.json ./src/data/catalan-gu
 
 EXPOSE 3000
 
-CMD ["sh", "-lc", "pnpm db:migrate && exec pnpm start"]
+# deploy-compose.sh migrates once before starting either writer.
+# Launch Node directly to avoid package-manager overhead during the switchover.
+CMD ["node", "--env-file-if-exists=.env", "--import", "./.output/server/instrument.server.mjs", ".output/server/index.mjs"]
 
 FROM alpine AS supercronic-download
 ARG SUPERCRONIC_VERSION=0.2.49
