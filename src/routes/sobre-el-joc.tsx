@@ -27,7 +27,7 @@ function AboutPage() {
 					Les paraules provenen del diccionari de{" "}
 					<a
 						href="https://github.com/Softcatala/catalan-dict-tools"
-						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+						className="text-link"
 					>
 						Softcatalà
 					</a>
@@ -44,14 +44,14 @@ function AboutPage() {
 					Garbuix síl·labes fa servir els patrons de{" "}
 					<a
 						href="https://github.com/jaumeortola/hyphen-ca"
-						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+						className="text-link"
 					>
 						hyphen-ca
 					</a>
 					, de Jaume Ortolà, publicats sota la llicència{" "}
 					<a
 						href="https://github.com/jaumeortola/hyphen-ca/blob/dac10c01eab7132c1ddf4a22e2ea8a3f6ee439ae/LICENSE"
-						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+						className="text-link"
 					>
 						GPL-3.0
 					</a>
@@ -68,10 +68,7 @@ function AboutPage() {
 			</section>
 			<p className="text-sm leading-relaxed">
 				Garbuix és un joc de codi obert. Pots consultar el codi font a{" "}
-				<a
-					href="https://github.com/rogerclotet/garbuix"
-					className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-				>
+				<a href="https://github.com/rogerclotet/garbuix" className="text-link">
 					GitHub
 				</a>
 				.
@@ -80,17 +77,11 @@ function AboutPage() {
 				<div className="space-y-2 text-sm text-foreground/80">
 					<p className="font-medium">Un joc de Roger Clotet</p>
 					<p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-						<a
-							href="https://clotet.dev"
-							className="underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-						>
+						<a href="https://clotet.dev" className="text-link">
 							clotet.dev
 						</a>
 						<span aria-hidden>·</span>
-						<a
-							href="mailto:roger@clotet.dev"
-							className="underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-						>
+						<a href="mailto:roger@clotet.dev" className="text-link">
 							roger@clotet.dev
 						</a>
 					</p>
