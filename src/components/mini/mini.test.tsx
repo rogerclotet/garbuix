@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	createMemoryHistory,
 	createRootRoute,
@@ -13,10 +14,12 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { getMiniDictionary } from "@/lib/mini-dictionary.server";
 import { generateMiniCrossword } from "@/lib/mini-generator";
 import { readMiniSaves, writeMiniSave } from "@/lib/mini-local";
 import { applyMiniEvent } from "@/lib/mini-progress";
@@ -25,6 +28,7 @@ import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
 import { getWordCellKeys } from "@/lib/puzzle-helpers";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
+import { normalizeWord } from "@/lib/puzzle-text";
 import { Mini, type MiniPageData } from "./mini";
 
 vi.mock("@/lib/mini-server-fns", () => ({
@@ -182,7 +186,7 @@ async function fixture() {
 		}),
 	);
 	const data: MiniPageData = {
-		puzzle,
+		puzzle: { ...puzzle, ...getMiniDictionary(puzzle.letters) },
 		progress: null,
 		userId: null,
 		rolloverAt: new Date(Date.now() + 60_000).toISOString(),
@@ -252,6 +256,29 @@ it("shows a playable empty board for a new player", async () => {
 	).toBeNull();
 });
 
+it("disables one- and two-letter submissions and caps typing and tapping at five letters", async () => {
+	const { data } = await fixture();
+	const { container } = render(<Mini initialData={data} />);
+	const group = await screen.findByRole("group", { name: "Forma una paraula" });
+	const submit = within(group).getByRole("button", { name: "Comprovar" });
+	const letter = data.puzzle.letters[0];
+	const key = within(group).getByRole("button", { name: letter.toUpperCase() });
+	for (let length = 1; length <= 2; length++) {
+		fireEvent.click(key);
+		expect(submit.hasAttribute("disabled")).toBe(true);
+		fireEvent.keyDown(window, { key: "Enter" });
+		expect(readMiniSaves(null)[data.puzzle.dateKey]).toBeUndefined();
+	}
+	fireEvent.keyDown(window, { key: letter });
+	expect(submit.hasAttribute("disabled")).toBe(false);
+	for (let index = 0; index < 4; index++) fireEvent.click(key);
+	fireEvent.keyDown(window, { key: letter });
+	expect(
+		container.querySelector('[data-slot="current-guess"]')?.textContent,
+	).toBe(letter.toUpperCase().repeat(5));
+	expect(submit.hasAttribute("disabled")).toBe(false);
+});
+
 it("offers a retry without showing an empty board if saved letters fail to decode", async () => {
 	const { data, progress, word } = await fixture();
 	writeMiniSave(null, data.puzzle.dateKey, progress);
@@ -280,8 +307,13 @@ it("plays Mini through hints, shuffles, completion, and restoring a finished sav
 		routeTree: createRootRoute(),
 		history: createMemoryHistory({ initialEntries: ["/mini/"] }),
 	});
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	const wrapper = ({ children }: { children: ReactNode }) => (
-		<RouterContextProvider router={router}>{children}</RouterContextProvider>
+		<QueryClientProvider client={queryClient}>
+			<RouterContextProvider router={router}>{children}</RouterContextProvider>
+		</QueryClientProvider>
 	);
 	renderToString(<Mini initialData={data} />);
 
@@ -291,6 +323,27 @@ it("plays Mini through hints, shuffles, completion, and restoring a finished sav
 	await screen.findByRole("group", { name: "Forma una paraula" });
 	fireEvent.click(screen.getByRole("button", { name: "Barrejar" }));
 	fireEvent.click(screen.getByRole("button", { name: "Pista" }));
+	const targets = new Set(words.map(normalizeWord));
+	const extra = data.puzzle.validNormalizedGuesses.find(
+		(word) => word.length === 5 && !targets.has(word),
+	);
+	if (!extra) throw new Error("Missing Mini extra in fixture");
+	for (let attempt = 0; attempt < 2; attempt++) {
+		for (const letter of extra) fireEvent.keyDown(window, { key: letter });
+		fireEvent.keyDown(window, { key: "Enter" });
+		await waitFor(() =>
+			expect(readMiniSaves(null)[data.puzzle.dateKey].bonusWordsFound).toBe(1),
+		);
+		await waitFor(() =>
+			expect(
+				document.querySelector('[data-slot="current-guess"]')?.textContent,
+			).toBe(""),
+		);
+	}
+	expect(readMiniSaves(null)[data.puzzle.dateKey].guessCount).toBe(1);
+	expect(
+		screen.queryByRole("region", { name: "Paraules trobades" }),
+	).toBeNull();
 	for (const [index, word] of words.entries()) {
 		for (const letter of word) fireEvent.keyDown(window, { key: letter });
 		fireEvent.keyDown(window, { key: "Enter" });
@@ -321,9 +374,25 @@ it("plays Mini through hints, shuffles, completion, and restoring a finished sav
 		{ timeout: 2000 },
 	);
 	expect(document.querySelector("[data-flying-letter]")).toBeNull();
+	const completedWords = screen.getByRole("region", {
+		name: "Paraules trobades",
+	});
+	expect(await within(completedWords).findAllByRole("listitem")).toHaveLength(
+		6,
+	);
+	await within(completedWords).findByText(
+		data.puzzle.displayWords[extra].toUpperCase(),
+	);
+	expect(
+		screen.queryByRole("link", { name: "Veure el meu progrés" }),
+	).toBeNull();
 	unmount();
 	render(<Mini initialData={data} />, { wrapper });
 	await screen.findByRole("heading", { name: "Les has trobades totes!" });
+	expect(readMiniSaves(null)[data.puzzle.dateKey].bonusWordsFound).toBe(1);
+	await within(
+		screen.getByRole("region", { name: "Paraules trobades" }),
+	).findByText(data.puzzle.displayWords[extra].toUpperCase());
 });
 
 it("reveals a correct word without flying letters when reduced motion is requested", async () => {

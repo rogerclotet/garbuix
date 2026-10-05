@@ -25,8 +25,10 @@ export function useCompletionWords({
 
 export function CompletionWordList({
 	query,
+	displayWords = {},
 }: {
 	query: ReturnType<typeof useCompletionWords>;
+	displayWords?: Readonly<Record<string, string>>;
 }) {
 	const { data: words, isPending, isError, refetch } = query;
 
@@ -56,7 +58,7 @@ export function CompletionWordList({
 							)}
 						>
 							<span className="min-w-0 wrap-anywhere">
-								{word.toUpperCase()}
+								{(displayWords[word] ?? word).toUpperCase()}
 							</span>
 							{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
 						</li>
@@ -64,5 +66,19 @@ export function CompletionWordList({
 				</ul>
 			)}
 		</section>
+	);
+}
+
+export function CompletedPuzzleWordList({
+	displayWords,
+	...props
+}: Omit<Parameters<typeof useCompletionWords>[0], "enabled"> & {
+	displayWords?: Readonly<Record<string, string>>;
+}) {
+	const query = useCompletionWords({ ...props, enabled: true });
+	return (
+		<div className="shrink-0">
+			<CompletionWordList query={query} displayWords={displayWords} />
+		</div>
 	);
 }

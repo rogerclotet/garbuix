@@ -79,11 +79,21 @@ function toCssVariables(tokens: Record<string, string>) {
 
 export const materialThemeCss = `
 :root {
-${toCssVariables(appScheme.light)}
+${toCssVariables({
+	...appScheme.light,
+	"game-regular": appScheme.light.primary,
+	"game-mini": "#7953a5",
+	"game-syllables": "#b84c13",
+})}
 }
 
 .dark {
-${toCssVariables(appScheme.dark)}
+${toCssVariables({
+	...appScheme.dark,
+	"game-regular": appScheme.dark.primary,
+	"game-mini": "#c7a3ed",
+	"game-syllables": "#ffb782",
+})}
 }
 
 :root[data-game="mini"] {
@@ -94,7 +104,7 @@ ${toCssVariables({
 	"card-foreground": "#302638",
 	popover: "#fbf8fc",
 	"popover-foreground": "#302638",
-	primary: "#7953a5",
+	primary: "var(--game-mini)",
 	"primary-foreground": "#ffffff",
 	secondary: "#ede4f4",
 	"secondary-foreground": "#302638",
@@ -104,7 +114,7 @@ ${toCssVariables({
 	"accent-foreground": "#302638",
 	border: "#ded0e9",
 	input: "#ded0e9",
-	ring: "#7953a5",
+	ring: "var(--game-mini)",
 	"mini-gold": "#a36b08",
 	"locate-color": "#c4a4e3",
 })}
@@ -118,7 +128,7 @@ ${toCssVariables({
 	"card-foreground": "#eee5f5",
 	popover: "#211a29",
 	"popover-foreground": "#eee5f5",
-	primary: "#c7a3ed",
+	primary: "var(--game-mini)",
 	"primary-foreground": "#30203f",
 	secondary: "#3d2f49",
 	"secondary-foreground": "#eee5f5",
@@ -128,9 +138,56 @@ ${toCssVariables({
 	"accent-foreground": "#eee5f5",
 	border: "#4b3a59",
 	input: "#4b3a59",
-	ring: "#c7a3ed",
+	ring: "var(--game-mini)",
 	"mini-gold": "#f2c76a",
 	"locate-color": "#9670ba",
+})}
+}
+:root[data-game="syllables"] {
+${toCssVariables({
+	background: "#fff9f3",
+	foreground: "#3c291b",
+	card: "#fff9f3",
+	"card-foreground": "#3c291b",
+	popover: "#fff9f3",
+	"popover-foreground": "#3c291b",
+	primary: "var(--game-syllables)",
+	"primary-foreground": "#ffffff",
+	secondary: "#ffe8d5",
+	"secondary-foreground": "#3c291b",
+	muted: "#fff0e2",
+	"muted-foreground": "#806451",
+	accent: "#ffe8d5",
+	"accent-foreground": "#3c291b",
+	border: "#efd4bd",
+	input: "#efd4bd",
+	ring: "var(--game-syllables)",
+	"syllable-star": "#b5680a",
+	"locate-color": "#f3b076",
+})}
+}
+
+:root.dark[data-game="syllables"] {
+${toCssVariables({
+	background: "#291d16",
+	foreground: "#ffead9",
+	card: "#291d16",
+	"card-foreground": "#ffead9",
+	popover: "#291d16",
+	"popover-foreground": "#ffead9",
+	primary: "var(--game-syllables)",
+	"primary-foreground": "#4b260e",
+	secondary: "#4b3020",
+	"secondary-foreground": "#ffead9",
+	muted: "#3e291d",
+	"muted-foreground": "#d0ad93",
+	accent: "#4b3020",
+	"accent-foreground": "#ffead9",
+	border: "#65432c",
+	input: "#65432c",
+	ring: "var(--game-syllables)",
+	"syllable-star": "#ffd180",
+	"locate-color": "#d4864a",
 })}
 }
 `.trim();
@@ -141,3 +198,5 @@ export const materialThemeMetaColors = {
 	light: appScheme.light.background,
 	dark: appScheme.dark.background,
 } as const;
+
+export const syllableThemeMetaColors = { light: "#fff9f3", dark: "#291d16" };

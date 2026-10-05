@@ -2,7 +2,7 @@ import type { HistoryState, RouterHistory } from "@tanstack/react-router";
 
 type GameLocation = Pick<RouterHistory["location"], "pathname" | "state">;
 
-type GameHistory = Partial<Record<"/" | "/mini", number>>;
+type GameHistory = Partial<Record<"/" | "/mini" | "/sillabes", number>>;
 
 declare module "@tanstack/react-router" {
 	interface HistoryState {
@@ -10,7 +10,7 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-const games = ["/", "/mini"] as const;
+const games = ["/", "/mini", "/sillabes"] as const;
 
 function previousGames(location: GameLocation): GameHistory {
 	const indices = { ...location.state.garbuixGameHistory };
@@ -28,6 +28,8 @@ export function getGameHistory(location: GameLocation): GameHistory {
 	if (path === "/" || path === "/mini" || path === "/mini/") {
 		indices[path === "/" ? "/" : "/mini"] = location.state.__TSR_index;
 	}
+	if (path === "/sillabes" || path === "/sillabes/")
+		indices["/sillabes"] = location.state.__TSR_index;
 	return indices;
 }
 

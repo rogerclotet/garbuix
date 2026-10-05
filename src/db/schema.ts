@@ -17,6 +17,7 @@ import type {
 	HistorySummaryEntry,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import type { SyllablePuzzlePublic } from "@/lib/syllable-types";
 
 type StoredPuzzleEventPayload = Record<string, unknown>;
 
@@ -46,6 +47,37 @@ export const miniProgress = pgTable(
 	},
 	(table) => [
 		uniqueIndex("mini_progress_user_puzzle_idx").on(
+			table.userId,
+			table.puzzleId,
+		),
+	],
+);
+
+export const syllablePuzzles = pgTable("syllable_puzzles", {
+	id: text("id").primaryKey(),
+	dateKey: date("date_key").notNull().unique(),
+	publicSnapshotJson: jsonb("public_snapshot_json")
+		.$type<SyllablePuzzlePublic>()
+		.notNull(),
+	privateSnapshotJson: jsonb("private_snapshot_json")
+		.$type<DailyPuzzlePrivate>()
+		.notNull(),
+});
+
+export const syllableProgress = pgTable(
+	"syllable_progress",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		puzzleId: text("puzzle_id")
+			.notNull()
+			.references(() => syllablePuzzles.id, { onDelete: "cascade" }),
+		progressJson: jsonb("progress_json").$type<PuzzleProgressState>().notNull(),
+	},
+	(table) => [
+		uniqueIndex("syllable_progress_user_puzzle_idx").on(
 			table.userId,
 			table.puzzleId,
 		),

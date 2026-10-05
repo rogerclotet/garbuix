@@ -19,6 +19,8 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
+import { Route as SillabesIndexRouteImport } from './routes/sillabes.index'
+import { Route as SillabesDiesAnteriorsRouteImport } from './routes/sillabes.dies-anteriors'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
@@ -73,6 +75,16 @@ const MiniDiesAnteriorsRoute = MiniDiesAnteriorsRouteImport.update({
   path: '/mini/dies-anteriors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SillabesIndexRoute = SillabesIndexRouteImport.update({
+  id: '/sillabes/',
+  path: '/sillabes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SillabesDiesAnteriorsRoute = SillabesDiesAnteriorsRouteImport.update({
+  id: '/sillabes/dies-anteriors',
+  path: '/sillabes/dies-anteriors',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -99,7 +111,9 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
+  '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -114,7 +128,9 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini': typeof MiniIndexRoute
+  '/sillabes': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -130,7 +146,9 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
+  '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
@@ -147,7 +165,9 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/sillabes/dies-anteriors'
     | '/mini/'
+    | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -162,7 +182,9 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/sillabes/dies-anteriors'
     | '/mini'
+    | '/sillabes'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -177,7 +199,9 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/sillabes/dies-anteriors'
     | '/mini/'
+    | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
     | '/api/leaderboard/$'
@@ -193,7 +217,9 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
+  SillabesDiesAnteriorsRoute: typeof SillabesDiesAnteriorsRoute
   MiniIndexRoute: typeof MiniIndexRoute
+  SillabesIndexRoute: typeof SillabesIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
@@ -271,6 +297,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MiniDiesAnteriorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sillabes/': {
+      id: '/sillabes/'
+      path: '/sillabes'
+      fullPath: '/sillabes/'
+      preLoaderRoute: typeof SillabesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sillabes/dies-anteriors': {
+      id: '/sillabes/dies-anteriors'
+      path: '/sillabes/dies-anteriors'
+      fullPath: '/sillabes/dies-anteriors'
+      preLoaderRoute: typeof SillabesDiesAnteriorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -305,7 +345,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
+  SillabesDiesAnteriorsRoute: SillabesDiesAnteriorsRoute,
   MiniIndexRoute: MiniIndexRoute,
+  SillabesIndexRoute: SillabesIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,

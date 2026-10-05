@@ -15,3 +15,6 @@ count.txt
 src/data/catalan-words.json
 src/data/catalan-guess-words.json
 public/version.json
+
+src/data/catalan-syllables.json
+src/data/catalan-syllable-words.json

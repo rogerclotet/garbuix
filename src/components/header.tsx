@@ -18,12 +18,14 @@ import {
 	setProfilePreferencesTipOpen,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
+import { SyllableHelpDialog } from "@/components/syllables/syllable-help-dialog";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { getGameHistory } from "@/lib/game-history";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useMiniRoute } from "@/lib/use-mini-route";
+import { useSyllableRoute } from "@/lib/use-syllable-route";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -32,10 +34,13 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 	"/sobre-el-joc": "Sobre el joc",
 	"/privacitat": "Privacitat",
 	"/mini/dies-anteriors": "Historial mini",
+	"/sillabes/dies-anteriors": "Historial síl·labes",
 };
 
 export default function Header() {
 	const mini = useMiniRoute();
+	const syllables = useSyllableRoute();
+	const gamePath = syllables ? "/sillabes" : mini ? "/mini" : "/";
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const location = useRouterState({ select: (s) => s.location });
 	const historyIndex = location.state.__TSR_index;
@@ -74,7 +79,7 @@ export default function Header() {
 		});
 	};
 
-	const returnToGame = (to: "/" | "/mini") => {
+	const returnToGame = (to: "/" | "/mini" | "/sillabes") => {
 		const gameHistoryIndex = gameHistoryIndices[to];
 
 		// Reuse the game entry so Back cannot revisit the pages we're leaving.
@@ -139,7 +144,12 @@ export default function Header() {
 
 	const dialogs = (
 		<>
-			{mini ? (
+			{syllables ? (
+				<SyllableHelpDialog
+					open={howToPlayOpen}
+					onOpenChange={setHowToPlayOpen}
+				/>
+			) : mini ? (
 				<MiniHelpDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
 			) : (
 				<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
@@ -160,7 +170,7 @@ export default function Header() {
 							<Button
 								variant="ghost"
 								size="icon-lg"
-								onClick={() => returnToGame(mini ? "/mini" : "/")}
+								onClick={() => returnToGame(gamePath)}
 								className="size-11 -ml-2 rounded-full text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9 sm:-ml-1"
 								aria-label="Tornar"
 							>
@@ -172,18 +182,32 @@ export default function Header() {
 						</div>
 					) : (
 						<Link
-							to={mini ? "/mini" : "/"}
+							to={gamePath}
 							replace
 							className="flex items-center gap-3 hover:opacity-80 transition-opacity"
 						>
 							<Logo
 								className="w-5 h-5 sm:w-6 sm:h-6 text-primary"
-								aria-label={mini ? "Logo Garbuixmini" : "Logo Garbuix!"}
+								aria-label={
+									syllables
+										? "Logo Garbuix síl·labes"
+										: mini
+											? "Logo Garbuix mini"
+											: "Logo Garbuix!"
+								}
 							/>
 							<h1 className="text-2xl font-bold text-primary">
-								{mini ? (
+								{syllables ? (
 									<>
-										Garbuix<span className="text-[var(--mini-gold)]">mini</span>
+										Garbuix{" "}
+										<span className="text-[var(--syllable-star)]">
+											síl·labes
+										</span>
+									</>
+								) : mini ? (
+									<>
+										Garbuix{" "}
+										<span className="text-[var(--mini-gold)]">mini</span>
 									</>
 								) : (
 									"Garbuix!"
@@ -191,7 +215,7 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
-					{actionButtons(!innerTitle && !mini)}
+					{actionButtons(!innerTitle && !mini && !syllables)}
 				</div>
 			</div>
 			{dialogs}

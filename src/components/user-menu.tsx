@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
+import { useSyllableRoute } from "@/lib/use-syllable-route";
 import { initialsFromName } from "@/lib/user-profile";
 
 const rootRoute = getRouteApi("__root__");
@@ -68,6 +69,7 @@ export function UserMenu({
 	onReturnToGarbuix: () => void;
 }) {
 	const mini = useMiniRoute();
+	const syllables = useSyllableRoute();
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const [open, setOpen] = useState(false);
@@ -153,7 +155,15 @@ export function UserMenu({
 					</>
 				)}
 				<DropdownMenuItem asChild>
-					<Link to={mini ? "/mini/dies-anteriors" : "/dies-anteriors"}>
+					<Link
+						to={
+							syllables
+								? "/sillabes/dies-anteriors"
+								: mini
+									? "/mini/dies-anteriors"
+									: "/dies-anteriors"
+						}
+					>
 						<History className="size-4" />
 						<span>Historial</span>
 					</Link>
@@ -178,7 +188,7 @@ export function UserMenu({
 						<span>Privacitat</span>
 					</Link>
 				</DropdownMenuItem>
-				{!mini ? (
+				{!mini && !syllables ? (
 					<DropdownMenuItem asChild>
 						<Link to="/preferencies">
 							<Settings className="size-4" />
@@ -190,10 +200,10 @@ export function UserMenu({
 				<DropdownMenuSeparator />
 				<DropdownMenuItem asChild>
 					<Link
-						to={mini ? "/" : "/mini"}
+						to={mini || syllables ? "/" : "/mini"}
 						onClick={(event) => {
 							if (
-								mini &&
+								(mini || syllables) &&
 								event.button === 0 &&
 								!event.metaKey &&
 								!event.ctrlKey &&
@@ -206,10 +216,42 @@ export function UserMenu({
 							}
 						}}
 					>
-						<Logo className="size-4" aria-hidden />
-						<span>{mini ? "Garbuix!" : "Garbuix mini"}</span>
+						<Logo
+							className="size-4"
+							style={{
+								color:
+									mini || syllables
+										? "var(--game-regular)"
+										: "var(--game-mini)",
+							}}
+							aria-hidden
+						/>
+						<span>{mini || syllables ? "Garbuix!" : "Garbuix mini"}</span>
 					</Link>
 				</DropdownMenuItem>
+				{syllables ? (
+					<DropdownMenuItem asChild>
+						<Link to="/mini">
+							<Logo
+								className="size-4"
+								style={{ color: "var(--game-mini)" }}
+								aria-hidden
+							/>
+							<span>Garbuix mini</span>
+						</Link>
+					</DropdownMenuItem>
+				) : (
+					<DropdownMenuItem asChild>
+						<Link to="/sillabes">
+							<Logo
+								className="size-4"
+								style={{ color: "var(--game-syllables)" }}
+								aria-hidden
+							/>
+							<span>Garbuix síl·labes</span>
+						</Link>
+					</DropdownMenuItem>
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

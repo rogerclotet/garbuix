@@ -1,14 +1,15 @@
 {
 	"name": "garbuix",
 	"private": true,
+	"license": "GPL-3.0-or-later",
 	"type": "module",
 	"packageManager": "pnpm@11.25.0",
 	"scripts": {
 		"dev": "node --env-file-if-exists=.env --import ./instrument.server.mjs ./node_modules/vite/bin/vite.js dev --port 3000",
 		"build": "vite build && cp instrument.server.mjs sentry-privacy.ts public/version.json .output/server/",
-		"prebuild": "tsx scripts/write-build-version.ts && tsx scripts/download-catalan-dictionary.ts --if-missing",
+		"prebuild": "tsx scripts/write-build-version.ts && tsx scripts/download-catalan-dictionary.ts --if-missing && tsx scripts/build-syllable-dictionary.ts --if-missing",
 		"start": "node --env-file-if-exists=.env --import ./.output/server/instrument.server.mjs .output/server/index.mjs",
-		"download-dict": "tsx scripts/download-catalan-dictionary.ts --force",
+		"download-dict": "tsx scripts/download-catalan-dictionary.ts --force && tsx scripts/build-syllable-dictionary.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"auth:migrate:plan": "auth migrate plan",
@@ -29,7 +30,7 @@
 		"format": "biome format",
 		"lint": "biome lint",
 		"check": "biome check",
-		"ensure-dict": "tsx scripts/download-catalan-dictionary.ts --if-missing",
+		"ensure-dict": "tsx scripts/download-catalan-dictionary.ts --if-missing && tsx scripts/build-syllable-dictionary.ts --if-missing",
 		"ci:lint": "pnpm lint && pnpm check && pnpm ensure-dict && pnpm typecheck",
 		"typecheck": "tsc --noEmit",
 		"prepare": "husky"

@@ -1,3 +1,4 @@
+import type { Word } from "@/data/types";
 import { type CrosswordGrid, SeededRandom } from "@/lib/crossword-generator";
 import {
 	createAnswerHash,
@@ -94,6 +95,7 @@ export async function buildPuzzleSnapshots(options: {
 	initialShuffledLetters: string[];
 	algorithmVersion: string;
 	availableWordCount: number;
+	getCells?: (word: Word) => string[];
 }) {
 	const {
 		algorithmVersion,
@@ -138,8 +140,15 @@ export async function buildPuzzleSnapshots(options: {
 			startRow: wordPlacement.startRow,
 			startCol: wordPlacement.startCol,
 			direction: wordPlacement.direction,
-			length,
-			middleDotAfterIndices,
+			length: options.getCells?.(wordPlacement.word).length ?? length,
+			middleDotAfterIndices: options.getCells ? [] : middleDotAfterIndices,
+			...(options.getCells
+				? {
+						cellLengths: options
+							.getCells(wordPlacement.word)
+							.map((cell) => cell.length),
+					}
+				: {}),
 			slotSalt,
 			answerHash,
 			answerCapsule,

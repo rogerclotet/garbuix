@@ -23,6 +23,9 @@ export type PuzzleWordSlot = {
 	direction: PuzzleDirection;
 	length: number;
 	middleDotAfterIndices?: number[];
+	// Syllable boards store the number of characters in each cell.
+	// Older and letter-based boards omit this metadata.
+	cellLengths?: number[];
 };
 
 export type DailyPuzzleWordSlot = PuzzleWordSlot & {

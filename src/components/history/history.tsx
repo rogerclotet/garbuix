@@ -221,6 +221,7 @@ export function HistoryView({
 	isLoadingMore,
 	onLoadMore,
 	mini = false,
+	mode = "regular",
 }: {
 	entries: HistorySummaryEntry[];
 	stats: HistoryStats;
@@ -230,6 +231,7 @@ export function HistoryView({
 	isLoadingMore: boolean;
 	onLoadMore: () => void;
 	mini?: boolean;
+	mode?: "regular" | "syllables";
 }) {
 	const statCards = [
 		{
@@ -243,7 +245,7 @@ export function HistoryView({
 		{
 			label: "Pistes donades",
 			value: stats.cluesGiven,
-			hidden: mini,
+			hidden: mini || mode === "syllables",
 		},
 		{
 			label: "Ratxa actual",
@@ -263,9 +265,11 @@ export function HistoryView({
 		<div className="min-h-screen px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-16">
 			<div className="max-w-5xl mx-auto space-y-6">
 				<p className="text-sm text-muted-foreground font-ui">
-					{mini
-						? "El teu progrés a Garbuixmini, amb les seves pròpies estadístiques."
-						: "Consulta els resultats dels dies passats i el teu progrés."}
+					{mode === "syllables"
+						? "El teu progrés a Garbuix síl·labes, amb les seves pròpies estadístiques."
+						: mini
+							? "El teu progrés a Garbuixmini, amb les seves pròpies estadístiques."
+							: "Consulta els resultats dels dies passats i el teu progrés."}
 				</p>
 
 				<div className="grid gap-6 lg:grid-cols-2">
@@ -417,6 +421,14 @@ export function HistoryView({
 													return (
 														<div
 															key={key}
+															style={
+																mode === "syllables"
+																	? {
+																			fontSize:
+																				"clamp(0.5rem, calc(23cqi / var(--cols)), 1rem)",
+																		}
+																	: undefined
+															}
 															className="aspect-square border rounded-[18%] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
 														>
 															{cell.toUpperCase()}

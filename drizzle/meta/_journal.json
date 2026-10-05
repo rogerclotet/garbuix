@@ -71,6 +71,13 @@
       "when": 1790496192798,
       "tag": "0009_better_auth_provider_account",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791193043023,
+      "tag": "0010_syllables",
+      "breakpoints": true
     }
   ]
 }

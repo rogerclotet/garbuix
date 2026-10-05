@@ -150,20 +150,25 @@ export function PuzzleGrid({
 				if (!cell) {
 					return <div key={key} className="aspect-square bg-transparent" />;
 				}
+				const cellStyle: CSSProperties & {
+					"--cell-characters": number;
+					"--guess-letter-delay"?: string;
+				} = {
+					"--cell-characters": cellLetters.get(key)?.length ?? 1,
+					...(isJustGuessed
+						? {
+								"--guess-letter-delay": isJustLanded
+									? "0ms"
+									: `${(highlightedLetterIndex ?? 0) * 34}ms`,
+							}
+						: {}),
+				};
 
 				return (
 					<div
 						key={key}
 						data-cell-key={key}
-						style={
-							isJustGuessed
-								? ({
-										"--guess-letter-delay": isJustLanded
-											? "0ms"
-											: `${(highlightedLetterIndex ?? 0) * 34}ms`,
-									} as CSSProperties)
-								: undefined
-						}
+						style={cellStyle}
 						className={`puzzle-cell relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
 							isRevealed
 								? "bg-primary/12 border-primary/40 text-foreground"

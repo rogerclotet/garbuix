@@ -98,6 +98,7 @@ export function tryGenerateCrossword(
 	words: Word[],
 	minWords: number,
 	maxWords: number,
+	getCells: (word: Word) => string[] = getWordCells,
 ): CrosswordGrid | null {
 	const placements: WordPlacement[] = [];
 	const grid: Map<string, GridCell> = new Map();
@@ -105,7 +106,7 @@ export function tryGenerateCrossword(
 	// Place first word horizontally in the middle
 	const MAX_GRID_SIZE = 15;
 	const firstWord = words[0];
-	const firstWordLetters = getWordCells(firstWord);
+	const firstWordLetters = getCells(firstWord);
 	// Place the first word around the center of the potential 15x15 grid
 	const startRow = Math.floor((MAX_GRID_SIZE - firstWordLetters.length) / 2);
 	const startCol = Math.floor((MAX_GRID_SIZE - firstWordLetters.length) / 2);
@@ -135,13 +136,19 @@ export function tryGenerateCrossword(
 			return false;
 		}
 
-		const placement = findBestPlacement(word, placements, grid, wordId);
+		const placement = findBestPlacement(
+			word,
+			placements,
+			grid,
+			wordId,
+			getCells,
+		);
 		if (!placement) {
 			return false;
 		}
 
 		placements.push(placement);
-		const wordLetters = getWordCells(word);
+		const wordLetters = getCells(word);
 		for (let j = 0; j < wordLetters.length; j++) {
 			const row =
 				placement.direction === "horizontal"
@@ -201,14 +208,15 @@ function findBestPlacement(
 	placements: WordPlacement[],
 	grid: Map<string, GridCell>,
 	wordId: number,
+	getCells: (word: Word) => string[],
 ): WordPlacement | null {
 	const candidates: Candidate[] = [];
 
 	// Try to find intersections with existing words
-	const wordLetters = getWordCells(word);
+	const wordLetters = getCells(word);
 	for (const placement of placements) {
 		const existingWord = placement.word;
-		const existingWordLetters = getWordCells(existingWord);
+		const existingWordLetters = getCells(existingWord);
 
 		// Try both directions
 		for (const direction of ["horizontal", "vertical"] as const) {
@@ -236,13 +244,14 @@ function findBestPlacement(
 						}
 
 						// Check if this placement is valid
-						if (isValidPlacement(word, row, col, direction, grid)) {
+						if (isValidPlacement(word, row, col, direction, grid, getCells)) {
 							const intersections = countIntersections(
 								word,
 								row,
 								col,
 								direction,
 								grid,
+								getCells,
 							);
 							candidates.push({
 								word,
@@ -282,9 +291,10 @@ function isValidPlacement(
 	startCol: number,
 	direction: "horizontal" | "vertical",
 	grid: Map<string, GridCell>,
+	getCells: (word: Word) => string[],
 ): boolean {
 	const MAX_GRID_SIZE = 15;
-	const wordLetters = getWordCells(word);
+	const wordLetters = getCells(word);
 
 	// Check bounds
 	if (
@@ -366,10 +376,11 @@ function countIntersections(
 	startCol: number,
 	direction: "horizontal" | "vertical",
 	grid: Map<string, GridCell>,
+	getCells: (word: Word) => string[],
 ): number {
 	let count = 0;
 	const isHorizontal = direction === "horizontal";
-	const wordLetters = getWordCells(word);
+	const wordLetters = getCells(word);
 
 	for (let i = 0; i < wordLetters.length; i++) {
 		const row = isHorizontal ? startRow : startRow + i;
