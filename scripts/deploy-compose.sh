@@ -17,7 +17,8 @@ docker compose build app pre-generator
 
 if [ "${1:-}" = "--update-dependencies" ]; then
   # Dependency maintenance must not interrupt connections from live writers.
-  docker compose stop app pre-generator
+  docker compose stop pre-generator
+  docker compose stop app
   docker compose up -d --pull always --wait --wait-timeout 120 db redis
 else
   # Routine releases must not reconcile dependency image/configuration drift.
@@ -26,7 +27,9 @@ fi
 
 # Neither old writer may use the database while its schema changes.
 if [ "${1:-}" != "--update-dependencies" ]; then
-  docker compose stop app pre-generator
+  # Let scheduler shutdown finish while the frontend is still serving.
+  docker compose stop pre-generator
+  docker compose stop app
 fi
 docker compose run --rm --no-deps app pnpm db:migrate
 
