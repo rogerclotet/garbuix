@@ -8,9 +8,6 @@ export const Route = createFileRoute("/privacitat")({
 	component: PrivacyPage,
 });
 
-const linkClass =
-	"underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
-
 function PrivacyPage() {
 	return (
 		<article className="mx-auto max-w-2xl space-y-8 px-4 py-8 text-sm leading-relaxed sm:py-12">
@@ -37,7 +34,7 @@ function PrivacyPage() {
 				<p>
 					Roger Clotet és el responsable del tractament de dades de Garbuix i
 					Garbuix mini. Per a qualsevol consulta de privacitat, escriu a{" "}
-					<a href="mailto:roger@clotet.dev" className={linkClass}>
+					<a href="mailto:roger@clotet.dev" className="text-link">
 						roger@clotet.dev
 					</a>
 					.
@@ -164,12 +161,12 @@ function PrivacyPage() {
 					Pots sol·licitar l'accés, la rectificació, la supressió, la limitació
 					i, quan correspongui, la portabilitat de les teves dades. També pots
 					oposar-te al tractament basat en l'interès legítim. Escriu a{" "}
-					<a href="mailto:roger@clotet.dev" className={linkClass}>
+					<a href="mailto:roger@clotet.dev" className="text-link">
 						roger@clotet.dev
 					</a>
 					. Si consideres que no hem atès els teus drets, pots presentar una
 					reclamació davant l'{" "}
-					<a href="https://www.aepd.es/" className={linkClass}>
+					<a href="https://www.aepd.es/" className="text-link">
 						Agència Espanyola de Protecció de Dades
 					</a>
 					.

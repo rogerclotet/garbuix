@@ -108,6 +108,12 @@ code {
 	--radius-4xl: calc(var(--radius) + 16px);
 }
 
+@layer components {
+	.text-link {
+		@apply text-primary underline decoration-current underline-offset-4 hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring;
+	}
+}
+
 @layer utilities {
 	.font-ui {
 		font-family: "Inter Variable", sans-serif;
