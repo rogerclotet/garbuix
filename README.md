@@ -39,6 +39,19 @@ written to the gitignored `src/data/catalan-syllables.json` and bundled on the
 server, so play requires no external syllabification service. Guess validation
 checks the chosen syllable boundaries, not only the concatenated letters.
 
+The pinned patterns are a build-time data dependency used only by Síl·labes;
+Mini's extra-word dictionary uses the original word list without syllable divisions.
+The five crossword targets use the curated divisions, so hyphen-ca affects the
+extra-word dictionary. Daily Síl·labes boards are generated on the first request
+for that date and stored with their accepted guesses; they are not part of the
+regular game's nightly pre-generator. Rebuilding the dictionary does not change
+existing stored boards.
+
+hyphen-ca publishes data files rather than an npm package, so the commit in
+`SOURCE` acts as the dependency lock. Its `ca.js` matches the v1.5 release.
+To update it, change that revision, run `pnpm download-dict`, and check the
+syllable tests before deploying.
+
 `pnpm download-dict` rebuilds all dictionaries, including syllable divisions.
 Run it after changing the curated vocabulary. Builds and `pnpm ensure-dict`
 generate missing files automatically. Apply migration `0010_syllables.sql`

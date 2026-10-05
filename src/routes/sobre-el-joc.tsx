@@ -36,8 +36,27 @@ function AboutPage() {
 					menys freqüents com a paraules extra.
 				</p>
 				<p>
-					Garbuix mini fa servir una selecció pròpia de paraules curtes i
-					quotidianes, pensada per a infants que comencen a llegir.
+					Garbuix mini i Garbuix síl·labes fan servir una selecció pròpia de
+					paraules curtes i quotidianes, pensada per a infants que comencen a
+					llegir.
+				</p>
+				<p>
+					Per separar en síl·labes les paraules extra de Garbuix síl·labes, fem
+					servir els patrons de{" "}
+					<a
+						href="https://github.com/jaumeortola/hyphen-ca"
+						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+					>
+						hyphen-ca
+					</a>
+					, de Jaume Ortolà, publicats sota la llicència{" "}
+					<a
+						href="https://github.com/jaumeortola/hyphen-ca/blob/dac10c01eab7132c1ddf4a22e2ea8a3f6ee439ae/LICENSE"
+						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+					>
+						GPL-3.0
+					</a>
+					.
 				</p>
 			</section>
 			<section className="space-y-3 text-sm leading-relaxed">

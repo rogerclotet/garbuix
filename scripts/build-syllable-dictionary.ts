@@ -5,7 +5,8 @@ import { SYLLABLE_WORDS } from "../src/data/syllable-words";
 import { createSyllableSplitter } from "./syllable-patterns";
 
 // This is the pattern source linked by Softcatalà's syllable separator.
-// Pin it so a fresh deployment cannot silently change the daily vocabulary.
+// Keep the build-time extra-word syllable divisions reproducible across builds.
+// Puzzle targets use the manually divided vocabulary in SYLLABLE_WORDS.
 // Patterns: Jaume Ortolà, GPL-3.0, https://github.com/jaumeortola/hyphen-ca
 const SOURCE =
 	"https://raw.githubusercontent.com/jaumeortola/hyphen-ca/dac10c01eab7132c1ddf4a22e2ea8a3f6ee439ae/ca.js";
