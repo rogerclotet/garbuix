@@ -14,6 +14,11 @@ import type { PuzzleSubmitFeedback } from "./puzzle-types";
 
 const HINT_HOLD_MS = 600;
 
+// Room the pinned keypad claims until it has reported its real height (see
+// onHeightChange). Only the first paint uses it, and only the board's size
+// depends on it.
+export const KEYPAD_FALLBACK_HEIGHT = "17rem";
+
 // Circle layout: every size below is derived from this one clamp, set as the
 // --circle-key custom property on the wheel, so the keys, the submit button,
 // the wheel itself, and the letters' font size all scale together and in

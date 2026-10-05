@@ -49,10 +49,6 @@ export function DailyStatus({
 			</div>
 		);
 
-	const percent = Math.min(
-		100,
-		Math.max(0, (progress.guessedWordIds.length / totalWords) * 100),
-	);
 	// Bottom meter fills 0→WORDS_PER_BONUS_CLUE toward the next bonus
 	// clue and resets each time one is earned; the label keeps the total.
 	const bonusCount = progress.bonusWordsFound;
@@ -61,37 +57,11 @@ export function DailyStatus({
 	const wordsToNextClue = WORDS_PER_BONUS_CLUE - bonusInCycle;
 	return (
 		<div className="flex flex-col overflow-hidden rounded-lg">
-			<div
-				className="relative h-9 overflow-hidden bg-muted/40"
-				role="progressbar"
-				aria-valuenow={progress.guessedWordIds.length}
-				aria-valuemin={0}
-				aria-valuemax={totalWords}
-				aria-label="Paraules trobades"
-			>
-				<div
-					className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
-					style={{ width: `${percent}%` }}
-				/>
-				<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
-					<span className="flex items-baseline gap-1">
-						<span className="text-foreground tabular-nums text-xs">
-							{progress.guessedWordIds.length}
-						</span>
-						<span className="text-muted-foreground/50">/</span>
-						<span className="text-muted-foreground tabular-nums">
-							{totalWords}
-						</span>
-						<span className="ml-1 hidden text-muted-foreground sm:inline">
-							paraules
-						</span>
-					</span>
-					<span className="text-muted-foreground tabular-nums">
-						{progress.guessCount}{" "}
-						{progress.guessCount === 1 ? "intent" : "intents"}
-					</span>
-				</div>
-			</div>
+			<DailyWordsMeter
+				foundCount={progress.guessedWordIds.length}
+				totalWords={totalWords}
+				guessCount={progress.guessCount}
+			/>
 			<div
 				className="relative h-6 overflow-hidden bg-blue-500/10 dark:bg-blue-400/10"
 				role="progressbar"
@@ -117,6 +87,50 @@ export function DailyStatus({
 						{wordsToNextClue} per a una lletra
 					</span>
 				</div>
+			</div>
+		</div>
+	);
+}
+
+export function DailyWordsMeter({
+	foundCount,
+	totalWords,
+	guessCount,
+}: {
+	foundCount: number;
+	totalWords: number;
+	guessCount: number;
+}) {
+	const percent = Math.min(100, Math.max(0, (foundCount / totalWords) * 100));
+	return (
+		<div
+			className="relative h-9 overflow-hidden bg-muted/40"
+			role="progressbar"
+			aria-valuenow={foundCount}
+			aria-valuemin={0}
+			aria-valuemax={totalWords}
+			aria-label="Paraules trobades"
+		>
+			<div
+				className="absolute inset-y-0 left-0 bg-primary/15 transition-[width] duration-500 ease-out"
+				style={{ width: `${percent}%` }}
+			/>
+			<div className="relative flex h-full items-center justify-between gap-2 px-2.5 text-[11px] font-semibold font-ui">
+				<span className="flex items-baseline gap-1">
+					<span className="text-foreground tabular-nums text-xs">
+						{foundCount}
+					</span>
+					<span className="text-muted-foreground/50">/</span>
+					<span className="text-muted-foreground tabular-nums">
+						{totalWords}
+					</span>
+					<span className="ml-1 hidden text-muted-foreground sm:inline">
+						paraules
+					</span>
+				</span>
+				<span className="text-muted-foreground tabular-nums">
+					{guessCount} {guessCount === 1 ? "intent" : "intents"}
+				</span>
 			</div>
 		</div>
 	);

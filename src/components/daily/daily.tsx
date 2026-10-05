@@ -1,19 +1,18 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { MiniAnnouncementDialog } from "@/components/mini/mini-announcement-dialog";
 import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
-import { PuzzleControls } from "@/components/puzzle/puzzle-controls";
+import {
+	KEYPAD_FALLBACK_HEIGHT,
+	PuzzleControls,
+} from "@/components/puzzle/puzzle-controls";
 import { PuzzleFlyingLetters } from "@/components/puzzle/puzzle-flying-letters";
 import { PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
+import { useLetterLayout } from "@/components/puzzle/use-letter-layout";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
-import {
-	DEFAULT_LETTER_LAYOUT,
-	getLetterLayout,
-	type LetterLayout,
-} from "@/lib/anon-identity";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
 import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
@@ -32,35 +31,6 @@ import { useDailyProgress } from "./use-daily-progress";
 import { useDailyShare } from "./use-daily-share";
 import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
-
-// Room the classic keypad claims until it has reported its real height.
-// Only the first paint uses it, and only the board's size depends on it.
-const CLASSIC_KEYPAD_FALLBACK_HEIGHT = "17rem";
-// The width at which the board switches to its two-column desktop layout,
-// where the keypad lives in a narrow side column. Matches the `lg:` breakpoint
-// the classic layout is built on.
-const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
-
-// Starts false so the server and the first client render agree; the real value
-// lands right after mount, before anything the player can act on.
-function useIsDesktopLayout(): boolean {
-	const [isDesktop, setIsDesktop] = useState(false);
-
-	useEffect(() => {
-		if (typeof window.matchMedia !== "function") {
-			return;
-		}
-
-		const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
-		const update = () => setIsDesktop(mediaQuery.matches);
-
-		update();
-		mediaQuery.addEventListener("change", update);
-		return () => mediaQuery.removeEventListener("change", update);
-	}, []);
-
-	return isDesktop;
-}
 
 export function Daily({ initialData }: { initialData: DailyData }) {
 	return <DailySession key={initialData.puzzle.id} initialData={initialData} />;
@@ -92,22 +62,10 @@ function DailyGame({
 	progressState: ReturnType<typeof useDailyProgress>;
 	sessionPending: boolean;
 }) {
-	const isDesktopLayout = useIsDesktopLayout();
 	const puzzle = initialData.puzzle;
 	const totalWords = puzzle.wordSlots.length;
 	// A player can opt into any of the three arrangements via /preferencies.
-	// Initialise to the default so SSR markup is deterministic, then read the
-	// stored choice after mount.
-	const [letterLayout, setLetterLayout] = useState<LetterLayout>(
-		DEFAULT_LETTER_LAYOUT,
-	);
-	useEffect(() => {
-		setLetterLayout(getLetterLayout());
-	}, []);
-	// The line only fits the phone keypad; on a desktop the keys live in a narrow
-	// side column, so a seven-across row falls back to the grid.
-	const effectiveLetterLayout: LetterLayout =
-		letterLayout === "line" && isDesktopLayout ? "grid" : letterLayout;
+	const effectiveLetterLayout = useLetterLayout();
 	// Height of the keypad pinned to the bottom of the classic board. Measured
 	// rather than assumed: which arrangement the letters use is a preference, and
 	// each one is a different height.
@@ -267,7 +225,7 @@ function DailyGame({
 	const keypadHeightCss = displayComplete
 		? "0px"
 		: keypadHeight == null
-			? CLASSIC_KEYPAD_FALLBACK_HEIGHT
+			? KEYPAD_FALLBACK_HEIGHT
 			: `${keypadHeight}px`;
 
 	return (

@@ -32,7 +32,23 @@ function typeWord(word: string) {
 	fireEvent.keyDown(board, { key: "Enter" });
 }
 
+function expectFoundWords(count: number) {
+	expect(
+		screen
+			.getByRole("progressbar", { name: "Paraules trobades" })
+			.getAttribute("aria-valuenow"),
+	).toBe(String(count));
+}
+
 beforeEach(() => {
+	// jsdom has no ResizeObserver; the keypad reports its height through one.
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			observe() {}
+			disconnect() {}
+		},
+	);
 	// Node 25 exposes a non-functional localStorage to jsdom in this test setup.
 	const entries = new Map<string, string>();
 	vi.stubGlobal("localStorage", {
@@ -75,10 +91,10 @@ describe("guided tutorial", () => {
 			),
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Comprovar" }));
-		expect(screen.getByText("1 / 5 paraules")).toBeTruthy();
+		expectFoundWords(1);
 		expect(screen.getByText("Una pista per continuar")).toBeTruthy();
 		typeWord("costa");
-		expect(screen.getByText("1 / 5 paraules")).toBeTruthy();
+		expectFoundWords(1);
 		// Keyboard / assistive-technology activation of the real clue control.
 		fireEvent.click(screen.getByRole("button", { name: "Pista (3)" }), {
 			detail: 0,
@@ -95,7 +111,7 @@ describe("guided tutorial", () => {
 		expect(document.activeElement).toBe(screen.getByRole("application"));
 		typeWord("osta");
 		for (const word of ["carta", "rosa", "tros"]) typeWord(word);
-		expect(screen.getByText("5 / 5 paraules")).toBeTruthy();
+		expectFoundWords(5);
 		expect(screen.getByText("Pas 4 de 4")).toBeTruthy();
 		expect(screen.getByText("Ajuda altres jugadors")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Ajuda la Marta" }));
@@ -143,7 +159,7 @@ describe("guided tutorial", () => {
 		expect(hasSeenHowToPlay()).toBe(true);
 		expect(screen.queryByRole("dialog")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Reobrir" }));
-		expect(screen.getByText("0 / 5 paraules")).toBeTruthy();
+		expectFoundWords(0);
 		expect(screen.getByText("Comencem amb CASA")).toBeTruthy();
 	});
 
@@ -164,7 +180,8 @@ describe("guided tutorial", () => {
 				"Aquesta paraula no és al tutorial. Prova'n una altra o demana una pista.",
 			),
 		).toBeTruthy();
-		expect(screen.getByText("1 / 5 paraules")).toBeTruthy();
+		expectFoundWords(1);
+		expect(screen.getByText("3 intents")).toBeTruthy();
 	});
 
 	it("reveals a clue only after holding the pointer, and cancels an early release", async () => {

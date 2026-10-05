@@ -1,4 +1,8 @@
 import type { PuzzleBoard } from "@/components/puzzle/puzzle-grid";
+import type {
+	PuzzleSubmitFeedback,
+	PuzzleSubmitFeedbackKind,
+} from "@/components/puzzle/puzzle-types";
 import { getSlotCellKey } from "@/lib/puzzle-helpers";
 
 export const TUTORIAL_LETTERS = ["r", "a", "t", "s", "c", "o"];
@@ -78,6 +82,8 @@ export type TutorialState = {
 	clueWordIds: number[];
 	message: string;
 	helpSent: boolean;
+	guessCount: number;
+	feedback: PuzzleSubmitFeedback | null;
 };
 
 export const INITIAL_TUTORIAL_STATE: TutorialState = {
@@ -86,7 +92,24 @@ export const INITIAL_TUTORIAL_STATE: TutorialState = {
 	clueWordIds: [],
 	message: "",
 	helpSent: false,
+	guessCount: 0,
+	feedback: null,
 };
+
+// A checked guess counts as an attempt and flashes in the guess bar, the same
+// way it does on the daily board.
+function checkedGuess(
+	state: TutorialState,
+	kind: PuzzleSubmitFeedbackKind,
+): TutorialState {
+	const guessCount = state.guessCount + 1;
+	return {
+		...state,
+		guess: "",
+		guessCount,
+		feedback: { id: guessCount, word: state.guess, kind },
+	};
+}
 
 export function getTutorialStep(state: TutorialState) {
 	if (state.foundWordIds.length === TUTORIAL_WORDS.length)
@@ -143,20 +166,17 @@ export function tutorialReducer(
 			const word = TUTORIAL_WORDS.find((word) => word.answer === state.guess);
 			if (!word)
 				return {
-					...state,
-					guess: "",
+					...checkedGuess(state, "valid_but_not_in_puzzle"),
 					message:
 						"Aquesta paraula no és al tutorial. Prova'n una altra o demana una pista.",
 				};
 			if (state.foundWordIds.includes(word.id))
 				return {
-					...state,
-					guess: "",
+					...checkedGuess(state, "already_found"),
 					message: "Aquesta ja l'has trobada. Busca'n una altra!",
 				};
 			return {
-				...state,
-				guess: "",
+				...checkedGuess(state, "new_word"),
 				foundWordIds: [...state.foundWordIds, word.id],
 				message: `${word.answer.toUpperCase()}, encertada!`,
 			};
