@@ -41,8 +41,7 @@ function AboutPage() {
 					llegir.
 				</p>
 				<p>
-					Per separar en síl·labes les paraules extra de Garbuix síl·labes, fem
-					servir els patrons de{" "}
+					Garbuix síl·labes fa servir els patrons de{" "}
 					<a
 						href="https://github.com/jaumeortola/hyphen-ca"
 						className="underline decoration-border underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
@@ -56,7 +55,8 @@ function AboutPage() {
 					>
 						GPL-3.0
 					</a>
-					.
+					, per comprovar la separació de les paraules seleccionades i separar
+					les paraules extra.
 				</p>
 			</section>
 			<section className="space-y-3 text-sm leading-relaxed">

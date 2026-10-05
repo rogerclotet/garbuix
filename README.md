@@ -28,7 +28,12 @@ is no leaderboard or audio. The orange theme supports light and dark mode.
 Browser saves, account sync, guest imports, and `/sillabes/dies-anteriors` history
 are separate from both other modes. Daily rollover uses Europe/Madrid.
 
-The target vocabulary and reviewed divisions live in `src/data/syllable-words.ts`.
+The target vocabulary and manually entered divisions live in
+`src/data/syllable-words.ts`.
+They were written for this mode rather than imported from an external word list.
+Dictionary generation checks every division against hyphen-ca and fails on any
+mismatch. CI also compares every target with the independently generated
+dictionary; the manual entries never override hyphen-ca's output.
 Extra words use Softcatalà's dictionary, including words shorter than four letters.
 The existing dictionary has no syllable field. `scripts/build-syllable-dictionary.ts`
 applies the Catalan patterns from [Jaume Ortolà's hyphen-ca](https://github.com/jaumeortola/hyphen-ca),
@@ -41,11 +46,11 @@ checks the chosen syllable boundaries, not only the concatenated letters.
 
 The pinned patterns are a build-time data dependency used only by Síl·labes;
 Mini's extra-word dictionary uses the original word list without syllable divisions.
-The five crossword targets use the curated divisions, so hyphen-ca affects the
-extra-word dictionary. Daily Síl·labes boards are generated on the first request
-for that date and stored with their accepted guesses; they are not part of the
-regular game's nightly pre-generator. Rebuilding the dictionary does not change
-existing stored boards.
+The five crossword targets use the validated curated divisions, while hyphen-ca
+also supplies the extra-word dictionary. Daily Síl·labes boards are generated on
+the first request for that date and stored with their accepted guesses; they are
+not part of the regular game's nightly pre-generator. Rebuilding the dictionary
+does not change existing stored boards.
 
 hyphen-ca publishes data files rather than an npm package, so the commit in
 `SOURCE` acts as the dependency lock. Its `ca.js` matches the v1.5 release.

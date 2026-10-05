@@ -1,5 +1,7 @@
 // Familiar words for early readers, with explicit orthographic syllables.
-// Keep this vocabulary curated. The broader dictionary is only for extra words.
+// Words and divisions were entered manually for this mode, not imported.
+// Dictionary generation and CI validate every division against hyphen-ca.
+// Keep the vocabulary curated; the broader dictionary is for extra words.
 export const SYLLABLE_WORDS: string[][] = [
 	["va", "ca"],
 	["a", "se"],

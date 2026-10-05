@@ -5,8 +5,7 @@ import { SYLLABLE_WORDS } from "../src/data/syllable-words";
 import { createSyllableSplitter } from "./syllable-patterns";
 
 // This is the pattern source linked by Softcatalà's syllable separator.
-// Keep the build-time extra-word syllable divisions reproducible across builds.
-// Puzzle targets use the manually divided vocabulary in SYLLABLE_WORDS.
+// Keep syllable divisions reproducible and validate the manually entered targets.
 // Patterns: Jaume Ortolà, GPL-3.0, https://github.com/jaumeortola/hyphen-ca
 const SOURCE =
 	"https://raw.githubusercontent.com/jaumeortola/hyphen-ca/dac10c01eab7132c1ddf4a22e2ea8a3f6ee439ae/ca.js";
@@ -37,10 +36,16 @@ async function main() {
 	const curated = new Map(
 		SYLLABLE_WORDS.map((syllables) => [syllables.join(""), syllables]),
 	);
-	const entries = words.map((word) => ({
-		word,
-		syllables: curated.get(word) ?? split(word),
-	}));
+	const entries = words.map((word) => {
+		const syllables = split(word);
+		const expected = curated.get(word);
+		if (expected && syllables.join("|") !== expected.join("|")) {
+			throw new Error(
+				`Syllable mismatch for ${word}: curated ${expected.join("·")}, hyphen-ca ${syllables.join("·")}`,
+			);
+		}
+		return { word, syllables };
+	});
 	writeFileSync(OUTPUT, `${JSON.stringify(entries)}\n`);
 	console.log(`Saved ${entries.length} syllabified words to ${OUTPUT}`);
 }

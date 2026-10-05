@@ -25,6 +25,20 @@ import { applySyllableEvent } from "@/lib/syllable-progress";
 import { syllableFixture } from "@/test/syllable-fixture";
 
 describe("syllable puzzles", () => {
+	it.each(
+		SYLLABLE_WORDS.map((syllables) => ({
+			word: syllables.join(""),
+			syllables,
+		})),
+	)(
+		"matches the independently generated hyphen-ca divisions for $word",
+		({ word, syllables }) => {
+			expect(
+				dictionary.find((entry) => entry.word === word)?.syllables,
+			).toEqual(syllables);
+		},
+	);
+
 	it("generates a connected five-word crossword using exactly six syllables throughout a year", () => {
 		const boards = new Set<string>();
 		for (let day = 0; day < 365; day++) {
