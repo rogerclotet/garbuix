@@ -7,6 +7,7 @@ import {
 	LogIn,
 	Menu,
 	Moon,
+	ScrollText,
 	Settings,
 	ShieldCheck,
 	Sun,
@@ -186,6 +187,12 @@ export function UserMenu({
 					<Link to="/privacitat">
 						<ShieldCheck className="size-4" />
 						<span>Privacitat</span>
+					</Link>
+				</DropdownMenuItem>
+				<DropdownMenuItem asChild>
+					<Link to="/condicions">
+						<ScrollText className="size-4" />
+						<span>Condicions d'ús</span>
 					</Link>
 				</DropdownMenuItem>
 				{!mini && !syllables ? (
