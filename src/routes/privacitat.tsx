@@ -23,7 +23,7 @@ function PrivacyPage() {
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzada el 3 d'octubre de 2026
+					Actualitzada el 7 d'octubre de 2026
 				</p>
 			</header>
 
@@ -114,6 +114,33 @@ function PrivacyPage() {
 				</p>
 			</section>
 
+			<section className="space-y-3" aria-labelledby="reddit">
+				<h2 id="reddit" className="text-base font-semibold">
+					La comunitat de Reddit
+				</h2>
+				<p>
+					Cada dia, l'aplicació garbuix-bot publica el Garbuix del dia a{" "}
+					<a href="https://www.reddit.com/r/garbuix/" className="text-link">
+						r/garbuix
+					</a>
+					. Funciona a la plataforma Devvit de Reddit i només desa els
+					identificadors de les seves pròpies publicacions i comentaris, per
+					saber què ha publicat i quina publicació ha de deixar de fixar.
+				</p>
+				<p>
+					L'aplicació no llegeix ni desa dades dels usuaris de Reddit, i no
+					relaciona els comptes de Reddit amb les partides de Garbuix. El que
+					publiques a Reddit es regeix per la{" "}
+					<a
+						href="https://www.reddit.com/policies/privacy-policy"
+						className="text-link"
+					>
+						política de privacitat de Reddit
+					</a>
+					.
+				</p>
+			</section>
+
 			<section className="space-y-3" aria-labelledby="proveidors">
 				<h2 id="proveidors" className="text-base font-semibold">
 					Proveïdors i transferències
@@ -122,7 +149,8 @@ function PrivacyPage() {
 					Els proveïdors d'allotjament intervenen en el funcionament del servei.
 					Google intervé quan tries iniciar-hi sessió. Fem servir Anthropic per
 					generar pistes a partir de paraules del diccionari; no hi enviem el
-					perfil del jugador per generar-les.
+					perfil del jugador per generar-les. Reddit allotja la comunitat
+					r/garbuix i executa l'aplicació que hi publica el joc de cada dia.
 				</p>
 				<p>
 					Els informes d'errors s'envien a la nostra instància de GlitchTip.

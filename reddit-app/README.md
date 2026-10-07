@@ -34,8 +34,10 @@ lockfile and tests, and is not part of the Docker image.
    pnpm run upload
    ```
 
-3. In the app's page on https://developers.reddit.com/apps/garbuix-bot, add links
-   to the terms and privacy policy (required for apps that use HTTP fetch).
+3. In the app's page on https://developers.reddit.com/apps/garbuix-bot, add the
+   links required for apps that use HTTP fetch:
+   - Terms: https://garbuix.app/condicions
+   - Privacy policy: https://garbuix.app/privacitat
 
 4. Once the domain is approved, install the app on r/garbuix from the same page
    (or with `pnpm exec devvit install garbuix`). The scheduled task starts

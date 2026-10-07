@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClassificacioRouteImport } from './routes/classificacio'
+import { Route as CondicionsRouteImport } from './routes/condicions'
 import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PrivacitatRouteImport } from './routes/privacitat'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
 const ClassificacioRoute = ClassificacioRouteImport.update({
   id: '/classificacio',
   path: '/classificacio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CondicionsRoute = CondicionsRouteImport.update({
+  id: '/condicions',
+  path: '/condicions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiesAnteriorsRoute = DiesAnteriorsRouteImport.update({
@@ -116,6 +122,7 @@ const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
+  '/condicions': typeof CondicionsRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
+  '/condicions': typeof CondicionsRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/classificacio': typeof ClassificacioRoute
+  '/condicions': typeof CondicionsRoute
   '/dies-anteriors': typeof DiesAnteriorsRoute
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/classificacio'
+    | '/condicions'
     | '/dies-anteriors'
     | '/preferencies'
     | '/privacitat'
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/classificacio'
+    | '/condicions'
     | '/dies-anteriors'
     | '/preferencies'
     | '/privacitat'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/classificacio'
+    | '/condicions'
     | '/dies-anteriors'
     | '/preferencies'
     | '/privacitat'
@@ -234,6 +246,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClassificacioRoute: typeof ClassificacioRoute
+  CondicionsRoute: typeof CondicionsRoute
   DiesAnteriorsRoute: typeof DiesAnteriorsRoute
   PreferenciesRoute: typeof PreferenciesRoute
   PrivacitatRoute: typeof PrivacitatRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       path: '/classificacio'
       fullPath: '/classificacio'
       preLoaderRoute: typeof ClassificacioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/condicions': {
+      id: '/condicions'
+      path: '/condicions'
+      fullPath: '/condicions'
+      preLoaderRoute: typeof CondicionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dies-anteriors': {
@@ -378,6 +398,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClassificacioRoute: ClassificacioRoute,
+  CondicionsRoute: CondicionsRoute,
   DiesAnteriorsRoute: DiesAnteriorsRoute,
   PreferenciesRoute: PreferenciesRoute,
   PrivacitatRoute: PrivacitatRoute,
