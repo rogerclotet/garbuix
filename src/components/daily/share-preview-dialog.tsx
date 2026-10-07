@@ -84,9 +84,9 @@ export function SharePreviewDialog({
 						Compartir el teu progrés
 					</AlertDialogTitle>
 					<AlertDialogDescription>
-						La imatge mostra quines caselles has revelat, però amaga les
-						lletres. Així pots presumir del progrés sense fer espòilers a qui
-						encara no ha jugat.
+						La imatge mostra quines caselles has revelat i les lletres del dia,
+						però no les paraules. Així pots presumir del progrés sense fer
+						espòilers a qui encara no ha jugat.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 

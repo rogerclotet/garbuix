@@ -108,6 +108,8 @@ const config = defineConfig(({ mode, command }) => {
 			: undefined,
 		test: {
 			setupFiles: ["./src/test/setup.ts"],
+			// The Devvit app runs its own tests with node:test.
+			exclude: ["**/node_modules/**", "**/.git/**", "reddit-app/**"],
 			environmentMatchGlobs: [["src/components/**/*.test.tsx", "jsdom"]],
 			server: {
 				deps: {

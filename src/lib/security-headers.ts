@@ -24,8 +24,9 @@ function getContentSecurityPolicy(browserDsn?: string): string {
 		// React sets inline styles through the style attribute across the board and
 		// the keypad, which style-src governs.
 		"style-src 'self' 'unsafe-inline'",
-		// https: covers Google account avatars; fonts are bundled, not fetched.
-		"img-src 'self' data: https:",
+		// https: covers Google account avatars; blob: the share image preview.
+		// Fonts are bundled, not fetched.
+		"img-src 'self' data: blob: https:",
 		"font-src 'self' data:",
 		// Allow only the configured reporting origin, never DSN credentials or paths.
 		`connect-src 'self'${reportingOrigin ? ` ${reportingOrigin.origin}` : ""}`,
