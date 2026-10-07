@@ -4,7 +4,13 @@ import {
 	useRouter,
 	useRouterState,
 } from "@tanstack/react-router";
-import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
+import {
+	ChevronLeft,
+	HelpingHand,
+	MessagesSquare,
+	Share2,
+	Trophy,
+} from "lucide-react";
 import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
@@ -18,7 +24,6 @@ import {
 	setProfilePreferencesTipOpen,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
-import { RedditIcon } from "@/components/reddit-icon";
 import { SyllableHelpDialog } from "@/components/syllables/syllable-help-dialog";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -124,8 +129,9 @@ export default function Header() {
 						target="_blank"
 						rel="noopener noreferrer"
 						aria-label="Comunitat de Reddit"
+						title="Comunitat de Reddit"
 					>
-						<RedditIcon className="size-5" />
+						<MessagesSquare className="size-5" />
 					</a>
 				</Button>
 			) : null}
