@@ -4,6 +4,7 @@
 // 2D canvas API is used, so it runs on a DOM canvas and on @napi-rs/canvas.
 
 import { appScheme } from "@/lib/material-theme";
+import { formatShortPuzzleDate, getPuzzleNumber } from "@/lib/puzzle-number";
 
 const CELL_SIZE = 48;
 const CELL_GAP = 4;
@@ -19,11 +20,12 @@ const STATS_GAP = 8;
 const STATS_RADIUS = 10;
 const LOGO_HEIGHT = 24;
 const WORDMARK = "Garbuix!";
-const WORDMARK_GAP = 10;
+// Space between the wordmark, the puzzle number and the date.
+const HEADER_GAP = 16;
 // Matches the app header, where the wordmark is as tall as the logo.
 const WORDMARK_FONT_SIZE = 24;
 const HEADER_BASELINE = 22;
-// Narrow boards would otherwise squeeze the wordmark, title and detail into
+// Narrow boards would otherwise squeeze the wordmark, number, date and detail into
 // each other.
 const MIN_CONTENT_WIDTH = 440;
 // Bézier handle length, as a fraction of the half-side, that traces the CSS
@@ -62,7 +64,7 @@ export type PuzzleCardInput = {
 	// "row,col" keys of cells the player has found; drawn filled, never with
 	// their letter, so the image is safe to show to people who haven't played.
 	revealedCells: ReadonlySet<string>;
-	title: string;
+	dateKey: string;
 	detail: string | null;
 	stats: readonly PuzzleCardStat[];
 };
@@ -238,6 +240,13 @@ function drawLogo(
 	ctx.restore();
 }
 
+// Days before #1 have no number, only the date.
+function headerParts(dateKey: string): string[] {
+	const number = getPuzzleNumber(dateKey);
+	const date = formatShortPuzzleDate(dateKey);
+	return number === null ? [date] : [`#${number}`, date];
+}
+
 function drawHeader(
 	ctx: PuzzleCardContext,
 	input: PuzzleCardInput,
@@ -257,10 +266,13 @@ function drawHeader(
 	ctx.fillStyle = colors.brand;
 	ctx.fillText(WORDMARK, wordmarkX, baseline);
 
-	const titleX = wordmarkX + ctx.measureText(WORDMARK).width + WORDMARK_GAP;
+	let x = wordmarkX + ctx.measureText(WORDMARK).width + HEADER_GAP;
 	ctx.font = `bold 18px ${fontFamily}`;
 	ctx.fillStyle = colors.foreground;
-	ctx.fillText(input.title, titleX, baseline);
+	for (const part of headerParts(input.dateKey)) {
+		ctx.fillText(part, x, baseline);
+		x += ctx.measureText(part).width + HEADER_GAP;
+	}
 
 	if (!input.detail) return;
 	ctx.fillStyle = colors.mutedForeground;

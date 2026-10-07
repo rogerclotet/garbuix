@@ -20,7 +20,7 @@ function card(overrides: Partial<PuzzleCardInput> = {}): PuzzleCardInput {
 		],
 		letters: ["a", "b", "c", "d", "e", "f"],
 		revealedCells: new Set(),
-		title: "#1 · 11/3/2026",
+		dateKey: "2026-03-11",
 		detail: "2 paraules",
 		stats: [],
 		...overrides,

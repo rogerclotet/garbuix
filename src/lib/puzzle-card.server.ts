@@ -6,7 +6,6 @@ import {
 	type PuzzleCardInput,
 } from "@/lib/puzzle-card";
 import { readDailyPuzzleRow } from "@/lib/puzzle-generation.server";
-import { formatShortPuzzleDate, getPuzzleNumber } from "@/lib/puzzle-number";
 
 // Reddit shows images scaled down, so render at twice the CSS size to stay
 // sharp on high-density screens.
@@ -63,15 +62,13 @@ export async function getDailyPuzzleCardPng(
 	if (!row) return null;
 
 	const snapshot = row.publicSnapshotJson;
-	const number = getPuzzleNumber(dateKey);
-	const date = formatShortPuzzleDate(dateKey);
 	const png = renderPuzzleCardPng({
 		rows: snapshot.rows,
 		cols: snapshot.cols,
 		gridMask: snapshot.gridMask,
 		letters: snapshot.initialShuffledLetters,
 		revealedCells: new Set(),
-		title: number === null ? date : `#${number} · ${date}`,
+		dateKey,
 		detail: `${snapshot.wordSlots.length} paraules`,
 		stats: [],
 	});

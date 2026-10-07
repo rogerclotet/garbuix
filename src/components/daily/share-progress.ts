@@ -18,16 +18,6 @@ export type ShareCompletionStats = {
 	currentStreak: number;
 };
 
-function formatShareDate(dateKey: string): string {
-	const [year, month, day] = dateKey.split("-");
-
-	if (!year || !month || !day) {
-		return dateKey;
-	}
-
-	return `${day}/${month}/${year}`;
-}
-
 function buildStatItems(stats: ShareCompletionStats): PuzzleCardStat[] {
 	const items: PuzzleCardStat[] = [
 		{
@@ -73,7 +63,7 @@ export function renderProgressCanvas(
 		gridMask: puzzle.gridMask,
 		letters: puzzle.initialShuffledLetters,
 		revealedCells,
-		title: formatShareDate(puzzle.dateKey),
+		dateKey: puzzle.dateKey,
 		detail: `${guessedCount} / ${totalWords} paraules`,
 		stats: completionStats ? buildStatItems(completionStats) : [],
 	};
