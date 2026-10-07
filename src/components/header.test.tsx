@@ -155,3 +155,14 @@ it("still rewinds regular Garbuix's inner pages", async () => {
 	await waitFor(() => expect(router.state.location.pathname).toBe("/"));
 	expect(router.history.location.state.__TSR_index).toBe(0);
 });
+
+it("links to the Reddit community from the main game only", async () => {
+	const router = await setup();
+	const link = screen.getByRole("link", { name: "Comunitat de Reddit" });
+	expect(link.getAttribute("href")).toBe("https://www.reddit.com/r/garbuix");
+	expect(link.getAttribute("target")).toBe("_blank");
+	await act(async () => router.navigate({ to: "/mini" }));
+	expect(
+		screen.queryByRole("link", { name: "Comunitat de Reddit" }),
+	).toBeNull();
+});
