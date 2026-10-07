@@ -1,0 +1,32 @@
+{
+	"private": true,
+	"name": "garbuix-reddit-app",
+	"version": "0.0.0",
+	"license": "GPL-3.0-or-later",
+	"type": "module",
+	"packageManager": "pnpm@11.25.0",
+	"scripts": {
+		"build": "vite build",
+		"dev": "devvit playtest",
+		"upload": "pnpm typecheck && pnpm test && devvit upload",
+		"login": "devvit login",
+		"logs": "devvit logs garbuix",
+		"test": "node --test \"src/**/*.test.ts\"",
+		"typecheck": "tsc --noEmit"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"dependencies": {
+		"@devvit/start": "0.14.6",
+		"@devvit/web": "0.14.6",
+		"@hono/node-server": "^2.1.3",
+		"devvit": "0.14.6",
+		"hono": "^4.13.13"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.4",
+		"typescript": "^7.0.2",
+		"vite": "8.3.1"
+	}
+}

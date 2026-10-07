@@ -1,5 +1,7 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
+  // The Devvit app has its own dependencies and tsconfig.
+  "exclude": ["node_modules", "reddit-app"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

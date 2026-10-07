@@ -1,0 +1,32 @@
+{
+	"$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+	"name": "garbuix-bot",
+	"server": {
+		"dir": "dist/server",
+		"entry": "index.cjs"
+	},
+	"scheduler": {
+		"tasks": {
+			"post-daily-puzzle": {
+				"endpoint": "/internal/scheduler/post-daily-puzzle",
+				"cron": "* * * * *"
+			}
+		}
+	},
+	"permissions": {
+		"reddit": true,
+		"redis": true,
+		"media": true,
+		"http": {
+			"enable": true,
+			"domains": ["garbuix.app"]
+		}
+	},
+	"scripts": {
+		"build": "vite build",
+		"dev": "vite build --watch"
+	},
+	"dev": {
+		"subreddit": "garbuix"
+	}
+}

@@ -15,6 +15,7 @@ import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
+import { Route as ApiDailyPostRouteImport } from './routes/api/daily-post'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
@@ -23,6 +24,7 @@ import { Route as SillabesIndexRouteImport } from './routes/sillabes.index'
 import { Route as SillabesDiesAnteriorsRouteImport } from './routes/sillabes.dies-anteriors'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiClueRequestsSplatRouteImport } from './routes/api/clue-requests/$'
+import { Route as ApiDailyImageSplatRouteImport } from './routes/api/daily-image/$'
 import { Route as ApiLeaderboardSplatRouteImport } from './routes/api/leaderboard/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +55,11 @@ const PrivacitatRoute = PrivacitatRouteImport.update({
 const SobreElJocRoute = SobreElJocRouteImport.update({
   id: '/sobre-el-joc',
   path: '/sobre-el-joc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDailyPostRoute = ApiDailyPostRouteImport.update({
+  id: '/api/daily-post',
+  path: '/api/daily-post',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -95,6 +102,11 @@ const ApiClueRequestsSplatRoute = ApiClueRequestsSplatRouteImport.update({
   path: '/api/clue-requests/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDailyImageSplatRoute = ApiDailyImageSplatRouteImport.update({
+  id: '/api/daily-image/$',
+  path: '/api/daily-image/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLeaderboardSplatRoute = ApiLeaderboardSplatRouteImport.update({
   id: '/api/leaderboard/$',
   path: '/api/leaderboard/$',
@@ -108,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/daily-post': typeof ApiDailyPostRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -116,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
+  '/api/daily-image/$': typeof ApiDailyImageSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +139,7 @@ export interface FileRoutesByTo {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/daily-post': typeof ApiDailyPostRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -133,6 +148,7 @@ export interface FileRoutesByTo {
   '/sillabes': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
+  '/api/daily-image/$': typeof ApiDailyImageSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRoutesById {
@@ -143,6 +159,7 @@ export interface FileRoutesById {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/daily-post': typeof ApiDailyPostRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -151,6 +168,7 @@ export interface FileRoutesById {
   '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
+  '/api/daily-image/$': typeof ApiDailyImageSplatRoute
   '/api/leaderboard/$': typeof ApiLeaderboardSplatRoute
 }
 export interface FileRouteTypes {
@@ -162,6 +180,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/daily-post'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -170,6 +189,7 @@ export interface FileRouteTypes {
     | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
+    | '/api/daily-image/$'
     | '/api/leaderboard/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -179,6 +199,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/daily-post'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -187,6 +208,7 @@ export interface FileRouteTypes {
     | '/sillabes'
     | '/api/auth/$'
     | '/api/clue-requests/$'
+    | '/api/daily-image/$'
     | '/api/leaderboard/$'
   id:
     | '__root__'
@@ -196,6 +218,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/daily-post'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -204,6 +227,7 @@ export interface FileRouteTypes {
     | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
+    | '/api/daily-image/$'
     | '/api/leaderboard/$'
   fileRoutesById: FileRoutesById
 }
@@ -214,6 +238,7 @@ export interface RootRouteChildren {
   PreferenciesRoute: typeof PreferenciesRoute
   PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
+  ApiDailyPostRoute: typeof ApiDailyPostRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
@@ -222,6 +247,7 @@ export interface RootRouteChildren {
   SillabesIndexRoute: typeof SillabesIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
+  ApiDailyImageSplatRoute: typeof ApiDailyImageSplatRoute
   ApiLeaderboardSplatRoute: typeof ApiLeaderboardSplatRoute
 }
 
@@ -267,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre-el-joc'
       fullPath: '/sobre-el-joc'
       preLoaderRoute: typeof SobreElJocRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/daily-post': {
+      id: '/api/daily-post'
+      path: '/api/daily-post'
+      fullPath: '/api/daily-post'
+      preLoaderRoute: typeof ApiDailyPostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -325,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClueRequestsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/daily-image/$': {
+      id: '/api/daily-image/$'
+      path: '/api/daily-image/$'
+      fullPath: '/api/daily-image/$'
+      preLoaderRoute: typeof ApiDailyImageSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/leaderboard/$': {
       id: '/api/leaderboard/$'
       path: '/api/leaderboard/$'
@@ -342,6 +382,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreferenciesRoute: PreferenciesRoute,
   PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
+  ApiDailyPostRoute: ApiDailyPostRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
@@ -350,6 +391,7 @@ const rootRouteChildren: RootRouteChildren = {
   SillabesIndexRoute: SillabesIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,
+  ApiDailyImageSplatRoute: ApiDailyImageSplatRoute,
   ApiLeaderboardSplatRoute: ApiLeaderboardSplatRoute,
 }
 export const routeTree = rootRouteImport

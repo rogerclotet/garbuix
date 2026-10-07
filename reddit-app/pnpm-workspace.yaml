@@ -1,0 +1,7 @@
+# A separate workspace from the web app: Devvit builds and uploads this
+# directory on its own, so it keeps its own lockfile and dependencies.
+minimumReleaseAge: 1440
+
+allowBuilds:
+  esbuild: true
+  protobufjs: false

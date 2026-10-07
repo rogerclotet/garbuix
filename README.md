@@ -455,6 +455,28 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 - Low-frequency words are filtered out during the build step (currently `frequency >= 200`)
 - Puzzle generation prefers more common words, while keeping some randomness
 
+### Reddit Daily Post
+
+Each day's puzzle is posted to [r/garbuix](https://www.reddit.com/r/garbuix/) as
+an image post titled `Garbuix #<number> - <d/m/yyyy>`. Numbers count Madrid days
+from `FIRST_PUZZLE_DATE_KEY` in `src/lib/puzzle-number.ts` (#1).
+
+The image is the share card with every cell hidden: the board's shape and the
+day's letters, rendered on the server with `@napi-rs/canvas` and the bundled
+Nunito font. The in-app share image uses the same renderer in
+`src/lib/puzzle-card.ts`, with the player's found cells filled in. Both always use
+the dark theme, with the logo, wordmark and letters in the brand teal, and draw
+cells as squircles like the board. The post is pinned (the previous day's post is
+unpinned), and its stickied first comment links to the game.
+
+- `GET /api/daily-post` returns today's `dateKey`, post title and image path,
+  or `503` while today's puzzle is still being generated.
+- `GET /api/daily-image/<yyyy-mm-dd>.png` returns the card for today or any past
+  day with a stored puzzle, and `404` for future days.
+
+Reddit closed self-service API keys in November 2025, so the poster is a Devvit
+app in `reddit-app/` that runs on Reddit's servers. See its README for setup.
+
 ## Technologies
 
 - **[TanStack Start](https://tanstack.com/start)** - Full-stack React framework

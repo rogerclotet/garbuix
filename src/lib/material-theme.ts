@@ -1,6 +1,6 @@
 export const MATERIAL_THEME_SEED = "#2a7d6e";
 
-const appScheme = {
+export const appScheme = {
 	light: {
 		background: "#faf8f5",
 		foreground: "#2c2825",
