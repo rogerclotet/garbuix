@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Logo } from "@/components/logo";
 import { APP_RELEASE } from "@/lib/app-version";
 
@@ -84,6 +84,15 @@ function AboutPage() {
 						<a href="mailto:roger@clotet.dev" className="text-link">
 							roger@clotet.dev
 						</a>
+					</p>
+					<p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+						<Link to="/privacitat" className="text-link">
+							Privacitat
+						</Link>
+						<span aria-hidden>·</span>
+						<Link to="/condicions" className="text-link">
+							Condicions d'ús
+						</Link>
 					</p>
 				</div>
 				<p className="text-xs">

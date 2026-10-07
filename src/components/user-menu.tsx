@@ -7,9 +7,7 @@ import {
 	LogIn,
 	Menu,
 	Moon,
-	ScrollText,
 	Settings,
-	ShieldCheck,
 	Sun,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -181,18 +179,6 @@ export function UserMenu({
 					<Link to="/sobre-el-joc">
 						<Info className="size-4" />
 						<span>Sobre el joc</span>
-					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
-					<Link to="/privacitat">
-						<ShieldCheck className="size-4" />
-						<span>Privacitat</span>
-					</Link>
-				</DropdownMenuItem>
-				<DropdownMenuItem asChild>
-					<Link to="/condicions">
-						<ScrollText className="size-4" />
-						<span>Condicions d'ús</span>
 					</Link>
 				</DropdownMenuItem>
 				{!mini && !syllables ? (
