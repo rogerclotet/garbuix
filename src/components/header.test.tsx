@@ -161,6 +161,7 @@ it("links to the Reddit community from the main game only", async () => {
 	const link = screen.getByRole("link", { name: "Comunitat de Reddit" });
 	expect(link.getAttribute("href")).toBe("https://www.reddit.com/r/garbuix");
 	expect(link.getAttribute("target")).toBe("_blank");
+	expect(link.getAttribute("title")).toBe("Comunitat de Reddit");
 	await act(async () => router.navigate({ to: "/mini" }));
 	expect(
 		screen.queryByRole("link", { name: "Comunitat de Reddit" }),
