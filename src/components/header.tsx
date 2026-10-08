@@ -17,7 +17,6 @@ import {
 	setHowToPlayOpen,
 	useHowToPlayOpen,
 } from "@/components/daily/how-to-play-store";
-import { Logo } from "@/components/logo";
 import { MiniHelpDialog } from "@/components/mini/mini-help-dialog";
 import { ProfilePreferencesTipDialog } from "@/components/profile-preferences-tip-dialog";
 import {
@@ -211,18 +210,8 @@ export default function Header() {
 						<Link
 							to={gamePath}
 							replace
-							className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+							className="hover:opacity-80 transition-opacity"
 						>
-							<Logo
-								className="w-5 h-5 sm:w-6 sm:h-6 text-primary"
-								aria-label={
-									syllables
-										? "Logo Garbuix síl·labes"
-										: mini
-											? "Logo Garbuix mini"
-											: "Logo Garbuix!"
-								}
-							/>
 							<h1 className="text-2xl font-bold text-primary">
 								{syllables ? (
 									<>
