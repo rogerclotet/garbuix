@@ -726,7 +726,6 @@ export function useDailyProgress({
 			body: JSON.stringify({
 				name: identity.name,
 				wordsFound,
-				totalWords,
 				clueCount: freeClueCount,
 				tryCount,
 				completedAt,
@@ -753,7 +752,6 @@ export function useDailyProgress({
 		derivedProgress.hintsUsed,
 		derivedProgress.guessCount,
 		puzzle.dateKey,
-		totalWords,
 	]);
 
 	const applyLocalEvent = (event: PuzzleClientEvent) => {

@@ -158,6 +158,18 @@ export async function getDailyPuzzleDifficulty(
 	);
 }
 
+// The authoritative word count for a stored day, so callers never have to trust
+// a client's figure. Null when the day has no puzzle.
+export async function getDailyPuzzleWordCount(
+	dateKey: string,
+): Promise<number | null> {
+	const existing = await db.query.dailyPuzzles.findFirst({
+		where: eq(dailyPuzzles.dateKey, dateKey),
+		columns: { wordCount: true },
+	});
+	return existing?.wordCount ?? null;
+}
+
 // Reads a stored puzzle without ever creating one. Every request-driven path
 // goes through this: generation is expensive (a placement search over the whole
 // dictionary) and it spends Anthropic credits on clues, so it may not be
