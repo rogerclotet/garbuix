@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	type DailyPostDeps,
-	FIRST_COMMENT_TEXT,
 	GARBUIX_ORIGIN,
 	getMadridDateKey,
 	postDailyPuzzle,
@@ -21,8 +20,6 @@ type Harness = {
 	posts: { title: string; imageUrl: string }[];
 	pins: string[];
 	unpins: string[];
-	comments: { postId: string; text: string }[];
-	pinnedComments: string[];
 };
 
 function harness(
@@ -31,7 +28,6 @@ function harness(
 		dailyPostStatus?: number;
 		failPin?: boolean;
 		failUnpin?: boolean;
-		failComment?: boolean;
 	} = {},
 ): Harness {
 	const values = new Map<string, string>();
@@ -40,8 +36,6 @@ function harness(
 	const posts: { title: string; imageUrl: string }[] = [];
 	const pins: string[] = [];
 	const unpins: string[] = [];
-	const comments: { postId: string; text: string }[] = [];
-	const pinnedComments: string[] = [];
 	const serverDateKey = options.serverDateKey ?? "2026-10-08";
 
 	const deps: DailyPostDeps = {
@@ -80,14 +74,6 @@ function harness(
 			posts.push({ title, imageUrl });
 			return "t3_abc123";
 		},
-		submitComment: async (postId, text) => {
-			if (options.failComment) throw new Error("comment failed");
-			comments.push({ postId, text });
-			return "t1_def456";
-		},
-		pinComment: async (commentId) => {
-			pinnedComments.push(commentId);
-		},
 		pinPost: async (postId) => {
 			if (options.failPin) throw new Error("pin failed");
 			pins.push(postId);
@@ -106,8 +92,6 @@ function harness(
 		posts,
 		pins,
 		unpins,
-		comments,
-		pinnedComments,
 	};
 }
 
@@ -149,45 +133,6 @@ describe("postDailyPuzzle", () => {
 			},
 		]);
 		assert.equal(h.values.get(postedKey("2026-10-08")), "t3_abc123");
-	});
-
-	it("adds the link to the game as the post's pinned first comment", async () => {
-		const h = harness();
-
-		await postDailyPuzzle(h.deps);
-
-		assert.deepEqual(h.comments, [
-			{ postId: "t3_abc123", text: FIRST_COMMENT_TEXT },
-		]);
-		assert.match(
-			FIRST_COMMENT_TEXT,
-			/\[garbuix\.app\]\(https:\/\/garbuix\.app\)/,
-		);
-		assert.deepEqual(h.pinnedComments, ["t1_def456"]);
-	});
-
-	it("comments only once per post", async () => {
-		const h = harness();
-
-		await postDailyPuzzle(h.deps);
-		await postDailyPuzzle(h.deps);
-
-		assert.equal(h.comments.length, 1);
-	});
-
-	it("retries a failed comment without posting again", async () => {
-		const h = harness({ failComment: true });
-		await assert.rejects(postDailyPuzzle(h.deps), /comment failed/);
-
-		const retry = harness();
-		retry.values.set(postedKey("2026-10-08"), "t3_abc123");
-		await postDailyPuzzle(retry.deps);
-
-		assert.equal(retry.posts.length, 0);
-		assert.deepEqual(retry.comments, [
-			{ postId: "t3_abc123", text: FIRST_COMMENT_TEXT },
-		]);
-		assert.deepEqual(retry.pins, ["t3_abc123"]);
 	});
 
 	it("posts only once per day", async () => {

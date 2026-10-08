@@ -23,7 +23,7 @@ function TermsPage() {
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzades el 7 d'octubre de 2026
+					Actualitzades el 8 d'octubre de 2026
 				</p>
 			</header>
 
@@ -78,9 +78,8 @@ function TermsPage() {
 						r/garbuix
 					</a>{" "}
 					es parla del joc. Cada dia, l'aplicació garbuix-bot hi publica la
-					imatge del Garbuix del dia, hi afegeix un comentari amb l'enllaç al
-					joc i fixa la publicació a la part superior de la comunitat.
-					L'aplicació no fa res més a Reddit.
+					imatge del Garbuix del dia i fixa la publicació a la part superior de
+					la comunitat. L'aplicació no fa res més a Reddit.
 				</p>
 				<p>
 					El que publiques a la comunitat es regeix per les{" "}

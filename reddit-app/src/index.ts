@@ -18,13 +18,6 @@ function toPostId(id: string): `t3_${string}` {
 	return id as `t3_${string}`;
 }
 
-function toCommentId(id: string): `t1_${string}` {
-	if (!id.startsWith("t1_")) {
-		throw new Error(`Expected a comment id (t1_...), got ${id}`);
-	}
-	return id as `t1_${string}`;
-}
-
 function getSubredditName(): string {
 	const { subredditName } = context;
 	if (!subredditName) {
@@ -66,14 +59,6 @@ const deps: DailyPostDeps = {
 			imageUrls: [imageUrl],
 		});
 		return post.id;
-	},
-	submitComment: async (postId, text) => {
-		const comment = await reddit.submitComment({ id: toPostId(postId), text });
-		return comment.id;
-	},
-	pinComment: async (commentId) => {
-		const comment = await reddit.getCommentById(toCommentId(commentId));
-		await comment.distinguish(true);
 	},
 	pinPost: async (postId) => {
 		const post = await reddit.getPostById(toPostId(postId));
