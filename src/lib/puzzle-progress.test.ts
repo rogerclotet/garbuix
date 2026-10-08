@@ -52,7 +52,7 @@ describe("puzzle-progress", () => {
 		expect(duplicate).toEqual(once);
 	});
 
-	it("caps hints at three and resets progress", () => {
+	it("caps hints at three", () => {
 		let state = createEmptyProgressState({
 			id: "puzzle-1",
 			initialShuffledLetters: ["a", "b", "c"],
@@ -88,22 +88,6 @@ describe("puzzle-progress", () => {
 
 		expect(state.hintsUsed).toBe(3);
 		expect(state.hintedCells).toEqual(["0,0", "0,1", "0,2"]);
-
-		state = applyPuzzleEvent(
-			state,
-			{
-				id: "reset",
-				at: "2026-03-10T10:10:00.000Z",
-				type: "progress_reset",
-				payload: {},
-			},
-			4,
-		);
-
-		expect(state.guessCount).toBe(0);
-		expect(state.guessedWordIds).toEqual([]);
-		expect(state.hintedCells).toEqual([]);
-		expect(state.completedAt).toBeNull();
 	});
 
 	it("replays out-of-order events chronologically", () => {
@@ -116,7 +100,7 @@ describe("puzzle-progress", () => {
 			initial,
 			[
 				{
-					id: "guess-after-reset",
+					id: "later-guess",
 					at: "2026-03-10T10:12:00.000Z",
 					type: "guess_added",
 					payload: {
@@ -126,13 +110,7 @@ describe("puzzle-progress", () => {
 					},
 				},
 				{
-					id: "older-reset",
-					at: "2026-03-10T10:10:00.000Z",
-					type: "progress_reset",
-					payload: {},
-				},
-				{
-					id: "guess-before-online-guess",
+					id: "earlier-guess",
 					at: "2026-03-10T10:11:00.000Z",
 					type: "guess_added",
 					payload: {
@@ -385,25 +363,12 @@ describe("puzzle-progress", () => {
 		expect(again).toEqual(revealed);
 	});
 
-	it("resets the bonus counter and keeps the larger value when merging", () => {
+	it("keeps the larger bonus counter when merging", () => {
 		const base = createEmptyProgressState({
 			id: "puzzle-1",
 			initialShuffledLetters: ["a", "b", "c"],
 		});
 		const counted = { ...base, bonusWordsFound: 7 };
-
-		const reset = applyPuzzleEvent(
-			counted,
-			{
-				id: "reset",
-				at: "2026-03-10T10:10:00.000Z",
-				type: "progress_reset",
-				payload: {},
-			},
-			3,
-		);
-		expect(reset.bonusWordsFound).toBe(0);
-
 		const merged = mergeProgressStates(counted, {
 			...base,
 			bonusWordsFound: 3,

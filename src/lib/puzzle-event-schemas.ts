@@ -71,12 +71,6 @@ export const puzzleClientEventSchema = z.discriminatedUnion("type", [
 			shuffledLetters: z.array(z.string().min(1).max(4)).max(32),
 		}),
 	}),
-	z.object({
-		id: eventIdSchema,
-		at: eventAtSchema,
-		type: z.literal("progress_reset"),
-		payload: z.object({}),
-	}),
 ]);
 
 export const puzzleClientEventsSchema = z

@@ -265,20 +265,6 @@ export function applyPuzzleEvent(
 				shuffledLetters: [...event.payload.shuffledLetters],
 			};
 		}
-		case "progress_reset": {
-			return {
-				...state,
-				guessHashes: [],
-				guessedWordIds: [],
-				revealedWordTokens: {},
-				hintedCells: [],
-				clueWordIds: [],
-				hintsUsed: 0,
-				guessCount: 0,
-				bonusWordsFound: 0,
-				completedAt: null,
-			};
-		}
 	}
 }
 

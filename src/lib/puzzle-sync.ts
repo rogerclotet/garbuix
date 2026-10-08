@@ -35,7 +35,6 @@ function createEmptyEventTypeCounts(): EventTypeCounts {
 		text_hint_fallback: 0,
 		bonus_clue_revealed: 0,
 		letters_shuffled: 0,
-		progress_reset: 0,
 	};
 }
 
@@ -119,12 +118,6 @@ function isHintEventAccepted(
 				return false;
 			}
 			state.hintedCells.add(cellKey);
-			return true;
-		}
-		case "progress_reset": {
-			state.hintsUsed = 0;
-			state.hintedCells.clear();
-			state.clueWordIds.clear();
 			return true;
 		}
 		default:
@@ -223,8 +216,7 @@ export async function filterSyncablePuzzleEvents(options: {
 			event.type === "hint_used" ||
 			event.type === "text_hint_requested" ||
 			event.type === "text_hint_fallback" ||
-			event.type === "bonus_clue_revealed" ||
-			event.type === "progress_reset"
+			event.type === "bonus_clue_revealed"
 		) {
 			if (
 				!isHintEventAccepted(
@@ -275,8 +267,7 @@ export type LeaderboardScoreState = {
 
 // A guess that matches nothing still moves the player: tries break ties between
 // equal clue counts, so the board is wrong until the new count reaches it. Any
-// difference republishes, in either direction — a reset lowers the counts and
-// has to reach the board just the same.
+// difference republishes, in either direction.
 export function hasLeaderboardScoreDelta(
 	previous: LeaderboardScoreState,
 	next: LeaderboardScoreState,

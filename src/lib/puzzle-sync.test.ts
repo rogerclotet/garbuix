@@ -338,7 +338,7 @@ describe("hasLeaderboardScoreDelta", () => {
 		);
 	});
 
-	it("republishes a reset, which lowers the counts", () => {
+	it("republishes counts that went down", () => {
 		expect(
 			hasLeaderboardScoreDelta(state, {
 				wordsFound: 0,

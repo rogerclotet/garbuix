@@ -165,21 +165,13 @@ export type LettersShuffledEvent = {
 	};
 };
 
-export type ProgressResetEvent = {
-	id: string;
-	at: string;
-	type: "progress_reset";
-	payload: Record<string, never>;
-};
-
 export type PuzzleClientEvent =
 	| GuessAddedEvent
 	| HintUsedEvent
 	| TextHintRequestedEvent
 	| TextHintFallbackEvent
 	| BonusClueRevealedEvent
-	| LettersShuffledEvent
-	| ProgressResetEvent;
+	| LettersShuffledEvent;
 
 export type HistorySummaryEntry = {
 	dateKey: string;
