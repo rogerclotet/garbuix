@@ -20,6 +20,19 @@ function getServiceWorkerUrl(version: string) {
 	return `/sw.js?v=${encodeURIComponent(version)}`;
 }
 
+// Navigations are network-first, so the running bundle is already current while
+// the worker that served it, and the precache it serves without revalidation,
+// can still be an older one. Compare against the worker actually in control:
+// against the bundle's own version, a precache-only change such as a new
+// manifest would never install its worker.
+function getActiveWorkerVersion(
+	registration: ServiceWorkerRegistration | null,
+): string | null {
+	const scriptURL = registration?.active?.scriptURL;
+	if (!scriptURL) return APP_SERVICE_WORKER_VERSION;
+	return new URL(scriptURL).searchParams.get("v");
+}
+
 async function fetchLatestVersion(signal: AbortSignal) {
 	const response = await fetch(`/version.json?ts=${Date.now()}`, {
 		cache: "no-store",
@@ -326,7 +339,7 @@ export function ServiceWorkerRegister() {
 				let preparedWorker: ServiceWorker | null = null;
 				if (
 					workers &&
-					version.serviceWorkerVersion !== APP_SERVICE_WORKER_VERSION
+					version.serviceWorkerVersion !== getActiveWorkerVersion(registration)
 				) {
 					const nextRegistration = await registerVersion(
 						version.serviceWorkerVersion,
@@ -399,7 +412,8 @@ export function ServiceWorkerRegister() {
 				}
 				if (disposed) return;
 				const workerChanged =
-					latestVersion.serviceWorkerVersion !== APP_SERVICE_WORKER_VERSION;
+					latestVersion.serviceWorkerVersion !==
+					getActiveWorkerVersion(registration);
 				const releaseChanged =
 					APP_RELEASE !== "dev" &&
 					latestVersion.sentryRelease !== "dev" &&

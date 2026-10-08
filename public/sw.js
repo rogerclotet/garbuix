@@ -96,9 +96,18 @@ async function staleWhileRevalidate(event, request) {
 	return cached;
 }
 
+// Precached entries are served without revalidation for as long as this worker
+// lives, so they must come from the network: a copy the HTTP cache still deems
+// fresh would pin the previous release's manifest or icon to the new worker.
 self.addEventListener("install", (event) => {
 	event.waitUntil(
-		caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)),
+		caches
+			.open(STATIC_CACHE)
+			.then((cache) =>
+				cache.addAll(
+					PRECACHE_URLS.map((url) => new Request(url, { cache: "reload" })),
+				),
+			),
 	);
 });
 
