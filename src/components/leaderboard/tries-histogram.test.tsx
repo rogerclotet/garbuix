@@ -38,6 +38,18 @@ describe("TriesHistogram", () => {
 		expect(screen.getByText("0 han acabat · 1 encara juga")).toBeDefined();
 		expect(screen.getByTitle("25-34 intents: 1 encara juga")).toBeDefined();
 		expect(screen.getByText("Encara jugant")).toBeDefined();
+		expect(screen.queryByText("Han acabat")).toBeNull();
+	});
+
+	it("names both bar colors once finished and playing players are mixed", () => {
+		render(
+			<TriesHistogram
+				entries={[buildEntry("a", 18), buildEntry("b", 30, false)]}
+			/>,
+		);
+
+		expect(screen.getByText("Han acabat")).toBeDefined();
+		expect(screen.getByText("Encara jugant")).toBeDefined();
 	});
 
 	it("describes each bucket, counting finished and playing players apart", () => {
