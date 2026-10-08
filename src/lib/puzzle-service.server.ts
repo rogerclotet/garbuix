@@ -55,7 +55,10 @@ export {
 	getWordCluesData,
 	syncPuzzleEventsForUser,
 } from "@/lib/puzzle-progress.server";
-export { getUserPuzzleProgressData } from "@/lib/puzzle-progress-store.server";
+export {
+	addPeerClueWordIds,
+	getUserPuzzleProgressData,
+} from "@/lib/puzzle-progress-store.server";
 
 function toSessionUser(
 	sessionData: Awaited<ReturnType<typeof getAuthSession>>,

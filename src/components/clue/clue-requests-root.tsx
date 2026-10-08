@@ -28,9 +28,11 @@ export function ClueRequestsRoot({ children }: PropsWithChildren) {
 	const anonParticipantId = useAnonParticipantId();
 	const localUserId = sessionUser?.id ?? anonParticipantId;
 
+	// Remount per player as well as per day: received clues belong to whoever
+	// asked, so signing in or out must not carry them over to the next player.
 	return (
 		<ClueRequestsProvider
-			key={dateKey}
+			key={`${dateKey}:${sessionUser?.id ?? "guest"}`}
 			dateKey={dateKey}
 			localUserId={localUserId}
 			anonCredentials={sessionUser?.id ? null : anonCredentials}

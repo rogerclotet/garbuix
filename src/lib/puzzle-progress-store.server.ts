@@ -21,7 +21,7 @@ export async function withPuzzleProgressTransaction<T>(
 }
 
 function serializeProgressRow(
-	row: typeof userPuzzleProgress.$inferSelect,
+	row: Omit<typeof userPuzzleProgress.$inferSelect, "peerClueWordIds">,
 ): PuzzleProgressState {
 	return {
 		puzzleId: row.puzzleId,
@@ -54,10 +54,14 @@ export async function getUserPuzzleProgressData(
 	return row ? serializeProgressRow(row) : null;
 }
 
-// Both event sync and guest import must persist every progress field.
+// Both event sync and guest import must persist every progress field. Peer
+// clues are left out so a sync never clobbers a delivery recorded meanwhile.
 function toStoredProgress(
 	progress: PuzzleProgressState,
-): Omit<typeof userPuzzleProgress.$inferSelect, "id" | "userId" | "puzzleId"> {
+): Omit<
+	typeof userPuzzleProgress.$inferSelect,
+	"id" | "userId" | "puzzleId" | "peerClueWordIds"
+> {
 	return {
 		guessHashes: progress.guessHashes,
 		guessedWordIds: progress.guessedWordIds,
@@ -90,4 +94,48 @@ export async function saveUserPuzzleProgress(
 		set: fields,
 	});
 	return serializeProgressRow(row);
+}
+
+// A set union per word, matching the inbox (one entry per word however many
+// friends answer). Computed in SQL so concurrent deliveries for different
+// words can't overwrite each other. A no-op when the player has no progress
+// row, which also covers guest requester ids.
+export async function addPeerClueWordIds(
+	input: { userId: string; puzzleId: string; wordIds: number[] },
+	database: Pick<typeof db, "update"> = db,
+) {
+	if (input.wordIds.length === 0) return;
+	const incoming = JSON.stringify(input.wordIds);
+	await database
+		.update(userPuzzleProgress)
+		.set({
+			peerClueWordIds: sql`(
+				select coalesce(jsonb_agg(distinct word_id order by word_id), '[]'::jsonb)
+				from jsonb_array_elements(${userPuzzleProgress.peerClueWordIds} || ${incoming}::jsonb) as word_id
+			)`,
+		})
+		.where(
+			and(
+				eq(userPuzzleProgress.userId, input.userId),
+				eq(userPuzzleProgress.puzzleId, input.puzzleId),
+				sql`not ${userPuzzleProgress.peerClueWordIds} @> ${incoming}::jsonb`,
+			),
+		);
+}
+
+export async function getPeerClueWordIds(
+	userId: string,
+	puzzleId: string,
+): Promise<number[]> {
+	const rows = await db
+		.select({ peerClueWordIds: userPuzzleProgress.peerClueWordIds })
+		.from(userPuzzleProgress)
+		.where(
+			and(
+				eq(userPuzzleProgress.userId, userId),
+				eq(userPuzzleProgress.puzzleId, puzzleId),
+			),
+		)
+		.limit(1);
+	return rows[0]?.peerClueWordIds ?? [];
 }

@@ -5,12 +5,14 @@ import {
 
 export function DailyStatus({
 	progress,
+	cluesUsed,
 	totalWords,
 	displayComplete,
 	currentStreak,
 	foundWordCount,
 }: {
 	progress: PuzzleProgressState;
+	cluesUsed: number;
 	totalWords: number;
 	displayComplete: boolean;
 	currentStreak: number;
@@ -30,11 +32,7 @@ export function DailyStatus({
 						{progress.guessCount} intent
 						{progress.guessCount === 1 ? "" : "s"}
 					</span>
-					<span>
-						{progress.hintsUsed === 1
-							? `${progress.hintsUsed} pista`
-							: `${progress.hintsUsed} pistes`}
-					</span>
+					<span>{cluesUsed === 1 ? "1 pista" : `${cluesUsed} pistes`}</span>
 					{foundWordCount !== undefined ? (
 						<span>
 							{foundWordCount === 1

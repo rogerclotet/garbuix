@@ -7,11 +7,13 @@ import {
 	recordProgress as recordLeaderboardProgress,
 	userParticipantId,
 } from "@/lib/leaderboard.server";
+import { getPeerClueWordIds } from "@/lib/puzzle-progress-store.server";
 import { resolveAvatarImage, resolveDisplayName } from "@/lib/user-profile";
 
 export async function publishLeaderboardForUser(input: {
 	dateKey: string;
 	userId: string;
+	puzzleId: string;
 	wordsFound: number;
 	totalWords: number;
 	freeCluesUsed: number;
@@ -37,10 +39,17 @@ export async function publishLeaderboardForUser(input: {
 		const displayName = leaderboardDisplayName(resolveDisplayName(profile));
 		const avatarImage = resolveAvatarImage(profile);
 
-		// Total clues = the free clues spent plus every clue a friend delivered
-		// (one inbox entry per word).
-		const friendClues = (await getClueInbox(input.userId, input.dateKey))
-			.length;
+		// Total clues = the free clues spent plus one per word a friend sent a
+		// clue for. The saved ids also hold clues received as a guest before
+		// signing in; the inbox covers deliveries the database missed.
+		const [inbox, savedWordIds] = await Promise.all([
+			getClueInbox(input.userId, input.dateKey),
+			getPeerClueWordIds(input.userId, input.puzzleId),
+		]);
+		const friendClues = new Set([
+			...inbox.map((response) => response.wordId),
+			...savedWordIds,
+		]).size;
 
 		await recordLeaderboardProgress({
 			dateKey: input.dateKey,

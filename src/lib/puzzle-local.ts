@@ -7,6 +7,9 @@ import type {
 
 const ANON_PROGRESS_PREFIX = "paraules-anon-progress-v2:";
 const ANON_HISTORY_KEY = "paraules-anon-history-v2";
+// Guest copy of user_puzzle_progress.peer_clue_word_ids: the inbox that lists
+// friend clues expires after a day, so history keeps its own record.
+const ANON_PEER_CLUES_PREFIX = "garbuix-anon-peer-clues-v1:";
 const ACCOUNT_CACHE_PREFIX = "paraules-account-cache-v1:";
 const IMPORT_MARKER_PREFIX = "paraules-account-import-v1:";
 const DEVICE_ID_KEY = "paraules-device-id-v1";
@@ -50,6 +53,28 @@ export function saveAnonymousProgress(
 export function clearAnonymousProgress(dateKey: string) {
 	if (typeof window === "undefined") return;
 	window.localStorage.removeItem(`${ANON_PROGRESS_PREFIX}${dateKey}`);
+}
+
+export function getAnonymousPeerClueWordIds(dateKey: string): number[] {
+	return readJson<number[]>(`${ANON_PEER_CLUES_PREFIX}${dateKey}`) ?? [];
+}
+
+// Returns the merged ids; they only ever grow, like the inbox they mirror.
+export function addAnonymousPeerClueWordIds(
+	dateKey: string,
+	wordIds: number[],
+): number[] {
+	const stored = getAnonymousPeerClueWordIds(dateKey);
+	const merged = [...new Set([...stored, ...wordIds])].sort((a, b) => a - b);
+	if (merged.length !== stored.length) {
+		writeJson(`${ANON_PEER_CLUES_PREFIX}${dateKey}`, merged);
+	}
+	return merged;
+}
+
+export function clearAnonymousPeerClueWordIds(dateKey: string) {
+	if (typeof window === "undefined") return;
+	window.localStorage.removeItem(`${ANON_PEER_CLUES_PREFIX}${dateKey}`);
 }
 
 export function getAnonymousHistoryEntries() {
@@ -123,12 +148,19 @@ export function buildAnonymousImportPayload(): AnonymousImportPayload {
 		return {
 			historyEntries: [],
 			activeProgressByDate: {},
+			peerClueWordIdsByDate: {},
 		};
 	}
 
 	const activeProgressByDate: Record<string, PuzzleProgressState> = {};
+	const peerClueWordIdsByDate: Record<string, number[]> = {};
 	for (let index = 0; index < window.localStorage.length; index += 1) {
 		const key = window.localStorage.key(index);
+		if (key?.startsWith(ANON_PEER_CLUES_PREFIX)) {
+			const dateKey = key.slice(ANON_PEER_CLUES_PREFIX.length);
+			peerClueWordIdsByDate[dateKey] = getAnonymousPeerClueWordIds(dateKey);
+			continue;
+		}
 		if (!key?.startsWith(ANON_PROGRESS_PREFIX)) continue;
 		const dateKey = key.slice(ANON_PROGRESS_PREFIX.length);
 		const progress = readJson<PuzzleProgressState>(key);
@@ -139,6 +171,7 @@ export function buildAnonymousImportPayload(): AnonymousImportPayload {
 	return {
 		historyEntries: getSortedAnonymousHistoryEntries(),
 		activeProgressByDate,
+		peerClueWordIdsByDate,
 	};
 }
 

@@ -7,6 +7,7 @@ import {
 	upsertHistoryEntry,
 } from "@/lib/puzzle-streaks";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import { useClueRequests } from "@/lib/use-clue-requests";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
 export function useDailyCompletion({
@@ -107,19 +108,28 @@ export function useDailyCompletion({
 		}
 	}, [isComplete]);
 
+	const { dateKey: clueRequestsDateKey, receivedClues } = useClueRequests();
+	// Mirrors the leaderboard's count (publishLeaderboardForUser and the guest
+	// endpoint): free clues plus one per word a friend delivered a clue for.
+	const friendClueCount =
+		clueRequestsDateKey === puzzle.dateKey
+			? Object.keys(receivedClues).length
+			: 0;
+	const cluesUsed = derivedProgress.hintsUsed + friendClueCount;
+
 	const completionStats = useMemo(() => {
 		if (derivedProgress.guessedWordIds.length !== totalWords) return undefined;
 		return {
 			guessCount: derivedProgress.guessCount,
-			hintsUsed: derivedProgress.hintsUsed,
+			hintsUsed: cluesUsed,
 			completedAt: derivedProgress.completedAt,
 			currentStreak: streakStats.currentStreak,
 		};
 	}, [
+		cluesUsed,
 		derivedProgress.completedAt,
 		derivedProgress.guessCount,
 		derivedProgress.guessedWordIds.length,
-		derivedProgress.hintsUsed,
 		streakStats.currentStreak,
 		totalWords,
 	]);
@@ -136,6 +146,7 @@ export function useDailyCompletion({
 		winDialogOpen,
 		setWinDialogOpen,
 		streakStats,
+		cluesUsed,
 		completionStats,
 		markCompleting,
 	};

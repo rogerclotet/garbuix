@@ -18,9 +18,12 @@ import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
 import { useBeforeAppReload } from "@/lib/app-reload";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import {
+	addAnonymousPeerClueWordIds,
 	buildAnonymousImportPayload,
+	clearAnonymousPeerClueWordIds,
 	clearAnonymousProgress,
 	getAccountPuzzleCache,
+	getAnonymousPeerClueWordIds,
 	getAnonymousProgress,
 	getStaleAccountCachesWithEvents,
 	hasImportedAnonymousData,
@@ -47,6 +50,7 @@ import type {
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import { useClueRequests } from "@/lib/use-clue-requests";
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
@@ -169,6 +173,10 @@ export function useDailyProgress({
 	const [loadedIdentity, setLoadedIdentity] = useState<string | null>(null);
 	const identity = JSON.stringify([puzzle.id, activeUserId]);
 	const hasLoadedLocalState = loadedIdentity === identity;
+	// Guests' friend clues, kept locally once the inbox delivers them. Signed-in
+	// players get the same record server-side (peer_clue_word_ids).
+	const [anonPeerClueCount, setAnonPeerClueCount] = useState(0);
+	const { dateKey: clueRequestsDateKey, receivedClues } = useClueRequests();
 	const [isOnline, setIsOnline] = useState(() =>
 		typeof navigator === "undefined" ? true : navigator.onLine,
 	);
@@ -251,6 +259,8 @@ export function useDailyProgress({
 		if (loggedOut) {
 			logoutTransitionRef.current = true;
 			clearAnonymousProgress(puzzle.dateKey);
+			clearAnonymousPeerClueWordIds(puzzle.dateKey);
+			setAnonPeerClueCount(0);
 			lastReportedAnonRef.current = {
 				dateKey: puzzle.dateKey,
 				wordsFound: 0,
@@ -290,6 +300,9 @@ export function useDailyProgress({
 			current.length === 0 && localState.queuedEvents.length === 0
 				? current
 				: localState.queuedEvents,
+		);
+		setAnonPeerClueCount(
+			activeUserId ? 0 : getAnonymousPeerClueWordIds(puzzle.dateKey).length,
 		);
 		setLoadedIdentity(identity);
 	}, [
@@ -408,11 +421,35 @@ export function useDailyProgress({
 			}
 			saveAnonymousProgress(puzzle.dateKey, snapshot.baseProgress);
 			saveAnonymousHistoryEntry(
-				buildHistoryEntry(puzzle, snapshot.baseProgress),
+				buildHistoryEntry(puzzle, snapshot.baseProgress, anonPeerClueCount),
 			);
 		},
-		[activeUserId, baseProgress, hasLoadedLocalState, puzzle, queuedEvents],
+		[
+			activeUserId,
+			anonPeerClueCount,
+			baseProgress,
+			hasLoadedLocalState,
+			puzzle,
+			queuedEvents,
+		],
 	);
+
+	useEffect(() => {
+		if (activeUserId || !hasLoadedLocalState || logoutTransitionRef.current)
+			return;
+		if (clueRequestsDateKey !== puzzle.dateKey) return;
+		const merged = addAnonymousPeerClueWordIds(
+			puzzle.dateKey,
+			Object.keys(receivedClues).map(Number),
+		);
+		setAnonPeerClueCount(merged.length);
+	}, [
+		activeUserId,
+		clueRequestsDateKey,
+		hasLoadedLocalState,
+		puzzle.dateKey,
+		receivedClues,
+	]);
 
 	useEffect(() => persistProgress(), [persistProgress]);
 	useBeforeAppReload(() => {
@@ -648,8 +685,10 @@ export function useDailyProgress({
 
 		const wordsFound = derivedProgress.guessedWordIds.length;
 		const completedAt = derivedProgress.completedAt ?? null;
-		// Self-serve hints only; peer clues don't affect the score.
-		const clueCount = derivedProgress.hintsUsed;
+		// The server adds friend clues from the guest's inbox, so only free clues
+		// are sent; the total still decides whether there is anything to report.
+		const freeClueCount = derivedProgress.hintsUsed;
+		const clueCount = freeClueCount + anonPeerClueCount;
 		const tryCount = derivedProgress.guessCount;
 		const prev = lastReportedAnonRef.current;
 		// Words, clues and tries all feed the score (see scoreFor), so a guess
@@ -688,7 +727,7 @@ export function useDailyProgress({
 				name: identity.name,
 				wordsFound,
 				totalWords,
-				clueCount,
+				clueCount: freeClueCount,
 				tryCount,
 				completedAt,
 				previousWordsFound,
@@ -707,6 +746,7 @@ export function useDailyProgress({
 			});
 	}, [
 		activeUserId,
+		anonPeerClueCount,
 		hasLoadedLocalState,
 		derivedProgress.guessedWordIds.length,
 		derivedProgress.completedAt,

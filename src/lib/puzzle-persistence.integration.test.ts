@@ -50,6 +50,7 @@ import {
 import { getHistoryEntriesForUser } from "@/lib/puzzle-history.server";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import {
+	addPeerClueWordIds,
 	getUserPuzzleProgressData,
 	getWordCluesData,
 	importAnonymousProgressForUser,
@@ -209,6 +210,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 		async function importProgress(
 			fixture: Awaited<ReturnType<typeof createFixture>>,
 			progress: PuzzleProgressState,
+			peerClueWordIds: number[] = [],
 		) {
 			return importAnonymousProgressForUser({
 				userId: fixture.id,
@@ -227,6 +229,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 						},
 					],
 					activeProgressByDate: { [fixture.dateKey]: progress },
+					peerClueWordIdsByDate: { [fixture.dateKey]: peerClueWordIds },
 				},
 			});
 		}
@@ -248,6 +251,59 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 					wordIds: [0, 1],
 				}),
 			).toEqual({ 0: "Clue 0" });
+		});
+
+		it("counts each friend clue once in history and keeps them across syncs", async () => {
+			const fixture = await createFixture();
+			await importProgress(fixture, {
+				...createEmptyProgressState(fixture.publicSnapshot),
+				clueWordIds: [0],
+				hintsUsed: 1,
+			});
+			const delivery = { userId: fixture.id, puzzleId: fixture.id };
+			await addPeerClueWordIds({ ...delivery, wordIds: [2] });
+			// A second friend answering the same word replaces the inbox entry.
+			await addPeerClueWordIds({ ...delivery, wordIds: [2] });
+			await Promise.all([
+				addPeerClueWordIds({ ...delivery, wordIds: [1] }),
+				addPeerClueWordIds({ ...delivery, wordIds: [0] }),
+			]);
+			await importProgress(fixture, {
+				...createEmptyProgressState(fixture.publicSnapshot),
+				clueWordIds: [0],
+				hintsUsed: 1,
+				guessCount: 2,
+			});
+
+			const [row] = await db
+				.select({ peerClueWordIds: userPuzzleProgress.peerClueWordIds })
+				.from(userPuzzleProgress)
+				.where(eq(userPuzzleProgress.userId, fixture.id));
+			expect(row?.peerClueWordIds).toEqual([0, 1, 2]);
+			expect(await getHistoryEntriesForUser(fixture.id)).toEqual([
+				expect.objectContaining({ dateKey: fixture.dateKey, hintsUsed: 4 }),
+			]);
+		});
+
+		it("brings a guest's friend clues into the account on sign-in", async () => {
+			const fixture = await createFixture();
+			await importProgress(
+				fixture,
+				{
+					...createEmptyProgressState(fixture.publicSnapshot),
+					hintsUsed: 3,
+				},
+				[1],
+			);
+			await addPeerClueWordIds({
+				userId: fixture.id,
+				puzzleId: fixture.id,
+				wordIds: [1, 2],
+			});
+
+			expect(await getHistoryEntriesForUser(fixture.id)).toEqual([
+				expect.objectContaining({ dateKey: fixture.dateKey, hintsUsed: 5 }),
+			]);
 		});
 
 		it("merges newly imported clues with clues already saved on the account", async () => {

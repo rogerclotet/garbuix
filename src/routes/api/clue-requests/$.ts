@@ -26,6 +26,7 @@ import {
 import { db } from "@/lib/db";
 import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
+	addPeerClueWordIds,
 	getUserPuzzleProgressData,
 	incrementCluesGivenCount,
 	publishLeaderboardForUser,
@@ -360,6 +361,18 @@ async function handleRespond(
 		});
 	}
 
+	// The inbox expires after a day; history keeps the asker's clue total from
+	// this copy. Anonymous askers have no progress row, so this is a no-op.
+	try {
+		await addPeerClueWordIds({
+			userId: clueRequest.requesterId,
+			puzzleId: clueRequest.puzzleId,
+			wordIds: [clueRequest.wordId],
+		});
+	} catch (error) {
+		console.warn("[clue-request] failed to record delivered clue", error);
+	}
+
 	// A delivered clue raises the asker's clue count immediately (see
 	// publishLeaderboardForUser), which can change the standings on its own even
 	// though wordsFound didn't move. Republish so the leaderboard reflects it
@@ -391,6 +404,7 @@ async function republishLeaderboardForClueRecipient(
 		await publishLeaderboardForUser({
 			dateKey,
 			userId: requesterId,
+			puzzleId,
 			wordsFound: progress.guessedWordIds.length,
 			totalWords: puzzle.wordCount,
 			freeCluesUsed: progress.hintsUsed,
