@@ -34,6 +34,7 @@ export function LeaderboardToasts() {
 			nextEmitAtRef.current = now + wait + GLOBAL_TOAST_GAP_MS;
 
 			window.setTimeout(() => {
+				if (document.visibilityState !== "visible") return;
 				const progress =
 					batch.totalWords > 0
 						? ` (${batch.wordsFound}/${batch.totalWords})`
@@ -56,6 +57,11 @@ export function LeaderboardToasts() {
 
 		const handleEvent = (event: LeaderboardEvent) => {
 			if (event.entry.participantId === localParticipantId) {
+				return;
+			}
+			// Live activity only matters as it happens. A toast raised in a hidden
+			// tab stays paused until the player comes back, then replays stale news.
+			if (document.visibilityState !== "visible") {
 				return;
 			}
 			if (!event.delta.justCompleted && event.delta.wordsAdded <= 0) {

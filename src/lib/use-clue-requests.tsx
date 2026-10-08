@@ -16,7 +16,11 @@ import type {
 	ClueRequestStreamEvent,
 	ClueResponse,
 } from "@/lib/clue-request-types";
-import { clueHelpGivenField } from "@/lib/clue-request-types";
+import { clueHelpGivenField, clueSeenMember } from "@/lib/clue-request-types";
+
+function isPageVisible(): boolean {
+	return document.visibilityState === "visible";
+}
 
 // A guest's identity is the signed cookie the server issued, which the browser
 // attaches on its own. All the client still supplies is the display name it
@@ -115,11 +119,10 @@ export function ClueRequestsProvider({
 	const listenersRef = useRef<Set<(event: ClueRequestStreamEvent) => void>>(
 		new Set(),
 	);
-	// Clues we've already surfaced to listeners (toasts), keyed by word + delivery
-	// time. Persisted to localStorage so a clue notifies exactly once across the
-	// snapshot replay, SSE reconnects, polls, and full page reloads — the snapshot
-	// re-sends every inbox clue (24h TTL) on every connect, so without this a reload
-	// would re-toast clues already seen.
+	// Clues already surfaced to listeners (toasts) in this session, keyed by word +
+	// delivery time. Across reloads and devices the server's seen-set takes over:
+	// the snapshot and poll re-send every inbox clue (24h TTL) flagged `seen` once
+	// any device has shown it, so a clue notifies once per player, not per device.
 	const notifiedClueKeysRef = useRef<Set<string>>(new Set());
 
 	// Guests supply a name with each write; signed-in players don't.
@@ -130,39 +133,41 @@ export function ClueRequestsProvider({
 	// having one.
 	const active = enabled && dateKey != null && (isAnon || localUserId != null);
 
-	// Per-user, per-day so a clue's notified-state doesn't leak across accounts on a
-	// shared browser or across days (the inbox is scoped to the day too).
-	const notifiedStorageKey =
-		dateKey && localUserId ? `clue-notified:${localUserId}:${dateKey}` : null;
-
-	// Hydrate the seen-set from localStorage before any clue is ingested. The
-	// snapshot/poll only deliver clues after a network round-trip, well after this
-	// synchronous load runs on mount.
-	useEffect(() => {
-		if (!notifiedStorageKey || typeof window === "undefined") {
-			return;
-		}
-		try {
-			const raw = window.localStorage.getItem(notifiedStorageKey);
-			notifiedClueKeysRef.current = new Set(
-				raw ? (JSON.parse(raw) as string[]) : [],
-			);
-		} catch {
-			notifiedClueKeysRef.current = new Set();
-		}
-	}, [notifiedStorageKey]);
+	// Tells the server these clues were shown, so the player's other devices and
+	// later reloads don't notify them again.
+	const markCluesSeen = useCallback(
+		(responses: ClueResponse[]) => {
+			if (!dateKey) return;
+			void fetch(`/api/clue-requests/${dateKey}/seen`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					clues: responses.map(({ wordId, at }) => ({ wordId, at })),
+					...(isAnon ? buildAnonNameBody() : {}),
+				}),
+			}).catch((error: unknown) => {
+				// The in-memory set still stops a repeat in this session; at worst
+				// another device or a reload shows the clue once more.
+				console.warn("[clue-requests] failed to mark clues seen", error);
+			});
+		},
+		[dateKey, isAnon],
+	);
 
 	// Merge delivered clues from any path (snapshot on open, live event, or the
 	// polling fallback) into state, and notify listeners once per clue so a clue
 	// surfaces the same way whether it arrives while playing or on opening the game.
+	// Notifying waits until the page is visible: a toast fired into a background
+	// tab sits paused until the player returns, by which time another device may
+	// have shown it. The poll that runs on becoming visible picks it back up.
 	const ingestResponses = useCallback(
 		(responses: ClueResponse[]) => {
 			if (responses.length === 0) {
 				return;
 			}
-			// Display state merges every clue unconditionally: the notified-set only
-			// gates toasts. After a reload the replayed inbox clues were all notified
-			// in the previous session, but they still need to render under the words.
+			// Display state merges every clue unconditionally: the seen flags only
+			// gate toasts. Replayed clues already shown on some device still need to
+			// render under the words.
 			setReceivedClues((current) => {
 				let changed = false;
 				const next = { ...current };
@@ -178,32 +183,30 @@ export function ClueRequestsProvider({
 				// re-render consumers with an equal-but-new object.
 				return changed ? next : current;
 			});
+			if (!isPageVisible()) {
+				return;
+			}
 			const fresh = responses.filter(
-				(r) => !notifiedClueKeysRef.current.has(`${r.wordId}:${r.at}`),
+				(r) =>
+					!r.seen &&
+					!notifiedClueKeysRef.current.has(clueSeenMember(r.wordId, r.at)),
 			);
 			if (fresh.length === 0) {
 				return;
 			}
 			for (const response of fresh) {
-				notifiedClueKeysRef.current.add(`${response.wordId}:${response.at}`);
+				notifiedClueKeysRef.current.add(
+					clueSeenMember(response.wordId, response.at),
+				);
 			}
-			if (notifiedStorageKey && typeof window !== "undefined") {
-				try {
-					window.localStorage.setItem(
-						notifiedStorageKey,
-						JSON.stringify([...notifiedClueKeysRef.current]),
-					);
-				} catch {
-					// best-effort; persistence is an enhancement, display still works
-				}
-			}
+			markCluesSeen(fresh);
 			for (const listener of listenersRef.current) {
 				for (const response of fresh) {
 					listener({ type: "response", response });
 				}
 			}
 		},
-		[notifiedStorageKey],
+		[markCluesSeen],
 	);
 
 	const ingestHelpGiven = useCallback((records: ClueHelpGiven[]) => {
@@ -343,7 +346,9 @@ export function ClueRequestsProvider({
 	// proxy buffering the open stream in production), so the asker would otherwise
 	// wait forever and responders would never see the request. Every few seconds we
 	// merge the inbox (clues for us) and reconcile the pending requests (clues we
-	// could give). ingestResponses dedupes, so a clue notifies exactly once.
+	// could give). ingestResponses dedupes, so a clue notifies exactly once. Coming
+	// back to the tab polls straight away, so clues that arrived while it was hidden
+	// notify on return — unless another device has shown them in the meantime.
 	useEffect(() => {
 		if (!active || !dateKey || typeof window === "undefined") {
 			return;
@@ -379,10 +384,18 @@ export function ClueRequestsProvider({
 			}
 		};
 
+		const handleVisibilityChange = () => {
+			if (isPageVisible()) {
+				void pollInbox();
+			}
+		};
+
 		const interval = window.setInterval(pollInbox, 8000);
+		document.addEventListener("visibilitychange", handleVisibilityChange);
 		return () => {
 			cancelled = true;
 			window.clearInterval(interval);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
 		};
 	}, [
 		active,

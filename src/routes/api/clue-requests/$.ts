@@ -12,6 +12,7 @@ import {
 	getPendingClueRequests,
 	hasActiveClueRequest,
 	hasHelpedRequesterForWord,
+	markCluesSeen,
 	publishClueResponse,
 	resolveOwnClueRequestsForWord,
 } from "@/lib/clue-request.server";
@@ -54,6 +55,7 @@ type ParsedPath =
 	| { kind: "request"; dateKey: string }
 	| { kind: "respond"; dateKey: string }
 	| { kind: "resolve"; dateKey: string }
+	| { kind: "seen"; dateKey: string }
 	| { kind: "unknown" };
 
 function parsePath(pathname: string): ParsedPath {
@@ -72,6 +74,7 @@ function parsePath(pathname: string): ParsedPath {
 	if (rest[1] === "request") return { kind: "request", dateKey };
 	if (rest[1] === "respond") return { kind: "respond", dateKey };
 	if (rest[1] === "resolve") return { kind: "resolve", dateKey };
+	if (rest[1] === "seen") return { kind: "seen", dateKey };
 	return { kind: "unknown" };
 }
 
@@ -143,17 +146,44 @@ const resolveSchema = z.object({
 	...anonAuthFields,
 });
 
+// A whole day's inbox holds at most one clue per word, so this bounds a batch
+// well above any real puzzle.
+const seenSchema = z.object({
+	clues: z
+		.array(
+			z.object({
+				wordId: z.number().int().min(0),
+				at: z.string().min(1).max(64),
+			}),
+		)
+		.min(1)
+		.max(64),
+	...anonAuthFields,
+});
+
+type PostKind = "request" | "respond" | "resolve" | "seen";
+
+function isPostKind(kind: ParsedPath["kind"]): kind is PostKind {
+	return (
+		kind === "request" ||
+		kind === "respond" ||
+		kind === "resolve" ||
+		kind === "seen"
+	);
+}
+
 async function handlePost(request: Request) {
 	const url = new URL(request.url);
 	const parsed = parsePath(url.pathname);
 	if (
-		(parsed.kind !== "request" &&
-			parsed.kind !== "respond" &&
-			parsed.kind !== "resolve") ||
+		parsed.kind === "unknown" ||
+		!isPostKind(parsed.kind) ||
 		!isValidDateKey(parsed.dateKey)
 	) {
 		return new Response("Not Found", { status: 404 });
 	}
+	const kind = parsed.kind;
+	const dateKey = parsed.dateKey;
 
 	let raw: unknown;
 	try {
@@ -176,38 +206,49 @@ async function handlePost(request: Request) {
 	// hourly budgets sit far above real play while capping how much text one
 	// player can push into other players' games. The address bucket catches a
 	// caller cycling guest cookies for a fresh budget.
-	const rateLimit = await enforceClueRateLimit(
-		request,
-		participant,
-		parsed.kind,
-	);
+	const rateLimit = await enforceClueRateLimit(request, participant, kind);
 	if (rateLimit) {
 		return rateLimit;
 	}
 
-	const response =
-		parsed.kind === "request"
-			? await handleCreateRequest(parsed.dateKey, participant, raw)
-			: parsed.kind === "resolve"
-				? await handleResolve(parsed.dateKey, participant, raw)
-				: await handleRespond(parsed.dateKey, participant, raw);
+	const response = await dispatchPost(kind, dateKey, participant, raw);
 
 	return withAnonCookie(response, participant.setCookie ?? null);
 }
 
+function dispatchPost(
+	kind: PostKind,
+	dateKey: string,
+	participant: ClueRequestParticipant,
+	raw: unknown,
+): Promise<Response> {
+	switch (kind) {
+		case "request":
+			return handleCreateRequest(dateKey, participant, raw);
+		case "respond":
+			return handleRespond(dateKey, participant, raw);
+		case "resolve":
+			return handleResolve(dateKey, participant, raw);
+		case "seen":
+			return handleSeen(dateKey, participant, raw);
+	}
+}
+
 const CLUE_RATE_LIMITS: Record<
-	"request" | "respond" | "resolve",
+	PostKind,
 	{ limit: number; windowSeconds: number }
 > = {
 	request: { limit: 30, windowSeconds: 60 * 60 },
 	respond: { limit: 40, windowSeconds: 60 * 60 },
 	resolve: { limit: 200, windowSeconds: 60 * 60 },
+	// One call per batch of clues shown, per device.
+	seen: { limit: 200, windowSeconds: 60 * 60 },
 };
 
 async function enforceClueRateLimit(
 	request: Request,
 	participant: ClueRequestParticipant,
-	kind: "request" | "respond" | "resolve",
+	kind: PostKind,
 ): Promise<Response | null> {
 	const { limit, windowSeconds } = CLUE_RATE_LIMITS[kind];
 	const results = await Promise.all([
@@ -437,6 +478,21 @@ async function handleResolve(
 		wordId: result.data.wordId,
 	});
 	return Response.json({ resolved: true });
+}
+
+// Only touches the caller's own seen-set, keyed by their authenticated id, so a
+// bogus entry can at most hide a notification from themselves.
+async function handleSeen(
+	dateKey: string,
+	participant: ClueRequestParticipant,
+	raw: unknown,
+) {
+	const result = seenSchema.safeParse(raw);
+	if (!result.success) {
+		return new Response("Invalid body", { status: 400 });
+	}
+	await markCluesSeen(participant.id, dateKey, result.data.clues);
+	return Response.json({ ok: true });
 }
 
 function openSseStream(dateKey: string, userId: string): Response {

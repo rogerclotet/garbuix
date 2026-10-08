@@ -25,6 +25,10 @@ export type ClueResponse = {
 	text: string;
 	responderName: string;
 	at: string;
+	// Set on inbox replays (snapshot + poll) once any of the asker's devices has
+	// shown this clue, so opening the game elsewhere doesn't re-notify it. Live
+	// events never carry it: a clue that was just sent can't have been seen yet.
+	seen?: boolean;
 };
 
 // A responder can only help a given asker once per word. Stored per responder so
@@ -80,6 +84,17 @@ export function clueRequestRecordsKey(dateKey: string): string {
 // relying solely on the live pub/sub event reaching them.
 export function clueInboxKey(userId: string, dateKey: string): string {
 	return `clreq:user:${userId}:${dateKey}:inbox`;
+}
+
+// Per-user, per-day set of inbox clues already shown to the asker on any device.
+// Members are clueSeenMember(); a fresh clue for the same word has a new `at`, so
+// it isn't covered by the old one's entry.
+export function clueSeenKey(userId: string, dateKey: string): string {
+	return `clreq:user:${userId}:${dateKey}:seen`;
+}
+
+export function clueSeenMember(wordId: number, at: string): string {
+	return `${wordId}:${at}`;
 }
 
 // Per-responder record of which asker+word pairs they've already helped today.
