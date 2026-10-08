@@ -14,12 +14,18 @@ export type TriesHistogramBucket = {
 	// null on the open-ended last bucket.
 	end: number | null;
 	label: string;
+	// Players who finished with this many tries.
 	count: number;
+	// Players still playing whose tries so far land here. Their final count can
+	// only grow, so this shows where the field is now, not where it will end.
+	inProgressCount: number;
 };
 
 export type TriesHistogram = {
 	buckets: TriesHistogramBucket[];
 	totalFinishers: number;
+	totalInProgress: number;
+	// Tallest bucket, finished and in-progress players together.
 	maxCount: number;
 	// Index of the bucket holding the local player's tries, or null when they
 	// haven't finished (or no highlight was asked for).
@@ -56,12 +62,13 @@ function emptyBuckets(): TriesHistogramBucket[] {
 			end,
 			label: isOpen ? `${start}+` : `${start}-${end}`,
 			count: 0,
+			inProgressCount: 0,
 		};
 	});
 }
 
-// Only players who finished count: an unfinished board's try count says nothing
-// about how many tries the puzzle takes.
+// An unfinished board's try count says nothing about how many tries the puzzle
+// takes, so finished and in-progress players are counted apart.
 function hasFinished(entry: LeaderboardEntry): boolean {
 	return entry.completedAt != null;
 }
@@ -80,26 +87,37 @@ export function buildTriesHistogram(
 ): TriesHistogram {
 	const buckets = emptyBuckets();
 	let totalFinishers = 0;
+	let totalInProgress = 0;
 	let selfCounted = false;
-
-	for (const entry of entries) {
-		if (!hasFinished(entry)) {
-			continue;
-		}
-		totalFinishers += 1;
-		if (entry.participantId === options?.selfParticipantId) {
-			selfCounted = true;
-		}
-		const bucket = buckets[triesBucketIndex(entry.tryCount)];
-		if (bucket) {
-			bucket.count += 1;
-		}
-	}
 
 	const highlightTries = options?.highlightTries;
 	const hasHighlight =
 		highlightTries != null && Number.isFinite(highlightTries);
 	const highlightIndex = hasHighlight ? triesBucketIndex(highlightTries) : null;
+
+	for (const entry of entries) {
+		const isSelf = entry.participantId === options?.selfParticipantId;
+		const bucket = buckets[triesBucketIndex(entry.tryCount)];
+		if (!hasFinished(entry)) {
+			// The stream can still hold the local player's last unfinished
+			// update after they've finished; the highlight already counts them.
+			if (isSelf && hasHighlight) {
+				continue;
+			}
+			totalInProgress += 1;
+			if (bucket) {
+				bucket.inProgressCount += 1;
+			}
+			continue;
+		}
+		totalFinishers += 1;
+		if (isSelf) {
+			selfCounted = true;
+		}
+		if (bucket) {
+			bucket.count += 1;
+		}
+	}
 
 	if (hasHighlight && !selfCounted && highlightIndex != null) {
 		totalFinishers += 1;
@@ -112,7 +130,11 @@ export function buildTriesHistogram(
 	return {
 		buckets,
 		totalFinishers,
-		maxCount: buckets.reduce((max, bucket) => Math.max(max, bucket.count), 0),
+		totalInProgress,
+		maxCount: buckets.reduce(
+			(max, bucket) => Math.max(max, bucket.count + bucket.inProgressCount),
+			0,
+		),
 		highlightIndex,
 	};
 }

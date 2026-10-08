@@ -42,18 +42,33 @@ describe("tries-histogram", () => {
 		expect(buckets.at(-1)?.end).toBeNull();
 	});
 
-	it("counts only the players who finished", () => {
+	it("counts finished and still-playing players apart", () => {
 		const histogram = buildTriesHistogram([
 			buildEntry("a", 17),
 			buildEntry("b", 21),
 			buildEntry("c", 26),
 			buildEntry("d", 30, false),
+			buildEntry("e", 33, false),
 		]);
 
 		expect(histogram.totalFinishers).toBe(3);
+		expect(histogram.totalInProgress).toBe(2);
 		expect(histogram.buckets[0]?.count).toBe(2);
+		expect(histogram.buckets[0]?.inProgressCount).toBe(0);
 		expect(histogram.buckets[1]?.count).toBe(1);
-		expect(histogram.maxCount).toBe(2);
+		expect(histogram.buckets[1]?.inProgressCount).toBe(2);
+		expect(histogram.maxCount).toBe(3);
+	});
+
+	it("drops the local player's stale unfinished entry once they've finished", () => {
+		const histogram = buildTriesHistogram(
+			[buildEntry("other", 18), buildEntry("me", 22, false)],
+			{ highlightTries: 26, selfParticipantId: "me" },
+		);
+
+		expect(histogram.totalFinishers).toBe(2);
+		expect(histogram.totalInProgress).toBe(0);
+		expect(histogram.buckets[1]?.count).toBe(1);
 	});
 
 	it("folds everything above the open bucket into it", () => {
