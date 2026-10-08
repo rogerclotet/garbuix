@@ -1,0 +1,1 @@
+ALTER TABLE "user_puzzle_progress" ADD COLUMN "peer_clue_word_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

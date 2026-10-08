@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { ClueResponse } from "@/lib/clue-request-types";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import type {
 	DailyPuzzlePublic,
@@ -10,6 +11,13 @@ import { useDailyCompletion } from "./use-daily-completion";
 
 vi.mock("@/lib/puzzle-local", () => ({
 	getSortedAnonymousHistoryEntries: () => [],
+}));
+
+const clueRequests = vi.hoisted(() => ({
+	receivedClues: {} as Record<number, ClueResponse>,
+}));
+vi.mock("@/lib/use-clue-requests", () => ({
+	useClueRequests: () => clueRequests,
 }));
 
 const puzzle: DailyPuzzlePublic = {
@@ -71,6 +79,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	clueRequests.receivedClues = {};
 	vi.useRealTimers();
 	vi.unstubAllGlobals();
 });
@@ -122,3 +131,18 @@ it.each([0, 520])(
 		expect(vi.getTimerCount()).toBe(0);
 	},
 );
+
+it("counts clues delivered by friends alongside the free ones", () => {
+	clueRequests.receivedClues = {
+		0: {
+			requestId: "request",
+			wordId: 0,
+			text: "Una pista",
+			responderName: "Anna",
+			at: "2026-04-11T11:00:00Z",
+		},
+	};
+	const { result } = renderCompletion({ ...complete, hintsUsed: 3 });
+	expect(result.current.cluesUsed).toBe(4);
+	expect(result.current.completionStats?.hintsUsed).toBe(4);
+});

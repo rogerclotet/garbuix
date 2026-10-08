@@ -127,6 +127,7 @@ function DailyGame({
 		winDialogOpen,
 		setWinDialogOpen,
 		streakStats,
+		cluesUsed,
 		completionStats,
 		markCompleting,
 	} = useDailyCompletion({ initialData, activeUser, derivedProgress });
@@ -251,6 +252,7 @@ function DailyGame({
 						>
 							<DailyStatus
 								progress={derivedProgress}
+								cluesUsed={cluesUsed}
 								totalWords={totalWords}
 								displayComplete={displayComplete}
 								currentStreak={streakStats.currentStreak}
@@ -364,7 +366,7 @@ function DailyGame({
 				open={winDialogOpen}
 				onOpenChange={setWinDialogOpen}
 				guessCount={derivedProgress.guessCount}
-				hintsUsed={derivedProgress.hintsUsed}
+				hintsUsed={cluesUsed}
 				completedAt={derivedProgress.completedAt}
 				currentStreak={streakStats.currentStreak}
 				isAnonymous={!activeUser}

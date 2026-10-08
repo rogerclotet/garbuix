@@ -29,6 +29,7 @@ import {
 	getUserPuzzleProgressData,
 	incrementCluesGivenCount,
 	publishLeaderboardForUser,
+	recordPeerClueDelivered,
 } from "@/lib/puzzle-service.server";
 import {
 	consumeRateLimit,
@@ -358,6 +359,18 @@ async function handleRespond(
 				error,
 			);
 		});
+	}
+
+	// The inbox expires after a day; history keeps the asker's clue total from
+	// this copy. Anonymous askers have no progress row, so this is a no-op.
+	try {
+		await recordPeerClueDelivered({
+			userId: clueRequest.requesterId,
+			puzzleId: clueRequest.puzzleId,
+			wordId: clueRequest.wordId,
+		});
+	} catch (error) {
+		console.warn("[clue-request] failed to record delivered clue", error);
 	}
 
 	// A delivered clue raises the asker's clue count immediately (see

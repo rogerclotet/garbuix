@@ -21,7 +21,7 @@ export async function withPuzzleProgressTransaction<T>(
 }
 
 function serializeProgressRow(
-	row: typeof userPuzzleProgress.$inferSelect,
+	row: Omit<typeof userPuzzleProgress.$inferSelect, "peerClueWordIds">,
 ): PuzzleProgressState {
 	return {
 		puzzleId: row.puzzleId,
@@ -54,10 +54,14 @@ export async function getUserPuzzleProgressData(
 	return row ? serializeProgressRow(row) : null;
 }
 
-// Both event sync and guest import must persist every progress field.
+// Both event sync and guest import must persist every progress field. Peer
+// clues are left out so a sync never clobbers a delivery recorded meanwhile.
 function toStoredProgress(
 	progress: PuzzleProgressState,
-): Omit<typeof userPuzzleProgress.$inferSelect, "id" | "userId" | "puzzleId"> {
+): Omit<
+	typeof userPuzzleProgress.$inferSelect,
+	"id" | "userId" | "puzzleId" | "peerClueWordIds"
+> {
 	return {
 		guessHashes: progress.guessHashes,
 		guessedWordIds: progress.guessedWordIds,
@@ -90,4 +94,27 @@ export async function saveUserPuzzleProgress(
 		set: fields,
 	});
 	return serializeProgressRow(row);
+}
+
+// Idempotent per word, matching the inbox (one entry per word however many
+// friends answer). A no-op when the player has no progress row, which also
+// covers guest requester ids.
+export async function recordPeerClueDelivered(input: {
+	userId: string;
+	puzzleId: string;
+	wordId: number;
+}) {
+	const wordIdJson = JSON.stringify([input.wordId]);
+	await db
+		.update(userPuzzleProgress)
+		.set({
+			peerClueWordIds: sql`${userPuzzleProgress.peerClueWordIds} || ${wordIdJson}::jsonb`,
+		})
+		.where(
+			and(
+				eq(userPuzzleProgress.userId, input.userId),
+				eq(userPuzzleProgress.puzzleId, input.puzzleId),
+				sql`not ${userPuzzleProgress.peerClueWordIds} @> ${wordIdJson}::jsonb`,
+			),
+		);
 }

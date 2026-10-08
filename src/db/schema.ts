@@ -143,6 +143,13 @@ export const userPuzzleProgress = pgTable(
 			.notNull()
 			.default(sql`'[]'::jsonb`),
 		hintsUsed: integer("hints_used").notNull().default(0),
+		// Words a friend delivered a clue for. Written by the server on delivery,
+		// never by progress sync: the inbox that drives the live count only lives
+		// in Redis for a day, so history needs its own copy.
+		peerClueWordIds: jsonb("peer_clue_word_ids")
+			.$type<number[]>()
+			.notNull()
+			.default(sql`'[]'::jsonb`),
 		guessCount: integer("guess_count").notNull().default(0),
 		bonusWordsFound: integer("bonus_words_found").notNull().default(0),
 		shuffledLetters: jsonb("shuffled_letters")
