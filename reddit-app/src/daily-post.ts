@@ -1,3 +1,5 @@
+import { buildPuzzleHeadline } from "../../src/lib/puzzle-number.ts";
+
 export const GARBUIX_ORIGIN = "https://garbuix.app";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
@@ -15,11 +17,18 @@ export type DailyPost = {
 	imagePath: string;
 };
 
+// What goes up for the day. imagePath is null when garbuix.app couldn't be
+// reached and the post is the title alone.
+type PostContent = {
+	title: string;
+	imagePath: string | null;
+};
+
 export type PostOutcome =
 	| { status: "already-posted"; dateKey: string }
 	| { status: "not-ready"; dateKey: string }
 	| { status: "in-progress"; dateKey: string }
-	| { status: "posted"; dateKey: string; postId: string };
+	| { status: "posted"; dateKey: string; postId: string; withImage: boolean };
 
 export type DailyPostDeps = {
 	now: () => Date;
@@ -32,6 +41,7 @@ export type DailyPostDeps = {
 	};
 	uploadImage: (dataUrl: string) => Promise<string>;
 	submitPost: (title: string, imageUrl: string) => Promise<string>;
+	submitTextPost: (title: string) => Promise<string>;
 	pinPost: (postId: string) => Promise<void>;
 	unpinPost: (postId: string) => Promise<void>;
 };
@@ -100,6 +110,31 @@ async function fetchImageDataUrl(
 	return `data:image/png;base64,${bytes.toString("base64")}`;
 }
 
+// The day still gets its thread when garbuix.app is down or the fetch domain is
+// not approved: the title only needs the date. An answer of "not ready yet"
+// still waits for the next run.
+async function getPostContent(
+	deps: DailyPostDeps,
+	dateKey: string,
+): Promise<PostContent | null> {
+	try {
+		return await fetchDailyPost(deps, dateKey);
+	} catch (error) {
+		console.warn("Could not get today's post from garbuix.app:", error);
+		return { title: buildPuzzleHeadline(dateKey), imagePath: null };
+	}
+}
+
+async function submitImagePost(
+	deps: DailyPostDeps,
+	title: string,
+	imagePath: string,
+): Promise<string> {
+	const dataUrl = await fetchImageDataUrl(deps, imagePath);
+	const imageUrl = await deps.uploadImage(dataUrl);
+	return deps.submitPost(title, imageUrl);
+}
+
 // Keeps only the newest daily post pinned. Checked on every run, so a pin that
 // failed right after posting is retried a minute later.
 async function ensurePinned(deps: DailyPostDeps, postId: string) {
@@ -121,7 +156,7 @@ async function ensurePinned(deps: DailyPostDeps, postId: string) {
 }
 
 // Runs every minute; posts at most once per Madrid day, in the first run after
-// garbuix.app has rolled over to the new puzzle.
+// garbuix.app has rolled over to the new puzzle or turns out to be unreachable.
 export async function postDailyPuzzle(
 	deps: DailyPostDeps,
 ): Promise<PostOutcome> {
@@ -133,8 +168,8 @@ export async function postDailyPuzzle(
 		return { status: "already-posted", dateKey };
 	}
 
-	const post = await fetchDailyPost(deps, dateKey);
-	if (!post) {
+	const content = await getPostContent(deps, dateKey);
+	if (!content) {
 		return { status: "not-ready", dateKey };
 	}
 
@@ -142,11 +177,17 @@ export async function postDailyPuzzle(
 		return { status: "in-progress", dateKey };
 	}
 
-	const dataUrl = await fetchImageDataUrl(deps, post.imagePath);
-	const imageUrl = await deps.uploadImage(dataUrl);
-	const postId = await deps.submitPost(post.title, imageUrl);
+	const postId =
+		content.imagePath === null
+			? await deps.submitTextPost(content.title)
+			: await submitImagePost(deps, content.title, content.imagePath);
 	await deps.store.set(postedKey(dateKey), postId, POSTED_MARKER_SECONDS);
 	await ensurePinned(deps, postId);
 
-	return { status: "posted", dateKey, postId };
+	return {
+		status: "posted",
+		dateKey,
+		postId,
+		withImage: content.imagePath !== null,
+	};
 }

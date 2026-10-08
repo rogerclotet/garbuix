@@ -18,6 +18,7 @@ type Harness = {
 	requests: string[];
 	uploads: string[];
 	posts: { title: string; imageUrl: string }[];
+	textPosts: string[];
 	pins: string[];
 	unpins: string[];
 };
@@ -26,6 +27,7 @@ function harness(
 	options: {
 		serverDateKey?: string;
 		dailyPostStatus?: number;
+		unreachable?: boolean;
 		failPin?: boolean;
 		failUnpin?: boolean;
 	} = {},
@@ -34,6 +36,7 @@ function harness(
 	const requests: string[] = [];
 	const uploads: string[] = [];
 	const posts: { title: string; imageUrl: string }[] = [];
+	const textPosts: string[] = [];
 	const pins: string[] = [];
 	const unpins: string[] = [];
 	const serverDateKey = options.serverDateKey ?? "2026-10-08";
@@ -42,6 +45,7 @@ function harness(
 		now: () => JUST_AFTER_MIDNIGHT,
 		fetch: async (url) => {
 			requests.push(url);
+			if (options.unreachable) throw new Error("domain not allowed");
 			if (url === `${GARBUIX_ORIGIN}/api/daily-post`) {
 				const status = options.dailyPostStatus ?? 200;
 				if (status !== 200) return new Response(null, { status });
@@ -74,6 +78,10 @@ function harness(
 			posts.push({ title, imageUrl });
 			return "t3_abc123";
 		},
+		submitTextPost: async (title) => {
+			textPosts.push(title);
+			return "t3_abc123";
+		},
 		pinPost: async (postId) => {
 			if (options.failPin) throw new Error("pin failed");
 			pins.push(postId);
@@ -90,6 +98,7 @@ function harness(
 		requests,
 		uploads,
 		posts,
+		textPosts,
 		pins,
 		unpins,
 	};
@@ -120,6 +129,7 @@ describe("postDailyPuzzle", () => {
 			status: "posted",
 			dateKey: "2026-10-08",
 			postId: "t3_abc123",
+			withImage: true,
 		});
 		assert.deepEqual(h.requests, [
 			`${GARBUIX_ORIGIN}/api/daily-post`,
@@ -207,18 +217,52 @@ describe("postDailyPuzzle", () => {
 		assert.deepEqual(retry.pins, ["t3_abc123"]);
 	});
 
-	it("still pins when yesterday's post can no longer be unpinned", async () => {
+	it("still pins when yesterday's post can no longer be unpinned", async (t) => {
+		const warn = t.mock.method(console, "warn", () => {});
 		const h = harness({ failUnpin: true });
 		h.values.set("daily-post:pinned", "t3_deleted");
 
 		await postDailyPuzzle(h.deps);
 
 		assert.deepEqual(h.pins, ["t3_abc123"]);
+		assert.equal(warn.mock.callCount(), 1);
+		assert.match(String(warn.mock.calls[0]?.arguments[0]), /t3_deleted/);
 	});
 
-	it("fails loudly on unexpected server errors", async () => {
+	it("posts the title alone when garbuix.app can't be reached", async (t) => {
+		const warn = t.mock.method(console, "warn", () => {});
+		const h = harness({ unreachable: true });
+
+		const outcome = await postDailyPuzzle(h.deps);
+
+		assert.deepEqual(outcome, {
+			status: "posted",
+			dateKey: "2026-10-08",
+			postId: "t3_abc123",
+			withImage: false,
+		});
+		assert.deepEqual(h.textPosts, ["Garbuix #212 - 8/10/2026"]);
+		assert.equal(h.posts.length, 0);
+		assert.deepEqual(h.pins, ["t3_abc123"]);
+		assert.equal(warn.mock.callCount(), 1);
+	});
+
+	it("posts the title alone when garbuix.app answers with an error", async (t) => {
+		t.mock.method(console, "warn", () => {});
 		const h = harness({ dailyPostStatus: 500 });
 
-		await assert.rejects(postDailyPuzzle(h.deps), /HTTP 500/);
+		await postDailyPuzzle(h.deps);
+
+		assert.deepEqual(h.textPosts, ["Garbuix #212 - 8/10/2026"]);
+	});
+
+	it("does not post the title alone once today's post is up", async (t) => {
+		t.mock.method(console, "warn", () => {});
+		const h = harness({ unreachable: true });
+
+		await postDailyPuzzle(h.deps);
+		await postDailyPuzzle(h.deps);
+
+		assert.equal(h.textPosts.length, 1);
 	});
 });

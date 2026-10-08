@@ -60,6 +60,14 @@ const deps: DailyPostDeps = {
 		});
 		return post.id;
 	},
+	submitTextPost: async (title) => {
+		const post = await reddit.submitPost({
+			subredditName: getSubredditName(),
+			title,
+			text: "",
+		});
+		return post.id;
+	},
 	pinPost: async (postId) => {
 		const post = await reddit.getPostById(toPostId(postId));
 		await post.sticky();
@@ -75,7 +83,8 @@ const app = new Hono();
 app.post("/internal/scheduler/post-daily-puzzle", async (c) => {
 	const outcome = await postDailyPuzzle(deps);
 	if (outcome.status === "posted") {
-		console.log(`Posted ${outcome.dateKey} as ${outcome.postId}`);
+		const kind = outcome.withImage ? "image" : "title-only";
+		console.log(`Posted ${outcome.dateKey} as ${outcome.postId} (${kind})`);
 	}
 	return c.json<TaskResponse>({ status: "ok" }, 200);
 });
