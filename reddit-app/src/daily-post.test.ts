@@ -207,13 +207,16 @@ describe("postDailyPuzzle", () => {
 		assert.deepEqual(retry.pins, ["t3_abc123"]);
 	});
 
-	it("still pins when yesterday's post can no longer be unpinned", async () => {
+	it("still pins when yesterday's post can no longer be unpinned", async (t) => {
+		const warn = t.mock.method(console, "warn", () => {});
 		const h = harness({ failUnpin: true });
 		h.values.set("daily-post:pinned", "t3_deleted");
 
 		await postDailyPuzzle(h.deps);
 
 		assert.deepEqual(h.pins, ["t3_abc123"]);
+		assert.equal(warn.mock.callCount(), 1);
+		assert.match(String(warn.mock.calls[0]?.arguments[0]), /t3_deleted/);
 	});
 
 	it("fails loudly on unexpected server errors", async () => {
