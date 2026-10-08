@@ -9,6 +9,8 @@ import {
 	clueRequestRecordsKey,
 	clueRequestsChannel,
 	clueResponsesChannel,
+	clueSeenKey,
+	clueSeenMember,
 	pendingRequestsKey,
 } from "@/lib/clue-request-types";
 import { getRedis, isRedisConfigured } from "@/lib/redis.server";
@@ -316,6 +318,8 @@ export async function publishClueResponse(options: {
 
 // Clues already delivered to a user for a puzzle, replayed in the SSE snapshot so
 // they show under the word regardless of whether the live event was received.
+// Each carries whether one of the user's devices already showed it, so only the
+// clues they haven't seen anywhere get notified.
 export async function getClueInbox(
 	userId: string,
 	dateKey: string,
@@ -329,7 +333,11 @@ export async function getClueInbox(
 	}
 
 	try {
-		const entries = await redis.hgetall(clueInboxKey(userId, dateKey));
+		const [entries, seenMembers] = await Promise.all([
+			redis.hgetall(clueInboxKey(userId, dateKey)),
+			redis.smembers(clueSeenKey(userId, dateKey)),
+		]);
+		const seen = new Set(seenMembers);
 		return Object.values(entries)
 			.map((raw) => {
 				try {
@@ -338,10 +346,43 @@ export async function getClueInbox(
 					return null;
 				}
 			})
-			.filter((response): response is ClueResponse => response !== null);
+			.filter((response): response is ClueResponse => response !== null)
+			.map((response) => ({
+				...response,
+				seen: seen.has(clueSeenMember(response.wordId, response.at)),
+			}));
 	} catch (error) {
 		console.warn("[clue-request] failed to read inbox", error);
 		return [];
+	}
+}
+
+// Records that the user has been shown these inbox clues, so their other devices
+// (and later reloads) stop notifying them. Expires with the inbox it describes.
+export async function markCluesSeen(
+	userId: string,
+	dateKey: string,
+	clues: Array<Pick<ClueResponse, "wordId" | "at">>,
+): Promise<void> {
+	if (clues.length === 0 || !isRedisConfigured()) {
+		return;
+	}
+	const redis = getRedis();
+	if (!redis) {
+		return;
+	}
+
+	const seenKey = clueSeenKey(userId, dateKey);
+	try {
+		const pipeline = redis.pipeline();
+		pipeline.sadd(
+			seenKey,
+			...clues.map((clue) => clueSeenMember(clue.wordId, clue.at)),
+		);
+		pipeline.expire(seenKey, INBOX_TTL_SECONDS);
+		await pipeline.exec();
+	} catch (error) {
+		console.warn("[clue-request] failed to mark clues seen", error);
 	}
 }
 

@@ -48,25 +48,25 @@ class MockEventSource {
 	}
 }
 
-// The environment's localStorage is non-functional under vitest (Node's
-// --localstorage-file shim); the provider tolerates that, but the tests need a
-// real store to simulate the notified-set surviving a reload.
-function createMemoryStorage(): Storage {
-	const store = new Map<string, string>();
-	return {
-		get length() {
-			return store.size;
-		},
-		clear: () => store.clear(),
-		getItem: (key: string) => store.get(key) ?? null,
-		key: (index: number) => [...store.keys()][index] ?? null,
-		removeItem: (key: string) => {
-			store.delete(key);
-		},
-		setItem: (key: string, value: string) => {
-			store.set(key, value);
-		},
-	};
+const CLUE = {
+	requestId: "req-1",
+	wordId: 3,
+	text: "El que tens al teu voltant",
+	responderName: "Anna",
+	at: "2026-06-11T08:00:00.000Z",
+};
+
+function setPageVisibility(state: DocumentVisibilityState): void {
+	Object.defineProperty(document, "visibilityState", {
+		configurable: true,
+		get: () => state,
+	});
+}
+
+function seenCalls(fetchMock: ReturnType<typeof vi.fn>): unknown[] {
+	return fetchMock.mock.calls
+		.filter(([url]) => String(url).endsWith("/seen"))
+		.map(([, init]) => JSON.parse((init as RequestInit).body as string));
 }
 
 type ClueRequestsContext = ReturnType<typeof useClueRequests>;
@@ -105,7 +105,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 	beforeEach(() => {
 		MockEventSource.instances = [];
 		captured = null;
-		vi.stubGlobal("localStorage", createMemoryStorage());
+		setPageVisibility("visible");
 		vi.stubGlobal("EventSource", MockEventSource);
 		vi.stubGlobal(
 			"fetch",
@@ -123,12 +123,7 @@ describe("ClueRequestsProvider snapshot replay", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("renders replayed clues that were already notified in a previous session", () => {
-		// Simulate a prior session: the clue was toasted, then the page reloaded.
-		window.localStorage.setItem(
-			`clue-notified:${USER_ID}:${DATE_KEY}`,
-			JSON.stringify(["3:2026-06-11T08:00:00.000Z"]),
-		);
+	it("renders replayed clues already seen on another device without re-notifying", () => {
 		renderProvider();
 
 		const events: ClueRequestStreamEvent[] = [];
@@ -139,22 +134,89 @@ describe("ClueRequestsProvider snapshot replay", () => {
 			lastEventSource().emit("snapshot", {
 				dateKey: DATE_KEY,
 				requests: [],
-				responses: [
-					{
-						requestId: "req-1",
-						wordId: 3,
-						text: "El que tens al teu voltant",
-						responderName: "Anna",
-						at: "2026-06-11T08:00:00.000Z",
-					},
-				],
+				responses: [{ ...CLUE, seen: true }],
 			});
 		});
 
-		// The clue must render again after the reload...
+		// The clue must still render under the word...
 		expect(context().receivedClues[3]?.text).toBe("El que tens al teu voltant");
-		// ...without re-notifying (no duplicate toast).
+		// ...without a duplicate toast.
 		expect(events).toHaveLength(0);
+	});
+
+	it("notifies an unseen replayed clue once and reports it as seen", () => {
+		const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+		vi.stubGlobal("fetch", fetchMock);
+		renderProvider();
+
+		const events: ClueRequestStreamEvent[] = [];
+		act(() => {
+			context().subscribe((event) => events.push(event));
+		});
+		act(() => {
+			lastEventSource().emit("snapshot", {
+				dateKey: DATE_KEY,
+				requests: [],
+				responses: [{ ...CLUE, seen: false }],
+			});
+		});
+		// A reconnect replays it again before the server has recorded the ack.
+		act(() => {
+			lastEventSource().emit("snapshot", {
+				dateKey: DATE_KEY,
+				requests: [],
+				responses: [{ ...CLUE, seen: false }],
+			});
+		});
+
+		expect(events).toHaveLength(1);
+		expect(seenCalls(fetchMock)).toEqual([
+			{ clues: [{ wordId: CLUE.wordId, at: CLUE.at }] },
+		]);
+	});
+
+	it("holds notifications while the tab is hidden and skips ones seen elsewhere meanwhile", async () => {
+		const second = { ...CLUE, requestId: "req-2", wordId: 4 };
+		// By the time the player returns, another device has shown the first clue.
+		const fetchMock = vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				requests: [],
+				responses: [
+					{ ...CLUE, seen: true },
+					{ ...second, seen: false },
+				],
+			}),
+		}));
+		vi.stubGlobal("fetch", fetchMock);
+		setPageVisibility("hidden");
+		renderProvider();
+
+		const events: ClueRequestStreamEvent[] = [];
+		act(() => {
+			context().subscribe((event) => events.push(event));
+		});
+		act(() => {
+			lastEventSource().emit("message", { type: "response", response: CLUE });
+			lastEventSource().emit("message", { type: "response", response: second });
+		});
+
+		expect(context().receivedClues[3]?.text).toBe(CLUE.text);
+		expect(events).toHaveLength(0);
+		expect(seenCalls(fetchMock)).toHaveLength(0);
+
+		setPageVisibility("visible");
+		await act(async () => {
+			document.dispatchEvent(new Event("visibilitychange"));
+			await Promise.resolve();
+		});
+
+		expect(events).toEqual([
+			{ type: "response", response: { ...second, seen: false } },
+		]);
+		expect(seenCalls(fetchMock)).toEqual([
+			{ clues: [{ wordId: second.wordId, at: second.at }] },
+		]);
 	});
 
 	it("restores own pending help requests from the snapshot", () => {

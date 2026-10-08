@@ -9,6 +9,7 @@ import {
 // chainable pipeline, enough to exercise the clue-request store/load paths.
 class FakeRedis {
 	store = new Map<string, Map<string, string>>();
+	sets = new Map<string, Set<string>>();
 	published: Array<{ channel: string; message: string }> = [];
 
 	private hash(key: string): Map<string, string> {
@@ -39,6 +40,10 @@ class FakeRedis {
 		return removed;
 	}
 
+	async smembers(key: string): Promise<string[]> {
+		return [...(this.sets.get(key) ?? [])];
+	}
+
 	async publish(channel: string, message: string): Promise<number> {
 		this.published.push({ channel, message });
 		return 0;
@@ -49,6 +54,14 @@ class FakeRedis {
 		const chain = {
 			hset: (key: string, field: string, value: string) => {
 				ops.push(() => this.hash(key).set(field, value));
+				return chain;
+			},
+			sadd: (key: string, ...members: string[]) => {
+				ops.push(() => {
+					const set = this.sets.get(key) ?? new Set<string>();
+					for (const member of members) set.add(member);
+					this.sets.set(key, set);
+				});
 				return chain;
 			},
 			expire: () => chain,
@@ -77,6 +90,7 @@ import {
 	getClueRequest,
 	getHelpGivenRecords,
 	hasHelpedRequesterForWord,
+	markCluesSeen,
 	publishClueResponse,
 	resolveClueRequest,
 	resolveOwnClueRequestsForWord,
@@ -207,5 +221,38 @@ describe("clue request store-and-forward", () => {
 		expect(
 			redisRef.current?.store.get(clueHelpGivenKey("responder-1", DATE_KEY)),
 		).toBeDefined();
+	});
+
+	it("flags inbox clues seen on any device, and treats a newer clue for the word as unseen", async () => {
+		const request = await createClueRequest(createInput());
+		expect(request).not.toBeNull();
+		if (!request) return;
+
+		await publishClueResponse({
+			request,
+			text: "Una peça de roba",
+			responderName: "Bru",
+			responderId: "responder-1",
+		});
+		const [delivered] = await getClueInbox(request.requesterId, DATE_KEY);
+		expect(delivered?.seen).toBe(false);
+		if (!delivered) return;
+
+		await markCluesSeen(request.requesterId, DATE_KEY, [delivered]);
+		const [afterSeen] = await getClueInbox(request.requesterId, DATE_KEY);
+		expect(afterSeen?.seen).toBe(true);
+
+		// A second responder's clue for the same word replaces the inbox entry
+		// with a new delivery time, so it must notify even though the first did.
+		await new Promise((resolve) => setTimeout(resolve, 2));
+		await publishClueResponse({
+			request,
+			text: "Es porta al coll",
+			responderName: "Carla",
+			responderId: "responder-2",
+		});
+		const [replaced] = await getClueInbox(request.requesterId, DATE_KEY);
+		expect(replaced?.text).toBe("Es porta al coll");
+		expect(replaced?.seen).toBe(false);
 	});
 });
