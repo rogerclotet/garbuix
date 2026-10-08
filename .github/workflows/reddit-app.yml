@@ -1,0 +1,50 @@
+name: Reddit app
+
+# The bot bundles src/lib/puzzle-number.ts for its titles, so a change there
+# changes the bot too.
+on:
+  push:
+    branches: [main]
+    paths:
+      - reddit-app/**
+      - src/lib/puzzle-number.ts
+  pull_request:
+    paths:
+      - reddit-app/**
+      - src/lib/puzzle-number.ts
+      - .github/workflows/reddit-app.yml
+
+jobs:
+  check-and-upload:
+    runs-on: ubuntu-latest
+    # Each upload takes the next version number from Reddit, so two uploads
+    # running at once could race for the same one.
+    concurrency:
+      group: reddit-app-${{ github.ref }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: reddit-app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: reddit-app/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: reddit-app/package.json
+          cache: pnpm
+          cache-dependency-path: reddit-app/pnpm-lock.yaml
+
+      - run: pnpm install
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # Uploads a new private build of garbuix-bot; Reddit picks the version.
+      - name: Upload to Reddit
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: pnpm exec devvit upload
+        env:
+          DEVVIT_AUTH_TOKEN: ${{ secrets.DEVVIT_AUTH_TOKEN }}

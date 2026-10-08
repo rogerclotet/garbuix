@@ -87,6 +87,11 @@ pnpm logs        # stream the app's logs from r/garbuix
 pnpm run upload  # typecheck, test and upload a new version
 ```
 
+CI uploads a new build on every push to `main` that touches this directory or
+`src/lib/puzzle-number.ts` (`.github/workflows/reddit-app.yml`). It logs in with the `DEVVIT_AUTH_TOKEN`
+repository secret, which holds the contents of `~/.devvit/token` after
+`devvit login`. `pnpm run upload` is still there for uploading by hand.
+
 The first upload registered the name `garbuix-bot`, which is also the bot
 account's username. Every upload sends `garbuix.app` for fetch review. In the
 app's details at https://developers.reddit.com/apps/garbuix-bot, the terms and
