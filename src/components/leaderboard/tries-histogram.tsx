@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
 import {
 	buildTriesHistogram,
@@ -37,6 +38,24 @@ function describeBucket(bucket: TriesHistogramBucket): string {
 
 function hasPlayers(bucket: TriesHistogramBucket): boolean {
 	return bucket.count + bucket.inProgressCount > 0;
+}
+
+function LegendItem({
+	swatchClassName,
+	children,
+}: {
+	swatchClassName: string;
+	children: ReactNode;
+}) {
+	return (
+		<p className="flex items-center gap-1.5">
+			<span
+				className={cn("size-2 shrink-0 rounded-[2px]", swatchClassName)}
+				aria-hidden
+			/>
+			{children}
+		</p>
+	);
 }
 
 export function TriesHistogram({
@@ -135,23 +154,19 @@ export function TriesHistogram({
 			{showYou || totalInProgress > 0 ? (
 				<div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-ui text-[11px] text-muted-foreground">
 					{showYou ? (
-						<p className="flex items-center gap-1.5">
-							<span
-								className="size-2 shrink-0 rounded-[2px] bg-primary"
-								aria-hidden
-							/>
+						<LegendItem swatchClassName="bg-primary">
 							Tu, amb {highlightTries}{" "}
 							{highlightTries === 1 ? "intent" : "intents"}
-						</p>
+						</LegendItem>
+					) : null}
+					{/* With grey bars on screen, the green ones need naming too. */}
+					{totalInProgress > 0 && totalFinishers > 0 ? (
+						<LegendItem swatchClassName="bg-primary/30">Han acabat</LegendItem>
 					) : null}
 					{totalInProgress > 0 ? (
-						<p className="flex items-center gap-1.5">
-							<span
-								className="size-2 shrink-0 rounded-[2px] bg-muted-foreground/20"
-								aria-hidden
-							/>
+						<LegendItem swatchClassName="bg-muted-foreground/20">
 							Encara jugant
-						</p>
+						</LegendItem>
 					) : null}
 				</div>
 			) : null}
