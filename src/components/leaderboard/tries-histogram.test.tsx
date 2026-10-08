@@ -27,14 +27,20 @@ function buildEntry(
 afterEach(cleanup);
 
 describe("TriesHistogram", () => {
-	it("renders nothing until somebody finishes", () => {
-		const { container } = render(
-			<TriesHistogram entries={[buildEntry("a", 30, false)]} />,
-		);
+	it("renders nothing until somebody plays", () => {
+		const { container } = render(<TriesHistogram entries={[]} />);
 		expect(container.innerHTML).toBe("");
 	});
 
-	it("describes each bucket and counts only finishers", () => {
+	it("shows players still playing before anybody finishes", () => {
+		render(<TriesHistogram entries={[buildEntry("a", 30, false)]} />);
+
+		expect(screen.getByText("0 han acabat · 1 encara juga")).toBeDefined();
+		expect(screen.getByTitle("25-34 intents: 1 encara juga")).toBeDefined();
+		expect(screen.getByText("Encara jugant")).toBeDefined();
+	});
+
+	it("describes each bucket, counting finished and playing players apart", () => {
 		render(
 			<TriesHistogram
 				entries={[
@@ -42,14 +48,18 @@ describe("TriesHistogram", () => {
 					buildEntry("b", 22),
 					buildEntry("c", 31),
 					buildEntry("d", 40, false),
+					buildEntry("e", 20, false),
 				]}
 			/>,
 		);
 
-		expect(screen.getByText("3 han acabat")).toBeDefined();
-		expect(screen.getByTitle("2 jugadors amb 15-24 intents")).toBeDefined();
-		expect(screen.getByTitle("1 jugador amb 25-34 intents")).toBeDefined();
-		expect(screen.getByTitle("0 jugadors amb 95+ intents")).toBeDefined();
+		expect(screen.getByText("3 han acabat · 2 encara juguen")).toBeDefined();
+		expect(
+			screen.getByTitle("15-24 intents: 2 han acabat, 1 encara juga"),
+		).toBeDefined();
+		expect(screen.getByTitle("25-34 intents: 1 ha acabat")).toBeDefined();
+		expect(screen.getByTitle("35-44 intents: 1 encara juga")).toBeDefined();
+		expect(screen.getByTitle("95+ intents: ningú")).toBeDefined();
 	});
 
 	it("shows the player's own result before the leaderboard echoes it back", () => {
@@ -62,7 +72,7 @@ describe("TriesHistogram", () => {
 		);
 
 		expect(screen.getByText("2 han acabat")).toBeDefined();
-		expect(screen.getByTitle("1 jugador amb 25-34 intents")).toBeDefined();
+		expect(screen.getByTitle("25-34 intents: 1 ha acabat")).toBeDefined();
 	});
 
 	it("names the player's own bucket instead of relying on color", () => {
