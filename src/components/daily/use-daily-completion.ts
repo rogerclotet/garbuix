@@ -108,11 +108,14 @@ export function useDailyCompletion({
 		}
 	}, [isComplete]);
 
-	const { receivedClues } = useClueRequests();
-	// Mirrors the leaderboard's count (publishLeaderboardForUser): free clues
-	// plus one per word a friend delivered a clue for.
-	const cluesUsed =
-		derivedProgress.hintsUsed + Object.keys(receivedClues).length;
+	const { dateKey: clueRequestsDateKey, receivedClues } = useClueRequests();
+	// Mirrors the leaderboard's count (publishLeaderboardForUser and the guest
+	// endpoint): free clues plus one per word a friend delivered a clue for.
+	const friendClueCount =
+		clueRequestsDateKey === puzzle.dateKey
+			? Object.keys(receivedClues).length
+			: 0;
+	const cluesUsed = derivedProgress.hintsUsed + friendClueCount;
 
 	const completionStats = useMemo(() => {
 		if (derivedProgress.guessedWordIds.length !== totalWords) return undefined;

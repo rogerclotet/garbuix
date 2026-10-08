@@ -179,6 +179,8 @@ describe("anonymousImportPayloadSchema", () => {
 				"2026-05-29": { ...textHintProgress, bonusWordsFound: 0 },
 				"2026-06-01": currentProgress,
 			},
+			// Saves from before guests kept friend clues carry none.
+			peerClueWordIdsByDate: {},
 		});
 	});
 

@@ -14,6 +14,7 @@ vi.mock("@/lib/puzzle-local", () => ({
 }));
 
 const clueRequests = vi.hoisted(() => ({
+	dateKey: "2026-04-11",
 	receivedClues: {} as Record<number, ClueResponse>,
 }));
 vi.mock("@/lib/use-clue-requests", () => ({

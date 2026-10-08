@@ -56,8 +56,8 @@ export {
 	syncPuzzleEventsForUser,
 } from "@/lib/puzzle-progress.server";
 export {
+	addPeerClueWordIds,
 	getUserPuzzleProgressData,
-	recordPeerClueDelivered,
 } from "@/lib/puzzle-progress-store.server";
 
 function toSessionUser(

@@ -221,6 +221,8 @@ export type HistoryEntriesPage = {
 export type AnonymousImportPayload = {
 	historyEntries: HistorySummaryEntry[];
 	activeProgressByDate: Record<string, PuzzleProgressState>;
+	// Words a friend sent the guest a clue for, keyed by day.
+	peerClueWordIdsByDate: Record<string, number[]>;
 };
 
 export type AccountPuzzleCache = {

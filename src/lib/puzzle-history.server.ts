@@ -19,6 +19,7 @@ import {
 	mergeProgressStates,
 } from "@/lib/puzzle-progress";
 import {
+	addPeerClueWordIds,
 	getUserPuzzleProgressData,
 	saveUserPuzzleProgress,
 	withPuzzleProgressTransaction,
@@ -294,6 +295,7 @@ export async function importAnonymousProgressForUser(options: {
 	const skippedLegacyDates: string[] = [];
 	const importedForLeaderboard: Array<{
 		dateKey: string;
+		puzzleId: string;
 		wordsFound: number;
 		totalWords: number;
 		freeCluesUsed: number;
@@ -331,17 +333,27 @@ export async function importAnonymousProgressForUser(options: {
 					userId,
 					transaction,
 				);
-				return saveUserPuzzleProgress(
+				const saved = await saveUserPuzzleProgress(
 					userId,
 					mergeProgressStates(existingProgress, activeProgress),
 					transaction,
 				);
+				await addPeerClueWordIds(
+					{
+						userId,
+						puzzleId: puzzle.id,
+						wordIds: payload.peerClueWordIdsByDate[historyEntry.dateKey] ?? [],
+					},
+					transaction,
+				);
+				return saved;
 			},
 		);
 
 		importedDates.push(historyEntry.dateKey);
 		importedForLeaderboard.push({
 			dateKey: historyEntry.dateKey,
+			puzzleId: puzzle.id,
 			wordsFound: merged.guessedWordIds.length,
 			totalWords: puzzle.privateSnapshotJson.wordSlots.length,
 			freeCluesUsed: merged.hintsUsed,
@@ -391,6 +403,7 @@ export async function importAnonymousProgressForUser(options: {
 			await publishLeaderboardForUser({
 				dateKey: imported.dateKey,
 				userId,
+				puzzleId: imported.puzzleId,
 				wordsFound: imported.wordsFound,
 				totalWords: imported.totalWords,
 				freeCluesUsed: imported.freeCluesUsed,

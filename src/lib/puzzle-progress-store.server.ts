@@ -96,25 +96,46 @@ export async function saveUserPuzzleProgress(
 	return serializeProgressRow(row);
 }
 
-// Idempotent per word, matching the inbox (one entry per word however many
-// friends answer). A no-op when the player has no progress row, which also
-// covers guest requester ids.
-export async function recordPeerClueDelivered(input: {
-	userId: string;
-	puzzleId: string;
-	wordId: number;
-}) {
-	const wordIdJson = JSON.stringify([input.wordId]);
-	await db
+// A set union per word, matching the inbox (one entry per word however many
+// friends answer). Computed in SQL so concurrent deliveries for different
+// words can't overwrite each other. A no-op when the player has no progress
+// row, which also covers guest requester ids.
+export async function addPeerClueWordIds(
+	input: { userId: string; puzzleId: string; wordIds: number[] },
+	database: Pick<typeof db, "update"> = db,
+) {
+	if (input.wordIds.length === 0) return;
+	const incoming = JSON.stringify(input.wordIds);
+	await database
 		.update(userPuzzleProgress)
 		.set({
-			peerClueWordIds: sql`${userPuzzleProgress.peerClueWordIds} || ${wordIdJson}::jsonb`,
+			peerClueWordIds: sql`(
+				select coalesce(jsonb_agg(distinct word_id order by word_id), '[]'::jsonb)
+				from jsonb_array_elements(${userPuzzleProgress.peerClueWordIds} || ${incoming}::jsonb) as word_id
+			)`,
 		})
 		.where(
 			and(
 				eq(userPuzzleProgress.userId, input.userId),
 				eq(userPuzzleProgress.puzzleId, input.puzzleId),
-				sql`not ${userPuzzleProgress.peerClueWordIds} @> ${wordIdJson}::jsonb`,
+				sql`not ${userPuzzleProgress.peerClueWordIds} @> ${incoming}::jsonb`,
 			),
 		);
+}
+
+export async function getPeerClueWordIds(
+	userId: string,
+	puzzleId: string,
+): Promise<number[]> {
+	const rows = await db
+		.select({ peerClueWordIds: userPuzzleProgress.peerClueWordIds })
+		.from(userPuzzleProgress)
+		.where(
+			and(
+				eq(userPuzzleProgress.userId, userId),
+				eq(userPuzzleProgress.puzzleId, puzzleId),
+			),
+		)
+		.limit(1);
+	return rows[0]?.peerClueWordIds ?? [];
 }

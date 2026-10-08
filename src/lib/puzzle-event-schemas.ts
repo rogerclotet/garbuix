@@ -119,6 +119,10 @@ export const progressStateSchema = z.object({
 export const anonymousImportPayloadSchema = z.object({
 	historyEntries: z.array(historySummaryEntrySchema).max(2000),
 	activeProgressByDate: z.record(dateKeySchema, progressStateSchema),
+	// Browsers that loaded the page before peer clues were saved send none.
+	peerClueWordIdsByDate: z
+		.record(dateKeySchema, z.array(wordIdSchema).max(200))
+		.default({}),
 });
 
 // Keeps the schemas honest against the hand-written types they parse into: if a

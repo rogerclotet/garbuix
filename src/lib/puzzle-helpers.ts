@@ -9,6 +9,7 @@ import type {
 export function buildHistoryEntry(
 	puzzle: DailyPuzzlePublic,
 	progress: PuzzleProgressState,
+	peerClueCount = 0,
 ) {
 	return {
 		dateKey: puzzle.dateKey,
@@ -16,7 +17,7 @@ export function buildHistoryEntry(
 		totalWords: puzzle.wordSlots.length,
 		guessedWords: progress.guessedWordIds.length,
 		guessCount: progress.guessCount,
-		hintsUsed: progress.hintsUsed,
+		hintsUsed: progress.hintsUsed + peerClueCount,
 		completed: progress.guessedWordIds.length >= puzzle.wordSlots.length,
 		lastUpdated: new Date().toISOString(),
 	};

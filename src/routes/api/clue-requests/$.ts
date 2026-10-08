@@ -26,10 +26,10 @@ import {
 import { db } from "@/lib/db";
 import { isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
+	addPeerClueWordIds,
 	getUserPuzzleProgressData,
 	incrementCluesGivenCount,
 	publishLeaderboardForUser,
-	recordPeerClueDelivered,
 } from "@/lib/puzzle-service.server";
 import {
 	consumeRateLimit,
@@ -364,10 +364,10 @@ async function handleRespond(
 	// The inbox expires after a day; history keeps the asker's clue total from
 	// this copy. Anonymous askers have no progress row, so this is a no-op.
 	try {
-		await recordPeerClueDelivered({
+		await addPeerClueWordIds({
 			userId: clueRequest.requesterId,
 			puzzleId: clueRequest.puzzleId,
-			wordId: clueRequest.wordId,
+			wordIds: [clueRequest.wordId],
 		});
 	} catch (error) {
 		console.warn("[clue-request] failed to record delivered clue", error);
@@ -404,6 +404,7 @@ async function republishLeaderboardForClueRecipient(
 		await publishLeaderboardForUser({
 			dateKey,
 			userId: requesterId,
+			puzzleId,
 			wordsFound: progress.guessedWordIds.length,
 			totalWords: puzzle.wordCount,
 			freeCluesUsed: progress.hintsUsed,

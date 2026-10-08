@@ -306,6 +306,7 @@ export async function syncPuzzleEventsForUser(options: {
 		void publishLeaderboardForUser({
 			dateKey: puzzleRow.dateKey,
 			userId,
+			puzzleId: puzzleRow.id,
 			wordsFound: nextProgress.guessedWordIds.length,
 			totalWords: puzzleRow.privateSnapshotJson.wordSlots.length,
 			freeCluesUsed: nextProgress.hintsUsed,

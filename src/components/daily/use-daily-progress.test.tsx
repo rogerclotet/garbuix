@@ -5,8 +5,11 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareAppReload } from "@/lib/app-reload";
+import type { ClueResponse } from "@/lib/clue-request-types";
 import {
 	getAccountPuzzleCache,
+	getAnonymousHistoryEntries,
+	getAnonymousPeerClueWordIds,
 	getAnonymousProgress,
 	saveAccountPuzzleCache,
 	saveAnonymousProgress,
@@ -47,6 +50,14 @@ vi.mock("@/lib/anon-identity", () => ({
 		completedAt: null,
 	}),
 	setReportedAnonProgress: vi.fn(),
+}));
+
+const clueRequests = vi.hoisted(() => ({
+	dateKey: null as string | null,
+	receivedClues: {} as Record<number, ClueResponse>,
+}));
+vi.mock("@/lib/use-clue-requests", () => ({
+	useClueRequests: () => clueRequests,
 }));
 
 vi.mock("sonner", () => ({
@@ -524,6 +535,48 @@ describe("useDailyProgress local state", () => {
 	afterEach(() => {
 		cleanup();
 		vi.unstubAllGlobals();
+		clueRequests.dateKey = null;
+		clueRequests.receivedClues = {};
+	});
+
+	it("saves a guest's friend clues in history and reports them to the leaderboard", async () => {
+		saveAnonymousProgress(
+			DATE_KEY,
+			progressWith({ guessedWordIds: [1], guessCount: 3, hintsUsed: 3 }),
+		);
+		const { rerender } = renderHook(() =>
+			useDailyProgress({
+				activeUser: null,
+				deviceId: "device-1",
+				initialData: INITIAL_DATA,
+			}),
+		);
+		await act(async () => {});
+		const fetchMock = window.fetch as unknown as ReturnType<typeof vi.fn>;
+		fetchMock.mockClear();
+
+		clueRequests.dateKey = DATE_KEY;
+		clueRequests.receivedClues = {
+			2: {
+				requestId: "request",
+				wordId: 2,
+				text: "Una pista",
+				responderName: "Anna",
+				at: "2026-06-11T11:00:00.000Z",
+			},
+		};
+		await act(async () => rerender());
+
+		expect(getAnonymousPeerClueWordIds(DATE_KEY)).toEqual([2]);
+		expect(getAnonymousHistoryEntries()[DATE_KEY]?.hintsUsed).toBe(4);
+		const reports = fetchMock.mock.calls.filter(([url]) =>
+			String(url).includes(`/api/leaderboard/${DATE_KEY}/anon`),
+		);
+		expect(reports).toHaveLength(1);
+		// The server adds friend clues from the inbox; the client sends free ones.
+		expect(JSON.parse(String(reports[0]?.[1]?.body))).toMatchObject({
+			clueCount: 3,
+		});
 	});
 
 	it("paints an anonymous player's stored progress instead of a loading state", async () => {

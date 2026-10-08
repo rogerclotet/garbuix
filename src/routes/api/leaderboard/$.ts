@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { resolveAnonSession, withAnonCookie } from "@/lib/anon-session.server";
+import { getClueInbox } from "@/lib/clue-request.server";
 import {
 	anonParticipantId,
 	getLeaderboard,
@@ -88,6 +89,7 @@ const anonSchema = z.object({
 	name: z.string().min(1).max(48),
 	wordsFound: z.number().int().min(0).max(200),
 	totalWords: z.number().int().min(1).max(200),
+	// Free clues only; friend clues are counted from the guest's inbox below.
 	clueCount: z.number().int().min(0).max(500).optional(),
 	tryCount: z.number().int().min(0).max(100000).optional(),
 	completedAt: z.string().datetime().nullable().optional(),
@@ -154,6 +156,10 @@ async function handlePost(request: Request) {
 	const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
 	const completedAt =
 		wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;
+	// Same total as signed-in players (publishLeaderboardForUser): one clue per
+	// word a friend answered. Guest clue requests use this participant id too.
+	const friendClues = (await getClueInbox(participantId, parsed.dateKey))
+		.length;
 	await recordProgress({
 		dateKey: parsed.dateKey,
 		participantId,
@@ -162,7 +168,7 @@ async function handlePost(request: Request) {
 		image: null,
 		wordsFound,
 		totalWords: payload.totalWords,
-		clueCount: payload.clueCount ?? 0,
+		clueCount: (payload.clueCount ?? 0) + friendClues,
 		tryCount: payload.tryCount ?? 0,
 		completedAt,
 		previousWordsFound: payload.previousWordsFound,
