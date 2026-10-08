@@ -15,25 +15,26 @@ import {
 	saveUserPuzzleProgress,
 	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
+import { toPlayedPublicSnapshot } from "@/lib/puzzle-snapshot";
 import {
 	collectAckedEventIds,
+	countDerivedBonusClues,
 	filterSyncablePuzzleEvents,
 	hasLeaderboardScoreDelta,
 } from "@/lib/puzzle-sync";
-import type { DailyPuzzlePrivate, PuzzleClientEvent } from "@/lib/puzzle-types";
+import type {
+	DailyPuzzlePrivate,
+	DailyPuzzlePublic,
+	PuzzleClientEvent,
+	PuzzleProgressState,
+} from "@/lib/puzzle-types";
 
 // Guess hashes of the valid words that aren't answers: the only guesses that
-// count toward a bonus clue. Only computed when a batch claims one.
-async function getBonusGuessHashes(
+// count toward a bonus clue.
+export async function buildBonusGuessHashes(
 	puzzleId: string,
 	privateSnapshot: DailyPuzzlePrivate,
-	events: PuzzleClientEvent[],
 ): Promise<ReadonlySet<string>> {
-	const claimsBonusWord = events.some(
-		(event) => event.type === "guess_added" && event.payload.validNotInPuzzle,
-	);
-	if (!claimsBonusWord) return new Set();
-
 	const answers = new Set(
 		privateSnapshot.wordSlots.map((slot) => slot.normalizedWord),
 	);
@@ -47,15 +48,39 @@ async function getBonusGuessHashes(
 	);
 }
 
-// Rejected reveals are never stored, so the stored rows are the reveals spent.
-async function countStoredBonusClues(
+// Only built when a batch claims a bonus word.
+function getBonusGuessHashesForBatch(
+	puzzleId: string,
+	privateSnapshot: DailyPuzzlePrivate,
+	events: PuzzleClientEvent[],
+): Promise<ReadonlySet<string>> {
+	const claimsBonusWord = events.some(
+		(event) => event.type === "guess_added" && event.payload.validNotInPuzzle,
+	);
+	return claimsBonusWord
+		? buildBonusGuessHashes(puzzleId, privateSnapshot)
+		: Promise.resolve(new Set());
+}
+
+// Rejected reveals are never stored, so stored rows are reveals spent through
+// sync. Reveals a guest made before signing in left no rows, so the letters on
+// the board that nothing else explains count as well.
+async function countSpentBonusClues(
 	transaction: ProgressTransaction,
-	options: { userId: string; puzzleId: string; events: PuzzleClientEvent[] },
+	options: {
+		userId: string;
+		puzzleId: string;
+		events: PuzzleClientEvent[];
+		progress: PuzzleProgressState;
+		publicSnapshot: DailyPuzzlePublic;
+		privateSnapshot: DailyPuzzlePrivate;
+	},
 ): Promise<number> {
 	if (!options.events.some((event) => event.type === "bonus_clue_revealed")) {
 		return 0;
 	}
 
+	const playedSnapshot = await toPlayedPublicSnapshot(options);
 	const [row] = await transaction
 		.select({ value: count() })
 		.from(userPuzzleEvents)
@@ -66,7 +91,10 @@ async function countStoredBonusClues(
 				eq(userPuzzleEvents.type, "bonus_clue_revealed"),
 			),
 		);
-	return row?.value ?? 0;
+	return Math.max(
+		row?.value ?? 0,
+		countDerivedBonusClues(options.progress, playedSnapshot),
+	);
 }
 
 function getStoredEventAt(row: typeof userPuzzleEvents.$inferSelect): string {
@@ -295,12 +323,15 @@ export async function syncPuzzleEventsForUser(options: {
 					publicSnapshot,
 					privateSnapshot,
 					existingHintState: baseProgress,
-					existingBonusCluesRevealed: await countStoredBonusClues(transaction, {
+					existingBonusCluesRevealed: await countSpentBonusClues(transaction, {
 						userId,
 						puzzleId,
 						events,
+						progress: baseProgress,
+						publicSnapshot,
+						privateSnapshot,
 					}),
-					bonusGuessHashes: await getBonusGuessHashes(
+					bonusGuessHashes: await getBonusGuessHashesForBatch(
 						puzzleId,
 						privateSnapshot,
 						events,

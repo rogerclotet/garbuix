@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { createUnlockToken } from "@/lib/puzzle-crypto";
+import { createGuessHash, createUnlockToken } from "@/lib/puzzle-crypto";
+import { getSlotHintCellKey } from "@/lib/puzzle-helpers";
+import { createEmptyProgressState } from "@/lib/puzzle-progress";
+import {
+	buildPuzzleSnapshots,
+	toPlayedPublicSnapshot,
+} from "@/lib/puzzle-snapshot";
 import {
 	collectAckedEventIds,
+	countDerivedBonusClues,
 	filterSyncablePuzzleEvents,
 	hasLeaderboardScoreDelta,
+	sanitizeProgressState,
 } from "@/lib/puzzle-sync";
 import type { PuzzleClientEvent } from "@/lib/puzzle-types";
 
@@ -524,5 +532,175 @@ describe("hasLeaderboardScoreDelta", () => {
 
 	it("stays quiet when nothing the score reads has moved", () => {
 		expect(hasLeaderboardScoreDelta(state, { ...state })).toBe(false);
+	});
+});
+
+describe("sanitizeProgressState", () => {
+	const puzzleId = "puzzle-import";
+	const words = ["casa", "sacs", "casc"];
+
+	async function buildFixture() {
+		const { publicSnapshot, privateSnapshot } = await buildPuzzleSnapshots({
+			puzzleId,
+			dateKey: "2026-03-10",
+			seed: 123,
+			algorithmVersion: "test",
+			letters: ["c", "a", "s"],
+			initialShuffledLetters: ["s", "a", "c"],
+			availableWordCount: 3,
+			crossword: {
+				rows: 3,
+				cols: 4,
+				grid: words.map((word, id) =>
+					[...word].map((letter) => ({ letter, wordIds: [id] })),
+				),
+				words: words.map((name, id) => ({
+					id,
+					word: { name, areatematica: "test", frequency: 1000 },
+					startRow: id,
+					startCol: 0,
+					direction: "horizontal" as const,
+					revealed: false,
+				})),
+			},
+		});
+		const playedSnapshot = await toPlayedPublicSnapshot({
+			publicSnapshot,
+			privateSnapshot,
+		});
+		const bonusGuessHashes = new Set(
+			await Promise.all(
+				["saca", "caca", "casca", "cassa", "assa"].map((word) =>
+					createGuessHash(puzzleId, word),
+				),
+			),
+		);
+		const fallbackCell = (wordId: number) => {
+			const slot = playedSnapshot.wordSlots[wordId];
+			const cellKey = slot ? getSlotHintCellKey(playedSnapshot, slot) : null;
+			if (!cellKey) throw new Error("fixture word has no hint cell");
+			return cellKey;
+		};
+		return {
+			playedSnapshot,
+			privateSnapshot,
+			bonusGuessHashes,
+			fallbackCell,
+			empty: createEmptyProgressState(playedSnapshot),
+		};
+	}
+
+	it("keeps only found words with a valid unlock token", async () => {
+		const fixture = await buildFixture();
+		const slot = fixture.playedSnapshot.wordSlots[0];
+		if (!slot) throw new Error("missing slot");
+		const realToken = await createUnlockToken(slot.slotSalt, "casa");
+
+		const sanitized = await sanitizeProgressState({
+			...fixture,
+			progress: {
+				...fixture.empty,
+				guessedWordIds: [0, 1, 2],
+				revealedWordTokens: { "0": realToken, "1": "forged", "2": "forged" },
+				completedAt: "2026-03-10T12:00:00.000Z",
+			},
+		});
+
+		expect(sanitized.guessedWordIds).toEqual([0]);
+		expect(sanitized.revealedWordTokens).toEqual({ "0": realToken });
+		expect(sanitized.guessHashes).toEqual([
+			await createGuessHash(puzzleId, "casa"),
+		]);
+		expect(sanitized.guessCount).toBe(1);
+		expect(sanitized.completedAt).toBeNull();
+	});
+
+	it("counts only real extra words toward bonus clues", async () => {
+		const fixture = await buildFixture();
+		const sanitized = await sanitizeProgressState({
+			...fixture,
+			progress: {
+				...fixture.empty,
+				guessHashes: [
+					await createGuessHash(puzzleId, "saca"),
+					await createGuessHash(puzzleId, "caca"),
+					"made-up",
+				],
+				bonusWordsFound: 999,
+			},
+		});
+
+		expect(sanitized.bonusWordsFound).toBe(2);
+	});
+
+	it("keeps clues within budget and charges every clue word", async () => {
+		const fixture = await buildFixture();
+		const sanitized = await sanitizeProgressState({
+			...fixture,
+			progress: { ...fixture.empty, clueWordIds: [0, 1, 99], hintsUsed: 0 },
+		});
+
+		expect(sanitized.clueWordIds).toEqual([0, 1]);
+		expect(sanitized.hintsUsed).toBe(2);
+	});
+
+	it("drops revealed letters nothing can explain", async () => {
+		const fixture = await buildFixture();
+		const sanitized = await sanitizeProgressState({
+			...fixture,
+			progress: {
+				...fixture.empty,
+				clueWordIds: [0],
+				hintsUsed: 1,
+				hintedCells: [fixture.fallbackCell(0), "1,0", "2,0", "9,9"],
+			},
+		});
+
+		expect(sanitized.hintedCells).toEqual([fixture.fallbackCell(0)]);
+	});
+
+	it("keeps a bonus letter once five extra words earn it", async () => {
+		const fixture = await buildFixture();
+		const guessHashes = await Promise.all(
+			["saca", "caca", "casca", "cassa", "assa"].map((word) =>
+				createGuessHash(puzzleId, word),
+			),
+		);
+		const sanitized = await sanitizeProgressState({
+			...fixture,
+			progress: {
+				...fixture.empty,
+				guessHashes,
+				bonusWordsFound: 5,
+				hintedCells: ["1,0", "2,0"],
+			},
+		});
+
+		expect(sanitized.hintedCells).toEqual(["1,0"]);
+	});
+
+	it("derives bonus reveals from letters no clue explains", async () => {
+		const fixture = await buildFixture();
+		expect(
+			countDerivedBonusClues(
+				{
+					clueWordIds: [0],
+					hintsUsed: 1,
+					hintedCells: [fixture.fallbackCell(0), "1,0", "2,0"],
+				},
+				fixture.playedSnapshot,
+			),
+		).toBe(2);
+		// A legacy letter hint explains one of them.
+		expect(
+			countDerivedBonusClues(
+				{
+					clueWordIds: [0],
+					hintsUsed: 2,
+					hintedCells: [fixture.fallbackCell(0), "1,0", "2,0"],
+				},
+				fixture.playedSnapshot,
+			),
+		).toBe(1);
 	});
 });

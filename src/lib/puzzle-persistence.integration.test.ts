@@ -527,6 +527,45 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			).toHaveLength(1);
 		});
 
+		it("holds imported guest progress to the sync rules", async () => {
+			const fixture = await createFixture();
+			const extraWordHashes = await Promise.all(
+				["saca", "caca", "casca", "cassa", "assa"].map((word) =>
+					createGuessHash(fixture.id, word),
+				),
+			);
+			await importProgress(fixture, {
+				...createEmptyProgressState(fixture.publicSnapshot),
+				guessedWordIds: [0, 1, 2],
+				revealedWordTokens: { "0": "forged", "1": "forged", "2": "forged" },
+				guessHashes: extraWordHashes,
+				guessCount: 5,
+				bonusWordsFound: 999,
+				hintedCells: ["1,0", "2,0", "1,1"],
+				completedAt: "2026-03-10T12:00:00.000Z",
+			});
+
+			expect(
+				await getUserPuzzleProgressData(fixture.id, fixture.id),
+			).toMatchObject({
+				guessedWordIds: [],
+				bonusWordsFound: 5,
+				hintedCells: ["1,0"],
+				completedAt: null,
+			});
+
+			// The guest already spent the reveal those five words earned.
+			const result = await sync(fixture, [
+				{
+					id: crypto.randomUUID(),
+					at: "2026-03-10T12:05:00.000Z",
+					type: "bonus_clue_revealed",
+					payload: { cellKey: "2,0" },
+				},
+			]);
+			expect(result.progress.hintedCells).toEqual(["1,0"]);
+		});
+
 		it("rolls back events if saving progress fails, allowing a complete retry", async () => {
 			const fixture = await createFixture();
 			const event = await guess(fixture, 0);

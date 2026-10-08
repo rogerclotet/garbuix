@@ -1,9 +1,11 @@
-import { createUnlockToken } from "@/lib/puzzle-crypto";
+import { createGuessHash, createUnlockToken } from "@/lib/puzzle-crypto";
+import { getSlotHintCellKey } from "@/lib/puzzle-helpers";
 import {
 	type DailyPuzzlePrivate,
 	type DailyPuzzlePublic,
 	type GuessAddedEvent,
 	type PuzzleClientEvent,
+	type PuzzleProgressState,
 	WORDS_PER_BONUS_CLUE,
 } from "@/lib/puzzle-types";
 
@@ -317,6 +319,143 @@ export async function filterSyncablePuzzleEvents(options: {
 // client that kept them queued would resend them forever while showing a
 // letter the account never earned. Dropping them lets it adopt the server's
 // progress instead.
+// The one letter each AI clue may fall back to when its text is missing.
+function getClueFallbackCells(
+	playedSnapshot: DailyPuzzlePublic,
+	clueWordIds: number[],
+): Set<string> {
+	const cells = new Set<string>();
+	for (const wordId of clueWordIds) {
+		const slot = playedSnapshot.wordSlots.find((item) => item.id === wordId);
+		const cellKey = slot ? getSlotHintCellKey(playedSnapshot, slot) : null;
+		if (cellKey) cells.add(cellKey);
+	}
+	return cells;
+}
+
+// The fewest bonus reveals that explain the letters on the board: every letter
+// that isn't a clue's fallback and isn't covered by a letter hint. Guest play
+// and imports leave no stored reveal events, so sync takes the larger of this
+// and the stored count. It never overcounts, because a bonus letter that
+// happens to land on a fallback cell is not counted.
+export function countDerivedBonusClues(
+	progress: Pick<
+		PuzzleProgressState,
+		"hintedCells" | "hintsUsed" | "clueWordIds"
+	>,
+	playedSnapshot: DailyPuzzlePublic,
+): number {
+	const fallbackCells = getClueFallbackCells(
+		playedSnapshot,
+		progress.clueWordIds,
+	);
+	const unexplained = progress.hintedCells.filter(
+		(cellKey) => !fallbackCells.has(cellKey),
+	).length;
+	const letterHints = Math.max(
+		0,
+		progress.hintsUsed - progress.clueWordIds.length,
+	);
+	return Math.max(0, unexplained - letterHints);
+}
+
+async function verifyFoundWords(
+	progress: PuzzleProgressState,
+	playedSnapshot: DailyPuzzlePublic,
+	privateSnapshot: DailyPuzzlePrivate,
+) {
+	const guessedWordIds: number[] = [];
+	const revealedWordTokens: Record<string, string> = {};
+	const foundWordHashes: string[] = [];
+	for (const wordId of new Set(progress.guessedWordIds)) {
+		const slot = playedSnapshot.wordSlots.find((item) => item.id === wordId);
+		const word = privateSnapshot.wordSlots.find((item) => item.id === wordId);
+		const token = progress.revealedWordTokens[String(wordId)];
+		if (!slot || !word || !token) continue;
+		if (token !== (await createUnlockToken(slot.slotSalt, word.normalizedWord)))
+			continue;
+		guessedWordIds.push(wordId);
+		revealedWordTokens[String(wordId)] = token;
+		foundWordHashes.push(
+			await createGuessHash(playedSnapshot.id, word.normalizedWord),
+		);
+	}
+	return { guessedWordIds, revealedWordTokens, foundWordHashes };
+}
+
+// Holds a whole progress state, as a guest import delivers it, to the rules sync
+// applies event by event: found words need their unlock token, bonus words must
+// be real extra words, clues stay within budget, and every revealed letter has
+// to be explained by a clue fallback, a letter hint, or an earned bonus reveal.
+// Letters beyond that allowance are dropped, earliest kept.
+export async function sanitizeProgressState(options: {
+	progress: PuzzleProgressState;
+	playedSnapshot: DailyPuzzlePublic;
+	privateSnapshot: DailyPuzzlePrivate;
+	bonusGuessHashes: ReadonlySet<string>;
+}): Promise<PuzzleProgressState> {
+	const { bonusGuessHashes, playedSnapshot, privateSnapshot, progress } =
+		options;
+	const { guessedWordIds, revealedWordTokens, foundWordHashes } =
+		await verifyFoundWords(progress, playedSnapshot, privateSnapshot);
+	const guessHashes = [
+		...new Set([...progress.guessHashes, ...foundWordHashes]),
+	];
+	const bonusWordsFound = Math.min(
+		progress.bonusWordsFound,
+		guessHashes.filter((hash) => bonusGuessHashes.has(hash)).length,
+	);
+
+	const validWordIds = buildValidWordIds(playedSnapshot);
+	const clueWordIds = [...new Set(progress.clueWordIds)]
+		.filter((wordId) => validWordIds.has(wordId))
+		.slice(0, MAX_HINTS);
+	const hintsUsed = Math.min(
+		MAX_HINTS,
+		Math.max(progress.hintsUsed, clueWordIds.length),
+	);
+
+	const validCellKeys = buildValidCellKeys(privateSnapshot);
+	const fallbackCells = getClueFallbackCells(playedSnapshot, clueWordIds);
+	let unexplainedAllowance =
+		hintsUsed -
+		clueWordIds.length +
+		Math.floor(bonusWordsFound / WORDS_PER_BONUS_CLUE);
+	const hintedCells: string[] = [];
+	for (const cellKey of new Set(progress.hintedCells)) {
+		if (!validCellKeys.has(cellKey)) continue;
+		if (!fallbackCells.has(cellKey)) {
+			if (unexplainedAllowance === 0) continue;
+			unexplainedAllowance -= 1;
+		}
+		hintedCells.push(cellKey);
+	}
+
+	const sortedLetters = (letters: string[]) => [...letters].sort().join("|");
+	const shuffledLetters =
+		sortedLetters(progress.shuffledLetters) ===
+		sortedLetters(playedSnapshot.letters)
+			? progress.shuffledLetters
+			: [...playedSnapshot.initialShuffledLetters];
+
+	return {
+		...progress,
+		guessHashes,
+		guessCount: guessHashes.length,
+		guessedWordIds,
+		revealedWordTokens,
+		bonusWordsFound,
+		clueWordIds,
+		hintsUsed,
+		hintedCells,
+		shuffledLetters,
+		completedAt:
+			guessedWordIds.length === privateSnapshot.wordSlots.length
+				? progress.completedAt
+				: null,
+	};
+}
+
 export function collectAckedEventIds(options: {
 	existingEventIds: Set<string>;
 	filteredEvents: PuzzleClientEvent[];
