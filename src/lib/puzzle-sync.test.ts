@@ -218,6 +218,13 @@ describe("puzzle-sync", () => {
 
 		expect(result.filteredEvents).toHaveLength(0);
 		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(5);
+		expect(result.rejectedEventIds).toEqual([
+			"hint-over-budget",
+			"hint-bad-cell",
+			"text-hint-bad-word",
+			"fallback-without-request",
+			"bonus-not-earned",
+		]);
 	});
 
 	it("accepts a valid hint sequence", async () => {
@@ -304,9 +311,10 @@ describe("puzzle-sync", () => {
 		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(0);
 	});
 
-	it("acks events that were already stored server-side", () => {
+	it("acks stored, accepted and rejected events", () => {
 		const ackedEventIds = collectAckedEventIds({
 			existingEventIds: new Set(["existing-1", "existing-2"]),
+			rejectedEventIds: ["rejected-1"],
 			filteredEvents: [
 				{
 					id: "new-1",
@@ -327,7 +335,12 @@ describe("puzzle-sync", () => {
 			],
 		});
 
-		expect(ackedEventIds).toEqual(["existing-1", "existing-2", "new-1"]);
+		expect(ackedEventIds).toEqual([
+			"existing-1",
+			"existing-2",
+			"new-1",
+			"rejected-1",
+		]);
 	});
 });
 

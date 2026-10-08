@@ -198,6 +198,7 @@ export async function filterSyncablePuzzleEvents(options: {
 		publicSnapshot,
 	} = options;
 	const filteredEvents: PuzzleClientEvent[] = [];
+	const rejectedEventIds: string[] = [];
 	const seenEventIds = new Set<string>();
 	const validCellKeys = buildValidCellKeys(privateSnapshot);
 	const validWordIds = buildValidWordIds(publicSnapshot);
@@ -294,6 +295,7 @@ export async function filterSyncablePuzzleEvents(options: {
 				)
 			) {
 				diagnostics.sanitizedInvalidHintCount += 1;
+				rejectedEventIds.push(event.id);
 				continue;
 			}
 		}
@@ -307,17 +309,24 @@ export async function filterSyncablePuzzleEvents(options: {
 	return {
 		diagnostics,
 		filteredEvents,
+		rejectedEventIds,
 	};
 }
 
+// Rejected events are acknowledged too: the server has ruled on them, and a
+// client that kept them queued would resend them forever while showing a
+// letter the account never earned. Dropping them lets it adopt the server's
+// progress instead.
 export function collectAckedEventIds(options: {
 	existingEventIds: Set<string>;
 	filteredEvents: PuzzleClientEvent[];
+	rejectedEventIds: string[];
 }) {
 	return Array.from(
 		new Set([
 			...options.existingEventIds,
 			...options.filteredEvents.map((event) => event.id),
+			...options.rejectedEventIds,
 		]),
 	);
 }

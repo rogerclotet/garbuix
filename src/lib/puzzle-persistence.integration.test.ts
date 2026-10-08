@@ -512,8 +512,11 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			expect(earned.progress.bonusWordsFound).toBe(5);
 			expect(earned.progress.hintedCells).toEqual(["1,0"]);
 
-			const extra = await sync(fixture, [reveal("2,0")], "tablet");
+			const unearned = reveal("2,0");
+			const extra = await sync(fixture, [unearned], "tablet");
 			expect(extra.progress.hintedCells).toEqual(["1,0"]);
+			// Acknowledged so the tablet drops it instead of resending forever.
+			expect(extra.ackedEventIds).toEqual([unearned.id]);
 			expect(
 				await db.query.userPuzzleEvents.findMany({
 					where: and(
@@ -594,20 +597,20 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			await db
 				.delete(userPuzzleProgress)
 				.where(eq(userPuzzleProgress.userId, fixture.id));
-			const result = await sync(fixture, [
-				{
-					id: crypto.randomUUID(),
-					at: "2026-03-10T12:00:04.000Z",
-					type: "hint_used",
-					payload: { cellKey: "1,1" },
-				},
-			]);
+			const overBudget: PuzzleClientEvent = {
+				id: crypto.randomUUID(),
+				at: "2026-03-10T12:00:04.000Z",
+				type: "hint_used",
+				payload: { cellKey: "1,1" },
+			};
+			const result = await sync(fixture, [overBudget]);
 			expect(result.progress).toMatchObject({
 				hintsUsed: 3,
 				clueWordIds: [0],
 				hintedCells: ["0,0", "1,0", "2,0"],
 			});
-			expect(result.ackedEventIds).toEqual([]);
+			// Rejected, so never stored, but acknowledged so the client drops it.
+			expect(result.ackedEventIds).toEqual([overBudget.id]);
 			expect(
 				await db.query.userPuzzleEvents.findMany({
 					where: eq(userPuzzleEvents.userId, fixture.id),

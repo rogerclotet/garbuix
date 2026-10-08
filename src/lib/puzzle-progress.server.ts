@@ -288,23 +288,24 @@ export async function syncPuzzleEventsForUser(options: {
 			const existingEventIds = new Set(
 				existingEvents.map((event) => event.clientEventId),
 			);
-			const { diagnostics, filteredEvents } = await filterSyncablePuzzleEvents({
-				events,
-				existingEventIds,
-				publicSnapshot,
-				privateSnapshot,
-				existingHintState: baseProgress,
-				existingBonusCluesRevealed: await countStoredBonusClues(transaction, {
-					userId,
-					puzzleId,
+			const { diagnostics, filteredEvents, rejectedEventIds } =
+				await filterSyncablePuzzleEvents({
 					events,
-				}),
-				bonusGuessHashes: await getBonusGuessHashes(
-					puzzleId,
+					existingEventIds,
+					publicSnapshot,
 					privateSnapshot,
-					events,
-				),
-			});
+					existingHintState: baseProgress,
+					existingBonusCluesRevealed: await countStoredBonusClues(transaction, {
+						userId,
+						puzzleId,
+						events,
+					}),
+					bonusGuessHashes: await getBonusGuessHashes(
+						puzzleId,
+						privateSnapshot,
+						events,
+					),
+				});
 			if (filteredEvents.length > 0) {
 				await transaction
 					.insert(userPuzzleEvents)
@@ -339,6 +340,7 @@ export async function syncPuzzleEventsForUser(options: {
 				ackedEventIds: collectAckedEventIds({
 					existingEventIds,
 					filteredEvents,
+					rejectedEventIds,
 				}),
 			};
 		},
