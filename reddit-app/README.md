@@ -33,8 +33,9 @@ it has already posted today and which post to unpin tomorrow.
   posts, pinning fails and the bot tries again every minute.
 - If a moderator deletes the day's post, the bot doesn't post it again that
   day.
-- If garbuix.app is down, the bot keeps retrying and posts once it gets an
-  answer. Nothing goes up that day if garbuix.app stays down.
+- If the bot can't get the day's post from garbuix.app, it posts the title
+  alone as a text post, so the day still has its thread. The image doesn't get
+  added later.
 
 ## Fetch Domains
 
@@ -71,7 +72,9 @@ To stop the daily posts, uninstall the app from the same page.
 ## For developers
 
 This directory is separate from the web app. It has its own dependencies,
-lockfile and tests, and it isn't part of the Docker image.
+lockfile and tests, and it isn't part of the Docker image. The one shared
+file is `src/lib/puzzle-number.ts`, which the bot imports for the title of
+title-only posts, so the numbering always matches the site.
 
 ```bash
 cd reddit-app
