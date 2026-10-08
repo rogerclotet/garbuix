@@ -3,7 +3,9 @@ import { userPuzzleProgress } from "@/db/schema";
 import { db } from "@/lib/db";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
 
-type ProgressTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type ProgressTransaction = Parameters<
+	Parameters<typeof db.transaction>[0]
+>[0];
 
 export async function withPuzzleProgressTransaction<T>(
 	identity: { userId: string; puzzleId: string },

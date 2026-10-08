@@ -1,8 +1,10 @@
 import { createUnlockToken } from "@/lib/puzzle-crypto";
-import type {
-	DailyPuzzlePrivate,
-	DailyPuzzlePublic,
-	PuzzleClientEvent,
+import {
+	type DailyPuzzlePrivate,
+	type DailyPuzzlePublic,
+	type GuessAddedEvent,
+	type PuzzleClientEvent,
+	WORDS_PER_BONUS_CLUE,
 } from "@/lib/puzzle-types";
 
 type EventTypeCounts = Record<PuzzleClientEvent["type"], number>;
@@ -19,12 +21,18 @@ export type PuzzleSyncDiagnostics = {
 	sanitizedInvalidUnlockTokenCount: number;
 	sanitizedMissingWordCount: number;
 	sanitizedInvalidHintCount: number;
+	sanitizedInvalidBonusWordCount: number;
 };
 
 type HintValidationState = {
 	hintsUsed: number;
 	hintedCells: Set<string>;
 	clueWordIds: Set<number>;
+	// Mirrors the reducer's bonus counter, so a reveal is only accepted once the
+	// words that earn it have been counted.
+	guessHashes: Set<string>;
+	bonusWordsFound: number;
+	bonusCluesRevealed: number;
 };
 
 function createEmptyEventTypeCounts(): EventTypeCounts {
@@ -54,16 +62,54 @@ function buildValidWordIds(publicSnapshot: DailyPuzzlePublic): Set<number> {
 	return new Set(publicSnapshot.wordSlots.map((slot) => slot.id));
 }
 
-function createHintValidationState(options?: {
-	hintsUsed?: number;
-	hintedCells?: string[];
-	clueWordIds?: number[];
-}): HintValidationState {
+export type ExistingHintState = {
+	hintsUsed: number;
+	hintedCells: string[];
+	clueWordIds: number[];
+	guessHashes: string[];
+	bonusWordsFound: number;
+};
+
+function createHintValidationState(
+	existing: ExistingHintState | undefined,
+	bonusCluesRevealed: number,
+): HintValidationState {
 	return {
-		hintsUsed: options?.hintsUsed ?? 0,
-		hintedCells: new Set(options?.hintedCells ?? []),
-		clueWordIds: new Set(options?.clueWordIds ?? []),
+		hintsUsed: existing?.hintsUsed ?? 0,
+		hintedCells: new Set(existing?.hintedCells ?? []),
+		clueWordIds: new Set(existing?.clueWordIds ?? []),
+		guessHashes: new Set(existing?.guessHashes ?? []),
+		bonusWordsFound: existing?.bonusWordsFound ?? 0,
+		bonusCluesRevealed,
 	};
+}
+
+// The client decides whether a guess was a valid off-puzzle word, so the claim
+// is checked against the hashes of every word that qualifies for this puzzle.
+function sanitizeBonusWordClaim(
+	event: GuessAddedEvent,
+	bonusGuessHashes: ReadonlySet<string>,
+	diagnostics: PuzzleSyncDiagnostics,
+): GuessAddedEvent {
+	if (
+		!event.payload.validNotInPuzzle ||
+		bonusGuessHashes.has(event.payload.guessHash)
+	) {
+		return event;
+	}
+
+	diagnostics.sanitizedInvalidBonusWordCount += 1;
+	return { ...event, payload: { ...event.payload, validNotInPuzzle: false } };
+}
+
+// Same rule as applyPuzzleEvent: only a guess's first appearance counts.
+function countBonusWord(event: GuessAddedEvent, state: HintValidationState) {
+	const { guessHash, matchedWordId, validNotInPuzzle } = event.payload;
+	if (state.guessHashes.has(guessHash)) return;
+	state.guessHashes.add(guessHash);
+	if (validNotInPuzzle && matchedWordId == null) {
+		state.bonusWordsFound += 1;
+	}
 }
 
 function isHintEventAccepted(
@@ -114,10 +160,16 @@ function isHintEventAccepted(
 		}
 		case "bonus_clue_revealed": {
 			const { cellKey } = event.payload;
-			if (!validCellKeys.has(cellKey) || state.hintedCells.has(cellKey)) {
+			const earned = Math.floor(state.bonusWordsFound / WORDS_PER_BONUS_CLUE);
+			if (
+				!validCellKeys.has(cellKey) ||
+				state.hintedCells.has(cellKey) ||
+				state.bonusCluesRevealed >= earned
+			) {
 				return false;
 			}
 			state.hintedCells.add(cellKey);
+			state.bonusCluesRevealed += 1;
 			return true;
 		}
 		default:
@@ -130,14 +182,16 @@ export async function filterSyncablePuzzleEvents(options: {
 	existingEventIds: Set<string>;
 	publicSnapshot: DailyPuzzlePublic;
 	privateSnapshot: DailyPuzzlePrivate;
-	existingHintState?: {
-		hintsUsed: number;
-		hintedCells: string[];
-		clueWordIds: number[];
-	};
+	existingHintState?: ExistingHintState;
+	// Bonus reveals already stored for this player and puzzle.
+	existingBonusCluesRevealed?: number;
+	// Guess hashes of the valid words that aren't part of the puzzle.
+	bonusGuessHashes: ReadonlySet<string>;
 }) {
 	const {
+		bonusGuessHashes,
 		events,
+		existingBonusCluesRevealed = 0,
 		existingEventIds,
 		existingHintState,
 		privateSnapshot,
@@ -147,7 +201,10 @@ export async function filterSyncablePuzzleEvents(options: {
 	const seenEventIds = new Set<string>();
 	const validCellKeys = buildValidCellKeys(privateSnapshot);
 	const validWordIds = buildValidWordIds(publicSnapshot);
-	const hintState = createHintValidationState(existingHintState);
+	const hintState = createHintValidationState(
+		existingHintState,
+		existingBonusCluesRevealed,
+	);
 	const diagnostics: PuzzleSyncDiagnostics = {
 		acceptedByType: createEmptyEventTypeCounts(),
 		acceptedCount: 0,
@@ -158,6 +215,7 @@ export async function filterSyncablePuzzleEvents(options: {
 		sanitizedInvalidUnlockTokenCount: 0,
 		sanitizedMissingWordCount: 0,
 		sanitizedInvalidHintCount: 0,
+		sanitizedInvalidBonusWordCount: 0,
 	};
 
 	for (const event of events) {
@@ -210,6 +268,15 @@ export async function filterSyncablePuzzleEvents(options: {
 					};
 				}
 			}
+		}
+
+		if (acceptedEvent.type === "guess_added") {
+			acceptedEvent = sanitizeBonusWordClaim(
+				acceptedEvent,
+				bonusGuessHashes,
+				diagnostics,
+			);
+			countBonusWord(acceptedEvent, hintState);
 		}
 
 		if (

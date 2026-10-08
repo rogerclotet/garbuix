@@ -5,6 +5,7 @@ import {
 	filterSyncablePuzzleEvents,
 	hasLeaderboardScoreDelta,
 } from "@/lib/puzzle-sync";
+import type { PuzzleClientEvent } from "@/lib/puzzle-types";
 
 describe("puzzle-sync", () => {
 	it("deduplicates events and sanitizes invalid matched guesses", async () => {
@@ -59,6 +60,7 @@ describe("puzzle-sync", () => {
 			existingEventIds: new Set(["already-synced"]),
 			publicSnapshot,
 			privateSnapshot,
+			bonusGuessHashes: new Set(),
 			events: [
 				{
 					id: "already-synced",
@@ -172,10 +174,13 @@ describe("puzzle-sync", () => {
 			existingEventIds: new Set(),
 			publicSnapshot,
 			privateSnapshot,
+			bonusGuessHashes: new Set(),
 			existingHintState: {
 				hintsUsed: 3,
 				hintedCells: [],
 				clueWordIds: [],
+				guessHashes: [],
+				bonusWordsFound: 4,
 			},
 			events: [
 				{
@@ -202,11 +207,17 @@ describe("puzzle-sync", () => {
 					type: "text_hint_fallback",
 					payload: { wordId: 0, cellKey: "0,0" },
 				},
+				{
+					id: "bonus-not-earned",
+					at: "2026-03-10T10:04:00.000Z",
+					type: "bonus_clue_revealed",
+					payload: { cellKey: "0,1" },
+				},
 			],
 		});
 
 		expect(result.filteredEvents).toHaveLength(0);
-		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(4);
+		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(5);
 	});
 
 	it("accepts a valid hint sequence", async () => {
@@ -259,6 +270,14 @@ describe("puzzle-sync", () => {
 			existingEventIds: new Set(),
 			publicSnapshot,
 			privateSnapshot,
+			bonusGuessHashes: new Set(),
+			existingHintState: {
+				hintsUsed: 0,
+				hintedCells: [],
+				clueWordIds: [],
+				guessHashes: [],
+				bonusWordsFound: 5,
+			},
 			events: [
 				{
 					id: "text-hint",
@@ -309,6 +328,147 @@ describe("puzzle-sync", () => {
 		});
 
 		expect(ackedEventIds).toEqual(["existing-1", "existing-2", "new-1"]);
+	});
+});
+
+describe("bonus clue validation", () => {
+	const publicSnapshot = {
+		id: "puzzle-1",
+		dateKey: "2026-03-10",
+		seed: 123,
+		algorithmVersion: "1",
+		rows: 1,
+		cols: 3,
+		gridMask: [[{ wordIds: [0] }, { wordIds: [0] }, { wordIds: [0] }]],
+		letters: ["c", "a", "s"],
+		initialShuffledLetters: ["a", "c", "s"],
+		validNormalizedGuesses: ["cas"],
+		wordSlots: [
+			{
+				id: 0,
+				startRow: 0,
+				startCol: 0,
+				direction: "horizontal" as const,
+				length: 3,
+				slotSalt: "slot-1",
+				answerHash: "hash",
+				answerCapsule: "capsule",
+			},
+		],
+		hintCapsules: [],
+	};
+	const privateSnapshot = {
+		id: "puzzle-1",
+		dateKey: "2026-03-10",
+		seed: 123,
+		rows: 1,
+		cols: 3,
+		gridLetters: [["c", "a", "s"]],
+		letters: ["c", "a", "s"],
+		wordSlots: [
+			{
+				id: 0,
+				displayWord: "cas",
+				normalizedWord: "cas",
+				startRow: 0,
+				startCol: 0,
+				direction: "horizontal" as const,
+			},
+		],
+	};
+	const bonusGuessHashes = new Set(["bonus-1", "bonus-2", "bonus-3"]);
+
+	function bonusGuess(id: string, guessHash: string): PuzzleClientEvent {
+		return {
+			id,
+			at: "2026-03-10T10:00:00.000Z",
+			type: "guess_added",
+			payload: {
+				guessHash,
+				matchedWordId: null,
+				unlockToken: null,
+				validNotInPuzzle: true,
+			},
+		};
+	}
+
+	function bonusReveal(id: string, cellKey: string): PuzzleClientEvent {
+		return {
+			id,
+			at: "2026-03-10T10:01:00.000Z",
+			type: "bonus_clue_revealed",
+			payload: { cellKey },
+		};
+	}
+
+	function existingState(bonusWordsFound: number, guessHashes: string[] = []) {
+		return {
+			hintsUsed: 0,
+			hintedCells: [],
+			clueWordIds: [],
+			guessHashes,
+			bonusWordsFound,
+		};
+	}
+
+	it("strips the bonus claim from a guess that isn't a valid extra word", async () => {
+		const result = await filterSyncablePuzzleEvents({
+			existingEventIds: new Set(),
+			publicSnapshot,
+			privateSnapshot,
+			bonusGuessHashes,
+			events: [bonusGuess("fake", "made-up")],
+		});
+
+		expect(result.diagnostics.sanitizedInvalidBonusWordCount).toBe(1);
+		expect(result.filteredEvents[0]).toMatchObject({
+			payload: { guessHash: "made-up", validNotInPuzzle: false },
+		});
+	});
+
+	it("accepts a reveal earned by words found earlier in the same batch", async () => {
+		const result = await filterSyncablePuzzleEvents({
+			existingEventIds: new Set(),
+			publicSnapshot,
+			privateSnapshot,
+			bonusGuessHashes,
+			existingHintState: existingState(4),
+			events: [bonusGuess("fifth", "bonus-1"), bonusReveal("reveal", "0,0")],
+		});
+
+		expect(result.filteredEvents.map((event) => event.id)).toEqual([
+			"fifth",
+			"reveal",
+		]);
+	});
+
+	it("does not count a repeated guess toward a reveal", async () => {
+		const result = await filterSyncablePuzzleEvents({
+			existingEventIds: new Set(),
+			publicSnapshot,
+			privateSnapshot,
+			bonusGuessHashes,
+			existingHintState: existingState(4, ["bonus-1"]),
+			events: [bonusGuess("repeat", "bonus-1"), bonusReveal("reveal", "0,0")],
+		});
+
+		expect(result.filteredEvents.map((event) => event.id)).toEqual(["repeat"]);
+		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(1);
+	});
+
+	it("allows one reveal per five bonus words, counting stored reveals", async () => {
+		const result = await filterSyncablePuzzleEvents({
+			existingEventIds: new Set(),
+			publicSnapshot,
+			privateSnapshot,
+			bonusGuessHashes,
+			existingHintState: existingState(10),
+			existingBonusCluesRevealed: 1,
+			events: [bonusReveal("second", "0,0"), bonusReveal("third", "0,1")],
+		});
+
+		expect(result.filteredEvents.map((event) => event.id)).toEqual(["second"]);
+		expect(result.diagnostics.sanitizedInvalidHintCount).toBe(1);
 	});
 });
 

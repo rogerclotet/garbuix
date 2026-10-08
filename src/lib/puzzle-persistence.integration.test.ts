@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import {
 	afterAll,
@@ -473,6 +473,53 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			expect(
 				await db.query.userPuzzleEvents.findMany({
 					where: eq(userPuzzleEvents.userId, fixture.id),
+				}),
+			).toHaveLength(1);
+		});
+
+		it("earns bonus reveals only from real extra words, one per five", async () => {
+			const fixture = await createFixture();
+			await seedProgress(fixture, { bonusWordsFound: 4 });
+			const bonusGuess = async (word: string): Promise<PuzzleClientEvent> => ({
+				id: crypto.randomUUID(),
+				at: "2026-03-10T12:00:00.000Z",
+				type: "guess_added",
+				payload: {
+					guessHash: await createGuessHash(fixture.id, word),
+					matchedWordId: null,
+					unlockToken: null,
+					validNotInPuzzle: true,
+				},
+			});
+			const reveal = (cellKey: string): PuzzleClientEvent => ({
+				id: crypto.randomUUID(),
+				at: "2026-03-10T12:01:00.000Z",
+				type: "bonus_clue_revealed",
+				payload: { cellKey },
+			});
+
+			const fake = await sync(fixture, [
+				await bonusGuess("zzzz"),
+				reveal("1,0"),
+			]);
+			expect(fake.progress.bonusWordsFound).toBe(4);
+			expect(fake.progress.hintedCells).toEqual([]);
+
+			const earned = await sync(fixture, [
+				await bonusGuess("saca"),
+				reveal("1,0"),
+			]);
+			expect(earned.progress.bonusWordsFound).toBe(5);
+			expect(earned.progress.hintedCells).toEqual(["1,0"]);
+
+			const extra = await sync(fixture, [reveal("2,0")], "tablet");
+			expect(extra.progress.hintedCells).toEqual(["1,0"]);
+			expect(
+				await db.query.userPuzzleEvents.findMany({
+					where: and(
+						eq(userPuzzleEvents.userId, fixture.id),
+						eq(userPuzzleEvents.type, "bonus_clue_revealed"),
+					),
 				}),
 			).toHaveLength(1);
 		});

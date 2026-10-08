@@ -1,7 +1,9 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { dailyPuzzles, puzzleWordClues, userPuzzleEvents } from "@/db/schema";
 import { db } from "@/lib/db";
+import { createGuessHash } from "@/lib/puzzle-crypto";
 import { puzzleClientEventSchema } from "@/lib/puzzle-event-schemas";
+import { getDailyValidNormalizedGuesses } from "@/lib/puzzle-generation.server";
 import { publishLeaderboardForUser } from "@/lib/puzzle-leaderboard.server";
 import {
 	buildSyncedProgressState,
@@ -9,6 +11,7 @@ import {
 } from "@/lib/puzzle-progress";
 import {
 	getUserPuzzleProgressData,
+	type ProgressTransaction,
 	saveUserPuzzleProgress,
 	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
@@ -17,7 +20,54 @@ import {
 	filterSyncablePuzzleEvents,
 	hasLeaderboardScoreDelta,
 } from "@/lib/puzzle-sync";
-import type { PuzzleClientEvent } from "@/lib/puzzle-types";
+import type { DailyPuzzlePrivate, PuzzleClientEvent } from "@/lib/puzzle-types";
+
+// Guess hashes of the valid words that aren't answers: the only guesses that
+// count toward a bonus clue. Only computed when a batch claims one.
+async function getBonusGuessHashes(
+	puzzleId: string,
+	privateSnapshot: DailyPuzzlePrivate,
+	events: PuzzleClientEvent[],
+): Promise<ReadonlySet<string>> {
+	const claimsBonusWord = events.some(
+		(event) => event.type === "guess_added" && event.payload.validNotInPuzzle,
+	);
+	if (!claimsBonusWord) return new Set();
+
+	const answers = new Set(
+		privateSnapshot.wordSlots.map((slot) => slot.normalizedWord),
+	);
+	const bonusWords = getDailyValidNormalizedGuesses(
+		privateSnapshot.letters,
+	).filter((word) => !answers.has(word));
+	return new Set(
+		await Promise.all(
+			bonusWords.map((word) => createGuessHash(puzzleId, word)),
+		),
+	);
+}
+
+// Rejected reveals are never stored, so the stored rows are the reveals spent.
+async function countStoredBonusClues(
+	transaction: ProgressTransaction,
+	options: { userId: string; puzzleId: string; events: PuzzleClientEvent[] },
+): Promise<number> {
+	if (!options.events.some((event) => event.type === "bonus_clue_revealed")) {
+		return 0;
+	}
+
+	const [row] = await transaction
+		.select({ value: count() })
+		.from(userPuzzleEvents)
+		.where(
+			and(
+				eq(userPuzzleEvents.userId, options.userId),
+				eq(userPuzzleEvents.puzzleId, options.puzzleId),
+				eq(userPuzzleEvents.type, "bonus_clue_revealed"),
+			),
+		);
+	return row?.value ?? 0;
+}
 
 function getStoredEventAt(row: typeof userPuzzleEvents.$inferSelect): string {
 	const eventAt =
@@ -244,6 +294,16 @@ export async function syncPuzzleEventsForUser(options: {
 				publicSnapshot,
 				privateSnapshot,
 				existingHintState: baseProgress,
+				existingBonusCluesRevealed: await countStoredBonusClues(transaction, {
+					userId,
+					puzzleId,
+					events,
+				}),
+				bonusGuessHashes: await getBonusGuessHashes(
+					puzzleId,
+					privateSnapshot,
+					events,
+				),
 			});
 			if (filteredEvents.length > 0) {
 				await transaction
