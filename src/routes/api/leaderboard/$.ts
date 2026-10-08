@@ -4,12 +4,14 @@ import { resolveAnonSession, withAnonCookie } from "@/lib/anon-session.server";
 import { getClueInbox } from "@/lib/clue-request.server";
 import {
 	anonParticipantId,
+	boundAnonProgress,
 	getLeaderboard,
 	leaderboardChannel,
 	recordProgress,
 	updateLeaderboardProfile,
 } from "@/lib/leaderboard.server";
 import { isPlayableDateKey } from "@/lib/puzzle-dates";
+import { getDailyPuzzleWordCount } from "@/lib/puzzle-generation.server";
 import {
 	consumeRateLimit,
 	getClientAddress,
@@ -88,7 +90,6 @@ async function handleGet(request: Request) {
 const anonSchema = z.object({
 	name: z.string().min(1).max(48),
 	wordsFound: z.number().int().min(0).max(200),
-	totalWords: z.number().int().min(1).max(200),
 	// Free clues only; friend clues are counted from the guest's inbox below.
 	clueCount: z.number().int().min(0).max(500).optional(),
 	tryCount: z.number().int().min(0).max(100000).optional(),
@@ -153,9 +154,20 @@ async function handlePost(request: Request) {
 	if (!normalizedName) {
 		return new Response("Invalid body", { status: 400 });
 	}
-	const wordsFound = Math.min(payload.wordsFound, payload.totalWords);
-	const completedAt =
-		wordsFound >= payload.totalWords ? (payload.completedAt ?? null) : null;
+	// Guests play entirely in the browser, so their counts are a claim. The day's
+	// real size bounds it: no one can report more words than the board holds.
+	const totalWords = await getDailyPuzzleWordCount(parsed.dateKey);
+	if (totalWords == null) {
+		return new Response("Not Found", { status: 404 });
+	}
+	const { wordsFound, tryCount, completedAt } = boundAnonProgress(
+		{
+			wordsFound: payload.wordsFound,
+			tryCount: payload.tryCount ?? 0,
+			completedAt: payload.completedAt ?? null,
+		},
+		totalWords,
+	);
 	// Same total as signed-in players (publishLeaderboardForUser): one clue per
 	// word a friend answered. Guest clue requests use this participant id too.
 	const friendClues = (await getClueInbox(participantId, parsed.dateKey))
@@ -167,9 +179,9 @@ async function handlePost(request: Request) {
 		name: normalizedName,
 		image: null,
 		wordsFound,
-		totalWords: payload.totalWords,
+		totalWords,
 		clueCount: (payload.clueCount ?? 0) + friendClues,
-		tryCount: payload.tryCount ?? 0,
+		tryCount,
 		completedAt,
 		previousWordsFound: payload.previousWordsFound,
 		previousCompletedAt: payload.previousCompletedAt ?? null,

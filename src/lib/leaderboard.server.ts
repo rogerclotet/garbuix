@@ -32,6 +32,27 @@ export function leaderboardDisplayName(
 	return LEADERBOARD_FALLBACK_NAME;
 }
 
+export type AnonProgressClaim = {
+	wordsFound: number;
+	tryCount: number;
+	completedAt: string | null;
+};
+
+// Clamps a guest's self-reported progress to what the day's board allows. Every
+// found word took a guess, so tries can't trail words; completion only counts
+// once every word is found.
+export function boundAnonProgress(
+	claim: AnonProgressClaim,
+	totalWords: number,
+): AnonProgressClaim {
+	const wordsFound = Math.min(claim.wordsFound, totalWords);
+	return {
+		wordsFound,
+		tryCount: Math.max(claim.tryCount, wordsFound),
+		completedAt: wordsFound >= totalWords ? claim.completedAt : null,
+	};
+}
+
 const TTL_SECONDS = 60 * 60 * 48;
 // Ranking tiers, highest priority first, packed into a single sorted-set score:
 //   1. words found  — each worth far more than any clue, try, or time delta

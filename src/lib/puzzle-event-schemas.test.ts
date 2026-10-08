@@ -49,15 +49,24 @@ describe("puzzleClientEventsSchema", () => {
 				type: "letters_shuffled",
 				payload: { shuffledLetters: ["a", "b", "c"] },
 			},
-			{
-				id: "e7",
-				at: "2026-09-01T10:00:06.000Z",
-				type: "progress_reset",
-				payload: {},
-			},
 		];
 
 		expect(puzzleClientEventsSchema.safeParse(events).success).toBe(true);
+	});
+
+	// No client sends a reset, and accepting one would let a player spend their
+	// clues, wipe the counts, and solve again with what the clues showed them.
+	it("rejects a progress reset", () => {
+		const result = puzzleClientEventsSchema.safeParse([
+			{
+				id: "e1",
+				at: "2026-09-01T10:00:00.000Z",
+				type: "progress_reset",
+				payload: {},
+			},
+		]);
+
+		expect(result.success).toBe(false);
 	});
 
 	it("rejects an unknown event type", () => {

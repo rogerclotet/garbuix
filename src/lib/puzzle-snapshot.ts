@@ -275,6 +275,23 @@ export function hydratePublicSnapshotWordMetadata(options: {
 	};
 }
 
+// The board's layout and hint capsules exactly as players receive them. Hint
+// cell choices depend on both (see getSlotHintCellKey), so server checks that
+// reason about which cell a hint revealed must start from this, not the row.
+export async function toPlayedPublicSnapshot(snapshots: {
+	publicSnapshot: DailyPuzzlePublic;
+	privateSnapshot: DailyPuzzlePrivate;
+}): Promise<DailyPuzzlePublic> {
+	const publicSnapshot = hydratePublicSnapshotWordMetadata(snapshots);
+	const hintCapsules = await ensureHintCapsulesCoverGrid({
+		puzzleId: publicSnapshot.id,
+		seed: publicSnapshot.seed,
+		gridLetters: snapshots.privateSnapshot.gridLetters,
+		existingHintCapsules: publicSnapshot.hintCapsules,
+	});
+	return { ...publicSnapshot, hintCapsules };
+}
+
 export function toPuzzlePreview(
 	privateSnapshot: DailyPuzzlePrivate,
 ): DailyPuzzlePreview {

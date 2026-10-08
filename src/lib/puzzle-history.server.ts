@@ -18,14 +18,16 @@ import {
 	getCompatibleProgress,
 	mergeProgressStates,
 } from "@/lib/puzzle-progress";
+import { buildBonusGuessHashes } from "@/lib/puzzle-progress.server";
 import {
 	addPeerClueWordIds,
 	getUserPuzzleProgressData,
 	saveUserPuzzleProgress,
 	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
-import { toPuzzlePreview } from "@/lib/puzzle-snapshot";
+import { toPlayedPublicSnapshot, toPuzzlePreview } from "@/lib/puzzle-snapshot";
 import { calculateHistoryStats } from "@/lib/puzzle-streaks";
+import { sanitizeProgressState } from "@/lib/puzzle-sync";
 import {
 	type AnonymousImportPayload,
 	HISTORY_PAGE_SIZE,
@@ -325,6 +327,15 @@ export async function importAnonymousProgressForUser(options: {
 			continue;
 		}
 
+		const snapshots = {
+			publicSnapshot: puzzle.publicSnapshotJson,
+			privateSnapshot: puzzle.privateSnapshotJson,
+		};
+		const playedSnapshot = await toPlayedPublicSnapshot(snapshots);
+		const bonusGuessHashes = await buildBonusGuessHashes(
+			puzzle.id,
+			snapshots.privateSnapshot,
+		);
 		const merged = await withPuzzleProgressTransaction(
 			{ userId, puzzleId: puzzle.id },
 			async (transaction) => {
@@ -333,9 +344,16 @@ export async function importAnonymousProgressForUser(options: {
 					userId,
 					transaction,
 				);
+				// Guest progress never went through sync's checks, so the merged
+				// state is held to the same rules before it reaches the account.
 				const saved = await saveUserPuzzleProgress(
 					userId,
-					mergeProgressStates(existingProgress, activeProgress),
+					await sanitizeProgressState({
+						progress: mergeProgressStates(existingProgress, activeProgress),
+						playedSnapshot,
+						privateSnapshot: snapshots.privateSnapshot,
+						bonusGuessHashes,
+					}),
 					transaction,
 				);
 				await addPeerClueWordIds(

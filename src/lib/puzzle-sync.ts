@@ -1,8 +1,12 @@
-import { createUnlockToken } from "@/lib/puzzle-crypto";
-import type {
-	DailyPuzzlePrivate,
-	DailyPuzzlePublic,
-	PuzzleClientEvent,
+import { createGuessHash, createUnlockToken } from "@/lib/puzzle-crypto";
+import { getSlotHintCellKey } from "@/lib/puzzle-helpers";
+import {
+	type DailyPuzzlePrivate,
+	type DailyPuzzlePublic,
+	type GuessAddedEvent,
+	type PuzzleClientEvent,
+	type PuzzleProgressState,
+	WORDS_PER_BONUS_CLUE,
 } from "@/lib/puzzle-types";
 
 type EventTypeCounts = Record<PuzzleClientEvent["type"], number>;
@@ -19,12 +23,18 @@ export type PuzzleSyncDiagnostics = {
 	sanitizedInvalidUnlockTokenCount: number;
 	sanitizedMissingWordCount: number;
 	sanitizedInvalidHintCount: number;
+	sanitizedInvalidBonusWordCount: number;
 };
 
 type HintValidationState = {
 	hintsUsed: number;
 	hintedCells: Set<string>;
 	clueWordIds: Set<number>;
+	// Mirrors the reducer's bonus counter, so a reveal is only accepted once the
+	// words that earn it have been counted.
+	guessHashes: Set<string>;
+	bonusWordsFound: number;
+	bonusCluesRevealed: number;
 };
 
 function createEmptyEventTypeCounts(): EventTypeCounts {
@@ -35,7 +45,6 @@ function createEmptyEventTypeCounts(): EventTypeCounts {
 		text_hint_fallback: 0,
 		bonus_clue_revealed: 0,
 		letters_shuffled: 0,
-		progress_reset: 0,
 	};
 }
 
@@ -55,16 +64,54 @@ function buildValidWordIds(publicSnapshot: DailyPuzzlePublic): Set<number> {
 	return new Set(publicSnapshot.wordSlots.map((slot) => slot.id));
 }
 
-function createHintValidationState(options?: {
-	hintsUsed?: number;
-	hintedCells?: string[];
-	clueWordIds?: number[];
-}): HintValidationState {
+export type ExistingHintState = {
+	hintsUsed: number;
+	hintedCells: string[];
+	clueWordIds: number[];
+	guessHashes: string[];
+	bonusWordsFound: number;
+};
+
+function createHintValidationState(
+	existing: ExistingHintState | undefined,
+	bonusCluesRevealed: number,
+): HintValidationState {
 	return {
-		hintsUsed: options?.hintsUsed ?? 0,
-		hintedCells: new Set(options?.hintedCells ?? []),
-		clueWordIds: new Set(options?.clueWordIds ?? []),
+		hintsUsed: existing?.hintsUsed ?? 0,
+		hintedCells: new Set(existing?.hintedCells ?? []),
+		clueWordIds: new Set(existing?.clueWordIds ?? []),
+		guessHashes: new Set(existing?.guessHashes ?? []),
+		bonusWordsFound: existing?.bonusWordsFound ?? 0,
+		bonusCluesRevealed,
 	};
+}
+
+// The client decides whether a guess was a valid off-puzzle word, so the claim
+// is checked against the hashes of every word that qualifies for this puzzle.
+function sanitizeBonusWordClaim(
+	event: GuessAddedEvent,
+	bonusGuessHashes: ReadonlySet<string>,
+	diagnostics: PuzzleSyncDiagnostics,
+): GuessAddedEvent {
+	if (
+		!event.payload.validNotInPuzzle ||
+		bonusGuessHashes.has(event.payload.guessHash)
+	) {
+		return event;
+	}
+
+	diagnostics.sanitizedInvalidBonusWordCount += 1;
+	return { ...event, payload: { ...event.payload, validNotInPuzzle: false } };
+}
+
+// Same rule as applyPuzzleEvent: only a guess's first appearance counts.
+function countBonusWord(event: GuessAddedEvent, state: HintValidationState) {
+	const { guessHash, matchedWordId, validNotInPuzzle } = event.payload;
+	if (state.guessHashes.has(guessHash)) return;
+	state.guessHashes.add(guessHash);
+	if (validNotInPuzzle && matchedWordId == null) {
+		state.bonusWordsFound += 1;
+	}
 }
 
 function isHintEventAccepted(
@@ -115,16 +162,16 @@ function isHintEventAccepted(
 		}
 		case "bonus_clue_revealed": {
 			const { cellKey } = event.payload;
-			if (!validCellKeys.has(cellKey) || state.hintedCells.has(cellKey)) {
+			const earned = Math.floor(state.bonusWordsFound / WORDS_PER_BONUS_CLUE);
+			if (
+				!validCellKeys.has(cellKey) ||
+				state.hintedCells.has(cellKey) ||
+				state.bonusCluesRevealed >= earned
+			) {
 				return false;
 			}
 			state.hintedCells.add(cellKey);
-			return true;
-		}
-		case "progress_reset": {
-			state.hintsUsed = 0;
-			state.hintedCells.clear();
-			state.clueWordIds.clear();
+			state.bonusCluesRevealed += 1;
 			return true;
 		}
 		default:
@@ -137,24 +184,30 @@ export async function filterSyncablePuzzleEvents(options: {
 	existingEventIds: Set<string>;
 	publicSnapshot: DailyPuzzlePublic;
 	privateSnapshot: DailyPuzzlePrivate;
-	existingHintState?: {
-		hintsUsed: number;
-		hintedCells: string[];
-		clueWordIds: number[];
-	};
+	existingHintState?: ExistingHintState;
+	// Bonus reveals already stored for this player and puzzle.
+	existingBonusCluesRevealed?: number;
+	// Guess hashes of the valid words that aren't part of the puzzle.
+	bonusGuessHashes: ReadonlySet<string>;
 }) {
 	const {
+		bonusGuessHashes,
 		events,
+		existingBonusCluesRevealed = 0,
 		existingEventIds,
 		existingHintState,
 		privateSnapshot,
 		publicSnapshot,
 	} = options;
 	const filteredEvents: PuzzleClientEvent[] = [];
+	const rejectedEventIds: string[] = [];
 	const seenEventIds = new Set<string>();
 	const validCellKeys = buildValidCellKeys(privateSnapshot);
 	const validWordIds = buildValidWordIds(publicSnapshot);
-	const hintState = createHintValidationState(existingHintState);
+	const hintState = createHintValidationState(
+		existingHintState,
+		existingBonusCluesRevealed,
+	);
 	const diagnostics: PuzzleSyncDiagnostics = {
 		acceptedByType: createEmptyEventTypeCounts(),
 		acceptedCount: 0,
@@ -165,6 +218,7 @@ export async function filterSyncablePuzzleEvents(options: {
 		sanitizedInvalidUnlockTokenCount: 0,
 		sanitizedMissingWordCount: 0,
 		sanitizedInvalidHintCount: 0,
+		sanitizedInvalidBonusWordCount: 0,
 	};
 
 	for (const event of events) {
@@ -219,12 +273,20 @@ export async function filterSyncablePuzzleEvents(options: {
 			}
 		}
 
+		if (acceptedEvent.type === "guess_added") {
+			acceptedEvent = sanitizeBonusWordClaim(
+				acceptedEvent,
+				bonusGuessHashes,
+				diagnostics,
+			);
+			countBonusWord(acceptedEvent, hintState);
+		}
+
 		if (
 			event.type === "hint_used" ||
 			event.type === "text_hint_requested" ||
 			event.type === "text_hint_fallback" ||
-			event.type === "bonus_clue_revealed" ||
-			event.type === "progress_reset"
+			event.type === "bonus_clue_revealed"
 		) {
 			if (
 				!isHintEventAccepted(
@@ -235,6 +297,7 @@ export async function filterSyncablePuzzleEvents(options: {
 				)
 			) {
 				diagnostics.sanitizedInvalidHintCount += 1;
+				rejectedEventIds.push(event.id);
 				continue;
 			}
 		}
@@ -248,17 +311,161 @@ export async function filterSyncablePuzzleEvents(options: {
 	return {
 		diagnostics,
 		filteredEvents,
+		rejectedEventIds,
+	};
+}
+
+// Rejected events are acknowledged too: the server has ruled on them, and a
+// client that kept them queued would resend them forever while showing a
+// letter the account never earned. Dropping them lets it adopt the server's
+// progress instead.
+// The one letter each AI clue may fall back to when its text is missing.
+function getClueFallbackCells(
+	playedSnapshot: DailyPuzzlePublic,
+	clueWordIds: number[],
+): Set<string> {
+	const cells = new Set<string>();
+	for (const wordId of clueWordIds) {
+		const slot = playedSnapshot.wordSlots.find((item) => item.id === wordId);
+		const cellKey = slot ? getSlotHintCellKey(playedSnapshot, slot) : null;
+		if (cellKey) cells.add(cellKey);
+	}
+	return cells;
+}
+
+// The fewest bonus reveals that explain the letters on the board: every letter
+// that isn't a clue's fallback and isn't covered by a letter hint. Guest play
+// and imports leave no stored reveal events, so sync takes the larger of this
+// and the stored count. It never overcounts, because a bonus letter that
+// happens to land on a fallback cell is not counted.
+export function countDerivedBonusClues(
+	progress: Pick<
+		PuzzleProgressState,
+		"hintedCells" | "hintsUsed" | "clueWordIds"
+	>,
+	playedSnapshot: DailyPuzzlePublic,
+): number {
+	const fallbackCells = getClueFallbackCells(
+		playedSnapshot,
+		progress.clueWordIds,
+	);
+	const unexplained = progress.hintedCells.filter(
+		(cellKey) => !fallbackCells.has(cellKey),
+	).length;
+	const letterHints = Math.max(
+		0,
+		progress.hintsUsed - progress.clueWordIds.length,
+	);
+	return Math.max(0, unexplained - letterHints);
+}
+
+async function verifyFoundWords(
+	progress: PuzzleProgressState,
+	playedSnapshot: DailyPuzzlePublic,
+	privateSnapshot: DailyPuzzlePrivate,
+) {
+	const guessedWordIds: number[] = [];
+	const revealedWordTokens: Record<string, string> = {};
+	const foundWordHashes: string[] = [];
+	for (const wordId of new Set(progress.guessedWordIds)) {
+		const slot = playedSnapshot.wordSlots.find((item) => item.id === wordId);
+		const word = privateSnapshot.wordSlots.find((item) => item.id === wordId);
+		const token = progress.revealedWordTokens[String(wordId)];
+		if (!slot || !word || !token) continue;
+		if (token !== (await createUnlockToken(slot.slotSalt, word.normalizedWord)))
+			continue;
+		guessedWordIds.push(wordId);
+		revealedWordTokens[String(wordId)] = token;
+		foundWordHashes.push(
+			await createGuessHash(playedSnapshot.id, word.normalizedWord),
+		);
+	}
+	return { guessedWordIds, revealedWordTokens, foundWordHashes };
+}
+
+// Holds a whole progress state, as a guest import delivers it, to the rules sync
+// applies event by event: found words need their unlock token, bonus words must
+// be real extra words, clues stay within budget, and every revealed letter has
+// to be explained by a clue fallback, a letter hint, or an earned bonus reveal.
+// Letters beyond that allowance are dropped, earliest kept.
+export async function sanitizeProgressState(options: {
+	progress: PuzzleProgressState;
+	playedSnapshot: DailyPuzzlePublic;
+	privateSnapshot: DailyPuzzlePrivate;
+	bonusGuessHashes: ReadonlySet<string>;
+}): Promise<PuzzleProgressState> {
+	const { bonusGuessHashes, playedSnapshot, privateSnapshot, progress } =
+		options;
+	const { guessedWordIds, revealedWordTokens, foundWordHashes } =
+		await verifyFoundWords(progress, playedSnapshot, privateSnapshot);
+	const guessHashes = [
+		...new Set([...progress.guessHashes, ...foundWordHashes]),
+	];
+	const bonusWordsFound = Math.min(
+		progress.bonusWordsFound,
+		guessHashes.filter((hash) => bonusGuessHashes.has(hash)).length,
+	);
+
+	const validWordIds = buildValidWordIds(playedSnapshot);
+	const clueWordIds = [...new Set(progress.clueWordIds)]
+		.filter((wordId) => validWordIds.has(wordId))
+		.slice(0, MAX_HINTS);
+	const hintsUsed = Math.min(
+		MAX_HINTS,
+		Math.max(progress.hintsUsed, clueWordIds.length),
+	);
+
+	const validCellKeys = buildValidCellKeys(privateSnapshot);
+	const fallbackCells = getClueFallbackCells(playedSnapshot, clueWordIds);
+	let unexplainedAllowance =
+		hintsUsed -
+		clueWordIds.length +
+		Math.floor(bonusWordsFound / WORDS_PER_BONUS_CLUE);
+	const hintedCells: string[] = [];
+	for (const cellKey of new Set(progress.hintedCells)) {
+		if (!validCellKeys.has(cellKey)) continue;
+		if (!fallbackCells.has(cellKey)) {
+			if (unexplainedAllowance === 0) continue;
+			unexplainedAllowance -= 1;
+		}
+		hintedCells.push(cellKey);
+	}
+
+	const sortedLetters = (letters: string[]) => [...letters].sort().join("|");
+	const shuffledLetters =
+		sortedLetters(progress.shuffledLetters) ===
+		sortedLetters(playedSnapshot.letters)
+			? progress.shuffledLetters
+			: [...playedSnapshot.initialShuffledLetters];
+
+	return {
+		...progress,
+		guessHashes,
+		guessCount: guessHashes.length,
+		guessedWordIds,
+		revealedWordTokens,
+		bonusWordsFound,
+		clueWordIds,
+		hintsUsed,
+		hintedCells,
+		shuffledLetters,
+		completedAt:
+			guessedWordIds.length === privateSnapshot.wordSlots.length
+				? progress.completedAt
+				: null,
 	};
 }
 
 export function collectAckedEventIds(options: {
 	existingEventIds: Set<string>;
 	filteredEvents: PuzzleClientEvent[];
+	rejectedEventIds: string[];
 }) {
 	return Array.from(
 		new Set([
 			...options.existingEventIds,
 			...options.filteredEvents.map((event) => event.id),
+			...options.rejectedEventIds,
 		]),
 	);
 }
@@ -275,8 +482,7 @@ export type LeaderboardScoreState = {
 
 // A guess that matches nothing still moves the player: tries break ties between
 // equal clue counts, so the board is wrong until the new count reaches it. Any
-// difference republishes, in either direction — a reset lowers the counts and
-// has to reach the board just the same.
+// difference republishes, in either direction.
 export function hasLeaderboardScoreDelta(
 	previous: LeaderboardScoreState,
 	next: LeaderboardScoreState,

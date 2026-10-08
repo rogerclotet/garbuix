@@ -17,10 +17,7 @@ import {
 	readDailyPuzzleRow,
 } from "@/lib/puzzle-generation.server";
 import { getHistoryEntriesForUser } from "@/lib/puzzle-history.server";
-import {
-	ensureHintCapsulesCoverGrid,
-	hydratePublicSnapshotWordMetadata,
-} from "@/lib/puzzle-snapshot";
+import { toPlayedPublicSnapshot } from "@/lib/puzzle-snapshot";
 import type {
 	DailyPuzzlePublic,
 	PuzzleProgressState,
@@ -126,22 +123,15 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 	const historyEntries = sessionData
 		? await getHistoryEntriesForUser(sessionData.user.id)
 		: null;
-	const publicSnapshot = hydratePublicSnapshotWordMetadata({
+	const publicSnapshot = await toPlayedPublicSnapshot({
 		publicSnapshot: puzzle.publicSnapshotJson,
 		privateSnapshot: puzzle.privateSnapshotJson,
-	});
-	const hintCapsules = await ensureHintCapsulesCoverGrid({
-		puzzleId: publicSnapshot.id,
-		seed: publicSnapshot.seed,
-		gridLetters: puzzle.privateSnapshotJson.gridLetters,
-		existingHintCapsules: publicSnapshot.hintCapsules,
 	});
 
 	return {
 		historyEntries,
 		puzzle: {
 			...publicSnapshot,
-			hintCapsules,
 			validNormalizedGuesses: getDailyValidNormalizedGuesses(
 				publicSnapshot.letters,
 			),
