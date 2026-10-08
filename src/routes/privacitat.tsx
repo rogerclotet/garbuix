@@ -23,7 +23,7 @@ function PrivacyPage() {
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzada el 7 d'octubre de 2026
+					Actualitzada el 8 d'octubre de 2026
 				</p>
 			</header>
 
@@ -124,8 +124,8 @@ function PrivacyPage() {
 						r/garbuix
 					</a>
 					. Funciona a la plataforma Devvit de Reddit i només desa els
-					identificadors de les seves pròpies publicacions i comentaris, per
-					saber què ha publicat i quina publicació ha de deixar de fixar.
+					identificadors de les seves pròpies publicacions, per saber què ha
+					publicat i quina publicació ha de deixar de fixar.
 				</p>
 				<p>
 					L'aplicació no llegeix ni desa dades dels usuaris de Reddit, i no

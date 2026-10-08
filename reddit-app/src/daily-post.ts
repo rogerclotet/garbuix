@@ -1,6 +1,4 @@
 export const GARBUIX_ORIGIN = "https://garbuix.app";
-// Markdown for the first comment on each day's post.
-export const FIRST_COMMENT_TEXT = `Juga al Garbuix d’avui a [garbuix.app](${GARBUIX_ORIGIN}) i comenta’l aquí.`;
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
 // Long enough for one fetch, upload and submit; a failed run frees the day for
@@ -34,9 +32,6 @@ export type DailyPostDeps = {
 	};
 	uploadImage: (dataUrl: string) => Promise<string>;
 	submitPost: (title: string, imageUrl: string) => Promise<string>;
-	submitComment: (postId: string, text: string) => Promise<string>;
-	// Keeps the comment above the players' comments.
-	pinComment: (commentId: string) => Promise<void>;
 	pinPost: (postId: string) => Promise<void>;
 	unpinPost: (postId: string) => Promise<void>;
 };
@@ -53,10 +48,6 @@ export function getMadridDateKey(date: Date): string {
 
 export function postedKey(dateKey: string): string {
 	return `daily-post:posted:${dateKey}`;
-}
-
-function commentedKey(dateKey: string): string {
-	return `daily-post:commented:${dateKey}`;
 }
 
 function lockKey(dateKey: string): string {
@@ -129,21 +120,6 @@ async function ensurePinned(deps: DailyPostDeps, postId: string) {
 	await deps.store.set(PINNED_KEY, postId);
 }
 
-// Checked on every run like the pin. The marker is written before pinning the
-// comment, so a failed comment pin is not retried: retrying would mean posting
-// the comment again.
-async function ensureCommented(
-	deps: DailyPostDeps,
-	dateKey: string,
-	postId: string,
-) {
-	if (await deps.store.get(commentedKey(dateKey))) return;
-
-	const commentId = await deps.submitComment(postId, FIRST_COMMENT_TEXT);
-	await deps.store.set(commentedKey(dateKey), commentId, POSTED_MARKER_SECONDS);
-	await deps.pinComment(commentId);
-}
-
 // Runs every minute; posts at most once per Madrid day, in the first run after
 // garbuix.app has rolled over to the new puzzle.
 export async function postDailyPuzzle(
@@ -153,7 +129,6 @@ export async function postDailyPuzzle(
 
 	const postedId = await deps.store.get(postedKey(dateKey));
 	if (postedId) {
-		await ensureCommented(deps, dateKey, postedId);
 		await ensurePinned(deps, postedId);
 		return { status: "already-posted", dateKey };
 	}
@@ -171,7 +146,6 @@ export async function postDailyPuzzle(
 	const imageUrl = await deps.uploadImage(dataUrl);
 	const postId = await deps.submitPost(post.title, imageUrl);
 	await deps.store.set(postedKey(dateKey), postId, POSTED_MARKER_SECONDS);
-	await ensureCommented(deps, dateKey, postId);
 	await ensurePinned(deps, postId);
 
 	return { status: "posted", dateKey, postId };
