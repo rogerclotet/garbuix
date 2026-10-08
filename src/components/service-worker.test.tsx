@@ -380,3 +380,22 @@ it("retries a timed-out version request on the next background return", async ()
 	await backgroundAndReturn();
 	expect(reload).toHaveBeenCalledTimes(1);
 });
+
+it("installs the latest worker when only its precache changed, despite a current bundle", async () => {
+	const stale = new Worker();
+	stale.state = "activated";
+	stale.scriptURL = "https://garbuix.app/sw.js?v=worker-old";
+	registration.active = stale;
+	const latest = new Worker();
+	latest.scriptURL = "https://garbuix.app/sw.js?v=worker-a";
+	workers.register.mockImplementation(async () => {
+		registration.waiting = latest;
+		return registration;
+	});
+	render(<ServiceWorkerRegister />);
+	await settle();
+	expect(workers.register).toHaveBeenCalledWith("/sw.js?v=worker-a");
+	expect(latest.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+	workers.dispatchEvent(new Event("controllerchange"));
+	expect(reload).toHaveBeenCalledTimes(1);
+});
