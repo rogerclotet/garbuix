@@ -9,14 +9,12 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
-import { DifficultyBars } from "@/components/difficulty-bars";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
 import { formatPuzzleDate } from "@/lib/puzzle-dates";
-import type { PuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	buildAnonymousImportPayload,
 	getDeviceId,
@@ -54,7 +52,6 @@ type HistoryData = {
 	yesterdayPuzzle: {
 		dateKey: string;
 		preview: DailyPuzzlePreview;
-		difficulty?: PuzzleDifficulty | null;
 	} | null;
 	yesterdayLeaderboard?: LeaderboardSnapshot;
 };
@@ -328,12 +325,6 @@ export function HistoryView({
 														{entry.legacy ? (
 															<Badge variant="outline">Importat</Badge>
 														) : null}
-														{entry.difficulty ? (
-															<DifficultyBars
-																difficulty={entry.difficulty}
-																label="level"
-															/>
-														) : null}
 														<span className="text-sm text-muted-foreground font-ui">
 															{entry.guessCount} intent
 															{entry.guessCount === 1 ? "" : "s"} ·{" "}
@@ -382,12 +373,6 @@ export function HistoryView({
 											<span className="text-sm text-muted-foreground font-ui">
 												{formatPuzzleDate(yesterdayPuzzle.dateKey)}
 											</span>
-											{yesterdayPuzzle.difficulty ? (
-												<DifficultyBars
-													difficulty={yesterdayPuzzle.difficulty}
-													label="level"
-												/>
-											) : null}
 										</div>
 									</div>
 

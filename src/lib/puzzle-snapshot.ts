@@ -6,7 +6,6 @@ import {
 	sealAnswerCapsule,
 	sealHintCapsule,
 } from "@/lib/puzzle-crypto";
-import { computePuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import { getWordLayout, normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzleHintCapsule,
@@ -94,12 +93,10 @@ export async function buildPuzzleSnapshots(options: {
 	letters: string[];
 	initialShuffledLetters: string[];
 	algorithmVersion: string;
-	availableWordCount: number;
 	getCells?: (word: Word) => string[];
 }) {
 	const {
 		algorithmVersion,
-		availableWordCount,
 		crossword,
 		dateKey,
 		initialShuffledLetters,
@@ -170,13 +167,6 @@ export async function buildPuzzleSnapshots(options: {
 		gridLetters,
 	});
 
-	const difficulty = computePuzzleDifficulty({
-		frequencies: crossword.words.map(
-			(wordPlacement) => wordPlacement.word.frequency,
-		),
-		availableWordCount,
-	});
-
 	const publicSnapshot: DailyPuzzlePublic = {
 		id: puzzleId,
 		dateKey,
@@ -190,7 +180,6 @@ export async function buildPuzzleSnapshots(options: {
 		validNormalizedGuesses: [],
 		wordSlots: wordSlotsPublic,
 		hintCapsules,
-		difficulty,
 	};
 
 	const privateSnapshot: DailyPuzzlePrivate = {

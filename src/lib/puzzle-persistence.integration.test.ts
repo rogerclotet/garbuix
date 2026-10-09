@@ -164,7 +164,6 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				algorithmVersion: "test",
 				letters: ["c", "a", "s"],
 				initialShuffledLetters: ["s", "a", "c"],
-				availableWordCount: 3,
 				crossword: {
 					rows: 3,
 					cols: 4,

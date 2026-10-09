@@ -35,7 +35,6 @@ export async function ensureSyllablePuzzle(dateKey = getTodayDateKey()) {
 		seed: dateKeyToSeed(dateKey),
 		puzzleId: id,
 		algorithmVersion: SYLLABLE_ALGORITHM_VERSION,
-		availableWordCount: 5,
 		getCells: getSyllableCells,
 	});
 	await db
@@ -46,7 +45,6 @@ export async function ensureSyllablePuzzle(dateKey = getTodayDateKey()) {
 			publicSnapshotJson: {
 				...publicSnapshot,
 				...getSyllableDictionary(letters),
-				difficulty: null,
 			},
 			privateSnapshotJson: privateSnapshot,
 		})

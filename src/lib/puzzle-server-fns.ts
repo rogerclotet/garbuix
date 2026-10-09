@@ -10,7 +10,6 @@ import {
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
-	getDailyPuzzleDifficulty as getDailyPuzzleDifficultyData,
 	getDailyPuzzlePublicData,
 	getHistoryEntriesPageForUser,
 	getHistoryPageDataForUser,
@@ -46,12 +45,6 @@ export const getDailyPuzzlePublic = createServerFn({ method: "GET" })
 	.validator(dateKeyInput)
 	.handler(async ({ data }) => {
 		return getDailyPuzzlePublicData(data?.dateKey);
-	});
-
-export const getDailyPuzzleDifficulty = createServerFn({ method: "GET" })
-	.validator(dateKeyInput)
-	.handler(async ({ data }) => {
-		return getDailyPuzzleDifficultyData(data?.dateKey);
 	});
 
 export const getDailyPuzzlePageData = createServerFn({ method: "POST" })

@@ -85,6 +85,13 @@
       "when": 1791464280032,
       "tag": "0011_peer_clue_word_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791584444243,
+      "tag": "0012_drop_puzzle_difficulty",
+      "breakpoints": true
     }
   ]
 }

@@ -13,12 +13,6 @@ import {
 	buildNormalizedDictionary,
 	getValidNormalizedGuessesForLetters,
 } from "@/lib/puzzle-dictionary";
-import {
-	buildWordFrequencyLookup,
-	computeDifficultyForNormalizedWords,
-	type PuzzleDifficulty,
-	toPuzzleDifficulty,
-} from "@/lib/puzzle-difficulty";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 
@@ -32,48 +26,9 @@ const serverWords = allWords as Word[];
 const normalizedServerWords = buildNormalizedDictionary(guessWords);
 
 let cachedDictionaryVersion: Promise<string> | null = null;
-let cachedFrequencyLookup: Map<string, number> | null = null;
 const validNormalizedGuessesCache = new Map<string, string[]>();
 const inProgressGenerations = new Map<string, Promise<void>>();
 const cluesGenerationStarted = new Set<string>();
-
-function getFrequencyLookup() {
-	if (!cachedFrequencyLookup) {
-		cachedFrequencyLookup = buildWordFrequencyLookup(serverWords);
-	}
-	return cachedFrequencyLookup;
-}
-
-// Re-score stored puzzles on read so older ratings pick up formula changes.
-// Persist only when the column or public snapshot disagrees with the new rating.
-async function ensurePuzzleRowDifficulty(
-	row: typeof dailyPuzzles.$inferSelect,
-): Promise<typeof dailyPuzzles.$inferSelect> {
-	const difficulty = computeDifficultyForNormalizedWords({
-		normalizedWords: row.privateSnapshotJson.wordSlots.map(
-			(slot) => slot.normalizedWord,
-		),
-		frequencyLookup: getFrequencyLookup(),
-		availableWordCount: getDailyValidNormalizedGuesses(
-			row.privateSnapshotJson.letters,
-		).length,
-	});
-	if (
-		difficulty == null ||
-		(row.difficulty === difficulty &&
-			row.publicSnapshotJson.difficulty === difficulty)
-	) {
-		return row;
-	}
-
-	const publicSnapshotJson = { ...row.publicSnapshotJson, difficulty };
-	await db
-		.update(dailyPuzzles)
-		.set({ difficulty, publicSnapshotJson })
-		.where(eq(dailyPuzzles.id, row.id));
-
-	return { ...row, difficulty, publicSnapshotJson };
-}
 
 // Fire-and-forget AI clue generation for a freshly created puzzle. Never blocks
 // or fails puzzle creation: a missing API key or API error only means clues are
@@ -140,24 +95,6 @@ export async function checkDailyPuzzleExists(
 	return existing != null;
 }
 
-// Lightweight lookup for UI that only needs today's rating (leaderboard header).
-// Does not generate a puzzle: if today's row isn't there yet, callers omit the
-// indicator. The column is authoritative; the snapshot covers older rows.
-export async function getDailyPuzzleDifficulty(
-	dateKey = getTodayDateKey(),
-): Promise<PuzzleDifficulty | null> {
-	const existing = await db.query.dailyPuzzles.findFirst({
-		where: eq(dailyPuzzles.dateKey, dateKey),
-		columns: { difficulty: true, publicSnapshotJson: true },
-	});
-	if (!existing) {
-		return null;
-	}
-	return toPuzzleDifficulty(
-		existing.difficulty ?? existing.publicSnapshotJson.difficulty,
-	);
-}
-
 // The authoritative word count for a stored day, so callers never have to trust
 // a client's figure. Null when the day has no puzzle.
 export async function getDailyPuzzleWordCount(
@@ -180,7 +117,7 @@ export async function readDailyPuzzleRow(dateKey = getTodayDateKey()) {
 		where: eq(dailyPuzzles.dateKey, dateKey),
 	});
 
-	return existing ? ensurePuzzleRowDifficulty(existing) : null;
+	return existing ?? null;
 }
 
 export class DailyPuzzleNotFoundError extends Error {
@@ -234,7 +171,7 @@ export async function ensureDailyPuzzleSnapshot(
 	});
 
 	if (existing) {
-		return ensurePuzzleRowDifficulty(existing);
+		return existing;
 	}
 
 	const seed = dateKeyToSeed(dateKey);
@@ -253,8 +190,6 @@ export async function ensureDailyPuzzleSnapshot(
 		letters: generated.letters,
 		initialShuffledLetters: generated.shuffledLetters,
 		algorithmVersion: PUZZLE_ALGORITHM_VERSION,
-		availableWordCount: getDailyValidNormalizedGuesses(generated.letters)
-			.length,
 	});
 
 	const inserted = await db
@@ -266,7 +201,6 @@ export async function ensureDailyPuzzleSnapshot(
 			algorithmVersion: PUZZLE_ALGORITHM_VERSION,
 			dictionaryVersion: await getDictionaryVersion(),
 			wordCount: privateSnapshot.wordSlots.length,
-			difficulty: publicSnapshot.difficulty ?? null,
 			publicSnapshotJson: publicSnapshot,
 			privateSnapshotJson: privateSnapshot,
 		})
@@ -290,5 +224,5 @@ export async function ensureDailyPuzzleSnapshot(
 		throw new Error(`Failed to persist puzzle for ${dateKey}`);
 	}
 
-	return ensurePuzzleRowDifficulty(conflictRow);
+	return conflictRow;
 }

@@ -15,14 +15,12 @@ export async function syllableFixture(dateKey = "2026-10-04") {
 		seed: 261004,
 		puzzleId: `syllable:${dateKey}`,
 		algorithmVersion: SYLLABLE_ALGORITHM_VERSION,
-		availableWordCount: 5,
 		getCells: getSyllableCells,
 	});
 	return {
 		puzzle: {
 			...publicSnapshot,
 			...getSyllableDictionary(generated.letters),
-			difficulty: null,
 		},
 		privateSnapshot,
 		crossword: generated.crossword,

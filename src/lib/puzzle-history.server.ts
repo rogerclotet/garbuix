@@ -11,7 +11,6 @@ import {
 	mergeAnonLeaderboardForUser,
 } from "@/lib/leaderboard.server";
 import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
-import { toPuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import { readDailyPuzzleRow } from "@/lib/puzzle-generation.server";
 import { publishLeaderboardForUser } from "@/lib/puzzle-leaderboard.server";
 import {
@@ -87,7 +86,6 @@ export async function getHistoryEntriesForUser(userId: string) {
 		hintsUsed: row.hintsUsed + row.peerClueWordIds.length,
 		completed: row.completedAt != null,
 		lastUpdated: row.lastSyncedAt.toISOString(),
-		difficulty: toPuzzleDifficulty(row.puzzle.difficulty),
 	}));
 
 	for (const row of legacyRows) {
@@ -124,7 +122,6 @@ export async function getHistoryEntriesPageForUser(
 			dateKey: dailyPuzzles.dateKey,
 			seed: dailyPuzzles.seed,
 			wordCount: dailyPuzzles.wordCount,
-			difficulty: dailyPuzzles.difficulty,
 			guessedWordIds: userPuzzleProgress.guessedWordIds,
 			guessCount: userPuzzleProgress.guessCount,
 			hintsUsed: userPuzzleProgress.hintsUsed,
@@ -154,7 +151,6 @@ export async function getHistoryEntriesPageForUser(
 		hintsUsed: row.hintsUsed + row.peerClueWordIds.length,
 		completed: row.completedAt != null,
 		lastUpdated: row.lastSyncedAt.toISOString(),
-		difficulty: toPuzzleDifficulty(row.difficulty),
 	}));
 
 	for (const row of legacyRows) {
@@ -274,10 +270,6 @@ export async function getHistoryPageDataForUser(
 			? {
 					dateKey: yesterdayPuzzleRow.dateKey,
 					preview: toPuzzlePreview(yesterdayPuzzleRow.privateSnapshotJson),
-					difficulty: toPuzzleDifficulty(
-						yesterdayPuzzleRow.difficulty ??
-							yesterdayPuzzleRow.publicSnapshotJson.difficulty,
-					),
 				}
 			: null,
 		yesterdayLeaderboard,
