@@ -62,8 +62,19 @@ function AboutPage() {
 			<section className="space-y-3 text-sm leading-relaxed">
 				<h3 className="text-base font-semibold">I les pistes?</h3>
 				<p>
-					Les pistes automàtiques es generen amb intel·ligència artificial.
-					També pots demanar pistes a altres jugadors.
+					Les pistes automàtiques es generen amb intel·ligència artificial a
+					partir de les definicions del{" "}
+					<a href="https://ca.wiktionary.org/" className="text-link">
+						Viccionari
+					</a>
+					, publicades sota la llicència{" "}
+					<a
+						href="https://creativecommons.org/licenses/by-sa/4.0/deed.ca"
+						className="text-link"
+					>
+						CC BY-SA 4.0
+					</a>
+					. També pots demanar pistes a altres jugadors.
 				</p>
 			</section>
 			<p className="text-sm leading-relaxed">
