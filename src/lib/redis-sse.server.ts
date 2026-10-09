@@ -1,5 +1,6 @@
 import type { Redis } from "ioredis";
 import { getRedisSub } from "@/lib/redis.server";
+import { registerOpenStream } from "@/lib/shutdown.server";
 
 type MessageListener = (channel: string, message: string) => void;
 type ChannelSubscription = {
@@ -118,15 +119,22 @@ export function createRedisSseStream({
 	let closed = false;
 	let heartbeat: ReturnType<typeof setInterval> | undefined;
 	let subscription: ReturnType<typeof subscribe> | undefined;
+	let unregisterOpenStream: (() => void) | undefined;
 
 	const cleanup = () => {
 		closed = true;
 		clearInterval(heartbeat);
 		subscription?.unsubscribe();
+		unregisterOpenStream?.();
 	};
 
 	return new ReadableStream({
 		async start(controller) {
+			unregisterOpenStream = registerOpenStream(() => {
+				if (closed) return;
+				cleanup();
+				controller.close();
+			});
 			const send = (chunk: string) => {
 				if (closed) return;
 				try {

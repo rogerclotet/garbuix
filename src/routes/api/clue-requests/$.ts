@@ -39,6 +39,7 @@ import {
 } from "@/lib/rate-limit.server";
 import { isRedisConfigured } from "@/lib/redis.server";
 import { createRedisSseStream } from "@/lib/redis-sse.server";
+import { trackBackgroundTask } from "@/lib/shutdown.server";
 
 export const Route = createFileRoute("/api/clue-requests/$")({
 	server: {
@@ -420,10 +421,12 @@ async function handleRespond(
 	// right away instead of waiting for the asker's next progress sync. Only
 	// signed-in askers have a leaderboard-tracked progress row; anon requester ids
 	// never match one, so this is a no-op for them.
-	void republishLeaderboardForClueRecipient(
-		dateKey,
-		clueRequest.puzzleId,
-		clueRequest.requesterId,
+	trackBackgroundTask(
+		republishLeaderboardForClueRecipient(
+			dateKey,
+			clueRequest.puzzleId,
+			clueRequest.requesterId,
+		),
 	);
 
 	return Response.json({ delivered: true });

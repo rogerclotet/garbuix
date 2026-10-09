@@ -2,6 +2,7 @@ import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRedisSub } from "@/lib/redis.server";
 import { createRedisSseStream } from "@/lib/redis-sse.server";
+import { closeOpenStreams } from "@/lib/shutdown.server";
 
 vi.mock("@/lib/redis.server", () => ({ getRedisSub: vi.fn() }));
 
@@ -250,5 +251,23 @@ describe("Redis SSE lifecycle", () => {
 		);
 		sub.emit("message", "shared", "new data");
 		expect(decoder.decode((await reader.read()).value)).toContain("new data");
+	});
+
+	it("ends open streams on shutdown so the server can close", async () => {
+		const reader = read(open());
+		await settle();
+		await reader.read();
+		closeOpenStreams();
+		expect(await reader.read()).toEqual({ done: true, value: undefined });
+		expect(sub.unsubscribe).toHaveBeenCalledExactlyOnceWith("shared");
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("stops tracking streams the viewer already closed", async () => {
+		const stream = open();
+		await settle();
+		await stream.cancel();
+		expect(() => closeOpenStreams()).not.toThrow();
+		expect(sub.unsubscribe).toHaveBeenCalledTimes(1);
 	});
 });

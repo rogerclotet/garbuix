@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, it } from "vitest";
 
-function deploy(args: string[] = [], failure = "") {
+function deploy(
+	args: string[] = [],
+	failure = "",
+	images: Record<string, string> = {},
+) {
 	const directory = mkdtempSync(join(tmpdir(), "garbuix-deploy-"));
 	const log = join(directory, "calls");
 	writeFileSync(log, "");
@@ -36,10 +40,11 @@ case "$*" in
     esac ;;
 esac
 case "$*" in
+  "pull "*) test "$DEPLOY_TEST_FAILURE" != pull || exit 45 ;;
   *db:migrate*)
     test -f "$DEPLOY_TEST_STOPPED.app" && test -f "$DEPLOY_TEST_STOPPED.scheduler" || exit 42
     test "$DEPLOY_TEST_FAILURE" != migration || exit 43 ;;
-  *--force-recreate*) test "$DEPLOY_TEST_FAILURE" != readiness || exit 44 ;;
+  *--force-recreate*" app") test "$DEPLOY_TEST_FAILURE" != readiness || exit 44 ;;
 esac
 `,
 		{ mode: 0o755 },
@@ -55,6 +60,9 @@ esac
 					DEPLOY_TEST_LOG: log,
 					DEPLOY_TEST_STOPPED: join(directory, "stopped"),
 					DEPLOY_TEST_FAILURE: failure,
+					DEPLOY_APP_IMAGE: "",
+					DEPLOY_SCHEDULER_IMAGE: "",
+					...images,
 				},
 				encoding: "utf8",
 			},
@@ -102,6 +110,21 @@ it.each([
 	},
 );
 
+it("starts the app before recreating the scheduler", () => {
+	const result = deploy();
+	expect(result.status, result.stderr).toBe(0);
+	const startups = result.calls
+		.split("\n")
+		.filter((line) => line.includes("--force-recreate"));
+	expect(startups).toHaveLength(2);
+	expect(startups[0]).toMatch(/ app$/);
+	expect(startups[1]).toMatch(/ pre-generator$/);
+	for (const startup of startups) {
+		expect(startup).toContain("--no-deps");
+		expect(startup).toContain("--wait --wait-timeout");
+	}
+});
+
 it("leaves writers stopped if migrations fail", () => {
 	const result = deploy([], "migration");
 	expect(result.status, result.stderr).toBe(43);
@@ -111,4 +134,47 @@ it("leaves writers stopped if migrations fail", () => {
 it("fails the deployment when the app never becomes ready", () => {
 	const result = deploy([], "readiness");
 	expect(result.status, result.stderr).toBe(44);
+	expect(result.calls).not.toMatch(/--force-recreate.* pre-generator$/m);
+});
+
+const published = {
+	DEPLOY_APP_IMAGE: "ghcr.io/owner/garbuix/app:abc",
+	DEPLOY_SCHEDULER_IMAGE: "ghcr.io/owner/garbuix/scheduler:abc",
+};
+
+it("deploys published images under the names Compose uses, without building", () => {
+	const result = deploy([], "", published);
+	expect(result.status, result.stderr).toBe(0);
+	const calls = result.calls.trim().split("\n");
+	expect(calls.slice(0, 5)).toEqual([
+		"pull ghcr.io/owner/garbuix/app:abc",
+		"pull ghcr.io/owner/garbuix/scheduler:abc",
+		"tag ghcr.io/owner/garbuix/app:abc paraules-app:prod",
+		"tag ghcr.io/owner/garbuix/scheduler:abc paraules-scheduler:prod",
+		"image rm ghcr.io/owner/garbuix/app:abc ghcr.io/owner/garbuix/scheduler:abc",
+	]);
+	expect(result.calls).not.toContain("compose build");
+	expect(result.calls).toContain("db:migrate");
+});
+
+it("keeps the running release untouched when pulling fails", () => {
+	const result = deploy([], "pull", published);
+	expect(result.status, result.stderr).toBe(45);
+	expect(result.calls).not.toContain("compose stop");
+});
+
+it("refuses to deploy only one published image", () => {
+	const result = deploy([], "", {
+		DEPLOY_APP_IMAGE: published.DEPLOY_APP_IMAGE,
+	});
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toContain("must be set together");
+	expect(result.calls).toBe("");
+});
+
+it("builds on the server when no published images are given", () => {
+	const result = deploy();
+	expect(result.status, result.stderr).toBe(0);
+	expect(result.calls.split("\n")[0]).toBe("compose build app pre-generator");
+	expect(result.calls).not.toContain("pull ");
 });

@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
 import { getServerEnv } from "@/lib/server-env";
+import { registerResourceCloser } from "@/lib/shutdown.server";
 
 const connectionString = getServerEnv().DATABASE_URL;
 
@@ -12,5 +13,7 @@ export const sql = postgres(connectionString, {
 	max: Number.isFinite(poolMax) && poolMax > 0 ? poolMax : 10,
 	prepare: false,
 });
+
+registerResourceCloser(() => sql.end({ timeout: 1 }));
 
 export const db = drizzle(sql, { schema });

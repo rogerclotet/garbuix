@@ -71,6 +71,7 @@ const config = defineConfig(({ mode, command }) => {
 
 	return {
 		nitro: {
+			plugins: ["./src/server-plugins/graceful-shutdown.ts"],
 			routeRules: {
 				"/**": {
 					headers: getSecurityHeaders(

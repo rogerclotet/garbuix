@@ -15,6 +15,7 @@ import {
 } from "@/lib/puzzle-dictionary";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
+import { trackBackgroundTask } from "@/lib/shutdown.server";
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
 
@@ -40,7 +41,7 @@ function triggerCluesGeneration(
 	if (cluesGenerationStarted.has(puzzleId)) return;
 	cluesGenerationStarted.add(puzzleId);
 
-	void generateAndStoreCluesForPuzzle({ puzzleId, wordSlots })
+	const generation = generateAndStoreCluesForPuzzle({ puzzleId, wordSlots })
 		.catch((error: unknown) => {
 			captureException(error);
 			console.error(
@@ -51,6 +52,7 @@ function triggerCluesGeneration(
 		.finally(() => {
 			cluesGenerationStarted.delete(puzzleId);
 		});
+	trackBackgroundTask(generation);
 }
 
 async function getDictionaryVersion() {
