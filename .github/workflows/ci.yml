@@ -53,8 +53,91 @@ jobs:
       - name: Run test suite
         run: pnpm test
 
-  deploy:
+  publish:
     needs: lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Building on the production server competed with the live app for CPU and
+    # memory for minutes on every deploy. Build here; the server only pulls.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      app-image: ${{ steps.images.outputs.app }}
+      scheduler-image: ${{ steps.images.outputs.scheduler }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The browser DSN is compiled into the bundle and its CSP. Building
+      # without it would silently ship a release that reports no errors.
+      - name: Check build configuration
+        env:
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$VITE_SENTRY_DSN" ]; then
+            echo "::error::Set the VITE_SENTRY_DSN repository variable"
+            exit 1
+          fi
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN is not set; source maps will not be uploaded"
+          fi
+
+      - name: Name images
+        id: images
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "release=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          echo "app=$repository/app:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "scheduler=$repository/scheduler:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.images.outputs.app }}
+          build-args: |
+            SENTRY_RELEASE=${{ steps.images.outputs.release }}
+            VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}
+            SENTRY_URL=${{ vars.SENTRY_URL }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+          secrets: |
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha,scope=production-images
+
+      # Reuses the app build from the builder cache, so the bundle and its
+      # uploaded source maps are produced once per release.
+      - name: Build and push scheduler image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: scheduler
+          push: true
+          tags: ${{ steps.images.outputs.scheduler }}
+          build-args: |
+            SENTRY_RELEASE=${{ steps.images.outputs.release }}
+            VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}
+            SENTRY_URL=${{ vars.SENTRY_URL }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+          secrets: |
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha,scope=production-images
+          cache-to: type=gha,scope=production-images,mode=max
+
+  deploy:
+    needs: publish
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     # Every deploy mutates the same checkout, images, and Compose project.
     # Finish the active deploy before another job can replace its containers.
@@ -62,6 +145,9 @@ jobs:
       group: production-deploy
       cancel-in-progress: false
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     container:
       image: alpine
     steps:
@@ -78,3 +164,8 @@ jobs:
           SSH_IP: ${{ secrets.SSH_IP }}
           SSH_PROJECT_DIRECTORY: ${{ secrets.SSH_PROJECT_DIRECTORY }}
           PORT: ${{ secrets.PORT }}
+          APP_IMAGE: ${{ needs.publish.outputs.app-image }}
+          SCHEDULER_IMAGE: ${{ needs.publish.outputs.scheduler-image }}
+          # Expires when this job ends, so the server keeps no registry login.
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}

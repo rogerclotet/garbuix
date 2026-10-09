@@ -196,19 +196,24 @@ docker build --target production \
   --secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN -t paraules-app:prod .
 ```
 
-For the standard Compose deployment, set the variables above in the deployment
-server's `.env` file. Compose passes the browser DSN and upload settings as build
-arguments, the token as a BuildKit secret, and the server DSN to the app, scheduler,
-and backfill containers. A GitHub Actions secret alone is not forwarded to the remote
-server by the deployment workflow.
+CI builds the production images. Set `VITE_SENTRY_DSN`, `SENTRY_URL`, `SENTRY_ORG`
+and `SENTRY_PROJECT` as GitHub Actions repository variables and `SENTRY_AUTH_TOKEN`
+as a repository secret. The publish job fails without `VITE_SENTRY_DSN` and warns
+when the token is missing. `SENTRY_DSN` stays in the deployment server's `.env`
+file, which Compose passes to the app, scheduler and backfill containers.
+
+Manual deployments without published images build on the server instead. Compose
+then reads the build settings from the server's `.env` file, passing the browser DSN
+and upload settings as build arguments and the token as a BuildKit secret.
 
 The token is only available during the build and is not stored in the image or
 added to the running containers' environment. Builds without a token still work,
 but skip source-map uploads. The Sentry plugin deletes uploaded maps from the
 build output.
 
-Docker does not invalidate its build cache when secret values change. After
-adding or rotating the token, rebuild once without cache before deploying:
+Docker does not invalidate its build cache when secret values change. Every CI
+build copies a new commit before the upload step, so this only affects server builds.
+After adding or rotating the token on the server, rebuild once without cache before deploying:
 
 ```bash
 SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" docker compose build --no-cache app pre-generator
@@ -278,11 +283,19 @@ if duplicates remain. Use `sh scripts/deploy-compose.sh` to stop the old writers
 apply the migration, and start the updated app together. See the
 [Better Auth upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide#account-identity-keeps-the-provider-key).
 
-Build both production images, keep existing PostgreSQL and Redis containers,
-stop the clue scheduler while the app still serves requests, then stop the app,
-apply migrations, recreate the app from its new image and wait for readiness, then
-recreate the scheduler. The app does not wait for the scheduler's container swap,
-and a failed app readiness check leaves the scheduler stopped. The app starts Node directly without repeating migrations or
+On pushes to `main`, CI builds both production images, pushes them to the GitHub
+Container Registry tagged with the commit SHA, and deploys them. The server logs in
+with the job's short-lived token, pulls the images and tags them with the local names
+in `compose.yml`, so it never builds while the app is serving. Without
+`DEPLOY_APP_IMAGE` and `DEPLOY_SCHEDULER_IMAGE`, the script builds both images on
+the server instead.
+
+Either way, the script gets both images first and keeps the existing PostgreSQL
+and Redis containers. It stops the clue scheduler while the app still serves
+requests, then stops the app, applies migrations, recreates the app from its new
+image and waits for readiness, then recreates the scheduler. The app does not wait
+for the scheduler's container swap, and a failed app readiness check leaves the
+scheduler stopped. The app starts Node directly without repeating migrations or
 launching pnpm. Stopping both writers before
 migrating prevents old code from querying removed columns. The app is briefly
 unavailable during migration and restart. If migration fails, both services stay
@@ -299,7 +312,7 @@ changes. To apply those changes, use the explicit dependency maintenance mode:
 sh scripts/deploy-compose.sh --update-dependencies
 ```
 
-This builds the application images first, stops both writers, pulls the configured
+This gets the application images first, stops both writers, pulls the configured
 dependency images, updates PostgreSQL and Redis, waits for their healthchecks,
 then migrates and starts the application. Take a database backup before database
 upgrades; changing PostgreSQL major versions requires a separate data migration.
