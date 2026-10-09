@@ -8,7 +8,12 @@ import { readClueUsage } from "@/lib/clue-generation-usage";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 
 const { create, save, replace } = vi.hoisted(() => ({
-	create: vi.fn<() => Promise<Pick<Anthropic.Message, "content" | "usage">>>(),
+	create:
+		vi.fn<
+			(
+				params: Anthropic.MessageCreateParamsNonStreaming,
+			) => Promise<Pick<Anthropic.Message, "content" | "usage" | "stop_reason">>
+		>(),
 	save: vi.fn<() => Promise<void>>(),
 	replace: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
@@ -35,6 +40,14 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@sentry/tanstackstart-react", () => ({
 	captureException: vi.fn(),
 }));
+vi.mock("@/data/catalan-definitions.json", () => ({
+	default: {
+		paraigua: [
+			"(nom) Estri portàtil per a protegir-se de la pluja.",
+			"(nom) Protecció davant d'un perill.",
+		],
+	},
+}));
 
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
 
@@ -50,8 +63,10 @@ const word: DailyPuzzlePrivateWord = {
 function response(
 	text = "Es desplega quan plou.",
 	usage: Partial<Anthropic.Usage> = {},
-): Pick<Anthropic.Message, "content" | "usage"> {
+	stopReason: Anthropic.StopReason = "end_turn",
+): Pick<Anthropic.Message, "content" | "usage" | "stop_reason"> {
 	return {
+		stop_reason: stopReason,
 		content: [{ type: "text", text, citations: null }],
 		usage: {
 			input_tokens: 100,
@@ -141,7 +156,7 @@ describe("clue generation cost", () => {
 				cache_read_input_tokens: 400,
 			}).usage,
 		);
-		expect(usage.estimatedCostUsd).toBeCloseTo(0.00228, 10);
+		expect(usage.estimatedCostUsd).toBeCloseTo(0.000114, 10);
 		expect(usage).toMatchObject({
 			inputTokens: 100,
 			outputTokens: 30,
@@ -156,7 +171,7 @@ describe("clue generation cost", () => {
 			readClueUsage(
 				response(undefined, { cache_creation_input_tokens: 100 }).usage,
 			).estimatedCostUsd,
-		).toBeCloseTo(0.00055, 10);
+		).toBeCloseTo(0.0000275, 10);
 	});
 
 	it("includes both responses when a leaking clue is regenerated", async () => {
@@ -176,7 +191,7 @@ describe("clue generation cost", () => {
 			JSON.stringify({
 				event: "puzzle_clue_generation_cost",
 				puzzleId: "retry",
-				model: "claude-sonnet-5-5",
+				model: "claude-haiku-5-5",
 				totalWords: 1,
 				completedWords: 1,
 				failedWords: 0,
@@ -187,7 +202,7 @@ describe("clue generation cost", () => {
 				cacheWrite5mTokens: 0,
 				cacheWrite1hTokens: 0,
 				cacheReadTokens: 0,
-				estimatedCostUsd: 0.0009,
+				estimatedCostUsd: 0.000045,
 			}),
 		);
 	});
@@ -211,7 +226,7 @@ describe("clue generation cost", () => {
 
 			expect(log).toHaveBeenCalledOnce();
 			expect(log).toHaveBeenCalledWith(
-				expect.stringContaining('"estimatedCostUsd":0.0003'),
+				expect.stringContaining('"estimatedCostUsd":0.000015'),
 			);
 			expect(log).toHaveBeenCalledWith(
 				expect.stringContaining(
@@ -238,12 +253,12 @@ describe("clue generation cost", () => {
 		).toHaveLength(2);
 		expect(log).toHaveBeenCalledWith(
 			expect.stringMatching(
-				/"puzzleId":"small".*"apiResponses":1.*"estimatedCostUsd":0.0003/,
+				/"puzzleId":"small".*"apiResponses":1.*"estimatedCostUsd":0.000015/,
 			),
 		);
 		expect(log).toHaveBeenCalledWith(
 			expect.stringMatching(
-				/"puzzleId":"large".*"apiResponses":6.*"estimatedCostUsd":0.0018/,
+				/"puzzleId":"large".*"apiResponses":6.*"estimatedCostUsd":0.00009/,
 			),
 		);
 	});
@@ -275,7 +290,7 @@ describe("clue regeneration", () => {
 			target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
 			set: {
 				normalizedWord: word.normalizedWord,
-				sonnetModel: "claude-sonnet-5-5",
+				sonnetModel: "claude-haiku-5-5",
 				sonnetClue: "Es desplega quan plou.",
 				createdAt: expect.any(Date),
 			},
@@ -304,4 +319,64 @@ describe("clue regeneration", () => {
 		expect(replace).not.toHaveBeenCalled();
 		expect(save).not.toHaveBeenCalled();
 	});
+});
+
+describe("clue prompt", () => {
+	function sentPrompt(): string {
+		const content = create.mock.calls[0][0].messages[0].content;
+		if (typeof content !== "string") throw new Error("Expected a text prompt");
+		return content;
+	}
+
+	it("gives the model the word's dictionary senses", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: "senses",
+			wordSlots: [word],
+		});
+		expect(sentPrompt()).toContain(
+			[
+				"Accepcions:",
+				"1. (nom) Estri portàtil per a protegir-se de la pluja.",
+				"2. (nom) Protecció davant d'un perill.",
+			].join("\n"),
+		);
+	});
+
+	it("reports a missing definition without exposing the word", async () => {
+		vi.spyOn(console, "info").mockImplementation(() => {});
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const undefinedWord = {
+			...word,
+			id: 3,
+			displayWord: "xiribec",
+			normalizedWord: "xiribec",
+		};
+		await generateAndStoreCluesForPuzzle({
+			puzzleId: "legacy",
+			wordSlots: [undefinedWord],
+		});
+		expect(sentPrompt()).not.toContain("Accepcions:");
+		expect(warn).toHaveBeenCalledExactlyOnceWith(
+			JSON.stringify({
+				event: "puzzle_clue_definition_missing",
+				puzzleId: "legacy",
+				wordId: 3,
+			}),
+		);
+		expect(save).toHaveBeenCalledOnce();
+	});
+
+	it.each(["max_tokens", "refusal"] as const)(
+		"stores nothing when the response stops with %s",
+		async (stopReason) => {
+			vi.spyOn(console, "info").mockImplementation(() => {});
+			create.mockResolvedValueOnce(response("Es desplega", {}, stopReason));
+			await generateAndStoreCluesForPuzzle({
+				puzzleId: "truncated",
+				wordSlots: [word],
+			});
+			expect(save).not.toHaveBeenCalled();
+		},
+	);
 });

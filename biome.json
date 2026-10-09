@@ -20,6 +20,7 @@
 			"!**/node_modules",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/data/catalan-words.json",
+			"!**/src/data/catalan-definitions.json",
 			"!**/src/data/catalan-guess-words.json",
 			"!**/src/data/catalan-syllable-words.json",
 			"!**/src/data/catalan-syllables.json",

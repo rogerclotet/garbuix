@@ -6,6 +6,7 @@ A responsive web application for a Catalan crossword-style word game.
 
 - 🎮 Interactive crossword puzzle game with Catalan words
 - 📚 Uses a general Catalan lexicon from [Softcatalà](https://github.com/Softcatala/catalan-dict-tools)
+- 💡 AI clues grounded in [Viccionari](https://ca.wiktionary.org/) definitions
 - 🎯 5-15 words per game, all crossing with each other
 - 🔤 Guess words without accents, see them properly spelled
 - 📱 Fully responsive design
@@ -362,6 +363,7 @@ answers or clue text.
 - `pnpm run build` - Build for production (automatically downloads dictionary if missing)
 - `pnpm run preview` - Preview production build
 - `pnpm run download-dict` - Force-refresh and rebuild the Catalan dictionary
+- `pnpm run build-definitions` - Re-extract word definitions from the latest Viccionari dump
 - `pnpm run db:migrate` - Apply Drizzle migrations
 - `pnpm run backfill:puzzles` - Persist daily puzzle snapshots for a date range
 - `pnpm run backfill:difficulty` - Fill in the 1-3 star difficulty for stored puzzles (defaults to today + yesterday)
@@ -394,8 +396,34 @@ Useful flags:
 The build process automatically:
 1. Fetches general lexical data from Softcatalà's `catalan-dict-tools` repository
 2. Combines nouns, adjectives, verbs, adverbs, and lemma frequency data
-3. Filters to crossword-friendly entries (4-12 letters, alphabetic, common enough to be useful)
-4. Saves the result to `src/data/catalan-words.json` (currently ~14.5k words)
+3. Filters to crossword-friendly entries (4-12 letters, alphabetic, corpus frequency >= 20)
+   that have a definition in `src/data/catalan-definitions.json`
+4. Saves the result to `src/data/catalan-words.json` (currently ~16k words)
+
+Guesses are still checked against every Softcatalà word of 4-12 letters, with
+or without a definition.
+
+### Word Definitions
+
+`src/data/catalan-definitions.json` holds up to four senses per puzzle-eligible
+word, extracted from the [Viccionari](https://ca.wiktionary.org/) dump
+(CC BY-SA 4.0). The AI clue prompt includes them so the model writes clues from
+the real meaning instead of guessing. The extraction:
+
+- Keeps the Catalan section only and tags each sense with its part of speech
+- Drops senses that only point at another form (`{{ca-forma-conj}}`,
+  `{{forma-f}}`, ...) or mark a missing definition (`{{sense accepcions}}`)
+- Replaces a sense that only names a synonym with that synonym's first
+  definition, or drops it when the synonym has none
+
+Words left without any sense never appear in puzzles. The file is committed
+because Wikimedia deletes old dumps after a few months. Regenerate it (needs
+`bzip2` on the PATH), then rebuild the word lists:
+
+```bash
+pnpm run build-definitions
+pnpm run download-dict
+```
 
 ### Crossword Generation
 
@@ -452,7 +480,9 @@ pnpm run backfill:difficulty -- --from 2026-01-01 --to 2026-01-31
 ### Word Selection Quality
 
 - The dictionary source is a general lexicon instead of a terminology database
-- Low-frequency words are filtered out during the build step (currently `frequency >= 200`)
+- Low-frequency words are filtered out during the build step (currently `frequency >= 20`)
+- Words without a Viccionari definition are filtered out, which also drops most
+  proper nouns and foreign words from the Softcatalà lists
 - Puzzle generation prefers more common words, while keeping some randomness
 
 ### Reddit Daily Post
@@ -572,5 +602,6 @@ Contributions are welcome! Feel free to submit pull requests or open issues.
 ## Acknowledgments
 
 - **Softcatalà** for maintaining and publishing open Catalan lexical data
+- **Viccionari** contributors for the Catalan definitions (CC BY-SA 4.0)
 - **TanStack** team for the amazing React tools
 - **shadcn** for the beautiful UI components
