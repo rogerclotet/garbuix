@@ -89,7 +89,6 @@ const historySummaryEntrySchema = z.object({
 	completed: z.boolean(),
 	lastUpdated: z.string().min(1).max(64),
 	legacy: z.boolean().optional(),
-	difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]).nullish(),
 });
 
 export const progressStateSchema = z.object({

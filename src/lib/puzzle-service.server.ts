@@ -10,7 +10,6 @@ import {
 } from "@/lib/leaderboard.server";
 import { openAnswerCapsule } from "@/lib/puzzle-crypto";
 import { getNextRolloverAt, getTodayDateKey } from "@/lib/puzzle-dates";
-import { toPuzzleDifficulty } from "@/lib/puzzle-difficulty";
 import {
 	DailyPuzzleNotFoundError,
 	getDailyValidNormalizedGuesses,
@@ -34,7 +33,6 @@ export {
 	checkDailyPuzzleExists,
 	DailyPuzzleNotFoundError,
 	ensureDailyPuzzleSnapshot,
-	getDailyPuzzleDifficulty,
 	PUZZLE_ALGORITHM_VERSION,
 	readDailyPuzzleRow,
 	triggerDailyPuzzleGeneration,
@@ -134,11 +132,6 @@ export async function getDailyPuzzlePublicData(dateKey = getTodayDateKey()) {
 			...publicSnapshot,
 			validNormalizedGuesses: getDailyValidNormalizedGuesses(
 				publicSnapshot.letters,
-			),
-			// The column is authoritative (kept in sync by generation and backfill);
-			// fall back to the snapshot JSON for rows persisted before the column.
-			difficulty: toPuzzleDifficulty(
-				puzzle.difficulty ?? publicSnapshot.difficulty,
 			),
 		},
 		rolloverAt: getNextRolloverAt().toISOString(),

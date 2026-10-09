@@ -29,14 +29,13 @@ export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 		seed: dateKeyToSeed(dateKey),
 		puzzleId: id,
 		algorithmVersion: MINI_ALGORITHM_VERSION,
-		availableWordCount: 5,
 	});
 	await db
 		.insert(miniPuzzles)
 		.values({
 			id,
 			dateKey,
-			publicSnapshotJson: { ...publicSnapshot, difficulty: null },
+			publicSnapshotJson: publicSnapshot,
 			privateSnapshotJson: privateSnapshot,
 		})
 		.onConflictDoNothing();

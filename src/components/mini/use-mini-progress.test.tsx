@@ -38,7 +38,6 @@ async function fixture() {
 		seed: 260101,
 		puzzleId: "mini:2026-01-01",
 		algorithmVersion: "mini-v1",
-		availableWordCount: 5,
 	});
 	return publicSnapshot;
 }
