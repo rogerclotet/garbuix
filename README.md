@@ -280,8 +280,9 @@ apply the migration, and start the updated app together. See the
 
 Build both production images, keep existing PostgreSQL and Redis containers,
 stop the clue scheduler while the app still serves requests, then stop the app,
-apply migrations, recreate both application services from the new images and wait
-for app readiness. The app starts Node directly without repeating migrations or
+apply migrations, recreate the app from its new image and wait for readiness, then
+recreate the scheduler. The app does not wait for the scheduler's container swap,
+and a failed app readiness check leaves the scheduler stopped. The app starts Node directly without repeating migrations or
 launching pnpm. Stopping both writers before
 migrating prevents old code from querying removed columns. The app is briefly
 unavailable during migration and restart. If migration fails, both services stay

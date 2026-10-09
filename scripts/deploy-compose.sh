@@ -35,5 +35,9 @@ docker compose run --rm --no-deps app pnpm db:migrate
 
 # Both writers now use the new images and the migrated schema. If migration
 # fails, set -e leaves them stopped instead of running incompatible code.
+# Compose starts no service until every listed one is recreated, so recreate
+# the app alone to keep the scheduler's container swap out of the outage.
 docker compose up -d --no-build --no-deps --force-recreate --remove-orphans \
-  --wait --wait-timeout 120 app pre-generator
+  --wait --wait-timeout 120 app
+docker compose up -d --no-build --no-deps --force-recreate \
+  --wait --wait-timeout 120 pre-generator

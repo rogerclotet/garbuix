@@ -39,7 +39,7 @@ case "$*" in
   *db:migrate*)
     test -f "$DEPLOY_TEST_STOPPED.app" && test -f "$DEPLOY_TEST_STOPPED.scheduler" || exit 42
     test "$DEPLOY_TEST_FAILURE" != migration || exit 43 ;;
-  *--force-recreate*) test "$DEPLOY_TEST_FAILURE" != readiness || exit 44 ;;
+  *--force-recreate*" app") test "$DEPLOY_TEST_FAILURE" != readiness || exit 44 ;;
 esac
 `,
 		{ mode: 0o755 },
@@ -102,6 +102,21 @@ it.each([
 	},
 );
 
+it("starts the app before recreating the scheduler", () => {
+	const result = deploy();
+	expect(result.status, result.stderr).toBe(0);
+	const startups = result.calls
+		.split("\n")
+		.filter((line) => line.includes("--force-recreate"));
+	expect(startups).toHaveLength(2);
+	expect(startups[0]).toMatch(/ app$/);
+	expect(startups[1]).toMatch(/ pre-generator$/);
+	for (const startup of startups) {
+		expect(startup).toContain("--no-deps");
+		expect(startup).toContain("--wait --wait-timeout");
+	}
+});
+
 it("leaves writers stopped if migrations fail", () => {
 	const result = deploy([], "migration");
 	expect(result.status, result.stderr).toBe(43);
@@ -111,4 +126,5 @@ it("leaves writers stopped if migrations fail", () => {
 it("fails the deployment when the app never becomes ready", () => {
 	const result = deploy([], "readiness");
 	expect(result.status, result.stderr).toBe(44);
+	expect(result.calls).not.toMatch(/--force-recreate.* pre-generator$/m);
 });
