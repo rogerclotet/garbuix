@@ -10,6 +10,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
+import { PuzzleTitle } from "@/components/puzzle-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -369,11 +370,10 @@ export function HistoryView({
 								<>
 									<div className="space-y-1.5">
 										<h3 className="text-base font-semibold">Resultat d'ahir</h3>
-										<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-											<span className="text-sm text-muted-foreground font-ui">
-												{formatPuzzleDate(yesterdayPuzzle.dateKey)}
-											</span>
-										</div>
+										<PuzzleTitle
+											dateKey={yesterdayPuzzle.dateKey}
+											numbered={!mini && mode === "regular"}
+										/>
 									</div>
 
 									<div

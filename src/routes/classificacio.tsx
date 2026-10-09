@@ -3,8 +3,9 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
+import { PuzzleTitle } from "@/components/puzzle-title";
 import { getLeaderboardSnapshot } from "@/lib/leaderboard-server-fns";
-import { formatPuzzleDate, getTodayDateKey } from "@/lib/puzzle-dates";
+import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { useLeaderboard } from "@/lib/use-leaderboard";
 
 export const Route = createFileRoute("/classificacio")({
@@ -59,9 +60,7 @@ function LeaderboardPage() {
 	return (
 		<div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 sm:py-10">
 			<header>
-				<p className="text-muted-foreground text-sm">
-					{formatPuzzleDate(dateKey)}
-				</p>
+				<PuzzleTitle dateKey={dateKey} />
 			</header>
 			<TriesHistogram
 				entries={entries}
