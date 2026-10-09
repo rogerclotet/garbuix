@@ -1,6 +1,7 @@
 import { captureException } from "@sentry/tanstackstart-react";
 import { Redis, type RedisOptions } from "ioredis";
 import { getServerEnv } from "@/lib/server-env";
+import { registerResourceCloser } from "@/lib/shutdown.server";
 
 let cachedPublisher: Redis | null = null;
 let cachedSubscriber: Redis | null = null;
@@ -33,6 +34,8 @@ function buildClient(role: "publisher" | "subscriber"): Redis | null {
 		}
 		console.warn(`[redis:${role}] error`, error.message);
 	});
+	// Runs after background work finishes, so no publish is still queued.
+	registerResourceCloser(() => client.disconnect());
 	return client;
 }
 

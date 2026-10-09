@@ -306,6 +306,12 @@ upgrades; changing PostgreSQL major versions requires a separate data migration.
 If dependency maintenance or migration fails, both writers remain stopped.
 Resolve the failure and rerun the maintenance command.
 
+On SIGTERM the app ends open live-update streams (browsers reconnect on their
+own), finishes in-flight requests, waits up to about seven seconds for background
+work such as AI clue generation and leaderboard updates, closes its database and
+Redis connections, flushes error reports and exits. This keeps it inside Docker's
+10-second stop timeout; anything still running at the deadline is cut off.
+
 Dependency and application readiness waits each have a 120-second limit. A failed
 app readiness check fails the deployment; inspect `docker compose ps` and
 `docker compose logs app db redis` before retrying. It does not automatically roll

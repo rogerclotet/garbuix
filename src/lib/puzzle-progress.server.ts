@@ -28,6 +28,7 @@ import type {
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import { trackBackgroundTask } from "@/lib/shutdown.server";
 
 // Guess hashes of the valid words that aren't answers: the only guesses that
 // count toward a bonus clue.
@@ -396,18 +397,20 @@ export async function syncPuzzleEventsForUser(options: {
 	);
 
 	if (hasProgressDelta) {
-		void publishLeaderboardForUser({
-			dateKey: puzzleRow.dateKey,
-			userId,
-			puzzleId: puzzleRow.id,
-			wordsFound: nextProgress.guessedWordIds.length,
-			totalWords: puzzleRow.privateSnapshotJson.wordSlots.length,
-			freeCluesUsed: nextProgress.hintsUsed,
-			tryCount: nextProgress.guessCount,
-			completedAt: nextCompletedAt,
-			previousWordsFound,
-			previousCompletedAt,
-		});
+		trackBackgroundTask(
+			publishLeaderboardForUser({
+				dateKey: puzzleRow.dateKey,
+				userId,
+				puzzleId: puzzleRow.id,
+				wordsFound: nextProgress.guessedWordIds.length,
+				totalWords: puzzleRow.privateSnapshotJson.wordSlots.length,
+				freeCluesUsed: nextProgress.hintsUsed,
+				tryCount: nextProgress.guessCount,
+				completedAt: nextCompletedAt,
+				previousWordsFound,
+				previousCompletedAt,
+			}),
+		);
 	}
 
 	return {
