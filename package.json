@@ -9,6 +9,7 @@
 		"build": "vite build && cp instrument.server.mjs sentry-privacy.ts public/version.json .output/server/",
 		"prebuild": "tsx scripts/write-build-version.ts && tsx scripts/download-catalan-dictionary.ts --if-missing && tsx scripts/build-syllable-dictionary.ts --if-missing",
 		"start": "node --env-file-if-exists=.env --import ./.output/server/instrument.server.mjs .output/server/index.mjs",
+		"build-definitions": "tsx scripts/build-definitions.ts",
 		"download-dict": "tsx scripts/download-catalan-dictionary.ts --force && tsx scripts/build-syllable-dictionary.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",

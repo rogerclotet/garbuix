@@ -1,5 +1,6 @@
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { captureException } from "@sentry/tanstackstart-react";
+import definitions from "@/data/catalan-definitions.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { puzzleWordClues } from "@/db/schema";
@@ -13,6 +14,7 @@ import { db } from "@/lib/db";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { getServerEnv } from "@/lib/server-env";
+import type { WordDefinitions } from "@/lib/word-definitions";
 
 export { CLUE_MODEL_ID } from "@/lib/clue-generation-usage";
 
@@ -21,7 +23,9 @@ export type GeneratedWordClue = {
 	clue: string;
 };
 
-const CLUE_MAX_TOKENS = 150;
+// Covers adaptive thinking at xhigh effort plus the clue. Sampled clues used
+// at most ~2,000 output tokens, so hitting this cap means the request misbehaved.
+const CLUE_MAX_TOKENS = 4096;
 
 // Cap how long a single Anthropic request can stall before we abort and let the
 // SDK retry. The default is 10 minutes, which lets one stuck request wedge a
@@ -29,14 +33,16 @@ const CLUE_MAX_TOKENS = 150;
 const ANTHROPIC_REQUEST_TIMEOUT_MS = 60_000;
 const ANTHROPIC_MAX_RETRIES = 2;
 
-const SYSTEM_PROMPT = `Ets l'autor de pistes per a un joc de paraules en català (estil mots encreuats). Et donaré una paraula amagada i la seva categoria temàtica. Has d'escriure UNA pista curta en català que orienti cap a la paraula sense revelar-la.
+const SYSTEM_PROMPT = `Ets l'autor de pistes per a un joc de paraules en català (estil mots encreuats). Et donaré una paraula amagada, la seva categoria gramatical i les seves accepcions del diccionari. Has d'escriure UNA pista curta en català que orienti cap a la paraula sense revelar-la.
 
 Regles estrictes:
 - Escriu sempre en català.
+- Basa la pista en el significat de les accepcions donades; no t'inventis significats. Si n'hi ha més d'una, fes la pista sobre la primera.
 - NO escriguis mai la paraula amagada ni cap de les seves formes (plural, femení, diminutiu, verb conjugat, derivats) ni cap fragment evident d'aquesta.
+- No copiïs el text de la definició: reformula-la amb paraules teves.
 - La pista ha de ser concreta i directa: descriu què és, on es fa servir o quin context evoca. Evita metàfores, endevinalles i associacions llunyanes.
-- No donis la resposta amb un sinònim directe ni amb una definició de diccionari massa transparent.
-- No facis servir la longitud, el nombre de lletres ni el nom de la categoria com a pista; usa la categoria només per orientar el context de la pista.
+- No donis la resposta amb un sinònim directe.
+- No facis servir la longitud, el nombre de lletres ni el nom de la categoria com a pista.
 - Màxim 12 paraules. Una sola frase, sense cometes, sense dos punts i sense posar la paraula entre parèntesis.
 
 Respon NOMÉS amb el text de la pista, res més.`;
@@ -72,14 +78,29 @@ export function getWordCategory(displayWord: string): string {
 	return wordCategoryByNormalizedName.get(normalizeWord(displayWord)) ?? "";
 }
 
+// Every puzzle word has senses; only puzzles generated before definitions
+// existed can lack them.
+export function getWordSenses(displayWord: string): string[] {
+	return (
+		(definitions as WordDefinitions)[displayWord.toLocaleLowerCase("ca")] ?? []
+	);
+}
+
 function buildUserPrompt(options: {
 	displayWord: string;
 	areatematica: string;
+	senses: string[];
 	extraInstruction?: string;
 }): string {
 	const lines = [`Paraula amagada: ${options.displayWord}`];
 	if (options.areatematica) {
-		lines.push(`Categoria temàtica: ${options.areatematica}`);
+		lines.push(`Categoria gramatical: ${options.areatematica}`);
+	}
+	if (options.senses.length > 0) {
+		lines.push(
+			"Accepcions:",
+			...options.senses.map((sense, index) => `${index + 1}. ${sense}`),
+		);
 	}
 	if (options.extraInstruction) {
 		lines.push(options.extraInstruction);
@@ -91,6 +112,7 @@ async function callModel(options: {
 	modelId: string;
 	displayWord: string;
 	areatematica: string;
+	senses: string[];
 	extraInstruction?: string;
 	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
@@ -100,9 +122,10 @@ async function callModel(options: {
 		// Match the published rates used by the puzzle cost summary.
 		service_tier: "standard_only",
 		inference_geo: "global",
-		// Without tools, this skips upfront thinking and reserves the budget for the clue.
-		thinking: { type: "between_tools" },
-		output_config: { effort: "low" },
+		// Thinking mostly buys rule compliance: clues within 12 words, rephrased
+		// rather than copied from the definition, and fewer near-leaks.
+		thinking: { type: "adaptive" },
+		output_config: { effort: "xhigh" },
 		system: [
 			{
 				type: "text",
@@ -116,6 +139,7 @@ async function callModel(options: {
 				content: buildUserPrompt({
 					displayWord: options.displayWord,
 					areatematica: options.areatematica,
+					senses: options.senses,
 					extraInstruction: options.extraInstruction,
 				}),
 			},
@@ -124,6 +148,11 @@ async function callModel(options: {
 
 	// Record every response before retries or persistence can fail.
 	options.onUsage?.(readClueUsage(message.usage));
+
+	// A truncated or refused response has no usable clue; the caller logs the failure.
+	if (message.stop_reason !== "end_turn") {
+		throw new Error(`Clue response stopped with ${message.stop_reason}`);
+	}
 
 	return message.content
 		.filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -149,12 +178,14 @@ async function generateClueForModel(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	senses: string[];
 	onUsage?: (usage: ClueUsage) => void;
 }): Promise<string> {
 	let clue = await callModel({
 		modelId: options.modelId,
 		displayWord: options.displayWord,
 		areatematica: options.areatematica,
+		senses: options.senses,
 		onUsage: options.onUsage,
 	});
 
@@ -163,6 +194,7 @@ async function generateClueForModel(options: {
 			modelId: options.modelId,
 			displayWord: options.displayWord,
 			areatematica: options.areatematica,
+			senses: options.senses,
 			extraInstruction: RETRY_REMINDER,
 			onUsage: options.onUsage,
 		});
@@ -176,6 +208,7 @@ export async function generateWordClue(options: {
 	displayWord: string;
 	normalizedWord: string;
 	areatematica: string;
+	senses: string[];
 	onUsage?: (usage: ClueUsage) => void;
 }): Promise<GeneratedWordClue> {
 	const clue = await generateClueForModel({
@@ -246,10 +279,21 @@ export async function generateAndStoreCluesForPuzzle(options: {
 			batch.map(async (slot) => {
 				let failureStage: "generation" | "storage" = "generation";
 				try {
+					const senses = getWordSenses(slot.displayWord);
+					if (senses.length === 0) {
+						console.warn(
+							JSON.stringify({
+								event: "puzzle_clue_definition_missing",
+								puzzleId: options.puzzleId,
+								wordId: slot.id,
+							}),
+						);
+					}
 					const generated = await generateWordClue({
 						displayWord: slot.displayWord,
 						normalizedWord: slot.normalizedWord,
 						areatematica: getWordCategory(slot.displayWord),
+						senses,
 						onUsage: recordUsage,
 					});
 
