@@ -24,7 +24,11 @@ import {
 	saveUserPuzzleProgress,
 	withPuzzleProgressTransaction,
 } from "@/lib/puzzle-progress-store.server";
-import { toPlayedPublicSnapshot, toPuzzlePreview } from "@/lib/puzzle-snapshot";
+import {
+	hydratePublicSnapshotWordMetadata,
+	toPlayedPublicSnapshot,
+	toPuzzlePreview,
+} from "@/lib/puzzle-snapshot";
 import { calculateHistoryStats } from "@/lib/puzzle-streaks";
 import { sanitizeProgressState } from "@/lib/puzzle-sync";
 import {
@@ -269,7 +273,13 @@ export async function getHistoryPageDataForUser(
 		yesterdayPuzzle: yesterdayPuzzleRow
 			? {
 					dateKey: yesterdayPuzzleRow.dateKey,
-					preview: toPuzzlePreview(yesterdayPuzzleRow.privateSnapshotJson),
+					preview: toPuzzlePreview({
+						publicSnapshot: hydratePublicSnapshotWordMetadata({
+							publicSnapshot: yesterdayPuzzleRow.publicSnapshotJson,
+							privateSnapshot: yesterdayPuzzleRow.privateSnapshotJson,
+						}),
+						privateSnapshot: yesterdayPuzzleRow.privateSnapshotJson,
+					}),
 				}
 			: null,
 		yesterdayLeaderboard,
