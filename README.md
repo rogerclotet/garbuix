@@ -235,7 +235,7 @@ build copies a new commit before the upload step, so this only affects server bu
 After adding or rotating the token on the server, rebuild once without cache before deploying:
 
 ```bash
-SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" docker compose build --no-cache app pre-generator
+SENTRY_RELEASE="$(git rev-parse --short=8 HEAD)" docker compose build --no-cache app-blue pre-generator
 sh scripts/deploy-compose.sh
 ```
 
@@ -299,8 +299,8 @@ HAVING count(*) > 1;
 ```
 
 Resolve any returned rows without merging distinct users. The migration fails
-if duplicates remain. Use `sh scripts/deploy-compose.sh` to stop the old writers,
-apply the migration, and start the updated app together. See the
+if duplicates remain. Use `sh scripts/deploy-compose.sh` to apply the migration
+and start the updated app. See the
 [Better Auth upgrade guide](https://better-auth.com/docs/guides/1-7-upgrade-guide#account-identity-keeps-the-provider-key).
 
 On pushes to `main`, CI builds both production images, pushes them to the GitHub
@@ -310,16 +310,40 @@ in `compose.yml`, so it never builds while the app is serving. Without
 `DEPLOY_APP_IMAGE` and `DEPLOY_SCHEDULER_IMAGE`, the script builds both images on
 the server instead.
 
-Either way, the script gets both images first and keeps the existing PostgreSQL
-and Redis containers. It stops the clue scheduler while the app still serves
-requests, then stops the app, applies migrations, recreates the app from its new
-image and waits for readiness, then recreates the scheduler. The app does not wait
-for the scheduler's container swap, and a failed app readiness check leaves the
-scheduler stopped. The app starts Node directly without repeating migrations or
-launching pnpm. Stopping both writers before
-migrating prevents old code from querying removed columns. The app is briefly
-unavailable during migration and restart. If migration fails, both services stay
-stopped so the failure can be resolved before restarting.
+The app runs as one of two identical services, `app-blue` and `app-green`. A
+Caddy `proxy` service publishes `APP_PORT` and forwards to the color serving the
+current release. Either way, the script gets both images first and keeps the
+existing PostgreSQL, Redis and proxy containers.
+
+The script applies migrations while the old release still serves, starts the
+new release in the idle color and waits for readiness. It then reloads the
+proxy to send new requests there and stops the old color, which first finishes
+the requests it already has. It recreates the scheduler last. No request fails.
+If a migration fails or the new release never becomes ready, the script exits
+with the old release still serving and the scheduler untouched.
+
+The old app and scheduler run on the migrated schema until the switch, so every
+migration must work with the release before it. `AGENTS.md` has the rules,
+including the two PRs that removing a column takes. The `migrations` CI job
+checks each new migration against them with `pnpm db:check-migrations` and
+blocks the deploy when one fails. When no release is serving,
+such as on a server's first deploy, the proxy holds requests for up to 30
+seconds until the new release accepts connections.
+
+The app starts Node directly without repeating migrations or launching pnpm.
+The stopped color keeps the previous release's container until the next deploy
+replaces it. To see which color serves and how both are doing:
+
+```bash
+docker compose exec proxy cat /state/upstream.caddy
+docker compose --profile '*' ps -a
+```
+
+The proxy passes on the client address and scheme reported by the server's TLS
+proxy only when that proxy connects from a private address. Each deploy reloads
+`proxy/Caddyfile` without dropping connections. The first deploy with the proxy
+removes the old `app` container, which held `APP_PORT`, so that one deploy still
+has a gap.
 
 ```bash
 sh scripts/deploy-compose.sh
@@ -333,8 +357,9 @@ sh scripts/deploy-compose.sh --update-dependencies
 ```
 
 This gets the application images first, stops both writers, pulls the configured
-dependency images, updates PostgreSQL and Redis, waits for their healthchecks,
-then migrates and starts the application. Take a database backup before database
+dependency images, updates PostgreSQL, Redis and the proxy, waits for their
+healthchecks, then migrates and starts the application. The app is unavailable
+for the duration. Take a database backup before database
 upgrades; changing PostgreSQL major versions requires a separate data migration.
 If dependency maintenance or migration fails, both writers remain stopped.
 Resolve the failure and rerun the maintenance command.
@@ -346,8 +371,8 @@ Redis connections, flushes error reports and exits. This keeps it inside Docker'
 10-second stop timeout; anything still running at the deadline is cut off.
 
 Dependency and application readiness waits each have a 120-second limit. A failed
-app readiness check fails the deployment; inspect `docker compose ps` and
-`docker compose logs app db redis` before retrying. It does not automatically roll
+app readiness check fails the deployment; inspect `docker compose --profile '*' ps -a`
+and `docker compose logs app-blue app-green db redis` before retrying. It does not automatically roll
 back schema changes or restart unhealthy containers.
 
 `/api/health` remains a cheap liveness check. `/api/ready` returns 200 only when
@@ -358,14 +383,14 @@ is unset; the production Compose configuration sets it by default.
 
 For external uptime monitoring, use `/api/ready` to include dependency failures.
 Configure two or three consecutive failures before alerting, or a bounded
-maintenance window covering deployment, to tolerate the planned migration gap.
-Monitor configuration lives outside this repository. Readiness checks verify
-recovery; they do not eliminate downtime. Application Redis failures continue to
+maintenance window covering dependency maintenance. Monitor configuration lives
+outside this repository. Application Redis failures continue to
 be reported to GlitchTip once per outage.
 
 Use this script for production updates. Production containers do not run migrations
-on startup. A plain `docker compose up` or `docker run` requires the database to
-have already been migrated with both old writers stopped.
+on startup. A plain `docker compose up` starts neither app color, and starting
+one by name or with `docker run` requires the database to have already been
+migrated.
 
 CI serializes production deployments and lets each active deploy finish before
 starting the next one. Parallel deploys can race while replacing the same Compose

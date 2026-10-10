@@ -1,5 +1,50 @@
 name: paraules
 
+# Blue and green are the same app. One serves the current release while the
+# deploy script starts the next release in the other.
+x-app: &app
+  build:
+    context: .
+    target: production
+    args:
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+      SENTRY_URL: ${SENTRY_URL:-}
+      SENTRY_ORG: ${SENTRY_ORG:-}
+      SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+    secrets:
+      - SENTRY_AUTH_TOKEN
+  image: paraules-app:prod
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  environment:
+    NODE_ENV: production
+    SENTRY_DSN: "${SENTRY_DSN:-}"
+    PORT: 3000
+    DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
+    REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+    BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
+    GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+    GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+    RESEND_API_KEY: "${RESEND_API_KEY:-}"
+    EMAIL_FROM: "${EMAIL_FROM:-}"
+    ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+  init: true
+  healthcheck:
+    test:
+      - CMD
+      - node
+      - -e
+      - "fetch('http://127.0.0.1:3000/api/ready', { signal: AbortSignal.timeout(4000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+    interval: 5s
+    timeout: 5s
+    retries: 10
+    start_period: 15s
+  restart: unless-stopped
+
 services:
   db:
     image: postgres:16-alpine
@@ -41,50 +86,31 @@ services:
     volumes:
       - redis_data:/data
 
-  app:
-    build:
-      context: .
-      target: production
-      args:
-        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
-        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
-        SENTRY_URL: ${SENTRY_URL:-}
-        SENTRY_ORG: ${SENTRY_ORG:-}
-        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
-      secrets:
-        - SENTRY_AUTH_TOKEN
-    image: paraules-app:prod
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      SENTRY_DSN: "${SENTRY_DSN:-}"
-      PORT: 3000
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paraules}"
-      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
-      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      RESEND_API_KEY: "${RESEND_API_KEY:-}"
-      EMAIL_FROM: "${EMAIL_FROM:-}"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-    init: true
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
     ports:
       - "${APP_PORT:-3000}:3000"
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3000/api/ready', { signal: AbortSignal.timeout(4000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      test: ["CMD", "nc", "-z", "127.0.0.1", "3000"]
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 15s
-    restart: unless-stopped
+      start_period: 5s
+    volumes:
+      # Mounted as a directory so the proxy sees a Caddyfile replaced by git pull.
+      - ./proxy:/etc/caddy:ro
+      - proxy_state:/state
+
+  # Profiles keep a plain `docker compose up` from starting both colors;
+  # scripts/deploy-compose.sh starts each one by name.
+  app-blue:
+    <<: *app
+    profiles: ["blue"]
+
+  app-green:
+    <<: *app
+    profiles: ["green"]
 
   pre-generator:
     build:
@@ -157,3 +183,4 @@ secrets:
 volumes:
   postgres_data:
   redis_data:
+  proxy_state:
