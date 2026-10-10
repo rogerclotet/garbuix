@@ -68,6 +68,8 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     ports:
@@ -111,6 +113,8 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     restart: unless-stopped
@@ -139,6 +143,8 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env - generate one with: openssl rand -base64 32}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     init: true
     profiles: ["ops"]

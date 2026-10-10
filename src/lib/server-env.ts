@@ -41,6 +41,16 @@ const serverEnvSchema = z.object({
 		.default("postgres://postgres:postgres@localhost:5432/paraules"),
 	GOOGLE_CLIENT_ID: optionalEnvString,
 	GOOGLE_CLIENT_SECRET: optionalEnvString,
+	// Sends the emailed sign-in codes. Without it, production hides the email
+	// option and development prints codes to the server log instead.
+	RESEND_API_KEY: optionalEnvString,
+	EMAIL_FROM: z
+		.preprocess(
+			(value) =>
+				typeof value === "string" && value.length === 0 ? undefined : value,
+			z.string().min(1).optional(),
+		)
+		.default("Garbuix <codi@garbuix.app>"),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

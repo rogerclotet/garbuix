@@ -53,10 +53,11 @@ function PrivacyPage() {
 					</li>
 					<li>
 						Si entres amb Google, rebem el nom, el correu electrònic, la imatge
-						de perfil i els identificadors necessaris per autenticar-te. Desem
-						el compte, les sessions i el progrés per sincronitzar les partides
-						entre dispositius. Les sessions poden incloure l'adreça IP i dades
-						del navegador per gestionar l'accés.
+						de perfil i els identificadors necessaris per autenticar-te. Si
+						entres amb el correu, rebem l'adreça i t'hi enviem un codi d'un sol
+						ús. Desem el compte, les sessions i el progrés per sincronitzar les
+						partides entre dispositius. Les sessions poden incloure l'adreça IP
+						i dades del navegador per gestionar l'accés.
 					</li>
 					<li>
 						La classificació mostra el nom de jugador, l'avatar i els resultats.
@@ -147,10 +148,11 @@ function PrivacyPage() {
 				</h2>
 				<p>
 					Els proveïdors d'allotjament intervenen en el funcionament del servei.
-					Google intervé quan tries iniciar-hi sessió. Fem servir Anthropic per
-					generar pistes a partir de paraules del diccionari; no hi enviem el
-					perfil del jugador per generar-les. Reddit allotja la comunitat
-					r/garbuix i executa l'aplicació que hi publica el joc de cada dia.
+					Google intervé quan tries iniciar-hi sessió. Resend envia els correus
+					amb el codi per entrar. Fem servir Anthropic per generar pistes a
+					partir de paraules del diccionari; no hi enviem el perfil del jugador
+					per generar-les. Reddit allotja la comunitat r/garbuix i executa
+					l'aplicació que hi publica el joc de cada dia.
 				</p>
 				<p>
 					Els informes d'errors s'envien a la nostra instància de GlitchTip.

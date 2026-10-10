@@ -4,7 +4,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSlotCellKey } from "@/lib/puzzle-helpers";
-import { hasSeenHowToPlay } from "@/lib/puzzle-local";
+import {
+	hasSeenHowToPlay,
+	hasSeenWelcome,
+	isWelcomePostponedToday,
+} from "@/lib/puzzle-local";
 import { HowToPlayDialog } from "./how-to-play-dialog";
 import {
 	TUTORIAL_BOARD,
@@ -128,6 +132,9 @@ describe("guided tutorial", () => {
 			screen.getByRole("button", { name: "Jugar al repte d'avui" }),
 		);
 		expect(hasSeenHowToPlay()).toBe(true);
+		// The sign-in welcome is due, just not on the day of the tutorial.
+		expect(isWelcomePostponedToday()).toBe(true);
+		expect(hasSeenWelcome()).toBe(false);
 		expect(screen.queryByRole("dialog")).toBeNull();
 	});
 

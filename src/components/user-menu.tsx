@@ -14,6 +14,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
 import { Logo } from "@/components/logo";
+import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { authClient } from "@/lib/auth-client";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
 import { useSyllableRoute } from "@/lib/use-syllable-route";
@@ -81,13 +81,6 @@ export function UserMenu({
 	const showUserImage = Boolean(imageSrc) && failedImageSrc !== imageSrc;
 	const avatarInitials = activeUser ? initialsFromName(activeUser.name) : "";
 
-	const handleSignIn = async () => {
-		await authClient.signIn.social({
-			provider: "google",
-			callbackURL: window.location.href,
-		});
-	};
-
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<DropdownMenuTrigger asChild>
@@ -124,14 +117,9 @@ export function UserMenu({
 										</AvatarFallback>
 									)}
 								</Avatar>
-								<div className="flex min-w-0 flex-col gap-0.5">
-									<span className="truncate text-foreground text-sm">
-										{activeUser.name}
-									</span>
-									<span className="truncate text-xs font-normal text-muted-foreground">
-										{activeUser.email}
-									</span>
-								</div>
+								<span className="min-w-0 truncate text-foreground text-sm">
+									{activeUser.name}
+								</span>
 								<ChevronRight className="ml-auto size-4" />
 							</Link>
 						</DropdownMenuItem>
@@ -145,7 +133,7 @@ export function UserMenu({
 								<span>Compte...</span>
 							</DropdownMenuItem>
 						) : (
-							<DropdownMenuItem onSelect={handleSignIn}>
+							<DropdownMenuItem onSelect={openSignIn}>
 								<LogIn className="size-4" />
 								<span>Entrar</span>
 							</DropdownMenuItem>

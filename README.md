@@ -114,6 +114,25 @@ pnpm dev
 
 The app will be available at `http://localhost:3000`
 
+### Sign-in options
+
+Players can sign in with Google or with a six-digit code sent by email. Each
+option shows up in the sign-in dialog only once its variables are set, so a
+half-configured one never shows a broken button.
+
+| Option | Variables | Setup |
+| --- | --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client in Google Cloud Console, with `https://<host>/api/auth/callback/google` as a redirect URI for each host. |
+| Email code | `RESEND_API_KEY`, `EMAIL_FROM` | Verify `garbuix.app` in Resend (SPF and DKIM records) and create a sending key. `EMAIL_FROM` defaults to `Garbuix <codi@garbuix.app>`. |
+
+Without `RESEND_API_KEY`, development still offers the email option and prints
+each code to the server log; production hides it. Codes last 10 minutes.
+
+Accounts link by email: a code sent to the address of an existing Google
+account signs in to that account, and the other way round. New accounts made
+with a code keep the guest's animal-and-adjective name, and can change it in
+Preferències.
+
 ### Error tracking
 
 The Sentry SDK sends browser errors, caught router errors, server request errors,
@@ -261,6 +280,7 @@ The app will be available at `http://localhost:3000` and Postgres at `localhost:
 The app does not send analytics, error reports, session recordings, or performance
 telemetry. Game progress, account sessions, leaderboards, and peer clues still use
 the app server and its database. Google sign-in and avatars contact Google;
+emailed sign-in codes are sent through Resend;
 optional AI clue generation sends puzzle words to Anthropic. Fonts are bundled
 locally.
 

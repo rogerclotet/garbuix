@@ -51,6 +51,8 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     stdin_open: true
     tty: true
@@ -77,6 +79,8 @@ services:
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-secret-change-me-please-replace-1234}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
       - .:/app

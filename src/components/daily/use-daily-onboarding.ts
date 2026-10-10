@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
 	openProfilePreferencesTip,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
-import { authClient } from "@/lib/auth-client";
+import { openSignIn } from "@/components/sign-in/sign-in-store";
 import {
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
 	hasSeenMiniAnnouncement,
 	hasSeenProfilePreferencesTip,
 	hasSeenWelcome,
+	isWelcomePostponedToday,
 	markMiniAnnouncementSeen,
 	markProfilePreferencesTipSeen,
 	markWelcomeSeen,
@@ -37,6 +37,7 @@ export function useDailyOnboarding({
 	const tutorialOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const firstVisitChecked = useRef(false);
+	const welcomeEndedInSignIn = useRef(false);
 	const openHowToPlayIfFirstVisit = useCallback(() => {
 		if (hasSeenHowToPlay()) return;
 		openHowToPlay();
@@ -59,7 +60,8 @@ export function useDailyOnboarding({
 			return;
 		}
 
-		const shouldShowWelcome = !activeUser && !hasSeenWelcome();
+		const shouldShowWelcome =
+			!activeUser && !hasSeenWelcome() && !isWelcomePostponedToday();
 		if (shouldShowWelcome) {
 			setWelcomeOpen(true);
 			return;
@@ -106,6 +108,13 @@ export function useDailyOnboarding({
 			setWelcomeOpen(next);
 			if (next) return;
 			markWelcomeSeen();
+			// "Entrar" closes the welcome through here too, right after opening
+			// the sign-in dialog. The follow-up tips wait for the next visit
+			// instead of stacking on top of it.
+			if (welcomeEndedInSignIn.current) {
+				welcomeEndedInSignIn.current = false;
+				return;
+			}
 			if (!hasSeenHowToPlay()) {
 				openHowToPlayIfFirstVisit();
 				return;
@@ -115,22 +124,10 @@ export function useDailyOnboarding({
 		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
 	);
 
-	const signInWithGoogle = useCallback(async () => {
-		try {
-			await authClient.signIn.social({
-				provider: "google",
-				callbackURL: window.location.href,
-			});
-		} catch {
-			toast.error("No s'ha pogut iniciar la sessió");
-		}
-	}, []);
-
 	const handleWelcomeSignIn = useCallback(() => {
-		markWelcomeSeen();
-		setWelcomeOpen(false);
-		void signInWithGoogle();
-	}, [signInWithGoogle]);
+		welcomeEndedInSignIn.current = true;
+		openSignIn();
+	}, []);
 
 	return {
 		welcomeOpen,
@@ -139,6 +136,5 @@ export function useDailyOnboarding({
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,
-		signInWithGoogle,
 	};
 }

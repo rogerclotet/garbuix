@@ -1,3 +1,4 @@
+import { getTodayDateKey } from "@/lib/puzzle-dates";
 import type {
 	AccountPuzzleCache,
 	AnonymousImportPayload,
@@ -17,6 +18,7 @@ const HOW_TO_PLAY_SEEN_KEY = "paraules-how-to-play-seen-v1";
 const PROFILE_PREFERENCES_TIP_SEEN_KEY =
 	"paraules-profile-preferences-tip-seen-v1";
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
+const WELCOME_POSTPONED_DATE_KEY = "garbuix-welcome-postponed-date-v1";
 const MINI_ANNOUNCEMENT_SEEN_KEY = "garbuix-mini-announcement-seen-v1";
 // Re-show the welcome dialog to anonymous users periodically so they keep
 // getting nudged to sign in. We store the last-shown timestamp and only
@@ -209,6 +211,21 @@ export function hasSeenWelcome(): boolean {
 export function markWelcomeSeen() {
 	if (typeof window === "undefined") return;
 	window.localStorage.setItem(WELCOME_SEEN_KEY, String(Date.now()));
+}
+
+// New players get through the tutorial and their first puzzle before anyone
+// asks them to sign in: the welcome dialog waits for a visit on a later day.
+export function postponeWelcomeForToday() {
+	if (typeof window === "undefined") return;
+	window.localStorage.setItem(WELCOME_POSTPONED_DATE_KEY, getTodayDateKey());
+}
+
+export function isWelcomePostponedToday(): boolean {
+	if (typeof window === "undefined") return false;
+	return (
+		window.localStorage.getItem(WELCOME_POSTPONED_DATE_KEY) ===
+		getTodayDateKey()
+	);
 }
 
 export function hasSeenMiniAnnouncement(): boolean {
