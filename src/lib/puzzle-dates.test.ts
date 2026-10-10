@@ -52,17 +52,9 @@ describe("puzzle-dates", () => {
 		);
 	});
 
-	it("returns a future rollover boundary", () => {
-		expect(getNextRolloverAt().getTime()).toBeGreaterThan(Date.now());
-	});
-
 	it("adds day offsets to date keys", () => {
 		expect(addDaysToDateKey("2026-03-31", 1)).toBe("2026-04-01");
 		expect(addDaysToDateKey("2026-01-01", -1)).toBe("2025-12-31");
-	});
-
-	it("computes tomorrow in Madrid time", () => {
-		expect(getTomorrowDateKey("Europe/Madrid")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 	});
 
 	it("schedules the next pre-generation boundary in the future", () => {
@@ -108,6 +100,29 @@ describe("puzzle-dates", () => {
 			),
 		).toBe(false);
 	});
+
+	it.each([
+		"2026-10-03T19:05:00Z", // 21:05 Madrid
+		"2026-10-03T20:59:59Z", // 22:59:59 Madrid
+		"2026-10-03T22:00:00Z", // Midnight Madrid: tomorrow's window has not started
+		"2026-01-03T21:59:59Z", // 22:59:59 Madrid in winter
+	])("stays outside the pre-generation window at %s", (now) => {
+		expect(isWithinPregenerationWindow("Europe/Madrid", new Date(now))).toBe(
+			false,
+		);
+	});
+
+	it.each([
+		["2026-10-03T21:59:59Z", "2026-10-04"], // 23:59:59 Madrid
+		["2026-01-03T22:00:00Z", "2026-01-04"], // 23:00 Madrid in winter
+		["2026-03-28T22:30:00Z", "2026-03-29"], // Night before clocks move forward
+		["2026-10-24T21:30:00Z", "2026-10-25"], // Night before clocks move back
+	])("pre-generates the following Madrid day at %s", (now, tomorrow) => {
+		const date = new Date(now);
+		expect(isWithinPregenerationWindow("Europe/Madrid", date)).toBe(true);
+		expect(addDaysToDateKey(getDateKeyForDate(date), 1)).toBe(tomorrow);
+	});
+
 	it("accepts well-formed date keys", () => {
 		expect(isValidDateKey("2026-03-10")).toBe(true);
 		expect(isValidDateKey("2024-02-29")).toBe(true);

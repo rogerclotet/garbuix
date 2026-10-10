@@ -134,18 +134,13 @@ describe("SignInDialogBody", () => {
 		}
 	});
 
-	it("explains a wrong code and stays on the code step", async () => {
+	it("explains a wrong code without reporting it as an error", async () => {
 		authClient.signIn.emailOtp.mockResolvedValue({
 			data: null,
 			error: { code: "INVALID_OTP", status: 400 },
 		});
 		renderBody(["email"]);
-
-		fireEvent.change(screen.getByLabelText("Adreça de correu"), {
-			target: { value: "laia@example.cat" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Envia'm un codi" }));
-		await screen.findByText("Escriu el codi");
+		await reachCodeStep();
 
 		fireEvent.change(screen.getByLabelText("Codi"), {
 			target: { value: "000000" },
@@ -155,6 +150,7 @@ describe("SignInDialogBody", () => {
 		expect((await screen.findByRole("alert")).textContent).toBe(
 			"El codi no és correcte.",
 		);
+		expect(captureException).not.toHaveBeenCalled();
 	});
 
 	it("reports a failure the player could not have caused", async () => {
@@ -177,23 +173,6 @@ describe("SignInDialogBody", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Envia'm un codi" }));
 
 		await waitFor(() => expect(captureException).toHaveBeenCalledTimes(2));
-	});
-
-	it("leaves a wrong code out of error reports", async () => {
-		authClient.signIn.emailOtp.mockResolvedValue({
-			data: null,
-			error: { code: "INVALID_OTP", status: 400 },
-		});
-		renderBody(["email"]);
-		await reachCodeStep();
-
-		fireEvent.change(screen.getByLabelText("Codi"), {
-			target: { value: "000000" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Entra" }));
-
-		await screen.findByRole("alert");
-		expect(captureException).not.toHaveBeenCalled();
 	});
 
 	it("explains when too many codes were requested", async () => {

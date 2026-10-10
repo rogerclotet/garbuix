@@ -54,28 +54,21 @@ globalThis.Date = class extends OriginalDate {
 	}
 }
 
-it.each([
-	"2026-10-03T19:05:00Z", // 21:05 Madrid: deployment before the schedule
-	"2026-10-03T20:59:59Z", // 22:59:59 Madrid
-	"2026-10-03T22:00:00Z", // Midnight Madrid: tomorrow's window has not started
-	"2026-01-03T21:59:59Z", // 22:59:59 Madrid in winter
-])("skips all generation before the Madrid window at %s", (now) => {
-	const result = preGenerate(now);
+// The window's boundaries, winter time and the clock changes are covered in
+// src/lib/puzzle-dates.test.ts. These two cases check the script's own wiring.
+it("skips all generation before the Madrid window", () => {
+	// 21:05 Madrid: deployment before the schedule
+	const result = preGenerate("2026-10-03T19:05:00Z");
 	expect(result.status, result.stderr).toBe(0);
 	expect(result.calls).toBe("");
 	expect(result.stdout).toContain("skipping");
 });
 
-it.each([
-	["2026-10-03T21:00:00Z", "2026-10-04"], // 23:00 Madrid in summer
-	["2026-10-03T21:59:59Z", "2026-10-04"], // 23:59:59 Madrid
-	["2026-01-03T22:00:00Z", "2026-01-04"], // 23:00 Madrid in winter
-	["2026-03-28T22:30:00Z", "2026-03-29"], // Night before clocks move forward
-	["2026-10-24T21:30:00Z", "2026-10-25"], // Night before clocks move back
-])("generates tomorrow's puzzle and clues in order at %s", (now, tomorrow) => {
-	const result = preGenerate(now);
+it("generates tomorrow's puzzle and clues in order inside the window", () => {
+	// 23:00 Madrid
+	const result = preGenerate("2026-10-03T21:00:00Z");
 	expect(result.status, result.stderr).toBe(0);
 	expect(result.calls).toBe(
-		`backfill:puzzles --from ${tomorrow} --to ${tomorrow}\nclues:backfill --from ${tomorrow} --to ${tomorrow}\n`,
+		"backfill:puzzles --from 2026-10-04 --to 2026-10-04\nclues:backfill --from 2026-10-04 --to 2026-10-04\n",
 	);
 });

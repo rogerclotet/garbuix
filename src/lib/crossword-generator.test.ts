@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import allWords from "@/data/catalan-words.json";
 import {
 	calculateCandidateFreshnessPenalty,
@@ -155,48 +155,43 @@ describe("crossword-generator freshness scoring", () => {
 
 		expect(frequentRepeatPenalty).toBeGreaterThan(singleRepeatPenalty);
 	});
+});
 
-	it("does not include duplicate normalized answers in the same daily puzzle", {
-		timeout: 60_000,
-	}, () => {
-		const result = generateDailyCrosswordForSeed(allWords, 260401);
+describe("generated daily puzzles", () => {
+	type GeneratedPuzzle = NonNullable<
+		ReturnType<typeof generateDailyCrosswordForSeed>
+	>;
+	let puzzles: GeneratedPuzzle[] = [];
 
-		expect(result).not.toBeNull();
-
-		const crossword = result?.crossword;
-
-		expect(crossword).toBeDefined();
-		if (!crossword) {
-			throw new Error("Expected crossword to be generated");
-		}
-
-		const normalizedWords = crossword.words.map((placement) =>
-			normalizeWord(placement.word.name),
-		);
-
-		expect(new Set(normalizedWords).size).toBe(normalizedWords.length);
-		expect(crossword.words.map((placement) => placement.word.name)).not.toEqual(
-			expect.arrayContaining(["consol", "cònsol"]),
-		);
-	});
-
-	it("does not place multiple words sharing a root in the same puzzle", {
-		timeout: 120_000,
-	}, () => {
+	// Generating a day also generates its lookback window, and these windows
+	// overlap, so one shared cache pays for that history once. Generating here in
+	// a fixed order keeps each puzzle the same whichever tests are selected.
+	beforeAll(() => {
 		const cache = new Map();
-		for (const seed of [260401, 260405, 260411]) {
+		puzzles = [260401, 260405, 260411].map((seed) => {
 			const result = generateDailyCrosswordForSeed(allWords, seed, 10, 15, {
 				cache,
 			});
-
-			expect(result).not.toBeNull();
 			if (!result) {
 				throw new Error(`Expected crossword for seed ${seed}`);
 			}
+			return result;
+		});
+	}, 120_000);
 
-			const placedWords = result.crossword.words.map(
-				(placement) => placement.word,
+	it("does not include duplicate normalized answers in the same daily puzzle", () => {
+		for (const { crossword } of puzzles) {
+			const normalizedWords = crossword.words.map((placement) =>
+				normalizeWord(placement.word.name),
 			);
+
+			expect(new Set(normalizedWords).size).toBe(normalizedWords.length);
+		}
+	});
+
+	it("does not place multiple words sharing a root in the same puzzle", () => {
+		for (const { crossword } of puzzles) {
+			const placedWords = crossword.words.map((placement) => placement.word);
 
 			expect(countSameRootPairs(placedWords)).toBe(0);
 			expect(placedWords.length).toBeGreaterThanOrEqual(10);
@@ -204,16 +199,9 @@ describe("crossword-generator freshness scoring", () => {
 		}
 	});
 
-	it("avoids crossings that disagree on the displayed accent for a shared cell", {
-		timeout: 60_000,
-	}, () => {
-		const result = generateDailyCrosswordForSeed(allWords, 260411);
-
-		expect(result).not.toBeNull();
-		if (!result) {
-			throw new Error("Expected crossword to be generated");
+	it("avoids crossings that disagree on the displayed accent for a shared cell", () => {
+		for (const puzzle of puzzles) {
+			expect(hasConflictingDisplayIntersections(puzzle)).toBe(false);
 		}
-
-		expect(hasConflictingDisplayIntersections(result)).toBe(false);
 	});
 });
