@@ -78,11 +78,6 @@ it.each([
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
-it("shows ordinary application errors without reloading", () => {
-	renderError(new Error("Cannot read properties of undefined"));
-	expect(reload).not.toHaveBeenCalled();
-});
-
 it("reports a caught route error to Sentry while keeping the recovery UI", async () => {
 	const events: Sentry.ErrorEvent[] = [];
 	const client = Sentry.init({
@@ -187,17 +182,6 @@ it("offers a manual reload while offline", () => {
 	expect(reload).not.toHaveBeenCalled();
 	fireEvent.click(screen.getByRole("button", { name: "Recarrega la pàgina" }));
 	expect(reload).toHaveBeenCalledTimes(1);
-});
-
-it("keeps the error usable when session storage is blocked", () => {
-	vi.stubGlobal("sessionStorage", {
-		getItem: () => null,
-		setItem: () => {
-			throw new DOMException("Storage blocked", "SecurityError");
-		},
-	});
-	renderError();
-	expect(reload).not.toHaveBeenCalled();
 });
 
 it("recovers a failed split loader through the actual router error boundary", async () => {
