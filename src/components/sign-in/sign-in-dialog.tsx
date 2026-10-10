@@ -367,11 +367,15 @@ function CodeStep({
 					Escriu el codi
 				</AlertDialogTitle>
 				<AlertDialogDescription>
-					T'hem enviat un codi de {CODE_LENGTH} xifres a{" "}
-					<strong className="font-medium text-foreground break-all">
-						{email}
-					</strong>
-					. Si no el trobes, mira a la carpeta de correu brossa.
+					<span className="block">
+						T'hem enviat un codi de {CODE_LENGTH} xifres a{" "}
+						<strong className="font-medium text-foreground break-all">
+							{email}
+						</strong>
+					</span>
+					<span className="mt-2 block">
+						Si no el trobes, mira a la carpeta de correu brossa.
+					</span>
 				</AlertDialogDescription>
 			</AlertDialogHeader>
 

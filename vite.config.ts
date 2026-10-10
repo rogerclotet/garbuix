@@ -91,6 +91,11 @@ const config = defineConfig(({ mode, command }) => {
 		resolve: {
 			tsconfigPaths: true,
 		},
+		optimizeDeps: {
+			// The client dep scan follows the route tree into server-only routes
+			// before Start strips them, and the bundler can't load a native binary.
+			exclude: ["@napi-rs/canvas"],
+		},
 		server: isDockerDev
 			? {
 					host: "0.0.0.0",
