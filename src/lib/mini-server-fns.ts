@@ -50,7 +50,10 @@ export const getMiniHistoryData = createServerFn({ method: "GET" }).handler(
 			entries,
 			yesterdayPuzzle: {
 				dateKey: yesterday.dateKey,
-				preview: toPuzzlePreview(yesterday.privateSnapshotJson),
+				preview: toPuzzlePreview({
+					publicSnapshot: yesterday.publicSnapshotJson,
+					privateSnapshot: yesterday.privateSnapshotJson,
+				}),
 			},
 		};
 	},

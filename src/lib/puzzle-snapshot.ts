@@ -12,6 +12,7 @@ import type {
 	DailyPuzzlePreview,
 	DailyPuzzlePrivate,
 	DailyPuzzlePublic,
+	PuzzleWordSlot,
 } from "@/lib/puzzle-types";
 
 function toGridMask(grid: CrosswordGrid["grid"]) {
@@ -281,12 +282,32 @@ export async function toPlayedPublicSnapshot(snapshots: {
 	return { ...publicSnapshot, hintCapsules };
 }
 
-export function toPuzzlePreview(
-	privateSnapshot: DailyPuzzlePrivate,
-): DailyPuzzlePreview {
+// Names each field instead of spreading the slot, so the salts, hashes and
+// capsules that guard an unsolved board never ride along with a solution.
+function toPreviewWordSlot(slot: PuzzleWordSlot): PuzzleWordSlot {
+	return {
+		id: slot.id,
+		startRow: slot.startRow,
+		startCol: slot.startCol,
+		direction: slot.direction,
+		length: slot.length,
+		middleDotAfterIndices: slot.middleDotAfterIndices ?? [],
+	};
+}
+
+// Takes the public snapshot as the board draws it. Its word slots already
+// count cells the way that game does, letters or whole syllables, which the
+// private snapshot alone cannot tell apart.
+export function toPuzzlePreview(snapshots: {
+	publicSnapshot: Pick<DailyPuzzlePublic, "wordSlots">;
+	privateSnapshot: DailyPuzzlePrivate;
+}): DailyPuzzlePreview {
+	const { privateSnapshot, publicSnapshot } = snapshots;
+
 	return {
 		rows: privateSnapshot.rows,
 		cols: privateSnapshot.cols,
 		gridLetters: privateSnapshot.gridLetters,
+		wordSlots: publicSnapshot.wordSlots.map(toPreviewWordSlot),
 	};
 }

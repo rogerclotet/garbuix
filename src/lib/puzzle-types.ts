@@ -77,6 +77,9 @@ export type DailyPuzzlePreview = {
 	rows: number;
 	cols: number;
 	gridLetters: (string | null)[][];
+	// Where each word sits, so the solution marks the same middle dots (l·l) as
+	// the board.
+	wordSlots: PuzzleWordSlot[];
 };
 
 // Valid off-puzzle words needed to earn one free bonus letter reveal.

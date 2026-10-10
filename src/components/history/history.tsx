@@ -1,15 +1,10 @@
 import { captureException } from "@sentry/tanstackstart-react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import {
-	type CSSProperties,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
+import { type PuzzleBoard, PuzzleGrid } from "@/components/puzzle/puzzle-grid";
 import { PuzzleTitle } from "@/components/puzzle-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -376,53 +371,7 @@ export function HistoryView({
 										/>
 									</div>
 
-									<div
-										className="flex items-center justify-center w-full @container"
-										style={
-											{
-												"--cols": yesterdayPuzzle.preview.cols,
-											} as CSSProperties
-										}
-									>
-										<div
-											className="grid gap-[3px] sm:gap-1 w-full max-w-sm mx-auto"
-											style={{
-												gridTemplateColumns: `repeat(${yesterdayPuzzle.preview.cols}, 1fr)`,
-											}}
-										>
-											{yesterdayPuzzle.preview.gridLetters.map((row, rowIdx) =>
-												row.map((cell, colIdx) => {
-													const key = `${rowIdx},${colIdx}`;
-
-													if (!cell) {
-														return (
-															<div
-																key={key}
-																className="aspect-square bg-transparent"
-															/>
-														);
-													}
-
-													return (
-														<div
-															key={key}
-															style={
-																mode === "syllables"
-																	? {
-																			fontSize:
-																				"clamp(0.5rem, calc(23cqi / var(--cols)), 1rem)",
-																		}
-																	: undefined
-															}
-															className="aspect-square border rounded-[18%] flex items-center justify-center font-bold leading-none overflow-hidden text-[clamp(0.25rem,calc(42cqi/var(--cols)),0.95rem)] bg-primary/10 border-primary/30 text-foreground"
-														>
-															{cell.toUpperCase()}
-														</div>
-													);
-												}),
-											)}
-										</div>
-									</div>
+									<SolvedPuzzleGrid preview={yesterdayPuzzle.preview} />
 								</>
 							) : null}
 
@@ -441,6 +390,57 @@ export function HistoryView({
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+type SolvedBoard = {
+	puzzle: PuzzleBoard;
+	revealedCells: Set<string>;
+	cellLetters: Map<string, string>;
+};
+
+function toSolvedBoard(preview: DailyPuzzlePreview): SolvedBoard {
+	const cellLetters = new Map<string, string>();
+
+	preview.gridLetters.forEach((row, rowIdx) => {
+		row.forEach((letter, colIdx) => {
+			if (letter) {
+				cellLetters.set(`${rowIdx},${colIdx}`, letter);
+			}
+		});
+	});
+
+	return {
+		puzzle: {
+			rows: preview.rows,
+			cols: preview.cols,
+			gridMask: preview.gridLetters.map((row) =>
+				row.map((letter) => (letter ? { wordIds: [] } : null)),
+			),
+			wordSlots: preview.wordSlots,
+		},
+		revealedCells: new Set(cellLetters.keys()),
+		cellLetters,
+	};
+}
+
+// Draws the solution with the board's own grid so its cells cannot drift from
+// the ones players solve on.
+function SolvedPuzzleGrid({ preview }: { preview: DailyPuzzlePreview }) {
+	const { puzzle, revealedCells, cellLetters } = useMemo(
+		() => toSolvedBoard(preview),
+		[preview],
+	);
+
+	return (
+		<div className="mx-auto w-full max-w-sm">
+			<PuzzleGrid
+				puzzle={puzzle}
+				revealedCells={revealedCells}
+				cellLetters={cellLetters}
+				highlightedWordId={null}
+			/>
 		</div>
 	);
 }

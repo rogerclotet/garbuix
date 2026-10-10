@@ -3,6 +3,7 @@ import {
 	buildPuzzleSnapshots,
 	ensureHintCapsulesCoverGrid,
 	hydratePublicSnapshotWordMetadata,
+	toPuzzlePreview,
 } from "@/lib/puzzle-snapshot";
 
 describe("puzzle-snapshot", () => {
@@ -267,6 +268,61 @@ describe("puzzle-snapshot", () => {
 		expect(upgradedSnapshot.wordSlots[0]).toMatchObject({
 			length: 10,
 			middleDotAfterIndices: [2],
+		});
+	});
+
+	it("previews a solution with each word's layout and none of its secrets", () => {
+		const preview = toPuzzlePreview({
+			publicSnapshot: {
+				wordSlots: [
+					{
+						id: 0,
+						startRow: 0,
+						startCol: 0,
+						direction: "horizontal",
+						length: 10,
+						middleDotAfterIndices: [2],
+						slotSalt: "slot-0",
+						answerHash: "hash-0",
+						answerCapsule: "capsule-0",
+					},
+				],
+			},
+			privateSnapshot: {
+				id: "puzzle-7",
+				dateKey: "2026-04-04",
+				seed: 260404,
+				rows: 1,
+				cols: 10,
+				gridLetters: [Array.from("collaborar")],
+				letters: ["c", "o", "l", "a", "b", "r"],
+				wordSlots: [
+					{
+						id: 0,
+						displayWord: "col·laborar",
+						normalizedWord: "collaborar",
+						startRow: 0,
+						startCol: 0,
+						direction: "horizontal",
+					},
+				],
+			},
+		});
+
+		expect(preview).toEqual({
+			rows: 1,
+			cols: 10,
+			gridLetters: [Array.from("collaborar")],
+			wordSlots: [
+				{
+					id: 0,
+					startRow: 0,
+					startCol: 0,
+					direction: "horizontal",
+					length: 10,
+					middleDotAfterIndices: [2],
+				},
+			],
 		});
 	});
 });

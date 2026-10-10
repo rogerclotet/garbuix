@@ -55,7 +55,7 @@ it.each([false, true])(
 			},
 			yesterdayPuzzle: {
 				dateKey: "2026-10-03",
-				preview: { rows: 1, cols: 1, gridLetters: [["a"]] },
+				preview: { rows: 1, cols: 1, gridLetters: [["a"]], wordSlots: [] },
 			},
 			hasMore: false,
 			isLoadingMore: false,
@@ -84,3 +84,51 @@ it.each([false, true])(
 		}
 	},
 );
+
+it("marks the middle dot between the cells of yesterday's solution", async () => {
+	const { HistoryView } = await import("./history");
+	const container = document.createElement("div");
+	container.innerHTML = renderToString(
+		<HistoryView
+			entries={[]}
+			stats={{
+				totalDays: 0,
+				completedDays: 0,
+				currentStreak: 0,
+				bestStreak: 0,
+				avgGuesses: 0,
+				cluesGiven: 0,
+			}}
+			yesterdayPuzzle={{
+				dateKey: "2026-10-03",
+				preview: {
+					rows: 1,
+					cols: 5,
+					gridLetters: [Array.from("colla")],
+					wordSlots: [
+						{
+							id: 0,
+							startRow: 0,
+							startCol: 0,
+							direction: "horizontal",
+							length: 5,
+							middleDotAfterIndices: [2],
+						},
+					],
+				},
+			}}
+			hasMore={false}
+			isLoadingMore={false}
+			onLoadMore={() => {}}
+		/>,
+	);
+
+	const cells = [...container.querySelectorAll("[data-cell-key]")];
+	expect(cells.map((cell) => cell.textContent)).toEqual([
+		"C",
+		"O",
+		"L·",
+		"L",
+		"A",
+	]);
+});
