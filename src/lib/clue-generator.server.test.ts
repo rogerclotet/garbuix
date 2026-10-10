@@ -49,7 +49,10 @@ vi.mock("@/data/catalan-definitions.json", () => ({
 	},
 }));
 
-import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
+import {
+	generateAndStoreCluesForPuzzle,
+	generateWordClue,
+} from "@/lib/clue-generator.server";
 
 const word: DailyPuzzlePrivateWord = {
 	id: 0,
@@ -318,6 +321,25 @@ describe("clue regeneration", () => {
 		});
 		expect(replace).not.toHaveBeenCalled();
 		expect(save).not.toHaveBeenCalled();
+	});
+});
+
+describe("clue punctuation", () => {
+	it.each([
+		["Es desplega quan plou", "Es desplega quan plou."],
+		["Es desplega quan plou.", "Es desplega quan plou."],
+		["Què es desplega quan plou?", "Què es desplega quan plou?"],
+		// Leaks on both attempts, so the clue ends on the mask.
+		["Et cobreix el paraigua", "Et cobreix el …"],
+	])("turns %j into %j", async (modelText, expectedClue) => {
+		create.mockResolvedValue(response(modelText));
+		const generated = await generateWordClue({
+			displayWord: word.displayWord,
+			normalizedWord: word.normalizedWord,
+			areatematica: "",
+			senses: [],
+		});
+		expect(generated.clue).toBe(expectedClue);
 	});
 });
 
