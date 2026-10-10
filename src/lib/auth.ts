@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { getOAuthState } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { authSchema } from "@/db/schema";
@@ -25,9 +24,6 @@ const { socialProviders, signInCodeMailer, enabledMethods } =
 
 export const enabledSignInMethods = enabledMethods;
 
-// Apple returns from its sign-in page with a cross-site form POST.
-const APPLE_ORIGIN = "https://appleid.apple.com";
-
 // Better Auth also accepts an environment opt-in, which overrides its options.
 process.env.BETTER_AUTH_TELEMETRY = "false";
 
@@ -41,10 +37,7 @@ export const auth = betterAuth({
 				fallback: "https://garbuix.app",
 			}
 		: devBaseURL,
-	trustedOrigins: [
-		...(isProduction ? [] : [devBaseURL]),
-		...(socialProviders.apple ? [APPLE_ORIGIN] : []),
-	],
+	trustedOrigins: isProduction ? [] : [devBaseURL],
 	secret: serverEnv.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, {
 		provider: "pg",
@@ -52,23 +45,19 @@ export const auth = betterAuth({
 	}),
 	socialProviders,
 	account: {
-		// One player, one account: signing in with another provider, or with an
-		// emailed code, under an email we already know verified lands on the
-		// same user. Reddit shares no email, so it never links this way.
+		// One player, one account: an emailed code for an address a Google
+		// account already verified signs in to that account, and the other way
+		// round.
 		accountLinking: { enabled: true },
 	},
 	databaseHooks: {
 		user: {
 			create: {
 				before: async (newUser, ctx) => {
-					const oauthState = ctx?.path.startsWith("/callback/")
-						? await getOAuthState()
-						: null;
 					const profile = resolveNewUserProfile({
 						name: newUser.name,
 						image: newUser.image,
 						path: ctx?.path,
-						guestName: oauthState?.guestName,
 					});
 					return { data: { ...newUser, ...profile } };
 				},

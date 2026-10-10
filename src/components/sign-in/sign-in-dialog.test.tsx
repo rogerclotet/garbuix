@@ -50,24 +50,27 @@ afterEach(() => {
 
 describe("SignInDialogBody", () => {
 	it("offers only the methods the server enabled", () => {
-		renderBody(["google", "reddit"]);
+		renderBody(["google"]);
 
 		expect(screen.getByRole("button", { name: /Google/ })).toBeTruthy();
-		expect(screen.getByRole("button", { name: /Reddit/ })).toBeTruthy();
-		expect(screen.queryByRole("button", { name: /Apple/ })).toBeNull();
 		expect(screen.queryByLabelText("Adreça de correu")).toBeNull();
+		cleanup();
+
+		renderBody(["email"]);
+
+		expect(screen.queryByRole("button", { name: /Google/ })).toBeNull();
+		expect(screen.getByLabelText("Adreça de correu")).toBeTruthy();
 	});
 
-	it("starts a provider sign-in carrying the guest name", async () => {
-		renderBody(["google", "apple", "reddit", "email"]);
+	it("starts Google sign-in back to the current page", async () => {
+		renderBody(["google", "email"]);
 
-		fireEvent.click(screen.getByRole("button", { name: /Apple/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Google/ }));
 
 		await waitFor(() => {
 			expect(authClient.signIn.social).toHaveBeenCalledWith({
-				provider: "apple",
+				provider: "google",
 				callbackURL: window.location.href,
-				additionalData: { guestName: "Guineu astuta" },
 			});
 		});
 	});

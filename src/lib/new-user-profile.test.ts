@@ -12,46 +12,33 @@ function isGeneratedName(name: string) {
 }
 
 describe("resolveNewUserProfile", () => {
-	it("keeps the name and photo a provider shares", () => {
+	it("keeps the name and photo Google shares", () => {
 		expect(
 			resolveNewUserProfile({
 				name: "Laia Puig",
 				image: "https://example.com/laia.png",
 				path: "/callback/google",
-				guestName: "Guineu astuta",
 			}),
 		).toEqual({ name: "Laia Puig", image: "https://example.com/laia.png" });
 	});
 
-	it("keeps the guest name when the provider shares none", () => {
-		expect(
-			resolveNewUserProfile({
-				name: "",
-				image: null,
-				path: "/callback/apple",
-				guestName: "guineu astuta",
-			}),
-		).toEqual({ name: "Guineu Astuta", image: null });
-	});
-
-	it("generates an animal name when there is no guest name either", () => {
+	it("generates an animal name if Google shares none", () => {
 		const profile = resolveNewUserProfile({
 			name: "  ",
 			image: undefined,
-			path: "/callback/apple",
-			guestName: undefined,
+			path: "/callback/google",
 		});
 
 		expect(isGeneratedName(profile.name)).toBe(true);
+		expect(profile.image).toBeNull();
 	});
 
-	it("sanitizes the name and drops the photo sent with an email code", () => {
+	it("sanitizes the guest name and drops the photo sent with an email code", () => {
 		expect(
 			resolveNewUserProfile({
 				name: "  guineu   astuta 🦊 ",
 				image: "https://evil.example/tracker.png",
 				path: EMAIL_CODE_SIGN_IN_PATH,
-				guestName: undefined,
 			}),
 		).toEqual({ name: "Guineu Astuta", image: null });
 	});
@@ -61,7 +48,6 @@ describe("resolveNewUserProfile", () => {
 			name: "!!!",
 			image: null,
 			path: EMAIL_CODE_SIGN_IN_PATH,
-			guestName: undefined,
 		});
 
 		expect(isGeneratedName(profile.name)).toBe(true);

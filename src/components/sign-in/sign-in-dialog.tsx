@@ -1,7 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { ArrowLeft, Mail } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
-import { ProviderIcon } from "@/components/sign-in/provider-icons";
+import { GoogleIcon } from "@/components/sign-in/google-icon";
 import {
 	setSignInOpen,
 	useSignInOpen,
@@ -19,11 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getOrCreateAnonIdentity } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
-import {
-	type SignInMethod,
-	SOCIAL_SIGN_IN_LABELS,
-	type SocialSignInMethod,
-} from "@/lib/sign-in-methods";
+import type { SignInMethod } from "@/lib/sign-in-methods";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -58,8 +54,9 @@ function describeVerifyError(error: AuthError): string {
 	return "No s'ha pogut iniciar la sessió. Torna-ho a provar.";
 }
 
-// The name a brand-new account starts with, so a guest keeps the name they
-// already have on the leaderboard. Existing accounts ignore it.
+// The name a brand-new account made with an emailed code starts with, so a
+// guest keeps the name they already have on the leaderboard. Existing accounts
+// ignore it.
 function currentGuestName(): string | undefined {
 	try {
 		return getOrCreateAnonIdentity().name;
@@ -85,9 +82,7 @@ export function SignInDialog() {
 
 export function SignInDialogBody({ methods }: { methods: SignInMethod[] }) {
 	const [step, setStep] = useState<Step>({ kind: "choose" });
-	const socialMethods = methods.filter(
-		(method): method is SocialSignInMethod => method !== "email",
-	);
+	const googleEnabled = methods.includes("google");
 	const emailEnabled = methods.includes("email");
 
 	if (step.kind === "code") {
@@ -114,15 +109,9 @@ export function SignInDialogBody({ methods }: { methods: SignInMethod[] }) {
 				</p>
 			) : null}
 
-			{socialMethods.length > 0 ? (
-				<div className="flex flex-col gap-2">
-					{socialMethods.map((provider) => (
-						<SocialButton key={provider} provider={provider} />
-					))}
-				</div>
-			) : null}
+			{googleEnabled ? <GoogleButton /> : null}
 
-			{socialMethods.length > 0 && emailEnabled ? (
+			{googleEnabled && emailEnabled ? (
 				<div className="flex items-center gap-3 text-xs text-muted-foreground font-ui">
 					<div className="h-px flex-1 bg-border" aria-hidden />
 					<span>o amb el teu correu</span>
@@ -141,25 +130,23 @@ export function SignInDialogBody({ methods }: { methods: SignInMethod[] }) {
 	);
 }
 
-function SocialButton({ provider }: { provider: SocialSignInMethod }) {
+function GoogleButton() {
 	const [pending, setPending] = useState(false);
 	const [failed, setFailed] = useState(false);
-	const label = SOCIAL_SIGN_IN_LABELS[provider];
 
 	const handleClick = async () => {
 		setPending(true);
 		setFailed(false);
 		try {
 			const result = await authClient.signIn.social({
-				provider,
+				provider: "google",
 				callbackURL: window.location.href,
-				additionalData: { guestName: currentGuestName() },
 			});
 			if (result.error) {
 				setFailed(true);
 				setPending(false);
 			}
-			// On success the browser is already leaving for the provider, so the
+			// On success the browser is already leaving for Google, so the
 			// button stays busy until the page unloads.
 		} catch {
 			setFailed(true);
@@ -168,7 +155,7 @@ function SocialButton({ provider }: { provider: SocialSignInMethod }) {
 	};
 
 	return (
-		<>
+		<div className="flex flex-col gap-2">
 			<Button
 				type="button"
 				variant="outline"
@@ -176,15 +163,15 @@ function SocialButton({ provider }: { provider: SocialSignInMethod }) {
 				disabled={pending}
 				onClick={handleClick}
 			>
-				<ProviderIcon provider={provider} />
-				Continua amb {label}
+				<GoogleIcon />
+				Continua amb Google
 			</Button>
 			{failed ? (
 				<p role="alert" className="text-sm text-destructive font-ui">
-					No s'ha pogut connectar amb {label}. Torna-ho a provar.
+					No s'ha pogut connectar amb Google. Torna-ho a provar.
 				</p>
 			) : null}
-		</>
+		</div>
 	);
 }
 
