@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
 	openProfilePreferencesTip,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
-import { authClient } from "@/lib/auth-client";
+import { openSignIn } from "@/components/sign-in/sign-in-store";
 import {
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
@@ -115,22 +114,11 @@ export function useDailyOnboarding({
 		[openHowToPlayIfFirstVisit, openProfilePreferencesTipIfNeeded],
 	);
 
-	const signInWithGoogle = useCallback(async () => {
-		try {
-			await authClient.signIn.social({
-				provider: "google",
-				callbackURL: window.location.href,
-			});
-		} catch {
-			toast.error("No s'ha pogut iniciar la sessió");
-		}
-	}, []);
-
 	const handleWelcomeSignIn = useCallback(() => {
 		markWelcomeSeen();
 		setWelcomeOpen(false);
-		void signInWithGoogle();
-	}, [signInWithGoogle]);
+		openSignIn();
+	}, []);
 
 	return {
 		welcomeOpen,
@@ -139,6 +127,5 @@ export function useDailyOnboarding({
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,
-		signInWithGoogle,
 	};
 }

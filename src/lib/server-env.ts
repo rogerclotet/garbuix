@@ -41,6 +41,24 @@ const serverEnvSchema = z.object({
 		.default("postgres://postgres:postgres@localhost:5432/paraules"),
 	GOOGLE_CLIENT_ID: optionalEnvString,
 	GOOGLE_CLIENT_SECRET: optionalEnvString,
+	// Sign in with Apple: the Services ID, plus the team, key ID and .p8 key the
+	// client secret is signed with (see apple-client-secret.server.ts).
+	APPLE_CLIENT_ID: optionalEnvString,
+	APPLE_TEAM_ID: optionalEnvString,
+	APPLE_KEY_ID: optionalEnvString,
+	APPLE_PRIVATE_KEY: optionalEnvString,
+	REDDIT_CLIENT_ID: optionalEnvString,
+	REDDIT_CLIENT_SECRET: optionalEnvString,
+	// Sends the emailed sign-in codes. Without it, production hides the email
+	// option and development prints codes to the server log instead.
+	RESEND_API_KEY: optionalEnvString,
+	EMAIL_FROM: z
+		.preprocess(
+			(value) =>
+				typeof value === "string" && value.length === 0 ? undefined : value,
+			z.string().min(1).optional(),
+		)
+		.default("Garbuix <codi@garbuix.app>"),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
 });

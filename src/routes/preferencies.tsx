@@ -34,6 +34,7 @@ import {
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
+import { isPlaceholderEmail } from "@/lib/sign-in-methods";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import {
 	DISPLAY_NAME_MAX_LENGTH,
@@ -378,8 +379,8 @@ function PreferencesPage() {
 									Avatar
 								</div>
 								<p className="text-sm text-muted-foreground font-ui">
-									Tria si vols mostrar la foto de Google o l'avatar de convidat
-									amb les inicials.
+									Tria si vols mostrar la foto del teu compte o l'avatar de
+									convidat amb les inicials.
 								</p>
 							</div>
 							<fieldset
@@ -388,7 +389,7 @@ function PreferencesPage() {
 							>
 								{(
 									[
-										{ value: "google", label: "Google" },
+										{ value: "google", label: "Foto" },
 										{ value: "initials", label: "Convidat" },
 									] as const
 								).map((option) => {
@@ -547,9 +548,11 @@ function PreferencesPage() {
 				<section className="flex flex-col gap-4 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
 					<div className="min-w-0 space-y-1">
 						<h2 className="font-medium">Compte</h2>
-						<p className="break-words text-sm text-muted-foreground font-ui">
-							{activeUser.email}
-						</p>
+						{activeUser.email && !isPlaceholderEmail(activeUser.email) ? (
+							<p className="break-words text-sm text-muted-foreground font-ui">
+								{activeUser.email}
+							</p>
+						) : null}
 					</div>
 					<Button
 						type="button"

@@ -72,7 +72,7 @@ export function WelcomeDialog({
 					<p>
 						Si{" "}
 						<strong className="font-medium text-foreground">
-							entres amb Google
+							entres amb un compte
 						</strong>
 						, mantens la ratxa entre dispositius i apareixes a la classificació
 						amb el teu nom.
@@ -140,7 +140,7 @@ export function WelcomeDialog({
 					<AlertDialogCancel>Sense compte</AlertDialogCancel>
 					<AlertDialogAction onClick={onSignIn}>
 						<LogIn className="size-4" />
-						Connectar amb Google
+						Entrar
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

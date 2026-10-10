@@ -1,4 +1,4 @@
-import anonNameWords from "@/data/anon-name-words.json";
+import { pickAnonName } from "@/lib/anon-name";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { normalizeDisplayNameInput } from "@/lib/user-profile";
@@ -40,17 +40,6 @@ type StoredIdentity = {
 	version: 2;
 };
 
-function pickName(): string {
-	const { adjectives, animals } = anonNameWords;
-	const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-	const animal = animals[Math.floor(Math.random() * animals.length)];
-	if (!adjective || !animal) {
-		return "Convidat";
-	}
-	const inflected = animal.gender === "f" ? adjective.fem : adjective.masc;
-	return `${animal.name} ${inflected.toLowerCase()}`;
-}
-
 export function getOrCreateAnonIdentity(): AnonIdentity {
 	const deviceId = getDeviceId();
 	if (typeof window === "undefined") {
@@ -74,7 +63,7 @@ export function getOrCreateAnonIdentity(): AnonIdentity {
 	const identity: StoredIdentity = {
 		version: 2,
 		deviceId,
-		name: pickName(),
+		name: pickAnonName(),
 	};
 	window.localStorage.setItem(ANON_IDENTITY_KEY, JSON.stringify(identity));
 	return { deviceId: identity.deviceId, name: identity.name };

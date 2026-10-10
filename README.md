@@ -114,6 +114,36 @@ pnpm dev
 
 The app will be available at `http://localhost:3000`
 
+### Sign-in providers
+
+Players can sign in with Google, Apple, Reddit or a six-digit code sent by
+email. Each option shows up in the sign-in dialog only once all of its
+variables are set, so a half-configured provider never shows a broken button.
+Register one callback URL per host the app serves (`garbuix.app` and
+`garbuix.clotet.dev` in production, `http://localhost:3000` locally):
+`https://<host>/api/auth/callback/<provider>`.
+
+| Provider | Variables | Setup |
+| --- | --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client in Google Cloud Console. |
+| Apple | `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` | In the Apple Developer portal, create a Services ID (this is `APPLE_CLIENT_ID`) with Sign in with Apple enabled, add each host as a domain and its callback as a return URL. Create a Sign in with Apple key and put the `.p8` contents in `APPLE_PRIVATE_KEY`, on one line with `\n` for line breaks. Apple doesn't accept `localhost`, so test it on a real host. |
+| Reddit | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | A "web app" OAuth client. Reddit stopped handing out API credentials on request in November 2025 (see [Reddit Daily Post](#reddit-daily-post)), so this needs Reddit to approve access first. Until then, leave these empty and the Reddit button stays hidden. |
+| Email code | `RESEND_API_KEY`, `EMAIL_FROM` | Verify `garbuix.app` in Resend (SPF and DKIM records) and create a sending key. `EMAIL_FROM` defaults to `Garbuix <codi@garbuix.app>`. |
+
+Apple only accepts client secrets that expire within six months, so the server
+signs its own from the `.p8` key and renews it before it expires. Nobody has to
+rotate it by hand.
+
+Without `RESEND_API_KEY`, development still offers the email option and prints
+each code to the server log; production hides it.
+
+Accounts link by email: signing in with another provider, or with a code, under
+an email address an existing account already verified lands on that same
+account. Reddit doesn't share an email address, so Reddit accounts stay
+separate. New accounts whose provider shares no name (email codes, or Apple
+when the player hides it) keep the guest's animal-and-adjective name, and can
+change it in Preferències.
+
 ### Error tracking
 
 The Sentry SDK sends browser errors, caught router errors, server request errors,
@@ -260,7 +290,8 @@ The app will be available at `http://localhost:3000` and Postgres at `localhost:
 
 The app does not send analytics, error reports, session recordings, or performance
 telemetry. Game progress, account sessions, leaderboards, and peer clues still use
-the app server and its database. Google sign-in and avatars contact Google;
+the app server and its database. Google, Apple and Reddit sign-in (and their
+avatars) contact those providers; emailed sign-in codes are sent through Resend;
 optional AI clue generation sends puzzle words to Anthropic. Fonts are bundled
 locally.
 

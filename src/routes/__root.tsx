@@ -15,12 +15,15 @@ import { LeaderboardToasts } from "@/components/leaderboard/leaderboard-toast";
 import { links } from "@/components/meta";
 import { OrientationLock } from "@/components/orientation-lock";
 import { ServiceWorkerRegister } from "@/components/service-worker";
+import { SignInDialog } from "@/components/sign-in/sign-in-dialog";
 import { ThemeMeta } from "@/components/theme-meta";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getSignInMethods } from "@/lib/auth-server-fns";
 import { materialThemeCss } from "@/lib/material-theme";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
+import type { SignInMethod } from "@/lib/sign-in-methods";
 import { useMiniRoute } from "@/lib/use-mini-route";
 import { useSyllableRoute } from "@/lib/use-syllable-route";
 import appCss from "@/styles.css?url";
@@ -29,10 +32,26 @@ interface MyRouterContext {
 	queryClient: QueryClient;
 }
 
+// Which sign-in methods the server offers only changes on a redeploy, so the
+// browser asks once instead of on every navigation.
+let cachedSignInMethods: SignInMethod[] | null = null;
+
+async function loadSignInMethods(): Promise<SignInMethod[]> {
+	if (cachedSignInMethods) return cachedSignInMethods;
+	const methods = await getSignInMethods();
+	if (typeof window !== "undefined") {
+		cachedSignInMethods = methods;
+	}
+	return methods;
+}
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	loader: async () => {
-		const sessionUser = await getSessionUser();
-		return { sessionUser, dateKey: getTodayDateKey() };
+		const [sessionUser, signInMethods] = await Promise.all([
+			getSessionUser(),
+			loadSignInMethods(),
+		]);
+		return { sessionUser, signInMethods, dateKey: getTodayDateKey() };
 	},
 
 	head: () => ({
@@ -118,6 +137,7 @@ function RootDocument() {
 									</main>
 								</div>
 								<Toaster position="top-center" />
+								<SignInDialog />
 								{mini || syllables ? null : <LeaderboardToasts />}
 							</ClueRequestsRoot>
 						</LeaderboardRoot>

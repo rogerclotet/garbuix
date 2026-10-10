@@ -13,6 +13,7 @@ import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { useLetterLayout } from "@/components/puzzle/use-letter-layout";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
+import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
 import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
@@ -151,7 +152,6 @@ function DailyGame({
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,
-		signInWithGoogle,
 	} = useDailyOnboarding({
 		activeUser,
 		isPresentable,
@@ -371,7 +371,8 @@ function DailyGame({
 				currentStreak={streakStats.currentStreak}
 				isAnonymous={!activeUser}
 				onSignIn={() => {
-					void signInWithGoogle();
+					setWinDialogOpen(false);
+					openSignIn();
 				}}
 			/>
 		</>

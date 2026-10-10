@@ -1,3 +1,4 @@
+import { emailOTPClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 function getBaseURL() {
@@ -10,4 +11,5 @@ function getBaseURL() {
 
 export const authClient = createAuthClient({
 	baseURL: getBaseURL(),
+	plugins: [emailOTPClient()],
 });

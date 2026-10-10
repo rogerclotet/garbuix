@@ -52,8 +52,13 @@ function PrivacyPage() {
 						classificació i intercanviar pistes.
 					</li>
 					<li>
-						Si entres amb Google, rebem el nom, el correu electrònic, la imatge
-						de perfil i els identificadors necessaris per autenticar-te. Desem
+						Si entres amb Google, Apple o Reddit, rebem els identificadors
+						necessaris per autenticar-te i les dades de perfil que el servei
+						comparteixi: amb Google, el nom, el correu electrònic i la imatge de
+						perfil; amb Apple, el correu (o l'adreça privada que Apple generi)
+						i, només el primer cop, el nom si decideixes compartir-lo; amb
+						Reddit, el nom d'usuari i l'avatar, sense el correu. Si entres amb
+						el correu, rebem l'adreça i t'hi enviem un codi d'un sol ús. Desem
 						el compte, les sessions i el progrés per sincronitzar les partides
 						entre dispositius. Les sessions poden incloure l'adreça IP i dades
 						del navegador per gestionar l'accés.
@@ -129,8 +134,10 @@ function PrivacyPage() {
 				</p>
 				<p>
 					L'aplicació no llegeix ni desa dades dels usuaris de Reddit, i no
-					relaciona els comptes de Reddit amb les partides de Garbuix. El que
-					publiques a Reddit es regeix per la{" "}
+					relaciona els comptes de Reddit amb les partides de Garbuix. Només si
+					tries entrar a Garbuix amb Reddit, el compte queda vinculat a les
+					teves partides, tal com s'explica més amunt. El que publiques a Reddit
+					es regeix per la{" "}
 					<a
 						href="https://www.reddit.com/policies/privacy-policy"
 						className="text-link"
@@ -147,7 +154,8 @@ function PrivacyPage() {
 				</h2>
 				<p>
 					Els proveïdors d'allotjament intervenen en el funcionament del servei.
-					Google intervé quan tries iniciar-hi sessió. Fem servir Anthropic per
+					Google, Apple i Reddit intervenen quan tries iniciar-hi sessió. Resend
+					envia els correus amb el codi per entrar. Fem servir Anthropic per
 					generar pistes a partir de paraules del diccionari; no hi enviem el
 					perfil del jugador per generar-les. Reddit allotja la comunitat
 					r/garbuix i executa l'aplicació que hi publica el joc de cada dia.
