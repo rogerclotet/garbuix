@@ -173,6 +173,16 @@ function maskLeaks(clue: string, leakingTokens: string[]): string {
 	return masked.replace(/\s{2,}/g, " ").trim();
 }
 
+// The model closes a clue with a period only some of the time, and asking for
+// it in the prompt is no more reliable. A clue that already ends a sentence, or
+// ends on the mask of a leaked word, is left alone.
+function endWithPeriod(clue: string): string {
+	if (clue === "" || /[.!?…]$/.test(clue)) {
+		return clue;
+	}
+	return `${clue}.`;
+}
+
 async function generateClueForModel(options: {
 	modelId: string;
 	displayWord: string;
@@ -201,7 +211,7 @@ async function generateClueForModel(options: {
 	}
 
 	const leaks = findLeakingTokens(clue, options.normalizedWord);
-	return leaks.length > 0 ? maskLeaks(clue, leaks) : clue;
+	return endWithPeriod(leaks.length > 0 ? maskLeaks(clue, leaks) : clue);
 }
 
 export async function generateWordClue(options: {
