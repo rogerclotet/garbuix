@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -9,14 +10,23 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AlertDialog, AlertDialogContent } from "@/components/ui/alert-dialog";
 import type { SignInMethod } from "@/lib/sign-in-methods";
-import { SignInDialogBody } from "./sign-in-dialog";
+import { SignInDialog, SignInDialogBody } from "./sign-in-dialog";
+import { openSignIn, setSignInOpen } from "./sign-in-store";
 
 const authClient = vi.hoisted(() => ({
 	signIn: { social: vi.fn(), emailOtp: vi.fn() },
 	emailOtp: { sendVerificationOtp: vi.fn() },
 }));
 
+const captureException = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/auth-client", () => ({ authClient }));
+vi.mock("@sentry/tanstackstart-react", () => ({ captureException }));
+vi.mock("@tanstack/react-router", () => ({
+	getRouteApi: () => ({
+		useLoaderData: () => ({ signInMethods: ["email"] }),
+	}),
+}));
 vi.mock("@/lib/anon-identity", () => ({
 	getOrCreateAnonIdentity: () => ({
 		deviceId: "device",
@@ -28,7 +38,7 @@ function renderBody(methods: SignInMethod[]) {
 	render(
 		<AlertDialog open>
 			<AlertDialogContent>
-				<SignInDialogBody methods={methods} />
+				<SignInDialogBody methods={methods} onVerifyingChange={() => {}} />
 			</AlertDialogContent>
 		</AlertDialog>,
 	);
@@ -45,8 +55,17 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	setSignInOpen(false);
 	vi.clearAllMocks();
 });
+
+async function reachCodeStep() {
+	fireEvent.change(screen.getByLabelText("Adreça de correu"), {
+		target: { value: "laia@example.cat" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Envia'm un codi" }));
+	await screen.findByText("Escriu el codi");
+}
 
 describe("SignInDialogBody", () => {
 	it("offers only the methods the server enabled", () => {
@@ -138,6 +157,45 @@ describe("SignInDialogBody", () => {
 		);
 	});
 
+	it("reports a failure the player could not have caused", async () => {
+		const networkError = new Error("Failed to fetch");
+		authClient.emailOtp.sendVerificationOtp.mockRejectedValueOnce(networkError);
+		renderBody(["email"]);
+
+		fireEvent.change(screen.getByLabelText("Adreça de correu"), {
+			target: { value: "laia@example.cat" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Envia'm un codi" }));
+
+		await screen.findByRole("alert");
+		expect(captureException).toHaveBeenCalledWith(networkError);
+
+		authClient.emailOtp.sendVerificationOtp.mockResolvedValueOnce({
+			data: null,
+			error: { status: 500 },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Envia'm un codi" }));
+
+		await waitFor(() => expect(captureException).toHaveBeenCalledTimes(2));
+	});
+
+	it("leaves a wrong code out of error reports", async () => {
+		authClient.signIn.emailOtp.mockResolvedValue({
+			data: null,
+			error: { code: "INVALID_OTP", status: 400 },
+		});
+		renderBody(["email"]);
+		await reachCodeStep();
+
+		fireEvent.change(screen.getByLabelText("Codi"), {
+			target: { value: "000000" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Entra" }));
+
+		await screen.findByRole("alert");
+		expect(captureException).not.toHaveBeenCalled();
+	});
+
 	it("explains when too many codes were requested", async () => {
 		authClient.emailOtp.sendVerificationOtp.mockResolvedValue({
 			data: null,
@@ -154,5 +212,42 @@ describe("SignInDialogBody", () => {
 			"massa codis",
 		);
 		expect(screen.queryByText("Escriu el codi")).toBeNull();
+	});
+});
+
+describe("SignInDialog", () => {
+	it("stays open on Escape while a code is being checked", async () => {
+		let failVerify: (result: unknown) => void = () => {};
+		authClient.signIn.emailOtp.mockReturnValue(
+			new Promise((resolve) => {
+				failVerify = resolve;
+			}),
+		);
+		render(<SignInDialog />);
+		act(() => openSignIn());
+		await reachCodeStep();
+
+		fireEvent.change(screen.getByLabelText("Codi"), {
+			target: { value: "000000" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Entra" }));
+		await screen.findByRole("button", { name: "Entrant..." });
+
+		fireEvent.keyDown(document.activeElement ?? document.body, {
+			key: "Escape",
+		});
+		expect(screen.getByRole("alertdialog")).toBeTruthy();
+
+		await act(async () => {
+			failVerify({ data: null, error: { code: "INVALID_OTP", status: 400 } });
+		});
+		expect(screen.getByRole("alert").textContent).toBe(
+			"El codi no és correcte.",
+		);
+
+		fireEvent.keyDown(document.activeElement ?? document.body, {
+			key: "Escape",
+		});
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 	});
 });

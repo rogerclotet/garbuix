@@ -1,8 +1,8 @@
 import anonNameWords from "@/data/anon-name-words.json";
 
 // A playful "animal + adjective" name, gendered to agree with the animal. Guests
-// get one on their first visit, and accounts whose provider gives us no name
-// (an emailed code, or an Apple ID with the name withheld) start from one too.
+// get one on their first visit, and accounts made with an emailed code, which
+// carries no name, start from one too when the guest's own is unusable.
 export function pickAnonName(): string {
 	const { adjectives, animals } = anonNameWords;
 	const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];

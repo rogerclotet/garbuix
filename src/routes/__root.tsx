@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -38,11 +39,19 @@ let cachedSignInMethods: SignInMethod[] | null = null;
 
 async function loadSignInMethods(): Promise<SignInMethod[]> {
 	if (cachedSignInMethods) return cachedSignInMethods;
-	const methods = await getSignInMethods();
-	if (typeof window !== "undefined") {
-		cachedSignInMethods = methods;
+	try {
+		const methods = await getSignInMethods();
+		if (typeof window !== "undefined") {
+			cachedSignInMethods = methods;
+		}
+		return methods;
+	} catch (error) {
+		// Every page waits on this loader, so a failed lookup must not take the
+		// app down with it. The dialog says sign-in is unavailable and the next
+		// navigation asks again.
+		captureException(error);
+		return [];
 	}
-	return methods;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { validateClueText } from "@/lib/clue-fairness";
 import type { ClueRequest } from "@/lib/clue-request-types";
 import { getGuessKeyboardAction, getSlotCellKey } from "@/lib/puzzle-helpers";
-import { markHowToPlaySeen, markWelcomeSeen } from "@/lib/puzzle-local";
+import { markHowToPlaySeen, postponeWelcomeForToday } from "@/lib/puzzle-local";
 import { WORDS_PER_BONUS_CLUE } from "@/lib/puzzle-types";
 import { shuffleArray } from "@/lib/shuffle";
 import { DailyWordsMeter } from "./daily-status";
@@ -55,7 +55,7 @@ type HowToPlayDialogProps = {
 export function HowToPlayDialog({ open, onOpenChange }: HowToPlayDialogProps) {
 	function finishTutorial() {
 		markHowToPlaySeen();
-		markWelcomeSeen();
+		postponeWelcomeForToday();
 		onOpenChange(false);
 	}
 

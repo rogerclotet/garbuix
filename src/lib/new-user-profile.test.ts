@@ -36,11 +36,11 @@ describe("resolveNewUserProfile", () => {
 	it("sanitizes the guest name and drops the photo sent with an email code", () => {
 		expect(
 			resolveNewUserProfile({
-				name: "  guineu   astuta 🦊 ",
+				name: "  Guineu   astuta 🦊 ",
 				image: "https://evil.example/tracker.png",
 				path: EMAIL_CODE_SIGN_IN_PATH,
 			}),
-		).toEqual({ name: "Guineu Astuta", image: null });
+		).toEqual({ name: "Guineu astuta", image: null });
 	});
 
 	it("falls back to a generated name when the email-code name is unusable", () => {

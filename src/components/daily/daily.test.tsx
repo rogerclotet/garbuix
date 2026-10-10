@@ -49,9 +49,11 @@ const {
 	hasSeenProfilePreferencesTipMock,
 	markProfilePreferencesTipSeenMock,
 	hasSeenWelcomeMock,
+	isWelcomePostponedTodayMock,
 	markWelcomeSeenMock,
 	openHowToPlayMock,
 	openProfilePreferencesTipMock,
+	openSignInMock,
 } = vi.hoisted(() => ({
 	getWordCluesMock: vi.fn(),
 	resolveGuessMock: vi.fn(),
@@ -61,9 +63,11 @@ const {
 	hasSeenProfilePreferencesTipMock: vi.fn(() => true),
 	markProfilePreferencesTipSeenMock: vi.fn(),
 	hasSeenWelcomeMock: vi.fn(() => true),
+	isWelcomePostponedTodayMock: vi.fn(() => false),
 	markWelcomeSeenMock: vi.fn(),
 	openHowToPlayMock: vi.fn(),
 	openProfilePreferencesTipMock: vi.fn(),
+	openSignInMock: vi.fn(),
 }));
 
 vi.mock("@/lib/puzzle-client", async () => {
@@ -94,6 +98,7 @@ vi.mock("@/lib/puzzle-local", async () => ({
 	hasSeenProfilePreferencesTip: hasSeenProfilePreferencesTipMock,
 	markProfilePreferencesTipSeen: markProfilePreferencesTipSeenMock,
 	hasSeenWelcome: hasSeenWelcomeMock,
+	isWelcomePostponedToday: isWelcomePostponedTodayMock,
 	markWelcomeSeen: markWelcomeSeenMock,
 }));
 
@@ -105,6 +110,10 @@ vi.mock("./how-to-play-store", () => ({
 vi.mock("@/components/profile-preferences-tip-store", () => ({
 	openProfilePreferencesTip: openProfilePreferencesTipMock,
 	useProfilePreferencesTipOpen: vi.fn(() => false),
+}));
+
+vi.mock("@/components/sign-in/sign-in-store", () => ({
+	openSignIn: openSignInMock,
 }));
 
 vi.mock("@/lib/puzzle-streaks", () => ({
@@ -340,8 +349,11 @@ describe("Daily submit feedback", () => {
 		markProfilePreferencesTipSeenMock.mockReset();
 		hasSeenWelcomeMock.mockReset();
 		hasSeenWelcomeMock.mockReturnValue(true);
+		isWelcomePostponedTodayMock.mockReset();
+		isWelcomePostponedTodayMock.mockReturnValue(false);
 		markWelcomeSeenMock.mockReset();
 		openHowToPlayMock.mockReset();
+		openSignInMock.mockReset();
 		openProfilePreferencesTipMock.mockReset();
 		installMatchMediaMock(false);
 		installResizeObserverMock();
@@ -567,7 +579,7 @@ describe("Daily submit feedback", () => {
 		hasSeenWelcomeMock.mockReturnValue(false);
 		renderDaily();
 		await waitFor(() => expect(openHowToPlayMock).toHaveBeenCalledTimes(1));
-		expect(screen.queryByText("Benvingut/da a Garbuix!")).toBeNull();
+		expect(screen.queryByText("Desa el teu progrés")).toBeNull();
 	});
 
 	it("ignores live puzzle keyboard input while the tutorial is open", () => {
@@ -690,16 +702,39 @@ describe("Daily submit feedback", () => {
 		expect(hasSeenMiniAnnouncement()).toBe(false);
 	});
 
+	it("holds the welcome dialog back on the day of the tutorial", async () => {
+		installLocalStorageMock();
+		hasSeenWelcomeMock.mockReturnValue(false);
+		isWelcomePostponedTodayMock.mockReturnValue(true);
+		renderDaily();
+		await screen.findByTestId("daily-grid");
+		expect(screen.queryByText("Desa el teu progrés")).toBeNull();
+	});
+
 	it("keeps the welcome dialog and does not follow it with a Mini announcement", async () => {
 		installLocalStorageMock();
 		progressState.guessCount = 3;
 		hasSeenWelcomeMock.mockReturnValue(false);
 		renderDaily();
-		await screen.findByRole("alertdialog", { name: "Benvingut/da a Garbuix!" });
+		await screen.findByRole("alertdialog", { name: "Desa el teu progrés" });
 		expect(screen.queryByText("Pels més petits de la casa")).toBeNull();
-		fireEvent.click(screen.getByRole("button", { name: "Sense compte" }));
+		fireEvent.click(screen.getByRole("button", { name: "Ara no" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		expect(hasSeenMiniAnnouncement()).toBe(false);
+	});
+
+	it("opens only the sign-in dialog when the welcome ends in Entrar", async () => {
+		installLocalStorageMock();
+		hasSeenWelcomeMock.mockReturnValue(false);
+		hasSeenProfilePreferencesTipMock.mockReturnValue(false);
+		renderDaily();
+		await screen.findByRole("alertdialog", { name: "Desa el teu progrés" });
+		fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(openSignInMock).toHaveBeenCalledOnce();
+		expect(markWelcomeSeenMock).toHaveBeenCalled();
+		expect(openProfilePreferencesTipMock).not.toHaveBeenCalled();
+		expect(openHowToPlayMock).not.toHaveBeenCalled();
 	});
 
 	it.each(["tutorial", "profile tip"])(

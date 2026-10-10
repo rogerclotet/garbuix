@@ -70,16 +70,25 @@ export function capitalizeDisplayName(value: string): string {
 		.join(" ");
 }
 
-export function normalizeDisplayNameInput(value: string): string | null {
+// Strips what a display name may not contain but leaves its casing alone, for
+// names that are already shown somewhere and must not change on the way in.
+export function sanitizeDisplayNameInput(value: string): string | null {
 	const sanitized = sanitizeDisplayNameRaw(value);
 	if (!sanitized || sanitized.length > DISPLAY_NAME_MAX_LENGTH) {
 		return null;
 	}
-
-	const capitalized = capitalizeDisplayName(sanitized);
-	if (!capitalized || !/\p{L}/u.test(capitalized)) {
+	if (!/\p{L}/u.test(sanitized)) {
 		return null;
 	}
 
-	return capitalized;
+	return sanitized;
+}
+
+export function normalizeDisplayNameInput(value: string): string | null {
+	const sanitized = sanitizeDisplayNameInput(value);
+	if (!sanitized) {
+		return null;
+	}
+
+	return capitalizeDisplayName(sanitized);
 }

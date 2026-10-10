@@ -1,5 +1,5 @@
 import { pickAnonName } from "@/lib/anon-name";
-import { normalizeDisplayNameInput } from "@/lib/user-profile";
+import { sanitizeDisplayNameInput } from "@/lib/user-profile";
 
 export const EMAIL_CODE_SIGN_IN_PATH = "/sign-in/email-otp";
 
@@ -9,8 +9,10 @@ export const EMAIL_CODE_SIGN_IN_PATH = "/sign-in/email-otp";
 // they can change it in Preferències either way.
 //
 // On the emailed-code path the name and photo come straight from the request
-// body, so the name is sanitized like any typed display name and the photo is
-// dropped rather than let a client point the leaderboard at any URL.
+// body, so the name is stripped of anything a display name may not contain and
+// the photo is dropped rather than let a client point the leaderboard at any
+// URL. The casing stays as the guest had it, so their leaderboard row doesn't
+// change when they sign in.
 export function resolveNewUserProfile(input: {
 	name: string;
 	image: string | null | undefined;
@@ -18,7 +20,7 @@ export function resolveNewUserProfile(input: {
 }): { name: string; image: string | null } {
 	if (input.path === EMAIL_CODE_SIGN_IN_PATH) {
 		return {
-			name: normalizeDisplayNameInput(input.name) ?? pickAnonName(),
+			name: sanitizeDisplayNameInput(input.name) ?? pickAnonName(),
 			image: null,
 		};
 	}

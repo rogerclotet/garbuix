@@ -1,35 +1,7 @@
-import { useSyncExternalStore } from "react";
+import { createBooleanStore } from "@/lib/boolean-store";
 
-let open = false;
-const listeners = new Set<() => void>();
+const store = createBooleanStore();
 
-function emit() {
-	for (const listener of listeners) listener();
-}
-
-function subscribe(listener: () => void) {
-	listeners.add(listener);
-	return () => {
-		listeners.delete(listener);
-	};
-}
-
-export function openSignIn() {
-	if (open) return;
-	open = true;
-	emit();
-}
-
-export function setSignInOpen(next: boolean) {
-	if (open === next) return;
-	open = next;
-	emit();
-}
-
-export function useSignInOpen(): boolean {
-	return useSyncExternalStore(
-		subscribe,
-		() => open,
-		() => false,
-	);
-}
+export const openSignIn = store.open;
+export const setSignInOpen = store.set;
+export const useSignInOpen = store.useValue;

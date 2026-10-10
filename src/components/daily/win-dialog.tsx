@@ -96,8 +96,7 @@ export function WinDialog({
 							Guarda la teva ratxa
 						</p>
 						<p className="text-muted-foreground mt-1 text-xs leading-snug font-ui">
-							Entra amb un compte per jugar des de qualsevol dispositiu i
-							aparèixer a la classificació amb el teu nom.
+							Entra amb un compte per jugar des de qualsevol dispositiu.
 						</p>
 						<Button
 							variant="outline"

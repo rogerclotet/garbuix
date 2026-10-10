@@ -58,11 +58,10 @@ export function WelcomeDialog({
 			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-base">
-						Benvingut/da a Garbuix!
+						Desa el teu progrés
 					</AlertDialogTitle>
 					<AlertDialogDescription>
-						Cada dia, un nou trencaclosques: troba totes les paraules amagades
-						que es poden formar amb les lletres del dia.
+						Entra amb un compte i tot el que has jugat fins ara es conserva.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
@@ -70,29 +69,29 @@ export function WelcomeDialog({
 
 				<div className="space-y-2 text-sm leading-snug text-muted-foreground font-ui">
 					<p>
-						Si{" "}
+						Mantens{" "}
 						<strong className="font-medium text-foreground">
-							entres amb un compte
+							la ratxa en tots els teus dispositius
 						</strong>
-						, mantens la ratxa entre dispositius i apareixes a la classificació
-						amb el teu nom.
+						.
 					</p>
 					<p className="flex items-start gap-2">
 						<Sparkles className="size-4 shrink-0 text-primary" />
 						<span>
-							A més, desbloqueges{" "}
+							Desbloqueges{" "}
 							<strong className="font-medium text-foreground">
 								pistes descriptives amb IA
-							</strong>{" "}
-							que t'expliquen cada paraula en comptes de revelar-te una lletra.
+							</strong>
+							, que t'expliquen cada paraula en comptes de revelar-te una
+							lletra.
 						</span>
 					</p>
 					<p>
 						<strong className="font-medium text-foreground">
 							Sense compte
-						</strong>
-						, juges al moment, però el progrés es queda en aquest navegador i
-						pot perdre's si esborres les dades.
+						</strong>{" "}
+						pots continuar jugant igualment, però el progrés es queda en aquest
+						navegador i pot perdre's si esborres les dades.
 					</p>
 				</div>
 
@@ -137,7 +136,7 @@ export function WelcomeDialog({
 				) : null}
 
 				<AlertDialogFooter>
-					<AlertDialogCancel>Sense compte</AlertDialogCancel>
+					<AlertDialogCancel>Ara no</AlertDialogCancel>
 					<AlertDialogAction onClick={onSignIn}>
 						<LogIn className="size-4" />
 						Entrar

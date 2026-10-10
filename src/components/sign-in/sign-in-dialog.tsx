@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/tanstackstart-react";
 import { getRouteApi } from "@tanstack/react-router";
 import { ArrowLeft, Mail } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
@@ -54,13 +55,23 @@ function describeVerifyError(error: AuthError): string {
 	return "No s'ha pogut iniciar la sessió. Torna-ho a provar.";
 }
 
+// Better Auth hands back HTTP failures instead of throwing them, so a server
+// fault has to be reported by hand or it never reaches error tracking.
+function reportServerFault(action: string, error: AuthError): void {
+	if (!error?.status || error.status < 500) return;
+	captureException(new Error(`${action} failed with status ${error.status}`));
+}
+
 // The name a brand-new account made with an emailed code starts with, so a
 // guest keeps the name they already have on the leaderboard. Existing accounts
 // ignore it.
 function currentGuestName(): string | undefined {
 	try {
 		return getOrCreateAnonIdentity().name;
-	} catch {
+	} catch (caught) {
+		// Blocked storage must not stop the sign-in: the account just starts
+		// with a generated name.
+		captureException(caught);
 		return undefined;
 	}
 }
@@ -68,26 +79,49 @@ function currentGuestName(): string | undefined {
 export function SignInDialog() {
 	const open = useSignInOpen();
 	const { signInMethods } = rootRoute.useLoaderData();
+	const [verifying, setVerifying] = useState(false);
+
+	const handleOpenChange = (next: boolean) => {
+		// Escape must not dismiss the dialog while a code is being checked: a
+		// wrong code would fail with nowhere to say so.
+		if (!next && verifying) return;
+		setSignInOpen(next);
+	};
 
 	return (
-		<AlertDialog open={open} onOpenChange={setSignInOpen}>
+		<AlertDialog open={open} onOpenChange={handleOpenChange}>
 			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-sm">
 				{/* Remounted on every open so a half-finished code step never
 				    greets the player the next time. */}
-				{open ? <SignInDialogBody methods={signInMethods} /> : null}
+				{open ? (
+					<SignInDialogBody
+						methods={signInMethods}
+						onVerifyingChange={setVerifying}
+					/>
+				) : null}
 			</AlertDialogContent>
 		</AlertDialog>
 	);
 }
 
-export function SignInDialogBody({ methods }: { methods: SignInMethod[] }) {
+export function SignInDialogBody({
+	methods,
+	onVerifyingChange,
+}: {
+	methods: SignInMethod[];
+	onVerifyingChange: (verifying: boolean) => void;
+}) {
 	const [step, setStep] = useState<Step>({ kind: "choose" });
 	const googleEnabled = methods.includes("google");
 	const emailEnabled = methods.includes("email");
 
 	if (step.kind === "code") {
 		return (
-			<CodeStep email={step.email} onBack={() => setStep({ kind: "choose" })} />
+			<CodeStep
+				email={step.email}
+				onBack={() => setStep({ kind: "choose" })}
+				onVerifyingChange={onVerifyingChange}
+			/>
 		);
 	}
 
@@ -98,8 +132,7 @@ export function SignInDialogBody({ methods }: { methods: SignInMethod[] }) {
 					Entra a Garbuix
 				</AlertDialogTitle>
 				<AlertDialogDescription>
-					Desa la ratxa, juga des de qualsevol dispositiu i apareix a la
-					classificació amb el teu nom.
+					Desa la ratxa i juga des de qualsevol dispositiu.
 				</AlertDialogDescription>
 			</AlertDialogHeader>
 
@@ -143,12 +176,14 @@ function GoogleButton() {
 				callbackURL: window.location.href,
 			});
 			if (result.error) {
+				reportServerFault("Google sign-in", result.error);
 				setFailed(true);
 				setPending(false);
 			}
 			// On success the browser is already leaving for Google, so the
 			// button stays busy until the page unloads.
-		} catch {
+		} catch (caught) {
+			captureException(caught);
 			setFailed(true);
 			setPending(false);
 		}
@@ -197,11 +232,13 @@ function EmailStep({ onSent }: { onSent: (email: string) => void }) {
 				type: "sign-in",
 			});
 			if (result.error) {
+				reportServerFault("Sending the sign-in code", result.error);
 				setError(describeSendError(result.error));
 				return;
 			}
 			onSent(trimmed);
-		} catch {
+		} catch (caught) {
+			captureException(caught);
 			setError(describeSendError(null));
 		} finally {
 			setPending(false);
@@ -243,16 +280,27 @@ function EmailStep({ onSent }: { onSent: (email: string) => void }) {
 	);
 }
 
-function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
+function CodeStep({
+	email,
+	onBack,
+	onVerifyingChange,
+}: {
+	email: string;
+	onBack: () => void;
+	onVerifyingChange: (verifying: boolean) => void;
+}) {
 	const inputId = useId();
 	const errorId = useId();
 	const [code, setCode] = useState("");
-	const [pending, setPending] = useState(false);
+	const [verifying, setVerifyingState] = useState(false);
 	const [resending, setResending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 
-	const [signedIn, setSignedIn] = useState(false);
+	const setVerifying = (next: boolean) => {
+		setVerifyingState(next);
+		onVerifyingChange(next);
+	};
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -260,7 +308,7 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 			setError(`El codi té ${CODE_LENGTH} xifres.`);
 			return;
 		}
-		setPending(true);
+		setVerifying(true);
 		setError(null);
 		setNotice(null);
 		try {
@@ -270,18 +318,19 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 				name: currentGuestName(),
 			});
 			if (result.error) {
+				reportServerFault("Verifying the sign-in code", result.error);
 				setError(describeVerifyError(result.error));
-				setPending(false);
+				setVerifying(false);
 				return;
 			}
-			setSignedIn(true);
 			// A full reload lands the player exactly where an OAuth redirect
 			// would: the session is read on the server and the guest's progress
-			// is imported.
+			// is imported. The step stays busy until the page unloads.
 			window.location.reload();
-		} catch {
+		} catch (caught) {
+			captureException(caught);
 			setError(describeVerifyError(null));
-			setPending(false);
+			setVerifying(false);
 		}
 	};
 
@@ -295,19 +344,21 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 				type: "sign-in",
 			});
 			if (result.error) {
+				reportServerFault("Resending the sign-in code", result.error);
 				setError(describeSendError(result.error));
 				return;
 			}
 			setCode("");
 			setNotice("T'hem enviat un codi nou.");
-		} catch {
+		} catch (caught) {
+			captureException(caught);
 			setError(describeSendError(null));
 		} finally {
 			setResending(false);
 		}
 	};
 
-	const busy = pending || resending || signedIn;
+	const busy = verifying || resending;
 
 	return (
 		<>
@@ -361,7 +412,7 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 					</p>
 				) : null}
 				<Button type="submit" className="h-11 w-full" disabled={busy}>
-					{pending || signedIn ? "Entrant..." : "Entra"}
+					{verifying ? "Entrant..." : "Entra"}
 				</Button>
 			</form>
 
@@ -389,7 +440,7 @@ function CodeStep({ email, onBack }: { email: string; onBack: () => void }) {
 			</div>
 
 			<AlertDialogFooter>
-				<AlertDialogCancel disabled={signedIn}>Ara no</AlertDialogCancel>
+				<AlertDialogCancel disabled={verifying}>Ara no</AlertDialogCancel>
 			</AlertDialogFooter>
 		</>
 	);
