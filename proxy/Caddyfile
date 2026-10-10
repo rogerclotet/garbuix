@@ -1,0 +1,20 @@
+{
+	servers {
+		# The server's TLS proxy connects from a private address. Keep the client
+		# address and scheme it reports; the rate limiter keys on the former.
+		trusted_proxies static private_ranges
+	}
+}
+
+http://:3000 {
+	reverse_proxy {
+		# scripts/deploy-compose.sh writes the color serving the current release.
+		# The glob lets the proxy start before the first release exists.
+		import /state/upstream*.caddy
+
+		# Dependency maintenance and a server's first deploy have no app running
+		# for a while. Hold those requests until the release accepts connections.
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+}

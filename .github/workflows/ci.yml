@@ -53,8 +53,41 @@ jobs:
       - name: Run test suite
         run: pnpm test
 
+  migrations:
+    # Deploys migrate while the previous release still serves. Fail before
+    # anything is published when a new migration would break that release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The check compares against the previous release's commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+
+      - name: Check new migrations against the previous release
+        env:
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSHED_OVER: ${{ github.event.before }}
+        run: |
+          base="$PULL_REQUEST_BASE"
+          if [ -z "$base" ]; then
+            # On main the previous release is what production serves. That is
+            # older than the previous commit when a deploy failed or was
+            # cancelled for a newer one.
+            release="$(curl -fsS --max-time 10 https://garbuix.app/version.json | jq -r '.sentryRelease // empty')" || release=""
+            base="${release#garbuix@}"
+            if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              echo "::warning::Could not read the serving release; comparing with the previous commit instead"
+              base="$PUSHED_OVER"
+            fi
+          fi
+          node scripts/check-migrations.ts "$base"
+
   publish:
-    needs: lint
+    needs: [lint, migrations]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     # Building on the production server competed with the live app for CPU and
     # memory for minutes on every deploy. Build here; the server only pulls.
@@ -139,8 +172,9 @@ jobs:
   deploy:
     needs: publish
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    # Every deploy mutates the same checkout, images, and Compose project.
-    # Finish the active deploy before another job can replace its containers.
+    # Every deploy mutates the same checkout, images, and Compose project, and
+    # picks the idle app color from the proxy's state. Finish the active deploy
+    # before another job can replace its containers.
     concurrency:
       group: production-deploy
       cancel-in-progress: false

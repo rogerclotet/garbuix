@@ -13,6 +13,7 @@
 		"download-dict": "tsx scripts/download-catalan-dictionary.ts --force && tsx scripts/build-syllable-dictionary.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
+		"db:check-migrations": "node scripts/check-migrations.ts",
 		"auth:migrate:plan": "auth migrate plan",
 		"auth:migrate:apply": "auth migrate apply",
 		"preview": "vite preview",
