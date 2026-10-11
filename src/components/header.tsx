@@ -24,6 +24,7 @@ import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { getGameHistory } from "@/lib/game-history";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useMiniRoute } from "@/lib/use-mini-route";
+import { useRenderedPathname } from "@/lib/use-rendered-route";
 import { useSyllableRoute } from "@/lib/use-syllable-route";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
@@ -41,7 +42,7 @@ export default function Header() {
 	const mini = useMiniRoute();
 	const syllables = useSyllableRoute();
 	const gamePath = syllables ? "/sillabes" : mini ? "/mini" : "/";
-	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const pathname = useRenderedPathname();
 	const location = useRouterState({ select: (s) => s.location });
 	const historyIndex = location.state.__TSR_index;
 	const gameHistoryIndices = getGameHistory(location);
