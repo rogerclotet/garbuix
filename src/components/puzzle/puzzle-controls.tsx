@@ -25,10 +25,32 @@ export const KEYPAD_FALLBACK_HEIGHT = "17rem";
 // proportion at any screen width instead of jumping between fixed sizes at
 // the sm/md breakpoints.
 const CIRCLE_KEY_SIZE = "clamp(3.25rem, 2.5rem + 3vw, 4rem)";
-// Multiplier from key size to the distance between the wheel's center and
-// each letter button, tuned so the six letters clear each other by the same
-// margin whatever size the wheel ends up at.
-const CIRCLE_RADIUS_FACTOR = 1.2;
+// The wheel's width in full-size keys. It stays the same however many letters
+// the day has, so the panel around it never has to make room.
+const CIRCLE_WHEEL_KEYS = 3.4;
+// Distance between the centers of neighbouring letters, in key sizes. Six
+// full-size keys land exactly on it: they sit 1.2 keys from the center, and
+// neighbours on a hexagon are as far apart as the radius.
+const CIRCLE_KEY_PITCH = 1.2;
+const CIRCLE_FULL_SIZE_MAX_LETTERS = 6;
+
+// How much the keys shrink so a wheel of more than six keeps both its width
+// and the six-letter clearance between neighbours. With the keys on a circle
+// of radius (wheel - key) / 2, neighbours are 2 * radius * sin(PI / count)
+// apart; solving that for the pitch gives the key size.
+function getCircleKeyScale(letterCount: number): number {
+	if (letterCount <= CIRCLE_FULL_SIZE_MAX_LETTERS) {
+		return 1;
+	}
+
+	const halfChord = Math.sin(Math.PI / letterCount);
+	return (CIRCLE_WHEEL_KEYS * halfChord) / (CIRCLE_KEY_PITCH + halfChord);
+}
+
+// The grid holds six letters in three columns with the submit beside it. A
+// seventh would open a third row and push the board up, so a longer keypad
+// takes four columns and the submit closes its last row.
+const GRID_SUBMIT_BESIDE_MAX_LETTERS = 6;
 
 // Row layout: every key plus the submit has to fit on one line at any width,
 // so the key is sized from the width the row is actually given (--row-key, see
@@ -36,9 +58,9 @@ const CIRCLE_RADIUS_FACTOR = 1.2;
 // used to have, so a wide phone still gets a keyboard rather than a handful of
 // oversized buttons.
 const ROW_MAX_KEY_REM = 3.25;
-// Floor for the same clamp. Today's puzzles are always six letters, which fits
-// down to the narrowest phone; the floor only keeps the width a valid length if
-// a future puzzle carries enough keys to drive the division to zero.
+// Floor for the same clamp. Six letters, or seven on a Sunday, fit down to the
+// narrowest phone; the floor only keeps the width a valid length if a future
+// puzzle carries enough keys to drive the division to zero.
 const ROW_MIN_KEY_REM = 1.5;
 const ROW_GAP_REM = 0.375;
 // The submit sits a little apart from the letters; counted into the fit so the
@@ -56,8 +78,8 @@ type PuzzleControlsProps = {
 	inline?: boolean;
 	tutorialTarget?: TutorialControlTarget;
 	aiClueMode: boolean;
-	// How the letters are arranged: around the submit button, in a three-column
-	// grid, or in a single row. Independent of where the panel sits.
+	// How the letters are arranged: around the submit button, in a grid, or in
+	// a single row. Independent of where the panel sits.
 	layout: LetterLayout;
 	canUseHint: boolean;
 	currentGuess: string;
@@ -198,19 +220,32 @@ export function PuzzleControls({
 
 	const isRow = layout === "line";
 	const isCircle = layout === "circle";
-	// The grid has room for the full-size key on any board. The circle and the
-	// row size their keys from a custom property instead (--circle-key and
-	// --row-key, see the styles below).
+	const submitClosesGrid =
+		!isRow &&
+		!isCircle &&
+		shuffledLetters.length > GRID_SUBMIT_BESIDE_MAX_LETTERS;
+	// The grid has room for the full-size key on any board; four columns only
+	// reach it once the desktop side column is wide enough for them. The circle
+	// and the row size their keys from a custom property instead (--circle-key
+	// and --row-key, see the styles below).
+	const gridKeySizeClass = submitClosesGrid
+		? "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 xl:w-16 xl:h-16"
+		: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16";
 	const keySizeClass = isRow
 		? "shrink-0"
 		: isCircle
 			? "rounded-full"
-			: "w-[3.25rem] h-[3.25rem] sm:w-14 sm:h-14 md:w-16 md:h-16";
+			: gridKeySizeClass;
 	const submitSizeClass = isRow
 		? "ml-1 shrink-0"
 		: isCircle
 			? "rounded-full"
-			: "w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl";
+			: submitClosesGrid
+				? `${gridKeySizeClass} rounded-lg sm:rounded-xl`
+				: "w-14 h-14 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl";
+	const circleKeyScale = getCircleKeyScale(shuffledLetters.length);
+	const circleWheelSize = (CIRCLE_WHEEL_KEYS / circleKeyScale).toFixed(4);
+	const circleRadius = (CIRCLE_WHEEL_KEYS / circleKeyScale - 1) / 2;
 	// Every letter plus the submit, and everything the row has to fit around
 	// them: the gaps between the keys and the submit's extra breathing room.
 	const rowKeyCount = shuffledLetters.length + 1;
@@ -378,15 +413,15 @@ export function PuzzleControls({
 	);
 
 	// The keys themselves, without the surrounding actions: a wheel around the
-	// submit button, a three-column grid, or one row that ends in the submit.
+	// submit button, a grid, or one row that ends in the submit.
 	const lettersLayout = isCircle ? (
 		<div
 			className="relative shrink-0 overflow-visible"
 			style={
 				{
-					"--circle-key": CIRCLE_KEY_SIZE,
-					width: "calc(var(--circle-key) * 3.4)",
-					height: "calc(var(--circle-key) * 3.4)",
+					"--circle-key": `calc(${CIRCLE_KEY_SIZE} * ${circleKeyScale.toFixed(4)})`,
+					width: `calc(var(--circle-key) * ${circleWheelSize})`,
+					height: `calc(var(--circle-key) * ${circleWheelSize})`,
 				} as CSSProperties
 			}
 		>
@@ -396,8 +431,8 @@ export function PuzzleControls({
 			{shuffledLetters.map((letter, index) => {
 				const angle =
 					(index / shuffledLetters.length) * 2 * Math.PI - Math.PI / 2;
-				const x = (CIRCLE_RADIUS_FACTOR * Math.cos(angle)).toFixed(4);
-				const y = (CIRCLE_RADIUS_FACTOR * Math.sin(angle)).toFixed(4);
+				const x = (circleRadius * Math.cos(angle)).toFixed(4);
+				const y = (circleRadius * Math.sin(angle)).toFixed(4);
 				return (
 					<div
 						key={`letter-${letter}`}
@@ -423,14 +458,20 @@ export function PuzzleControls({
 			</div>
 		</div>
 	) : (
-		<div className="grid grid-cols-3 gap-2 sm:gap-3">
+		<div
+			className={cn(
+				"grid gap-2 sm:gap-3",
+				submitClosesGrid ? "grid-cols-4" : "grid-cols-3",
+			)}
+		>
 			{shuffledLetters.map((letter) => renderLetterButton(letter))}
+			{submitClosesGrid ? submitButton : null}
 		</div>
 	);
 
 	// The keys plus the actions. The row stacks them, the wheel puts the actions
-	// alongside it, and the grid keeps the submit beside the keys with the
-	// actions spread underneath.
+	// alongside it, and the grid keeps the submit beside the keys (or in their
+	// last row) with the actions spread underneath.
 	const keypad = isRow ? (
 		<div className="flex w-full flex-col gap-2">
 			{lettersLayout}
@@ -445,7 +486,7 @@ export function PuzzleControls({
 		<>
 			<div className="flex items-center w-full gap-4 sm:gap-6 justify-evenly">
 				{lettersLayout}
-				{submitButton}
+				{submitClosesGrid ? null : submitButton}
 			</div>
 
 			<div className="grid grid-cols-3 gap-2 sm:gap-4 w-full font-ui">

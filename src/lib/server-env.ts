@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidDateKey } from "@/lib/puzzle-dates";
 
 const optionalEnvString = z.preprocess(
 	(value) =>
@@ -53,6 +54,12 @@ const serverEnvSchema = z.object({
 		.default("Garbuix <codi@garbuix.app>"),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
+	// Moves the first seven-letter Sunday, so one can be generated and played
+	// locally before the real start date. Leave unset in production.
+	SEVEN_LETTER_SUNDAYS_START: optionalEnvString.refine(
+		(value) => value === undefined || isValidDateKey(value),
+		{ error: "SEVEN_LETTER_SUNDAYS_START must be a YYYY-MM-DD date." },
+	),
 });
 
 let cachedServerEnv: z.infer<typeof serverEnvSchema> | null = null;

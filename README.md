@@ -498,6 +498,14 @@ The crossword generator:
 - Creates a compact grid layout
 - Falls back to simpler layouts if complex generation fails
 
+Each day has six letters, except Sundays from 2026-10-18, which have seven
+(`src/lib/daily-letter-count.ts`). Earlier Sundays stay at six because
+generating a day replays the previous 45 days, and that replay has to match the
+puzzles already published. To play a seven-letter day before then in local
+development, set `SEVEN_LETTER_SUNDAYS_START` to an earlier Sunday, remove that
+day's stored puzzle with `pnpm delete:puzzle-day -- --date <YYYY-MM-DD> --confirm`
+and reload the page.
+
 ### Word Matching
 
 - User input is normalized (accents removed, lowercase)
