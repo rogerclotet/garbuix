@@ -4,7 +4,7 @@ export const FESTIVE_LETTER_COUNT = 7;
 // The first day the seven-letter rule applies. Earlier Sundays and holidays
 // keep six: generating a day replays its lookback window, and that replay has
 // to reproduce the puzzles that were actually published.
-export const SEVEN_LETTER_DAYS_START = "2026-10-18";
+export const SEVEN_LETTER_DAYS_START = "2026-10-12";
 
 // Holidays in Catalunya that fall on the same date every year, the Spanish
 // ones included, as month-day. Easter and other holidays that move are left

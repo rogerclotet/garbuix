@@ -5,11 +5,13 @@ import {
 } from "@/lib/daily-letter-count";
 
 describe("getDailyLetterCount", () => {
-	it("starts the seven-letter days on a Sunday", () => {
+	it("starts the seven-letter days on a holiday", () => {
+		expect(SEVEN_LETTER_DAYS_START).toBe("2026-10-12");
 		expect(getDailyLetterCount(SEVEN_LETTER_DAYS_START)).toBe(7);
 	});
 
 	it("gives seven letters to every later Sunday", () => {
+		expect(getDailyLetterCount("2026-10-18")).toBe(7);
 		expect(getDailyLetterCount("2026-10-25")).toBe(7);
 		expect(getDailyLetterCount("2027-01-03")).toBe(7);
 	});
@@ -52,13 +54,12 @@ describe("getDailyLetterCount", () => {
 
 	it("keeps six letters on Sundays and holidays before the start date", () => {
 		expect(getDailyLetterCount("2026-10-11")).toBe(6);
-		expect(getDailyLetterCount("2026-10-12")).toBe(6);
 		expect(getDailyLetterCount("2026-09-11")).toBe(6);
 	});
 
 	it("moves the first seven-letter day with the start date", () => {
 		expect(getDailyLetterCount("2026-10-11", "2026-10-11")).toBe(7);
-		expect(getDailyLetterCount("2026-10-12", "2026-10-12")).toBe(7);
+		expect(getDailyLetterCount("2026-10-12", "2026-10-13")).toBe(6);
 		expect(getDailyLetterCount("2026-10-18", "2026-11-01")).toBe(6);
 	});
 });

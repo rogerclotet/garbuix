@@ -498,7 +498,7 @@ The crossword generator:
 - Creates a compact grid layout
 - Falls back to simpler layouts if complex generation fails
 
-Each day has six letters. From 2026-10-18, Sundays and the holidays that fall
+Each day has six letters. From 2026-10-12, Sundays and the holidays that fall
 on the same date every year in Catalunya have seven
 (`src/lib/daily-letter-count.ts`). Holidays that move, such as Easter, are left
 out so the list never needs a yearly update. Earlier Sundays and holidays stay
