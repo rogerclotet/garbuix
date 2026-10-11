@@ -92,8 +92,8 @@ beforeEach(() => {
 	});
 	vi.stubGlobal(
 		"window",
-		Object.assign(Object.create(window), {
-			location: { ...window.location, reload },
+		Object.create(window, {
+			location: { value: { ...window.location, reload } },
 		}),
 	);
 	vi.stubGlobal("fetch", fetchVersion);
