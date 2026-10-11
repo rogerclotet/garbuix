@@ -7,8 +7,9 @@ import { createRedisSseStream } from "@/lib/redis-sse.server";
 
 vi.mock("@/lib/redis.server", () => ({ getRedisSub: vi.fn() }));
 
-function reply(values: (string | number)[]) {
-	return `*${values.length}\r\n${values
+// Pub/sub frames are RESP3 pushes: the client negotiates RESP3 with HELLO.
+function push(values: (string | number)[]) {
+	return `>${values.length}\r\n${values
 		.map((value) =>
 			typeof value === "number"
 				? `:${value}\r\n`
@@ -17,9 +18,9 @@ function reply(values: (string | number)[]) {
 		.join("")}`;
 }
 
-it("removes abandoned channels after a real ioredis reconnect while preserving active viewers", async () => {
-	// A local RESP peer keeps the actual ioredis command queue, subscription
-	// bookkeeping and reconnect logic in the test. No Redis commands are mocked.
+// A local RESP peer keeps the actual ioredis command queue, subscription
+// bookkeeping and reconnect logic in the test. No Redis commands are mocked.
+async function startRespPeer() {
 	const connections: { socket: Socket; channels: Set<string> }[] = [];
 	const server = createServer((socket) => {
 		const channels = new Set<string>();
@@ -43,8 +44,10 @@ it("removes abandoned channels after a real ioredis reconnect while preserving a
 					for (const channel of args) {
 						if (command === "subscribe") channels.add(channel);
 						else channels.delete(channel);
-						socket.write(reply([command, channel, channels.size]));
+						socket.write(push([command, channel, channels.size]));
 					}
+				} else if (command === "hello") {
+					socket.write("%1\r\n$5\r\nproto\r\n:3\r\n");
 				} else {
 					// Acknowledge ioredis's CLIENT handshake commands.
 					socket.write("+OK\r\n");
@@ -57,29 +60,49 @@ it("removes abandoned channels after a real ioredis reconnect while preserving a
 	const address = server.address();
 	if (!address || typeof address === "string")
 		throw new Error("Missing TCP address");
+	return {
+		connections,
+		port: address.port,
+		async close() {
+			for (const { socket } of connections) socket.destroy();
+			await new Promise<void>((resolve) => server.close(() => resolve()));
+		},
+	};
+}
+
+function connectSubscriber(port: number, lazyConnect: boolean) {
 	const sub = new Redis({
 		host: "127.0.0.1",
-		port: address.port,
-		lazyConnect: true,
+		port,
+		lazyConnect,
 		enableReadyCheck: false,
 		enableOfflineQueue: false,
 		retryStrategy: () => 100,
 	});
 	sub.on("error", () => {});
 	vi.mocked(getRedisSub).mockReturnValue(sub);
+	return sub;
+}
+
+const readers: ReadableStreamDefaultReader<Uint8Array>[] = [];
+
+function open(privateChannel: string) {
+	const reader = createRedisSseStream({
+		channels: ["shared", privateChannel],
+		event: "message",
+		snapshot: async () => ({}),
+		fallbackSnapshot: {},
+		logPrefix: "[test:sse]",
+	}).getReader();
+	readers.push(reader);
+	return reader;
+}
+
+it("removes abandoned channels after a real ioredis reconnect while preserving active viewers", async () => {
+	const peer = await startRespPeer();
+	const { connections } = peer;
+	const sub = connectSubscriber(peer.port, true);
 	const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-	const readers: ReadableStreamDefaultReader<Uint8Array>[] = [];
-	const open = (privateChannel: string) => {
-		const reader = createRedisSseStream({
-			channels: ["shared", privateChannel],
-			event: "message",
-			snapshot: async () => ({}),
-			fallbackSnapshot: {},
-			logPrefix: "[test:sse]",
-		}).getReader();
-		readers.push(reader);
-		return reader;
-	};
 	try {
 		await sub.connect();
 		const departed = open("private:departed");
@@ -88,7 +111,7 @@ it("removes abandoned channels after a real ioredis reconnect while preserving a
 		await active.read();
 		await vi.waitFor(() => expect(connections[0].channels.size).toBe(3));
 		connections[0].socket.write(
-			reply(["message", "private:active", "before outage"]),
+			push(["message", "private:active", "before outage"]),
 		);
 		await active.read();
 
@@ -104,7 +127,7 @@ it("removes abandoned channels after a real ioredis reconnect while preserving a
 		expect(sub.listenerCount("message")).toBe(1);
 		expect(sub.listenerCount("ready")).toBe(1);
 		connections[1].socket.write(
-			reply(["message", "private:active", "after outage"]),
+			push(["message", "private:active", "after outage"]),
 		);
 		expect(new TextDecoder().decode((await active.read()).value)).toContain(
 			"after outage",
@@ -112,10 +135,39 @@ it("removes abandoned channels after a real ioredis reconnect while preserving a
 		await active.cancel();
 		await vi.waitFor(() => expect(connections[1].channels.size).toBe(0));
 	} finally {
-		await Promise.all(readers.map((reader) => reader.cancel()));
+		await Promise.all(readers.splice(0).map((reader) => reader.cancel()));
 		sub.disconnect();
-		for (const { socket } of connections) socket.destroy();
-		await new Promise<void>((resolve) => server.close(() => resolve()));
+		await peer.close();
+		warn.mockRestore();
+	}
+});
+
+it("subscribes a viewer that arrives while the connection is still being established", async () => {
+	const peer = await startRespPeer();
+	// Connects on construction, like the production subscriber on first use.
+	const sub = connectSubscriber(peer.port, false);
+	const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+	try {
+		expect(sub.status).toBe("connecting");
+		const viewer = open("private:early");
+		await viewer.read();
+		await vi.waitFor(() => {
+			expect(peer.connections[0]?.channels).toEqual(
+				new Set(["shared", "private:early"]),
+			);
+		});
+		peer.connections[0].socket.write(
+			push(["message", "private:early", "live update"]),
+		);
+		expect(new TextDecoder().decode((await viewer.read()).value)).toContain(
+			"live update",
+		);
+		expect(warn).not.toHaveBeenCalled();
+		expect(sub.listenerCount("ready")).toBe(1);
+	} finally {
+		await Promise.all(readers.splice(0).map((reader) => reader.cancel()));
+		sub.disconnect();
+		await peer.close();
 		warn.mockRestore();
 	}
 });

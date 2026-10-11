@@ -9,6 +9,32 @@ type ChannelSubscription = {
 };
 
 const subscribers = new WeakMap<Redis, Map<string, ChannelSubscription>>();
+const settling = new WeakMap<Redis, Promise<void>>();
+
+// ioredis writes only its own commands until its handshake completes, and the
+// subscriber has no offline queue, so a SUBSCRIBE issued before then is
+// rejected. The first viewers after a start arrive while it is connecting.
+function connectionSettled(sub: Redis): Promise<void> {
+	if (sub.status !== "connecting" && sub.status !== "connect") {
+		return Promise.resolve();
+	}
+	let pending = settling.get(sub);
+	if (!pending) {
+		// One pair of listeners, however many viewers wait on this attempt.
+		pending = new Promise((resolve) => {
+			const settle = () => {
+				sub.off("ready", settle);
+				sub.off("close", settle);
+				settling.delete(sub);
+				resolve();
+			};
+			sub.on("ready", settle);
+			sub.on("close", settle);
+		});
+		settling.set(sub, pending);
+	}
+	return pending;
+}
 
 function unsubscribeChannel({
 	sub,
@@ -155,6 +181,8 @@ export function createRedisSseStream({
 			if (closed) return;
 
 			if (sub) {
+				await connectionSettled(sub);
+				if (closed) return;
 				subscription = subscribe(sub, channels, (_channel, message) => {
 					send(`event: ${event}\ndata: ${message}\n\n`);
 				});
