@@ -6,6 +6,7 @@ import {
 	Info,
 	LogIn,
 	Menu,
+	MessagesSquare,
 	Moon,
 	Settings,
 	Sun,
@@ -29,6 +30,8 @@ import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import { useMiniRoute } from "@/lib/use-mini-route";
 import { useSyllableRoute } from "@/lib/use-syllable-route";
 import { initialsFromName } from "@/lib/user-profile";
+
+const REDDIT_COMMUNITY_URL = "https://www.reddit.com/r/garbuix";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -141,6 +144,18 @@ export function UserMenu({
 						<DropdownMenuSeparator />
 					</>
 				)}
+				{!mini && !syllables ? (
+					<DropdownMenuItem asChild>
+						<a
+							href={REDDIT_COMMUNITY_URL}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							<MessagesSquare className="size-4" />
+							<span>Comunitat de Reddit</span>
+						</a>
+					</DropdownMenuItem>
+				) : null}
 				<DropdownMenuItem asChild>
 					<Link
 						to={

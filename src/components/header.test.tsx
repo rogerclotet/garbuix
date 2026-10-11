@@ -156,14 +156,33 @@ it("still rewinds regular Garbuix's inner pages", async () => {
 	expect(router.history.location.state.__TSR_index).toBe(0);
 });
 
-it("links to the Reddit community from the main game only", async () => {
-	const router = await setup();
-	const link = screen.getByRole("link", { name: "Comunitat de Reddit" });
+function openMenu() {
+	fireEvent.pointerDown(screen.getByRole("button", { name: "Obrir el menú" }), {
+		button: 0,
+		ctrlKey: false,
+		pointerType: "mouse",
+	});
+}
+
+it("links to the Reddit community above the other navigation items", async () => {
+	await setup();
+	openMenu();
+	const labels = (await screen.findAllByRole("menuitem")).map(
+		(item) => item.textContent,
+	);
+	expect(labels.indexOf("Comunitat de Reddit")).toBe(
+		labels.indexOf("Historial") - 1,
+	);
+	const link = screen.getByRole("menuitem", { name: "Comunitat de Reddit" });
 	expect(link.getAttribute("href")).toBe("https://www.reddit.com/r/garbuix");
 	expect(link.getAttribute("target")).toBe("_blank");
-	expect(link.getAttribute("title")).toBe("Comunitat de Reddit");
-	await act(async () => router.navigate({ to: "/mini" }));
+});
+
+it("leaves the Reddit community out of the mini menu", async () => {
+	await setup("/mini");
+	openMenu();
+	await screen.findByRole("menuitem", { name: "Historial" });
 	expect(
-		screen.queryByRole("link", { name: "Comunitat de Reddit" }),
+		screen.queryByRole("menuitem", { name: "Comunitat de Reddit" }),
 	).toBeNull();
 });

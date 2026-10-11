@@ -4,13 +4,7 @@ import {
 	useRouter,
 	useRouterState,
 } from "@tanstack/react-router";
-import {
-	ChevronLeft,
-	HelpingHand,
-	MessagesSquare,
-	Share2,
-	Trophy,
-} from "lucide-react";
+import { ChevronLeft, HelpingHand, Share2, Trophy } from "lucide-react";
 import { useDailyHeaderSummary } from "@/components/daily/daily-header-store";
 import { HowToPlayDialog } from "@/components/daily/how-to-play-dialog";
 import {
@@ -31,8 +25,6 @@ import { getGameHistory } from "@/lib/game-history";
 import { useClueRequests } from "@/lib/use-clue-requests";
 import { useMiniRoute } from "@/lib/use-mini-route";
 import { useSyllableRoute } from "@/lib/use-syllable-route";
-
-const REDDIT_COMMUNITY_URL = "https://www.reddit.com/r/garbuix";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -100,9 +92,9 @@ export default function Header() {
 		void navigate({ to, replace: true });
 	};
 
-	// Share / Reddit / trophy / help badge / avatar. The share action is the one
-	// the progress meters used to own. Inner pages (classificació, dies
-	// anteriors, preferències) drop the share, Reddit and ranking actions.
+	// Share / trophy / help badge / avatar. The share action is the one the
+	// progress meters used to own. Inner pages (classificació, dies anteriors,
+	// preferències) drop the share and ranking actions.
 	const actionButtons = (showNav: boolean) => (
 		<div className="flex items-center gap-1">
 			{showNav && dailySummary ? (
@@ -114,24 +106,6 @@ export default function Header() {
 					aria-label="Compartir progrés"
 				>
 					<Share2 className="size-5" />
-				</Button>
-			) : null}
-			{showNav ? (
-				<Button
-					variant="ghost"
-					size="icon"
-					asChild
-					className="rounded-full size-10 text-foreground hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/20 sm:size-9"
-				>
-					<a
-						href={REDDIT_COMMUNITY_URL}
-						target="_blank"
-						rel="noopener noreferrer"
-						aria-label="Comunitat de Reddit"
-						title="Comunitat de Reddit"
-					>
-						<MessagesSquare className="size-5" />
-					</a>
 				</Button>
 			) : null}
 			{showNav && pathname !== "/classificacio" ? (
