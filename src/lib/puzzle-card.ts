@@ -1,7 +1,5 @@
-// Draws the puzzle card: the board's shape, the day's letters below it, and
-// optional completion stats. The browser share image and the server-rendered
-// Reddit image both go through here so the two always look the same. Only the
-// 2D canvas API is used, so it runs on a DOM canvas and on @napi-rs/canvas.
+// Draws the puzzle card the share image is made of: the board's shape, the
+// day's letters below it, and optional completion stats.
 
 import { appScheme } from "@/lib/material-theme";
 import { formatShortPuzzleDate, getPuzzleNumber } from "@/lib/puzzle-number";
@@ -43,8 +41,7 @@ type PuzzleCardColors = {
 };
 
 // Always the dark theme, whatever the player's setting, so every shared image
-// and Reddit post looks the same. Brand is the teal the dark theme uses for the
-// logo.
+// looks the same. Brand is the teal the dark theme uses for the logo.
 const COLORS: PuzzleCardColors = {
 	background: appScheme.dark.background,
 	brand: appScheme.dark.primary,
@@ -67,47 +64,6 @@ export type PuzzleCardInput = {
 	dateKey: string;
 	detail: string | null;
 	stats: readonly PuzzleCardStat[];
-};
-
-// Structural subset of CanvasRenderingContext2D shared by the DOM and
-// @napi-rs/canvas, whose context types are otherwise unrelated.
-export type PuzzleCardContext = {
-	fillStyle: string | object;
-	strokeStyle: string | object;
-	lineWidth: number;
-	globalAlpha: number;
-	font: string;
-	textAlign: CanvasTextAlign;
-	textBaseline: CanvasTextBaseline;
-	save(): void;
-	restore(): void;
-	translate(x: number, y: number): void;
-	scale(x: number, y: number): void;
-	beginPath(): void;
-	closePath(): void;
-	moveTo(x: number, y: number): void;
-	lineTo(x: number, y: number): void;
-	quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
-	bezierCurveTo(
-		cp1x: number,
-		cp1y: number,
-		cp2x: number,
-		cp2y: number,
-		x: number,
-		y: number,
-	): void;
-	arc(
-		x: number,
-		y: number,
-		radius: number,
-		startAngle: number,
-		endAngle: number,
-	): void;
-	fill(): void;
-	stroke(): void;
-	fillRect(x: number, y: number, w: number, h: number): void;
-	fillText(text: string, x: number, y: number): void;
-	measureText(text: string): { width: number };
 };
 
 type PuzzleCardLayout = {
@@ -161,7 +117,7 @@ export function measurePuzzleCard(input: PuzzleCardInput): {
 }
 
 function roundRect(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
 	w: number,
@@ -181,7 +137,12 @@ function roundRect(
 	ctx.closePath();
 }
 
-function squircle(ctx: PuzzleCardContext, x: number, y: number, size: number) {
+function squircle(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	size: number,
+) {
 	const half = size / 2;
 	const handle = half * SQUIRCLE_HANDLE;
 	const cx = x + half;
@@ -199,7 +160,7 @@ function squircle(ctx: PuzzleCardContext, x: number, y: number, size: number) {
 }
 
 function drawLogo(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
 	height: number,
@@ -248,7 +209,7 @@ function headerParts(dateKey: string): string[] {
 }
 
 function drawHeader(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	input: PuzzleCardInput,
 	layout: PuzzleCardLayout,
 	colors: PuzzleCardColors,
@@ -283,7 +244,7 @@ function drawHeader(
 }
 
 function drawRevealedCell(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
 	colors: PuzzleCardColors,
@@ -309,7 +270,7 @@ function drawRevealedCell(
 }
 
 function drawHiddenCell(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
 	colors: PuzzleCardColors,
@@ -327,7 +288,7 @@ function drawHiddenCell(
 }
 
 function drawGrid(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	input: PuzzleCardInput,
 	layout: PuzzleCardLayout,
 	colors: PuzzleCardColors,
@@ -350,7 +311,7 @@ function drawGrid(
 // Styled like the board's letter keys: outlined squircles with a bold letter,
 // here in the brand teal.
 function drawLetters(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	input: PuzzleCardInput,
 	layout: PuzzleCardLayout,
 	colors: PuzzleCardColors,
@@ -385,7 +346,7 @@ function drawLetters(
 }
 
 function drawStats(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	input: PuzzleCardInput,
 	layout: PuzzleCardLayout,
 	colors: PuzzleCardColors,
@@ -429,7 +390,7 @@ function drawStats(
 
 // Draws at 1 unit per CSS pixel; scale the context first for denser output.
 export function drawPuzzleCard(
-	ctx: PuzzleCardContext,
+	ctx: CanvasRenderingContext2D,
 	input: PuzzleCardInput,
 	fontFamily: string,
 ): void {

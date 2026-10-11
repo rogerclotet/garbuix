@@ -1,13 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("@/lib/puzzle-generation.server", () => ({
-	readDailyPuzzleRow: vi.fn(),
-}));
-
+import { describe, expect, it } from "vitest";
 import { measurePuzzleCard, type PuzzleCardInput } from "@/lib/puzzle-card";
-import { renderPuzzleCardPng } from "@/lib/puzzle-card.server";
-
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 
 function card(overrides: Partial<PuzzleCardInput> = {}): PuzzleCardInput {
 	return {
@@ -27,23 +19,7 @@ function card(overrides: Partial<PuzzleCardInput> = {}): PuzzleCardInput {
 	};
 }
 
-function pngSize(png: Buffer): { width: number; height: number } {
-	return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-}
-
-describe("renderPuzzleCardPng", () => {
-	it("renders a PNG at twice the card's measured size", () => {
-		const input = card();
-		const png = renderPuzzleCardPng(input);
-		const measured = measurePuzzleCard(input);
-
-		expect([...png.subarray(0, 4)]).toEqual(PNG_SIGNATURE);
-		expect(pngSize(png)).toEqual({
-			width: measured.width * 2,
-			height: measured.height * 2,
-		});
-	});
-
+describe("measurePuzzleCard", () => {
 	it("keeps narrow boards wide enough for the header", () => {
 		const narrow = measurePuzzleCard(card());
 		const wide = measurePuzzleCard(

@@ -23,7 +23,7 @@ function TermsPage() {
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzades el 8 d'octubre de 2026
+					Actualitzades l'11 d'octubre de 2026
 				</p>
 			</header>
 
@@ -77,9 +77,9 @@ function TermsPage() {
 					<a href="https://www.reddit.com/r/garbuix/" className="text-link">
 						r/garbuix
 					</a>{" "}
-					es parla del joc. Cada dia, l'aplicació garbuix-bot hi publica la
-					imatge del Garbuix del dia i fixa la publicació a la part superior de
-					la comunitat. L'aplicació no fa res més a Reddit.
+					es parla del joc. Cada dia, l'aplicació garbuix-bot hi obre el fil del
+					Garbuix del dia i el fixa a la part superior de la comunitat.
+					L'aplicació no fa res més a Reddit.
 				</p>
 				<p>
 					El que publiques a la comunitat es regeix per les{" "}

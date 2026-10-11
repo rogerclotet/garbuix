@@ -2,63 +2,37 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	type DailyPostDeps,
-	GARBUIX_ORIGIN,
 	getMadridDateKey,
 	postDailyPuzzle,
 	postedKey,
 } from "./daily-post.ts";
 
-const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 // 00:00:30 in Madrid (CEST, UTC+2) on 8 Oct 2026.
 const JUST_AFTER_MIDNIGHT = new Date("2026-10-07T22:00:30Z");
 
 type Harness = {
 	deps: DailyPostDeps;
 	values: Map<string, string>;
-	requests: string[];
-	uploads: string[];
-	posts: { title: string; imageUrl: string }[];
-	textPosts: string[];
+	posts: string[];
 	pins: string[];
 	unpins: string[];
 };
 
 function harness(
 	options: {
-		serverDateKey?: string;
-		dailyPostStatus?: number;
-		unreachable?: boolean;
+		now?: Date;
+		failSubmit?: boolean;
 		failPin?: boolean;
 		failUnpin?: boolean;
 	} = {},
 ): Harness {
 	const values = new Map<string, string>();
-	const requests: string[] = [];
-	const uploads: string[] = [];
-	const posts: { title: string; imageUrl: string }[] = [];
-	const textPosts: string[] = [];
+	const posts: string[] = [];
 	const pins: string[] = [];
 	const unpins: string[] = [];
-	const serverDateKey = options.serverDateKey ?? "2026-10-08";
 
 	const deps: DailyPostDeps = {
-		now: () => JUST_AFTER_MIDNIGHT,
-		fetch: async (url) => {
-			requests.push(url);
-			if (options.unreachable) throw new Error("domain not allowed");
-			if (url === `${GARBUIX_ORIGIN}/api/daily-post`) {
-				const status = options.dailyPostStatus ?? 200;
-				if (status !== 200) return new Response(null, { status });
-				return Response.json({
-					dateKey: serverDateKey,
-					title: "Garbuix #212 - 8/10/2026",
-					imagePath: `/api/daily-image/${serverDateKey}.png`,
-				});
-			}
-			return new Response(PNG_BYTES, {
-				headers: { "Content-Type": "image/png" },
-			});
-		},
+		now: () => options.now ?? JUST_AFTER_MIDNIGHT,
 		store: {
 			get: async (key) => values.get(key),
 			set: async (key, value) => {
@@ -70,16 +44,9 @@ function harness(
 				return true;
 			},
 		},
-		uploadImage: async (dataUrl) => {
-			uploads.push(dataUrl);
-			return "https://i.redd.it/garbuix.png";
-		},
-		submitPost: async (title, imageUrl) => {
-			posts.push({ title, imageUrl });
-			return "t3_abc123";
-		},
-		submitTextPost: async (title) => {
-			textPosts.push(title);
+		submitPost: async (title) => {
+			if (options.failSubmit) throw new Error("submit failed");
+			posts.push(title);
 			return "t3_abc123";
 		},
 		pinPost: async (postId) => {
@@ -92,16 +59,7 @@ function harness(
 		},
 	};
 
-	return {
-		deps,
-		values,
-		requests,
-		uploads,
-		posts,
-		textPosts,
-		pins,
-		unpins,
-	};
+	return { deps, values, posts, pins, unpins };
 }
 
 describe("getMadridDateKey", () => {
@@ -120,7 +78,7 @@ describe("getMadridDateKey", () => {
 });
 
 describe("postDailyPuzzle", () => {
-	it("posts the server's title with the uploaded image", async () => {
+	it("posts the day's title as a text post", async () => {
 		const h = harness();
 
 		const outcome = await postDailyPuzzle(h.deps);
@@ -129,19 +87,8 @@ describe("postDailyPuzzle", () => {
 			status: "posted",
 			dateKey: "2026-10-08",
 			postId: "t3_abc123",
-			withImage: true,
 		});
-		assert.deepEqual(h.requests, [
-			`${GARBUIX_ORIGIN}/api/daily-post`,
-			`${GARBUIX_ORIGIN}/api/daily-image/2026-10-08.png`,
-		]);
-		assert.deepEqual(h.uploads, ["data:image/png;base64,iVBORw=="]);
-		assert.deepEqual(h.posts, [
-			{
-				title: "Garbuix #212 - 8/10/2026",
-				imageUrl: "https://i.redd.it/garbuix.png",
-			},
-		]);
+		assert.deepEqual(h.posts, ["Garbuix #212 - 8/10/2026"]);
 		assert.equal(h.values.get(postedKey("2026-10-08")), "t3_abc123");
 	});
 
@@ -155,22 +102,22 @@ describe("postDailyPuzzle", () => {
 		assert.equal(h.posts.length, 1);
 	});
 
-	it("waits while the server is still on yesterday's puzzle", async () => {
-		const h = harness({ serverDateKey: "2026-10-07" });
+	it("posts the next day's puzzle once Madrid passes midnight", async () => {
+		const h = harness({ now: new Date("2026-10-08T22:00:30Z") });
+		h.values.set(postedKey("2026-10-08"), "t3_yesterday");
 
 		const outcome = await postDailyPuzzle(h.deps);
 
-		assert.equal(outcome.status, "not-ready");
-		assert.equal(h.posts.length, 0);
+		assert.equal(outcome.status, "posted");
+		assert.deepEqual(h.posts, ["Garbuix #213 - 9/10/2026"]);
 	});
 
-	it("waits while today's puzzle is being generated", async () => {
-		const h = harness({ dailyPostStatus: 503 });
+	it("leaves the day unposted when the submit fails", async () => {
+		const h = harness({ failSubmit: true });
 
-		const outcome = await postDailyPuzzle(h.deps);
+		await assert.rejects(postDailyPuzzle(h.deps), /submit failed/);
 
-		assert.equal(outcome.status, "not-ready");
-		assert.equal(h.posts.length, 0);
+		assert.equal(h.values.has(postedKey("2026-10-08")), false);
 	});
 
 	it("leaves the day to an overlapping run that holds the lock", async () => {
@@ -227,42 +174,5 @@ describe("postDailyPuzzle", () => {
 		assert.deepEqual(h.pins, ["t3_abc123"]);
 		assert.equal(warn.mock.callCount(), 1);
 		assert.match(String(warn.mock.calls[0]?.arguments[0]), /t3_deleted/);
-	});
-
-	it("posts the title alone when garbuix.app can't be reached", async (t) => {
-		const warn = t.mock.method(console, "warn", () => {});
-		const h = harness({ unreachable: true });
-
-		const outcome = await postDailyPuzzle(h.deps);
-
-		assert.deepEqual(outcome, {
-			status: "posted",
-			dateKey: "2026-10-08",
-			postId: "t3_abc123",
-			withImage: false,
-		});
-		assert.deepEqual(h.textPosts, ["Garbuix #212 - 8/10/2026"]);
-		assert.equal(h.posts.length, 0);
-		assert.deepEqual(h.pins, ["t3_abc123"]);
-		assert.equal(warn.mock.callCount(), 1);
-	});
-
-	it("posts the title alone when garbuix.app answers with an error", async (t) => {
-		t.mock.method(console, "warn", () => {});
-		const h = harness({ dailyPostStatus: 500 });
-
-		await postDailyPuzzle(h.deps);
-
-		assert.deepEqual(h.textPosts, ["Garbuix #212 - 8/10/2026"]);
-	});
-
-	it("does not post the title alone once today's post is up", async (t) => {
-		t.mock.method(console, "warn", () => {});
-		const h = harness({ unreachable: true });
-
-		await postDailyPuzzle(h.deps);
-		await postDailyPuzzle(h.deps);
-
-		assert.equal(h.textPosts.length, 1);
 	});
 });
