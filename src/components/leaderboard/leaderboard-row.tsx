@@ -19,12 +19,12 @@ export function LeaderboardRow({
 	return (
 		<li
 			className={cn(
-				"flex gap-3 rounded-md border border-transparent py-2 pr-3 pl-2",
+				"flex items-center gap-3 rounded-md border border-transparent py-2 pr-3 pl-2",
 				highlighted && "border-border bg-muted/60 text-foreground",
 			)}
 			aria-current={highlighted ? "true" : undefined}
 		>
-			<span className="w-6 shrink-0 pt-0.5 text-right font-mono text-muted-foreground text-sm tabular-nums">
+			<span className="w-6 shrink-0 text-right font-mono text-muted-foreground text-sm tabular-nums">
 				{rank}
 			</span>
 			<Avatar className="size-8 shrink-0 border border-border">
