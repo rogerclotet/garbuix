@@ -92,8 +92,6 @@ beforeEach(() => {
 	});
 	vi.stubGlobal(
 		"window",
-		// Defined rather than assigned: assigning would run jsdom's own
-		// `location` setter through the prototype, which rejects a plain object.
 		Object.create(window, {
 			location: { value: { ...window.location, reload } },
 		}),
