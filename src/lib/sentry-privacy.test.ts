@@ -135,6 +135,57 @@ it("drops message-only events and filters custom exception names", () => {
 	).toBe("Error");
 });
 
+const transportFailure = {
+	type: "TypeError",
+	value: "Failed to fetch",
+	mechanism: { type: "generic", handled: true },
+};
+
+it.each([
+	"Failed to fetch",
+	"Load failed",
+	"NetworkError when attempting to fetch resource.",
+])("drops a handled browser transport failure: %s", (value) => {
+	expect(
+		minimizeSentryEvent(
+			{
+				type: undefined,
+				platform: "javascript",
+				exception: { values: [{ ...transportFailure, value }] },
+			},
+			{},
+		),
+	).toBeNull();
+});
+
+it.each([
+	{ platform: "node", values: [transportFailure] },
+	{
+		platform: "javascript",
+		values: [
+			{ ...transportFailure, mechanism: { type: "generic", handled: false } },
+		],
+	},
+	{
+		platform: "javascript",
+		values: [{ ...transportFailure, value: "Failed to fetch dynamically" }],
+	},
+	{
+		platform: "javascript",
+		values: [transportFailure, { type: "Error", value: "Save failed" }],
+	},
+])(
+	"keeps transport failures that are uncaught, wrapped or not a browser's",
+	({ platform, values }) => {
+		expect(
+			minimizeSentryEvent(
+				{ type: undefined, platform, exception: { values } },
+				{},
+			),
+		).not.toBeNull();
+	},
+);
+
 it("applies the privacy hook to real SDK envelopes", async () => {
 	const envelopes: unknown[] = [];
 	const client = Sentry.init({

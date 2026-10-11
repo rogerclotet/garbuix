@@ -43,6 +43,28 @@ function isIncomingRequestDisconnect(event: ErrorEvent): boolean {
 	);
 }
 
+// What Chrome, Safari and Firefox each call a request whose response never
+// arrived or was cut off partway. A response with an error status never
+// produces these.
+const BROWSER_TRANSPORT_FAILURE =
+	/^(Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.)$/;
+
+function isHandledBrowserTransportFailure(event: ErrorEvent): boolean {
+	if (event.platform !== "javascript") return false;
+
+	// The player's connection dropped and the caller already recovered. An
+	// uncaught one is still reported, because it names a request with no
+	// error path.
+	return (
+		event.exception?.values?.every(
+			(exception) =>
+				exception.type === "TypeError" &&
+				exception.mechanism?.handled !== false &&
+				BROWSER_TRANSPORT_FAILURE.test(exception.value ?? ""),
+		) ?? false
+	);
+}
+
 export function minimizeSentryEvent(
 	event: ErrorEvent,
 	hint: EventHint,
@@ -52,6 +74,7 @@ export function minimizeSentryEvent(
 	// Inspect full paths and exception types before the privacy scrub below.
 	// Keep an event if any exception in its cause chain is an actual failure.
 	if (isIncomingRequestDisconnect(event)) return null;
+	if (isHandledBrowserTransportFailure(event)) return null;
 
 	// Keep exception messages for diagnosis, but allowlist the surrounding
 	// metadata to exclude request data, personal context, and custom tags.
