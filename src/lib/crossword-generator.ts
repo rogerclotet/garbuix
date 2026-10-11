@@ -524,8 +524,8 @@ export function generateDailyCrosswordForSeed(
 	maxWords = DEFAULT_MAX_WORDS,
 	options: {
 		cache?: Map<number, DailyGenerationResult | null>;
-		// Overrides the date the seven-letter Sundays begin, to preview one early.
-		sevenLetterSundaysStart?: string;
+		// Overrides the date the seven-letter days begin, to preview one early.
+		sevenLetterDaysStart?: string;
 	} = {},
 ): {
 	crossword: CrosswordGrid;
@@ -538,7 +538,7 @@ export function generateDailyCrosswordForSeed(
 		minWords,
 		maxWords,
 		options.cache ?? new Map(),
-		options.sevenLetterSundaysStart,
+		options.sevenLetterDaysStart,
 	);
 }
 
@@ -548,7 +548,7 @@ function generateDailyCrosswordForSeedInternal(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	cache: Map<number, DailyGenerationResult | null> = new Map(),
-	sevenLetterSundaysStart?: string,
+	sevenLetterDaysStart?: string,
 ): DailyGenerationResult | null {
 	const cached = cache.get(seed);
 	if (cached !== undefined) {
@@ -573,7 +573,7 @@ function generateDailyCrosswordForSeedInternal(
 				minWords,
 				maxWords,
 				recentHistory,
-				getDailyLetterCount(currentDate, sevenLetterSundaysStart),
+				getDailyLetterCount(currentDate, sevenLetterDaysStart),
 			);
 			cache.set(currentSeed, generated);
 		}

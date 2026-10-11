@@ -58,9 +58,9 @@ const GRID_SUBMIT_BESIDE_MAX_LETTERS = 6;
 // used to have, so a wide phone still gets a keyboard rather than a handful of
 // oversized buttons.
 const ROW_MAX_KEY_REM = 3.25;
-// Floor for the same clamp. Six letters, or seven on a Sunday, fit down to the
-// narrowest phone; the floor only keeps the width a valid length if a future
-// puzzle carries enough keys to drive the division to zero.
+// Floor for the same clamp. Six letters, or seven on a Sunday or holiday, fit
+// down to the narrowest phone; the floor only keeps the width a valid length
+// if a future puzzle carries enough keys to drive the division to zero.
 const ROW_MIN_KEY_REM = 1.5;
 const ROW_GAP_REM = 0.375;
 // The submit sits a little apart from the letters; counted into the fit so the

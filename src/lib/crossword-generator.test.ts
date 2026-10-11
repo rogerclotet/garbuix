@@ -205,7 +205,7 @@ describe("generated daily puzzles", () => {
 		// holds and only the days after 2026-04-01 are generated again.
 		sevenLetterSunday = generate(260405, {
 			cache: new Map(cache),
-			sevenLetterSundaysStart: "2026-04-05",
+			sevenLetterDaysStart: "2026-04-05",
 		});
 		puzzles = [
 			firstPuzzle,

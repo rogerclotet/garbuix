@@ -184,7 +184,7 @@ export async function ensureDailyPuzzleSnapshot(
 		undefined,
 		undefined,
 		{
-			sevenLetterSundaysStart: getServerEnv().SEVEN_LETTER_SUNDAYS_START,
+			sevenLetterDaysStart: getServerEnv().SEVEN_LETTER_DAYS_START,
 		},
 	);
 

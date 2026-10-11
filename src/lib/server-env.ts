@@ -54,11 +54,11 @@ const serverEnvSchema = z.object({
 		.default("Garbuix <codi@garbuix.app>"),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
-	// Moves the first seven-letter Sunday, so one can be generated and played
+	// Moves the first seven-letter day, so one can be generated and played
 	// locally before the real start date. Leave unset in production.
-	SEVEN_LETTER_SUNDAYS_START: optionalEnvString.refine(
+	SEVEN_LETTER_DAYS_START: optionalEnvString.refine(
 		(value) => value === undefined || isValidDateKey(value),
-		{ error: "SEVEN_LETTER_SUNDAYS_START must be a YYYY-MM-DD date." },
+		{ error: "SEVEN_LETTER_DAYS_START must be a YYYY-MM-DD date." },
 	),
 });
 
