@@ -79,6 +79,27 @@ describe("Redis SSE lifecycle", () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 
+	it.each(["ready", "close"] as const)(
+		"holds viewers behind one pair of listeners until a connection attempt ends: %s",
+		async (outcome) => {
+			const idleCloseListeners = sub.listenerCount("close");
+			sub.status = "connecting";
+			for (let viewer = 0; viewer < 11; viewer++) open();
+			await settle();
+			expect(sub.subscribe).not.toHaveBeenCalled();
+			expect(sub.listenerCount("ready")).toBe(1);
+			expect(sub.listenerCount("close")).toBe(idleCloseListeners + 1);
+
+			sub.status = outcome;
+			sub.emit(outcome);
+			await settle();
+			// After a failed attempt the real client rejects this, closing the streams.
+			expect(sub.subscribe).toHaveBeenCalledExactlyOnceWith("shared");
+			expect(sub.listenerCount("ready")).toBe(1);
+			expect(sub.listenerCount("close")).toBe(idleCloseListeners);
+		},
+	);
+
 	it("routes shared and private messages only to their viewers and preserves SSE event names", async () => {
 		const first = read(open({ channels: ["shared", "private:a"] }));
 		const second = read(

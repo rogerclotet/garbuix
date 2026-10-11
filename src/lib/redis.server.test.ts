@@ -8,7 +8,7 @@ const env = vi.hoisted(() => ({ REDIS_URL: "" }));
 vi.mock("@/lib/server-env", () => ({ getServerEnv: () => env }));
 vi.mock("@sentry/tanstackstart-react", () => ({ captureException: vi.fn() }));
 
-it("allows subscribing during the handshake while retaining publisher readiness checks", async () => {
+it("rejects a subscribe issued during the handshake without breaking readiness", async () => {
 	// Exercise the production factory and real ioredis against a local RESP peer.
 	const sockets: Socket[] = [];
 	const commands: string[] = [];
@@ -26,8 +26,11 @@ it("allows subscribing during the handshake while retaining publisher readiness 
 				const name = lines[2].toLowerCase();
 				pending = lines.slice(end).join("\r\n");
 				commands.push(name);
-				if (name === "subscribe") {
-					socket.write("*3\r\n$9\r\nsubscribe\r\n$4\r\ntest\r\n:1\r\n");
+				if (name === "hello") {
+					socket.write("%1\r\n$5\r\nproto\r\n:3\r\n");
+				} else if (name === "subscribe") {
+					// RESP3 confirms subscriptions with a push frame.
+					socket.write(">3\r\n$9\r\nsubscribe\r\n$4\r\ntest\r\n:1\r\n");
 				} else if (name === "info") {
 					socket.write("$11\r\nloading:0\r\n\r\n");
 				} else {
@@ -48,11 +51,17 @@ it("allows subscribing during the handshake while retaining publisher readiness 
 	const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 	try {
 		const ready = once(sub, "ready", { signal: AbortSignal.timeout(2_000) });
-		const subscribed = new Promise((resolve, reject) => {
-			// SUBSCRIBE can be written before the CLIENT handshake has finished.
-			sub.once("connect", () => sub.subscribe("test").then(resolve, reject));
+		const early = new Promise<unknown>((resolve) => {
+			// ioredis writes only its own commands until the handshake finishes.
+			// The subscriber has no offline queue, so this fails straight away.
+			// SSE streams wait for the connection to settle for that reason.
+			sub.once("connect", () => sub.subscribe("test").then(resolve, resolve));
 		});
-		await Promise.all([ready, subscribed]);
+		await ready;
+		expect(await early).toBeInstanceOf(Error);
+		expect(commands).not.toContain("subscribe");
+
+		await sub.subscribe("test");
 		expect(sub.status).toBe("ready");
 		expect(commands).toContain("subscribe");
 		expect(commands).not.toContain("info");
