@@ -1,9 +1,5 @@
-import { useRouterState } from "@tanstack/react-router";
+import { useRenderedGameRoute } from "@/lib/use-rendered-route";
 
-export function useSyllableRoute() {
-	return useRouterState({
-		select: ({ location }) =>
-			location.pathname === "/sillabes" ||
-			location.pathname.startsWith("/sillabes/"),
-	});
+export function useSyllableRoute(): boolean {
+	return useRenderedGameRoute("/sillabes");
 }

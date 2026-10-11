@@ -1,8 +1,5 @@
-import { useRouterState } from "@tanstack/react-router";
+import { useRenderedGameRoute } from "@/lib/use-rendered-route";
 
-export function useMiniRoute() {
-	return useRouterState({
-		select: ({ location }) =>
-			location.pathname === "/mini" || location.pathname.startsWith("/mini/"),
-	});
+export function useMiniRoute(): boolean {
+	return useRenderedGameRoute("/mini");
 }
