@@ -167,7 +167,9 @@ describe("viable letter sets", () => {
 		expect(sevenLetterSets.length).toBeGreaterThan(0);
 		expect(sixLetterSets.every((set) => set.letters.length === 6)).toBe(true);
 		expect(sevenLetterSets.every((set) => set.letters.length === 7)).toBe(true);
-	});
+		// Scans the whole dictionary twice with nothing cached yet, which takes
+		// longer than the default five seconds on a busy CI runner.
+	}, 30_000);
 });
 
 describe("generated daily puzzles", () => {
