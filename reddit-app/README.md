@@ -9,13 +9,9 @@ installed it needs no setup and nobody has to interact with it.
 
 ## What it does
 
-Shortly after midnight Madrid time, the bot submits an image post as
-u/garbuix-bot:
-
-- The title is the puzzle's number and date, for example
-  `Garbuix #212 - 8/10/2026`.
-- The image is that day's empty board, the same thing a player sees before
-  their first guess. It doesn't show any answers.
+Just after midnight Madrid time, the bot submits a text post as
+u/garbuix-bot. The title is the puzzle's number and date, for example
+`Garbuix #212 - 8/10/2026`, and the body is empty.
 
 The post has no link and the bot doesn't comment on it. It's a place for
 players to discuss the puzzle.
@@ -24,8 +20,9 @@ The bot pins the new post and unpins the previous day's post. It only unpins
 posts it pinned itself, so posts pinned by moderators stay where they are.
 
 That's all it does. It doesn't read, store or reply to anyone's posts or
-comments. In Redis it keeps only the IDs of its own posts, so it knows whether
-it has already posted today and which post to unpin tomorrow.
+comments, and it makes no requests outside Reddit. In Redis it keeps only the
+IDs of its own posts, so it knows whether it has already posted today and which
+post to unpin tomorrow.
 
 ### Operational notes
 
@@ -33,31 +30,8 @@ it has already posted today and which post to unpin tomorrow.
   posts, pinning fails and the bot tries again every minute.
 - If a moderator deletes the day's post, the bot doesn't post it again that
   day.
-- If the bot can't get the day's post from garbuix.app, it posts the title
-  alone as a text post, so the day still has its thread. The image doesn't get
-  added later.
-
-## Fetch Domains
-
-The following domains are requested for this app:
-
-- `garbuix.app` - The bot downloads the day's title and board image from
-  garbuix.app. The garbuix.app server generates the puzzle each day and stores
-  it, so the bot has no other way to get it.
-
-The bot makes two GET requests a day. The first one, to `/api/daily-post`,
-returns the title and the image path, and the second downloads that PNG. Until
-the new puzzle is ready, the first request is repeated once a minute, which
-usually takes a minute or two after midnight. After the post is up, the bot
-makes no more requests until the next day.
-
-Both endpoints are public and need no login. The requests carry no body and no
-Reddit data: no usernames, no post content, nothing about who installed the
-app. The bot uploads the image to Reddit, so the post never loads anything
-from garbuix.app.
-
-Terms: https://garbuix.app/condicions
-Privacy policy: https://garbuix.app/privacitat
+- The bot goes by the clock and doesn't check garbuix.app. If the site is down
+  at midnight, the post still goes up.
 
 ## Installing it on r/garbuix
 
@@ -73,8 +47,8 @@ To stop the daily posts, uninstall the app from the same page.
 
 This directory is separate from the web app. It has its own dependencies,
 lockfile and tests, and it isn't part of the Docker image. The one shared
-file is `src/lib/puzzle-number.ts`, which the bot imports for the title of
-title-only posts, so the numbering always matches the site.
+file is `src/lib/puzzle-number.ts`, which the bot imports for the post title,
+so the numbering always matches the site.
 
 ```bash
 cd reddit-app
@@ -93,11 +67,10 @@ repository secret, which holds the contents of `~/.devvit/token` after
 `devvit login`. `pnpm run upload` is still there for uploading by hand.
 
 The first upload registered the name `garbuix-bot`, which is also the bot
-account's username. Every upload sends `garbuix.app` for fetch review. In the
-app's details at https://developers.reddit.com/apps/garbuix-bot, the terms and
-privacy links above have to be filled in, because the app uses fetch.
+account's username. The app's details are at
+https://developers.reddit.com/apps/garbuix-bot.
 
 A scheduled task runs every minute (`devvit.json`). The posting logic is in
-`src/daily-post.ts`, and `src/index.ts` connects it to Reddit, Redis and media
-uploads. A Redis lock stops two overlapping runs from posting twice. A run
-that fails releases the day for another attempt after about ten minutes.
+`src/daily-post.ts`, and `src/index.ts` connects it to Reddit and Redis. A
+Redis lock stops two overlapping runs from posting twice. A run that fails
+releases the day for another attempt after about ten minutes.

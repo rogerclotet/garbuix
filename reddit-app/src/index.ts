@@ -2,7 +2,6 @@ import {
 	context,
 	createServer,
 	getServerPort,
-	media,
 	reddit,
 	redis,
 	type TaskResponse,
@@ -28,7 +27,6 @@ function getSubredditName(): string {
 
 const deps: DailyPostDeps = {
 	now: () => new Date(),
-	fetch: (url) => fetch(url),
 	store: {
 		get: (key) => redis.get(key),
 		set: async (key, value, ttlSeconds) => {
@@ -47,20 +45,7 @@ const deps: DailyPostDeps = {
 			return true;
 		},
 	},
-	uploadImage: async (dataUrl) => {
-		const asset = await media.upload({ url: dataUrl, type: "image" });
-		return asset.mediaUrl;
-	},
-	submitPost: async (title, imageUrl) => {
-		const post = await reddit.submitPost({
-			subredditName: getSubredditName(),
-			title,
-			kind: "image",
-			imageUrls: [imageUrl],
-		});
-		return post.id;
-	},
-	submitTextPost: async (title) => {
+	submitPost: async (title) => {
 		const post = await reddit.submitPost({
 			subredditName: getSubredditName(),
 			title,
@@ -83,8 +68,7 @@ const app = new Hono();
 app.post("/internal/scheduler/post-daily-puzzle", async (c) => {
 	const outcome = await postDailyPuzzle(deps);
 	if (outcome.status === "posted") {
-		const kind = outcome.withImage ? "image" : "title-only";
-		console.log(`Posted ${outcome.dateKey} as ${outcome.postId} (${kind})`);
+		console.log(`Posted ${outcome.dateKey} as ${outcome.postId}`);
 	}
 	return c.json<TaskResponse>({ status: "ok" }, 200);
 });
