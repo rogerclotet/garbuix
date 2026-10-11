@@ -498,6 +498,16 @@ The crossword generator:
 - Creates a compact grid layout
 - Falls back to simpler layouts if complex generation fails
 
+Each day has six letters. From 2026-10-12, Sundays and the holidays that fall
+on the same date every year in Catalunya have seven
+(`src/lib/daily-letter-count.ts`). Holidays that move, such as Easter, are left
+out so the list never needs a yearly update. Earlier Sundays and holidays stay
+at six because generating a day replays the previous 45 days, and that replay
+has to match the puzzles already published. To play a seven-letter day before
+then in local development, set `SEVEN_LETTER_DAYS_START` to an earlier Sunday or
+holiday, remove that day's stored puzzle with
+`pnpm delete:puzzle-day -- --date <YYYY-MM-DD> --confirm` and reload the page.
+
 ### Word Matching
 
 - User input is normalized (accents removed, lowercase)

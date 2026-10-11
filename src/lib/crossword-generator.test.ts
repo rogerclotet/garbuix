@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import allWords from "@/data/catalan-words.json";
 import {
 	calculateCandidateFreshnessPenalty,
+	computeViableLetterSets,
 	countSameRootPairs,
 	type DailyPuzzleHistoryEntry,
 	generateDailyCrosswordForSeed,
@@ -157,27 +158,80 @@ describe("crossword-generator freshness scoring", () => {
 	});
 });
 
+describe("viable letter sets", () => {
+	it("offers sets of the requested size, six by default", () => {
+		const sixLetterSets = computeViableLetterSets(allWords);
+		const sevenLetterSets = computeViableLetterSets(allWords, 7);
+
+		expect(sixLetterSets.length).toBeGreaterThan(0);
+		expect(sevenLetterSets.length).toBeGreaterThan(0);
+		expect(sixLetterSets.every((set) => set.letters.length === 6)).toBe(true);
+		expect(sevenLetterSets.every((set) => set.letters.length === 7)).toBe(true);
+	});
+});
+
 describe("generated daily puzzles", () => {
 	type GeneratedPuzzle = NonNullable<
 		ReturnType<typeof generateDailyCrosswordForSeed>
 	>;
 	let puzzles: GeneratedPuzzle[] = [];
+	let sevenLetterSunday: GeneratedPuzzle;
 
 	// Generating a day also generates its lookback window, and these windows
 	// overlap, so one shared cache pays for that history once. Generating here in
 	// a fixed order keeps each puzzle the same whichever tests are selected.
 	beforeAll(() => {
 		const cache = new Map();
-		puzzles = [260401, 260405, 260411].map((seed) => {
-			const result = generateDailyCrosswordForSeed(allWords, seed, 10, 15, {
-				cache,
-			});
+		const generate = (
+			seed: number,
+			options: Parameters<typeof generateDailyCrosswordForSeed>[4],
+		) => {
+			const result = generateDailyCrosswordForSeed(
+				allWords,
+				seed,
+				10,
+				15,
+				options,
+			);
 			if (!result) {
 				throw new Error(`Expected crossword for seed ${seed}`);
 			}
 			return result;
+		};
+
+		const firstPuzzle = generate(260401, { cache });
+		// 2026-04-05 is a Sunday before the real start date. Moving the start onto
+		// it changes nothing earlier, so a copy of the history cached so far still
+		// holds and only the days after 2026-04-01 are generated again.
+		sevenLetterSunday = generate(260405, {
+			cache: new Map(cache),
+			sevenLetterDaysStart: "2026-04-05",
 		});
+		puzzles = [
+			firstPuzzle,
+			...[260405, 260411].map((seed) => generate(seed, { cache })),
+		];
 	}, 120_000);
+
+	it("keeps six letters on Sundays before the seven-letter start date", () => {
+		for (const { letters } of puzzles) {
+			expect(new Set(letters).size).toBe(6);
+		}
+	});
+
+	it("builds a seven-letter puzzle on a Sunday from the start date", () => {
+		const { crossword, letters } = sevenLetterSunday;
+		const placedLetters = new Set(
+			crossword.words.flatMap((placement) => [
+				...normalizeWord(placement.word.name),
+			]),
+		);
+
+		expect(new Set(letters).size).toBe(7);
+		expect([...placedLetters].sort()).toEqual([...letters].sort());
+		expect(crossword.words.length).toBeGreaterThanOrEqual(10);
+		expect(crossword.words.length).toBeLessThanOrEqual(15);
+	});
 
 	it("does not include duplicate normalized answers in the same daily puzzle", () => {
 		for (const { crossword } of puzzles) {

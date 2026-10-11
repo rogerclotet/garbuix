@@ -62,4 +62,28 @@ describe("getServerEnv", () => {
 
 		expect(getServerEnv().BETTER_AUTH_SECRET).toBe(REAL_SECRET);
 	});
+
+	it("leaves the seven-letter days on their real start date by default", async () => {
+		const getServerEnv = await loadServerEnv({ NODE_ENV: "development" });
+
+		expect(getServerEnv().SEVEN_LETTER_DAYS_START).toBeUndefined();
+	});
+
+	it("accepts an earlier start date for the seven-letter days", async () => {
+		const getServerEnv = await loadServerEnv({
+			NODE_ENV: "development",
+			SEVEN_LETTER_DAYS_START: "2026-10-11",
+		});
+
+		expect(getServerEnv().SEVEN_LETTER_DAYS_START).toBe("2026-10-11");
+	});
+
+	it("refuses a start date for the seven-letter days that is not a date", async () => {
+		const getServerEnv = await loadServerEnv({
+			NODE_ENV: "development",
+			SEVEN_LETTER_DAYS_START: "next-sunday",
+		});
+
+		expect(() => getServerEnv()).toThrow(/SEVEN_LETTER_DAYS_START/);
+	});
 });

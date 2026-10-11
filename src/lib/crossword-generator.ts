@@ -1,6 +1,10 @@
 // Crossword generator for Catalan word game
 
 import type { Word } from "@/data/types";
+import {
+	getDailyLetterCount,
+	REGULAR_LETTER_COUNT,
+} from "@/lib/daily-letter-count";
 import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
 import { normalizeWord } from "@/lib/puzzle-text";
 
@@ -79,7 +83,7 @@ type CachedWordDataset = {
 	words: Word[];
 	entries: WordRuntimeMetadata[];
 	eligibleWordsByLetterSet: Map<string, Word[]>;
-	viableLetterSets: ViableLetterSet[] | null;
+	viableLetterSetsByLetterCount: Map<number, ViableLetterSet[]>;
 };
 
 type WordLengthProfile = {
@@ -114,7 +118,7 @@ function getCachedWordDataset(words: Word[]): CachedWordDataset {
 		words,
 		entries: words.map((word) => getWordRuntimeMetadata(word)),
 		eligibleWordsByLetterSet: new Map(),
-		viableLetterSets: null,
+		viableLetterSetsByLetterCount: new Map(),
 	};
 
 	return cachedWordDataset;
@@ -332,24 +336,29 @@ export function filterWordsByLetters(
 }
 
 /**
- * Precompute all viable 6-letter sets from the dictionary.
+ * Precompute all viable letter sets of the given size from the dictionary.
  * Groups words by their unique letter sets and filters to sets that produce
- * enough eligible words for a crossword puzzle. Results are cached by
- * reference equality on the words array.
+ * enough eligible words for a crossword puzzle. Results are cached per size
+ * by reference equality on the words array.
  */
-export function computeViableLetterSets(words: Word[]): ViableLetterSet[] {
+export function computeViableLetterSets(
+	words: Word[],
+	letterCount: number = REGULAR_LETTER_COUNT,
+): ViableLetterSet[] {
 	const dataset = getCachedWordDataset(words);
-	if (dataset.viableLetterSets) {
-		return dataset.viableLetterSets;
+	const cachedLetterSets =
+		dataset.viableLetterSetsByLetterCount.get(letterCount);
+	if (cachedLetterSets) {
+		return cachedLetterSets;
 	}
 
-	// Find all words with exactly 6 unique letters (length 6-10) and group by letter set
+	// Find all words with exactly letterCount unique letters (up to 10 long) and
+	// group by letter set
 	const groups = new Map<string, { letters: string[]; maxFrequency: number }>();
 	for (let index = 0; index < dataset.entries.length; index++) {
 		const entry = dataset.entries[index];
 		if (
-			entry.uniqueLetters.length !== 6 ||
-			entry.normalizedName.length < 6 ||
+			entry.uniqueLetters.length !== letterCount ||
 			entry.normalizedName.length > 10
 		) {
 			continue;
@@ -403,7 +412,7 @@ export function computeViableLetterSets(words: Word[]): ViableLetterSet[] {
 		}
 	}
 
-	dataset.viableLetterSets = result;
+	dataset.viableLetterSetsByLetterCount.set(letterCount, result);
 	return result;
 }
 
@@ -425,9 +434,10 @@ function computeLetterHeat(
 }
 
 /**
- * Pick 6 letters that produce a good amount of words, with novelty scoring
- * to avoid repeating the same letter sets across consecutive days.
- * Letters are derived from viable letter sets (groups of 6 unique letters
+ * Pick the day's letters (six unless letterCount says otherwise) so they
+ * produce a good amount of words, with novelty scoring to avoid repeating the
+ * same letter sets across consecutive days.
+ * Letters are derived from viable letter sets (groups of unique letters
  * found in actual dictionary words), scored by frequency, eligible word
  * count, and novelty relative to recent history.
  */
@@ -437,13 +447,19 @@ export function getRandomLetterSet(
 	options: {
 		recentHistory?: DailyPuzzleHistoryEntry[];
 		viableLetterSets?: ViableLetterSet[];
+		letterCount?: number;
 	} = {},
 ): string[] {
-	const { recentHistory = [], viableLetterSets } = options;
-	const viable = viableLetterSets ?? computeViableLetterSets(words);
+	const {
+		recentHistory = [],
+		viableLetterSets,
+		letterCount = REGULAR_LETTER_COUNT,
+	} = options;
+	const viable =
+		viableLetterSets ?? computeViableLetterSets(words, letterCount);
 
 	if (viable.length === 0) {
-		return random.shuffleArray("aeioustrln".split("")).slice(0, 6);
+		return random.shuffleArray("aeioustrln".split("")).slice(0, letterCount);
 	}
 
 	const letterHeat = computeLetterHeat(recentHistory);
@@ -508,6 +524,8 @@ export function generateDailyCrosswordForSeed(
 	maxWords = DEFAULT_MAX_WORDS,
 	options: {
 		cache?: Map<number, DailyGenerationResult | null>;
+		// Overrides the date the seven-letter days begin, to preview one early.
+		sevenLetterDaysStart?: string;
 	} = {},
 ): {
 	crossword: CrosswordGrid;
@@ -520,6 +538,7 @@ export function generateDailyCrosswordForSeed(
 		minWords,
 		maxWords,
 		options.cache ?? new Map(),
+		options.sevenLetterDaysStart,
 	);
 }
 
@@ -529,6 +548,7 @@ function generateDailyCrosswordForSeedInternal(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	cache: Map<number, DailyGenerationResult | null> = new Map(),
+	sevenLetterDaysStart?: string,
 ): DailyGenerationResult | null {
 	const cached = cache.get(seed);
 	if (cached !== undefined) {
@@ -553,6 +573,7 @@ function generateDailyCrosswordForSeedInternal(
 				minWords,
 				maxWords,
 				recentHistory,
+				getDailyLetterCount(currentDate, sevenLetterDaysStart),
 			);
 			cache.set(currentSeed, generated);
 		}
@@ -591,11 +612,12 @@ function selectBestDailyCrosswordForSeed(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	recentHistory: DailyPuzzleHistoryEntry[] = [],
+	letterCount: number = REGULAR_LETTER_COUNT,
 ): DailyGenerationResult | null {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
-	const viableLetterSets = computeViableLetterSets(words);
+	const viableLetterSets = computeViableLetterSets(words, letterCount);
 
 	// Build word freshness penalties from recent history so the crossword
 	// generator deprioritizes words that appeared in recent puzzles.
@@ -610,6 +632,7 @@ function selectBestDailyCrosswordForSeed(
 		const letters = getRandomLetterSet(words, random, {
 			recentHistory,
 			viableLetterSets,
+			letterCount,
 		});
 		const filteredWords = filterWordsByLetters(words, letters);
 		if (filteredWords.length < requiredMinWords) {

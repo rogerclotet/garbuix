@@ -15,6 +15,7 @@ import {
 } from "@/lib/puzzle-dictionary";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
+import { getServerEnv } from "@/lib/server-env";
 import { trackBackgroundTask } from "@/lib/shutdown.server";
 
 export const PUZZLE_ALGORITHM_VERSION = "3";
@@ -177,7 +178,15 @@ export async function ensureDailyPuzzleSnapshot(
 	}
 
 	const seed = dateKeyToSeed(dateKey);
-	const generated = generateDailyCrosswordForSeed(serverWords, seed);
+	const generated = generateDailyCrosswordForSeed(
+		serverWords,
+		seed,
+		undefined,
+		undefined,
+		{
+			sevenLetterDaysStart: getServerEnv().SEVEN_LETTER_DAYS_START,
+		},
+	);
 
 	if (!generated) {
 		throw new Error(`Failed to generate puzzle for ${dateKey}`);
