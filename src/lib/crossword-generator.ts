@@ -1,10 +1,6 @@
 // Crossword generator for Catalan word game
 
 import type { Word } from "@/data/types";
-import {
-	getDailyLetterCount,
-	REGULAR_LETTER_COUNT,
-} from "@/lib/daily-letter-count";
 import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
 import { normalizeWord } from "@/lib/puzzle-text";
 
@@ -33,6 +29,7 @@ export {
 export { SeededRandom } from "./crossword/seeded-random";
 export { countSameRootPairs, wordsShareRoot } from "./crossword/word-metadata";
 
+const DEFAULT_LETTER_COUNT = 6;
 const LETTER_CANDIDATE_POOL_SIZE = 256;
 const LETTER_CANDIDATE_RANK_BIAS = 1.6;
 const LETTER_NOVELTY_WEIGHT = 1.0;
@@ -343,7 +340,7 @@ export function filterWordsByLetters(
  */
 export function computeViableLetterSets(
 	words: Word[],
-	letterCount: number = REGULAR_LETTER_COUNT,
+	letterCount: number = DEFAULT_LETTER_COUNT,
 ): ViableLetterSet[] {
 	const dataset = getCachedWordDataset(words);
 	const cachedLetterSets =
@@ -453,7 +450,7 @@ export function getRandomLetterSet(
 	const {
 		recentHistory = [],
 		viableLetterSets,
-		letterCount = REGULAR_LETTER_COUNT,
+		letterCount = DEFAULT_LETTER_COUNT,
 	} = options;
 	const viable =
 		viableLetterSets ?? computeViableLetterSets(words, letterCount);
@@ -524,8 +521,9 @@ export function generateDailyCrosswordForSeed(
 	maxWords = DEFAULT_MAX_WORDS,
 	options: {
 		cache?: Map<number, DailyGenerationResult | null>;
-		// Overrides the date the seven-letter days begin, to preview one early.
-		sevenLetterDaysStart?: string;
+		// How many letters the requested day gets. The days replayed before it
+		// keep the default.
+		letterCount?: number;
 	} = {},
 ): {
 	crossword: CrosswordGrid;
@@ -538,7 +536,7 @@ export function generateDailyCrosswordForSeed(
 		minWords,
 		maxWords,
 		options.cache ?? new Map(),
-		options.sevenLetterDaysStart,
+		options.letterCount,
 	);
 }
 
@@ -548,7 +546,7 @@ function generateDailyCrosswordForSeedInternal(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	cache: Map<number, DailyGenerationResult | null> = new Map(),
-	sevenLetterDaysStart?: string,
+	letterCount: number = DEFAULT_LETTER_COUNT,
 ): DailyGenerationResult | null {
 	const cached = cache.get(seed);
 	if (cached !== undefined) {
@@ -573,7 +571,7 @@ function generateDailyCrosswordForSeedInternal(
 				minWords,
 				maxWords,
 				recentHistory,
-				getDailyLetterCount(currentDate, sevenLetterDaysStart),
+				currentDate === dateKey ? letterCount : DEFAULT_LETTER_COUNT,
 			);
 			cache.set(currentSeed, generated);
 		}
@@ -612,7 +610,7 @@ function selectBestDailyCrosswordForSeed(
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
 	recentHistory: DailyPuzzleHistoryEntry[] = [],
-	letterCount: number = REGULAR_LETTER_COUNT,
+	letterCount: number = DEFAULT_LETTER_COUNT,
 ): DailyGenerationResult | null {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
