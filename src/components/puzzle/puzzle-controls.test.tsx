@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PuzzleControls } from "./puzzle-controls";
 
 const noop = () => {};
@@ -10,7 +10,7 @@ const noop = () => {};
 function renderControls(
 	props: Pick<
 		ComponentProps<typeof PuzzleControls>,
-		"layout" | "shuffledLetters"
+		"layout" | "shuffledLetters" | "onHeightChange"
 	>,
 ) {
 	render(
@@ -37,7 +37,11 @@ function getLetterKeys(): HTMLElement[] {
 	return [...document.querySelectorAll<HTMLElement>("[data-slot=letter-key]")];
 }
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
 
 describe("PuzzleControls letter grid", () => {
 	it("keeps six letters in three columns with the submit beside them", () => {
@@ -87,5 +91,31 @@ describe("PuzzleControls letter wheel", () => {
 		expect(getWheel().style.getPropertyValue("--circle-key")).toContain(
 			"* 0.9029)",
 		);
+	});
+});
+
+describe("PuzzleControls height", () => {
+	it("reports its height on mount without waiting for the resize observer", () => {
+		// An observer that never answers stands in for the browser's, which
+		// delivers its first entry only after the page has painted.
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				observe() {}
+				disconnect() {}
+			},
+		);
+		vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+			height: 225,
+		} as DOMRect);
+		const onHeightChange = vi.fn();
+
+		renderControls({
+			layout: "grid",
+			shuffledLetters: [..."abcdef"],
+			onHeightChange,
+		});
+
+		expect(onHeightChange).toHaveBeenCalledWith(225);
 	});
 });

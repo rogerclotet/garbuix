@@ -19,8 +19,11 @@ export const Route = createFileRoute("/classificacio")({
 	// show a stale leaderboard.
 	gcTime: 0,
 	preload: false,
-	// Show the loading state immediately while the fresh snapshot loads.
+	// Show the loading state immediately while the fresh snapshot loads, and
+	// drop it as soon as the snapshot arrives. The router would otherwise keep
+	// the spinner up for its default 500 ms.
 	pendingMs: 0,
+	pendingMinMs: 0,
 	pendingComponent: LeaderboardPending,
 	component: LeaderboardPage,
 });
