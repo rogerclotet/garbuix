@@ -34,6 +34,18 @@ const puzzle: DailyPuzzlePublic = {
 	hintCapsules: [],
 };
 
+function renderFoundWord(pangramWordIds: number[]) {
+	return render(
+		<DailyWordList
+			puzzle={puzzle}
+			guessedWordIds={[0]}
+			revealedAnswers={{ 0: "cosa" }}
+			cellLetters={new Map()}
+			pangramWordIds={pangramWordIds}
+		/>,
+	);
+}
+
 function renderWordList(peerCluesByWordId: Record<number, ClueResponse>) {
 	return render(
 		<DailyWordList
@@ -45,6 +57,27 @@ function renderWordList(peerCluesByWordId: Record<number, ClueResponse>) {
 		/>,
 	);
 }
+
+describe("DailyWordList pangram", () => {
+	afterEach(() => {
+		cleanup();
+	});
+
+	it("marks a found word that uses every letter", () => {
+		renderFoundWord([0]);
+
+		expect(
+			screen.getByTitle("Paraula estrella: fa servir totes les lletres"),
+		).toBeTruthy();
+	});
+
+	it("leaves other found words unmarked", () => {
+		renderFoundWord([]);
+
+		expect(screen.getByText("COSA")).toBeTruthy();
+		expect(screen.queryByTitle(/Paraula estrella/)).toBeNull();
+	});
+});
 
 describe("DailyWordList peer clues", () => {
 	afterEach(() => {

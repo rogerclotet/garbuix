@@ -6,6 +6,7 @@ import {
 	HelpingHand,
 	Info,
 	Sparkles,
+	Star,
 	Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -33,6 +34,8 @@ type DailyWordListProps = {
 	cellLetters: Map<string, string>;
 	clueTextsByWordId?: Record<number, string>;
 	clueWordIds?: number[];
+	// Found words that use every letter of the day.
+	pangramWordIds?: number[];
 	foundClueTextsByWordId?: Record<number, string>;
 	onWordTap?: (wordId: number) => void;
 	// Peer clue requests: when out of hints, let the player ask other players for
@@ -55,6 +58,7 @@ export function DailyWordList({
 	cellLetters,
 	clueTextsByWordId = {},
 	clueWordIds = [],
+	pangramWordIds = [],
 	foundClueTextsByWordId = {},
 	onWordTap,
 	canRequestHelp = false,
@@ -71,6 +75,7 @@ export function DailyWordList({
 		cellLetters,
 	);
 	const cluedWordIds = new Set(clueWordIds);
+	const pangramWords = new Set(pangramWordIds);
 	const requestedHelp = new Set(requestedHelpWordIds);
 	const foundWordIds = new Set(guessedWordIds);
 
@@ -264,8 +269,11 @@ export function DailyWordList({
 		</div>
 	);
 
+	const pangramTooltip = "Paraula estrella: fa servir totes les lletres";
+
 	const renderFoundSlot = (slot: PuzzleWordSlot) => {
 		const foundClueText = foundClueTextsByWordId[slot.id];
+		const isPangramWord = pangramWords.has(slot.id);
 
 		return (
 			<div
@@ -278,6 +286,16 @@ export function DailyWordList({
 					<span className="min-w-0 font-semibold text-foreground tracking-wider wrap-anywhere">
 						{revealedAnswers[slot.id]?.toUpperCase()}
 					</span>
+					{isPangramWord ? (
+						<span
+							role="img"
+							aria-label={pangramTooltip}
+							title={pangramTooltip}
+							className="shrink-0 text-foreground/60"
+						>
+							<Star className="size-3.5 fill-current" aria-hidden="true" />
+						</span>
+					) : null}
 					<a
 						href={getOptimotDefinitionUrl(revealedAnswers[slot.id] ?? "")}
 						target="_blank"

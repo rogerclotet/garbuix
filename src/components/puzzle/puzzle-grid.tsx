@@ -21,6 +21,8 @@ type PuzzleGridProps = {
 	clueCells?: Set<string>;
 	clueCellsFading?: boolean;
 	locateCells?: Set<string>;
+	// The word that uses every letter of the day, while it is being celebrated.
+	pangramWordId?: number | null;
 	// Classic board: keep the width-driven grid, but never let it grow taller
 	// than the box it sits in.
 	fitHeight?: boolean;
@@ -38,6 +40,7 @@ export function PuzzleGrid({
 	clueCells,
 	clueCellsFading = false,
 	locateCells,
+	pangramWordId = null,
 	fitHeight = false,
 }: PuzzleGridProps) {
 	const animatingCellKeys = useMemo(() => {
@@ -73,6 +76,19 @@ export function PuzzleGrid({
 			]),
 		);
 	}, [highlightedWordId, puzzle.wordSlots]);
+	const pangramCells = useMemo(() => {
+		const slot = puzzle.wordSlots.find(
+			(wordSlot) => wordSlot.id === pangramWordId,
+		);
+
+		return new Set<string>(
+			slot
+				? Array.from({ length: slot.length }, (_, index) =>
+						getSlotCellKey(slot, index),
+					)
+				: [],
+		);
+	}, [pangramWordId, puzzle.wordSlots]);
 	const middleDotMarkers = useMemo(() => {
 		const markers = new Map<string, { bottom: boolean; right: boolean }>();
 
@@ -145,6 +161,7 @@ export function PuzzleGrid({
 				const isJustGuessed = isJustLanded || highlightedLetterIndex != null;
 				const isClueCell = clueCells?.has(key) ?? false;
 				const isLocateCell = locateCells?.has(key) ?? false;
+				const isPangramCell = pangramCells.has(key);
 				const middleDotMarker = middleDotMarkers.get(key);
 
 				if (!cell) {
@@ -170,9 +187,11 @@ export function PuzzleGrid({
 						data-cell-key={key}
 						style={cellStyle}
 						className={`puzzle-cell relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
-							isRevealed
-								? "bg-primary/12 border-primary/40 text-foreground"
-								: "bg-muted border-border/50"
+							isPangramCell
+								? "grid-pangram-cell bg-pangram/25 border-pangram/70 text-foreground"
+								: isRevealed
+									? "bg-primary/12 border-primary/40 text-foreground"
+									: "bg-muted border-border/50"
 						} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 					>
 						{showLetter ? (

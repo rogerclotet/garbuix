@@ -63,6 +63,26 @@ export function buildRevealedCells(
 	return cells;
 }
 
+// A pangram uses every letter of the day. Puzzles are generated around one
+// since algorithm version 4; older ones can hold none or several.
+export function isPangram(word: string, letters: string[]): boolean {
+	const wordLetters = new Set(normalizeWord(word));
+	return letters.every((letter) => wordLetters.has(letter));
+}
+
+// Only words the player has found count, so nothing marks the pangram's slot
+// before then.
+export function getFoundPangramSlots<Slot extends PuzzleWordSlot>(
+	wordSlots: Slot[],
+	revealedAnswers: Record<number, string>,
+	letters: string[],
+): Slot[] {
+	return wordSlots.filter((slot) => {
+		const answer = revealedAnswers[slot.id];
+		return answer !== undefined && isPangram(answer, letters);
+	});
+}
+
 export function buildCellLetters(
 	wordSlots: DailyPuzzlePublic["wordSlots"],
 	revealedAnswers: Record<number, string>,

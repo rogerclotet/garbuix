@@ -13,6 +13,8 @@ import { getPlayableWordLetters } from "@/lib/puzzle-text";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
 const LOCATE_FLASH_MS = 1300;
+// How long a found pangram keeps its own color once its letters have settled.
+const PANGRAM_LINGER_MS = 900;
 export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
@@ -26,6 +28,7 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 		() => new Set(),
 	);
 	const [bounceCells, setBounceCells] = useState<Set<string>>(() => new Set());
+	const [pangramWordId, setPangramWordId] = useState<number | null>(null);
 	const bounceClearTimersRef = useRef<Map<string, number>>(new Map());
 	const flyingLettersIdRef = useRef(0);
 	const pendingFlyCompleteRef = useRef<{
@@ -56,6 +59,16 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 		},
 		[],
 	);
+	useEffect(() => {
+		if (pangramWordId == null || animatingWordId === pangramWordId) {
+			return;
+		}
+
+		const timer = window.setTimeout(() => {
+			setPangramWordId(null);
+		}, PANGRAM_LINGER_MS);
+		return () => window.clearTimeout(timer);
+	}, [animatingWordId, pangramWordId]);
 	const showSubmitFeedback = useCallback(
 		(word: string, kind: PuzzleSubmitFeedback["kind"]) => {
 			const nextFeedbackId = submitFeedbackIdRef.current + 1;
@@ -162,7 +175,9 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 			wordId: number,
 			displayWord: string,
 			preExistingLetterCells: Set<string>,
+			isPangramWord = false,
 		) => {
+			setPangramWordId(isPangramWord ? wordId : null);
 			const slot = puzzle.wordSlots.find((wordSlot) => wordSlot.id === wordId);
 			const gridRoot = gridRef.current;
 			if (!slot || !gridRoot) {
@@ -266,6 +281,7 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 			landedAnimatingCells,
 			bounceCells,
 			locateCells,
+			pangramWordId,
 		},
 		flyingLettersProps: {
 			animation: flyingLettersAnimation,
