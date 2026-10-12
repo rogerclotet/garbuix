@@ -15,8 +15,9 @@ import type { PuzzleSubmitFeedback } from "./puzzle-types";
 const HINT_HOLD_MS = 600;
 
 // Room the pinned keypad claims until it has reported its real height (see
-// onHeightChange). Only the first paint uses it, and only the board's size
-// depends on it.
+// onHeightChange). The panel reports as it mounts, so this is only painted
+// when it mounts with no layout to measure, and only the board's size depends
+// on it.
 export const KEYPAD_FALLBACK_HEIGHT = "17rem";
 
 // Circle layout: every size below is derived from this one clamp, set as the
@@ -144,6 +145,16 @@ export function PuzzleControls({
 		(panel: HTMLDivElement | null) => {
 			if (!onHeightChange || !panel) {
 				return;
+			}
+
+			// The observer only answers after the first paint, which would draw
+			// the board against the fallback height and move it a frame later.
+			// React re-renders before painting when told the height from here.
+			// A panel mounted inside a hidden subtree measures zero and keeps the
+			// fallback until the observer sees it laid out.
+			const { height } = panel.getBoundingClientRect();
+			if (height > 0) {
+				onHeightChange(height);
 			}
 
 			const observer = new ResizeObserver((entries) => {
