@@ -15,7 +15,11 @@ import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
-import { buildCellLetters, buildRevealedCells } from "@/lib/puzzle-helpers";
+import {
+	buildCellLetters,
+	buildRevealedCells,
+	getFoundPangramSlots,
+} from "@/lib/puzzle-helpers";
 import { getDeviceId } from "@/lib/puzzle-local";
 import { createEmptyProgressState } from "@/lib/puzzle-progress";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
@@ -109,6 +113,16 @@ function DailyGame({
 	const cellLetters = useMemo(
 		() => buildCellLetters(puzzle.wordSlots, revealedAnswers, hintLetters),
 		[hintLetters, puzzle.wordSlots, revealedAnswers],
+	);
+
+	const pangramWordIds = useMemo(
+		() =>
+			getFoundPangramSlots(
+				puzzle.wordSlots,
+				revealedAnswers,
+				puzzle.letters,
+			).map((slot) => slot.id),
+		[puzzle.letters, puzzle.wordSlots, revealedAnswers],
 	);
 
 	const {
@@ -323,6 +337,7 @@ function DailyGame({
 								cellLetters={cellLetters}
 								clueTextsByWordId={clueTextsByWordId}
 								clueWordIds={derivedProgress.clueWordIds}
+								pangramWordIds={pangramWordIds}
 								foundClueTextsByWordId={clueTextsByWordId}
 								onWordTap={handleLocateWord}
 								canRequestHelp={canRequestHelp}

@@ -3,7 +3,11 @@ import { toast } from "sonner";
 import type { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { isVibrationEnabled } from "@/lib/anon-identity";
 import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
-import { getRandomHintCellKey, getSlotCellKey } from "@/lib/puzzle-helpers";
+import {
+	getRandomHintCellKey,
+	getSlotCellKey,
+	isPangram,
+} from "@/lib/puzzle-helpers";
 import { formatGuess } from "@/lib/puzzle-text";
 import {
 	type DailyPuzzlePublic,
@@ -169,12 +173,22 @@ export function useDailyActions({
 
 		if (result.kind === "new_word") {
 			triggerHaptic(HAPTIC_SUCCESS_PATTERN);
+			const isPangramWord =
+				result.displayWord != null &&
+				isPangram(result.displayWord, puzzle.letters);
 			if (result.matchedSlotId != null && result.displayWord) {
 				triggerFlyingLetters(
 					result.matchedSlotId,
 					result.displayWord,
 					preExistingLetterCells,
+					isPangramWord,
 				);
+			}
+
+			if (isPangramWord) {
+				toast.success("Pangrama!", {
+					description: "Fa servir totes les lletres d'avui.",
+				});
 			}
 
 			if (derivedProgress.guessedWordIds.length + 1 === totalWords) {

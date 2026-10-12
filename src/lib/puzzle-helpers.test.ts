@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
 	buildCellLetters,
 	getDisplayedSlotWord,
+	getFoundPangramSlots,
 	getGuessKeyboardAction,
 	getOptimotDefinitionUrl,
 	getRandomHintCellKey,
 	getSlotHintCellKey,
 	getSortedWordSlots,
+	isPangram,
 } from "@/lib/puzzle-helpers";
 
 function buildHintPuzzle(hintCellKeys: string[]) {
@@ -29,6 +31,40 @@ function buildHintPuzzle(hintCellKeys: string[]) {
 		})),
 	};
 }
+
+describe("isPangram", () => {
+	const letters = ["c", "o", "l", "e", "g", "i"];
+
+	it.each([
+		["col·legi", true],
+		["Geològic", true],
+		["colegi", true],
+		["cogi", false],
+		["", false],
+	])("tells whether %s uses every letter", (word, expected) => {
+		expect(isPangram(word, letters)).toBe(expected);
+	});
+});
+
+describe("getFoundPangramSlots", () => {
+	const slot = (id: number) => ({
+		id,
+		startRow: id,
+		startCol: 0,
+		direction: "horizontal" as const,
+		length: 6,
+	});
+
+	it("keeps only found words that use every letter", () => {
+		const found = getFoundPangramSlots(
+			[slot(0), slot(1), slot(2)],
+			{ 0: "trenca", 1: "recent" },
+			["t", "r", "e", "n", "c", "a"],
+		);
+
+		expect(found.map(({ id }) => id)).toEqual([0]);
+	});
+});
 
 describe("getGuessKeyboardAction", () => {
 	it("maps typed letters to the available puzzle letters", () => {

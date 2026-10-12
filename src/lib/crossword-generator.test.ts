@@ -7,9 +7,59 @@ import {
 	type DailyPuzzleHistoryEntry,
 	generateDailyCrosswordForSeed,
 	normalizeWord,
+	SeededRandom,
+	shuffleWordIds,
+	toDailyPuzzleHistoryEntry,
+	tryGenerateCrossword,
 	wordsShareRoot,
 } from "@/lib/crossword-generator";
 import { getPlayableWordLetters } from "@/lib/puzzle-text";
+
+type Crossword = NonNullable<
+	ReturnType<typeof generateDailyCrosswordForSeed>
+>["crossword"];
+
+// Every cell lists exactly the words drawn through it.
+function expectGridToMatchPlacements(crossword: Crossword) {
+	const wordIdsByCell = new Map<string, number[]>();
+
+	for (const placement of crossword.words) {
+		const length = getPlayableWordLetters(placement.word.name).length;
+
+		for (let index = 0; index < length; index += 1) {
+			const row =
+				placement.direction === "horizontal"
+					? placement.startRow
+					: placement.startRow + index;
+			const col =
+				placement.direction === "horizontal"
+					? placement.startCol + index
+					: placement.startCol;
+			const cellKey = `${row},${col}`;
+			wordIdsByCell.set(cellKey, [
+				...(wordIdsByCell.get(cellKey) ?? []),
+				placement.id,
+			]);
+		}
+	}
+
+	crossword.grid.forEach((cells, row) => {
+		cells.forEach((cell, col) => {
+			const expected = wordIdsByCell.get(`${row},${col}`) ?? [];
+			expect([...(cell?.wordIds ?? [])].sort()).toEqual(expected.sort());
+		});
+	});
+}
+
+function getPangramWords(
+	puzzle: NonNullable<ReturnType<typeof generateDailyCrosswordForSeed>>,
+) {
+	return puzzle.crossword.words.filter(
+		(placement) =>
+			new Set(normalizeWord(placement.word.name)).size ===
+			puzzle.letters.length,
+	);
+}
 
 function hasConflictingDisplayIntersections(
 	result: NonNullable<ReturnType<typeof generateDailyCrosswordForSeed>>,
@@ -158,6 +208,56 @@ describe("crossword-generator freshness scoring", () => {
 	});
 });
 
+describe("crossword layout", () => {
+	const layoutWords = [
+		"carretera",
+		"terra",
+		"carta",
+		"recta",
+		"tarta",
+		"cera",
+		"arca",
+		"reca",
+	].map((name) => ({ name, areatematica: "Nom", frequency: 1000 }));
+
+	it.each(["horizontal", "vertical"] as const)(
+		"starts from the first word placed %s",
+		(direction) => {
+			const crossword = tryGenerateCrossword(
+				layoutWords,
+				4,
+				8,
+				undefined,
+				direction,
+			);
+
+			expect(crossword?.words[0]).toMatchObject({
+				word: layoutWords[0],
+				direction,
+			});
+			expectGridToMatchPlacements(crossword as Crossword);
+		},
+	);
+
+	it("renumbers the words without changing where they sit", () => {
+		const crossword = tryGenerateCrossword(layoutWords, 4, 8) as Crossword;
+		const shuffled = shuffleWordIds(crossword, new SeededRandom(7));
+		const byName = (words: Crossword["words"]) =>
+			words
+				.map(({ id: _id, ...placement }) => placement)
+				.sort((a, b) => a.word.name.localeCompare(b.word.name));
+
+		expect(shuffled.words.map((placement) => placement.id)).toEqual(
+			crossword.words.map((_, index) => index),
+		);
+		expect(shuffled.words.map((placement) => placement.word.name)).not.toEqual(
+			crossword.words.map((placement) => placement.word.name),
+		);
+		expect(byName(shuffled.words)).toEqual(byName(crossword.words));
+		expectGridToMatchPlacements(shuffled);
+	});
+});
+
 describe("viable letter sets", () => {
 	it("offers sets of the requested size, six by default", () => {
 		const sixLetterSets = computeViableLetterSets(allWords);
@@ -179,14 +279,10 @@ describe("generated daily puzzles", () => {
 	let puzzles: GeneratedPuzzle[] = [];
 	let sevenLetterPuzzle: GeneratedPuzzle;
 
-	// Generating a day also generates its lookback window, and these windows
-	// overlap, so one shared cache pays for that history once. Generating here in
-	// a fixed order keeps each puzzle the same whichever tests are selected.
 	beforeAll(() => {
-		const cache = new Map();
 		const generate = (
 			seed: number,
-			options: Parameters<typeof generateDailyCrosswordForSeed>[4],
+			options?: Parameters<typeof generateDailyCrosswordForSeed>[4],
 		) => {
 			const result = generateDailyCrosswordForSeed(
 				allWords,
@@ -201,18 +297,8 @@ describe("generated daily puzzles", () => {
 			return result;
 		};
 
-		const firstPuzzle = generate(260401, { cache });
-		// The letter count only applies to the requested day, so a copy of the
-		// history cached so far still holds and only the days after 2026-04-01
-		// are generated again.
-		sevenLetterPuzzle = generate(260405, {
-			cache: new Map(cache),
-			letterCount: 7,
-		});
-		puzzles = [
-			firstPuzzle,
-			...[260405, 260411].map((seed) => generate(seed, { cache })),
-		];
+		sevenLetterPuzzle = generate(260405, { letterCount: 7 });
+		puzzles = [260401, 260405, 260411].map((seed) => generate(seed));
 	}, 120_000);
 
 	it("uses six letters unless asked for another count", () => {
@@ -233,6 +319,43 @@ describe("generated daily puzzles", () => {
 		expect([...placedLetters].sort()).toEqual([...letters].sort());
 		expect(crossword.words.length).toBeGreaterThanOrEqual(10);
 		expect(crossword.words.length).toBeLessThanOrEqual(15);
+	});
+
+	it("includes a word that uses every letter of the day", () => {
+		for (const puzzle of [...puzzles, sevenLetterPuzzle]) {
+			expect(getPangramWords(puzzle).length).toBeGreaterThan(0);
+		}
+	});
+
+	it("keeps the grid consistent with the renumbered words", () => {
+		for (const { crossword } of puzzles) {
+			expect(crossword.words.map((placement) => placement.id)).toEqual(
+				crossword.words.map((_, index) => index),
+			);
+			expectGridToMatchPlacements(crossword);
+		}
+	});
+
+	it("steers away from the puzzles in its history", () => {
+		const [first] = puzzles;
+
+		// The seed fixes every random draw, so only the history can move the
+		// second run away from the letters of the first.
+		const second = generateDailyCrosswordForSeed(allWords, 260401, 10, 15, {
+			recentHistory: [
+				toDailyPuzzleHistoryEntry(
+					2,
+					first.letters,
+					first.crossword.words.map((placement) =>
+						normalizeWord(placement.word.name),
+					),
+				),
+			],
+		});
+
+		expect([...(second?.letters ?? [])].sort()).not.toEqual(
+			[...first.letters].sort(),
+		);
 	});
 
 	it("does not include duplicate normalized answers in the same daily puzzle", () => {

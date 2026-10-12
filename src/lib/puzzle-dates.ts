@@ -58,6 +58,12 @@ export function addDaysToDateKey(dateKey: string, days: number) {
 	return getDateKeyForDate(date, "UTC");
 }
 
+export function countDaysBetween(fromDateKey: string, toDateKey: string) {
+	const from = Date.parse(`${fromDateKey}T12:00:00.000Z`);
+	const to = Date.parse(`${toDateKey}T12:00:00.000Z`);
+	return Math.round((to - from) / (24 * ONE_HOUR_IN_MS));
+}
+
 export function getTomorrowDateKey(timeZone = MADRID_TIME_ZONE) {
 	return addDaysToDateKey(getTodayDateKey(timeZone), 1);
 }

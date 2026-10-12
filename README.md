@@ -492,11 +492,14 @@ pnpm run download-dict
 
 The crossword generator:
 - Randomly selects 10-15 valid words
-- Places the first word horizontally
+- Starts from a word that uses every letter of the day, placed across or down
 - Finds intersections for subsequent words
 - Ensures all words cross with at least one other word
 - Creates a compact grid layout
 - Falls back to simpler layouts if complex generation fails
+
+A new day avoids the letters and words of the puzzles stored for the previous
+45 days.
 
 Each day has six letters. The generator and the keypad also handle seven: pass
 `letterCount` to `generateDailyCrosswordForSeed`. No day is scheduled to use it;

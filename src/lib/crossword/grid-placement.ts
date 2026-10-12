@@ -31,6 +31,12 @@ export interface CrosswordGrid {
 	cols: number;
 }
 
+// The word the rest of the crossword is built around, so it is always placed.
+export interface CrosswordAnchor {
+	word: Word;
+	direction: WordPlacement["direction"];
+}
+
 interface Candidate {
 	word: Word;
 	row: number;
@@ -40,7 +46,8 @@ interface Candidate {
 }
 
 /**
- * Generate a crossword grid with the given words
+ * Generate a crossword grid with the given words. With an anchor, the grid
+ * starts from that word instead of the best-ranked one.
  */
 export function generateCrossword(
 	words: Word[],
@@ -48,6 +55,7 @@ export function generateCrossword(
 	maxWords = DEFAULT_MAX_WORDS,
 	random: SeededRandom = new SeededRandom(Date.now()),
 	wordPenalties?: Map<string, number>,
+	anchor?: CrosswordAnchor,
 ): CrosswordGrid {
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
@@ -61,9 +69,12 @@ export function generateCrossword(
 		random,
 		wordPenalties,
 	);
-	const validWords = candidateWords.slice(
+	const orderedWords = anchor
+		? startWithAnchor(candidateWords, anchor.word)
+		: candidateWords;
+	const validWords = orderedWords.slice(
 		0,
-		Math.min(candidateWords.length, safeMaxWords * 5),
+		Math.min(orderedWords.length, safeMaxWords * 5),
 	); // Keep a larger pool so higher-quality words still have placement options
 
 	if (validWords.length < requiredMinWords) {
@@ -74,6 +85,8 @@ export function generateCrossword(
 		validWords,
 		requiredMinWords,
 		safeMaxWords,
+		getWordCells,
+		anchor?.direction,
 	);
 	if (result && result.words.length >= requiredMinWords) {
 		const normalizedResult = ensureMinimumGridWidth(result, MIN_GRID_COLS);
@@ -94,16 +107,68 @@ export function generateCrossword(
 	throw new Error("Failed to generate a valid crossword");
 }
 
+// Deduplication may have kept another spelling of the anchor's normalized form,
+// which would be a duplicate answer next to it.
+function startWithAnchor(candidateWords: Word[], anchorWord: Word): Word[] {
+	const anchorKey = getWordRuntimeMetadata(anchorWord).normalizedName;
+
+	return [
+		anchorWord,
+		...candidateWords.filter(
+			(word) => getWordRuntimeMetadata(word).normalizedName !== anchorKey,
+		),
+	];
+}
+
+/**
+ * Renumber the words in a random order. Placement order tells which word the
+ * grid was built around, and the ids reach the client.
+ */
+export function shuffleWordIds(
+	crossword: CrosswordGrid,
+	random: SeededRandom,
+): CrosswordGrid {
+	const shuffledWords = random.shuffleArray(crossword.words);
+	const newIdByOldId = new Map(
+		shuffledWords.map((placement, index) => [placement.id, index]),
+	);
+	const toNewId = (oldId: number): number => {
+		const newId = newIdByOldId.get(oldId);
+		if (newId === undefined) {
+			throw new Error(`Grid cell references unknown word id ${oldId}`);
+		}
+		return newId;
+	};
+
+	return {
+		...crossword,
+		words: shuffledWords.map((placement, index) => ({
+			...placement,
+			id: index,
+		})),
+		grid: crossword.grid.map((row) =>
+			row.map(
+				(cell) =>
+					cell && {
+						...cell,
+						wordIds: cell.wordIds.map(toNewId).sort((a, b) => a - b),
+					},
+			),
+		),
+	};
+}
+
 export function tryGenerateCrossword(
 	words: Word[],
 	minWords: number,
 	maxWords: number,
 	getCells: (word: Word) => string[] = getWordCells,
+	firstWordDirection: WordPlacement["direction"] = "horizontal",
 ): CrosswordGrid | null {
 	const placements: WordPlacement[] = [];
 	const grid: Map<string, GridCell> = new Map();
 
-	// Place first word horizontally in the middle
+	// Place first word in the middle
 	const MAX_GRID_SIZE = 15;
 	const firstWord = words[0];
 	const firstWordLetters = getCells(firstWord);
@@ -116,12 +181,15 @@ export function tryGenerateCrossword(
 		word: firstWord,
 		startRow,
 		startCol,
-		direction: "horizontal",
+		direction: firstWordDirection,
 		revealed: false,
 	});
 
 	for (let i = 0; i < firstWordLetters.length; i++) {
-		const key = `${startRow},${startCol + i}`;
+		const key =
+			firstWordDirection === "horizontal"
+				? `${startRow},${startCol + i}`
+				: `${startRow + i},${startCol}`;
 		grid.set(key, {
 			letter: firstWordLetters[i] ?? "",
 			wordIds: [0],

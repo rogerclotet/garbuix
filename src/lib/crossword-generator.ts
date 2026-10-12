@@ -1,7 +1,6 @@
 // Crossword generator for Catalan word game
 
 import type { Word } from "@/data/types";
-import { dateKeyToSeed, seedToDateKey } from "@/lib/puzzle-dates";
 import { normalizeWord } from "@/lib/puzzle-text";
 
 import {
@@ -10,11 +9,13 @@ import {
 	DEFAULT_MIN_WORDS,
 	generateCrossword,
 	MIN_GRID_COLS,
+	shuffleWordIds,
 } from "./crossword/grid-placement";
 import { SeededRandom } from "./crossword/seeded-random";
 import {
 	countSameRootPairs,
 	getWordRuntimeMetadata,
+	prioritizeWords,
 	type WordLike,
 	type WordRuntimeMetadata,
 } from "./crossword/word-metadata";
@@ -23,6 +24,7 @@ export {
 	type CrosswordGrid,
 	type GridCell,
 	generateCrossword,
+	shuffleWordIds,
 	tryGenerateCrossword,
 	type WordPlacement,
 } from "./crossword/grid-placement";
@@ -34,14 +36,10 @@ const LETTER_CANDIDATE_POOL_SIZE = 256;
 const LETTER_CANDIDATE_RANK_BIAS = 1.6;
 const LETTER_NOVELTY_WEIGHT = 1.0;
 const LETTER_HEAT_DECAY = 0.4;
-const LETTER_NOVELTY_WINDOW_DAYS = 21;
 const MAX_LETTER_OVERLAP_HARD = 3;
-const LETTER_SET_HISTORY_WINDOW_DAYS = 28;
-const WORD_HISTORY_WINDOW_DAYS = 45;
-const HISTORY_LOOKBACK_DAYS = Math.max(
-	LETTER_SET_HISTORY_WINDOW_DAYS,
-	WORD_HISTORY_WINDOW_DAYS,
-);
+// How many days back a puzzle still counts against a new one. Its letters and
+// words weigh less the older it is, down to nothing past this.
+export const HISTORY_LOOKBACK_DAYS = 45;
 const EXACT_LETTER_SET_REPEAT_PENALTY = 14;
 const LETTER_OVERLAP_PENALTY = 1.15;
 const WORD_REPEAT_PENALTY = 1.85;
@@ -52,21 +50,11 @@ const WORD_FRESHNESS_PENALTY = 1.5;
 // that reach the target word count without morphological siblings.
 const SAME_ROOT_PAIR_PENALTY = 3;
 
-type DailyPuzzleHistorySummary = {
+export type DailyPuzzleHistoryEntry = {
+	daysAgo: number;
 	letters: string[];
 	letterSetKey: string;
 	selectedWordKeys: string[];
-};
-
-export type DailyPuzzleHistoryEntry = DailyPuzzleHistorySummary & {
-	daysAgo: number;
-};
-
-type DailyGenerationResult = {
-	crossword: CrosswordGrid;
-	letters: string[];
-	shuffledLetters: string[];
-	summary: DailyPuzzleHistorySummary;
 };
 
 export type ViableLetterSet = {
@@ -80,6 +68,7 @@ type CachedWordDataset = {
 	words: Word[];
 	entries: WordRuntimeMetadata[];
 	eligibleWordsByLetterSet: Map<string, Word[]>;
+	pangramWordsByLetterSet: Map<string, Word[]>;
 	viableLetterSetsByLetterCount: Map<number, ViableLetterSet[]>;
 };
 
@@ -115,6 +104,7 @@ function getCachedWordDataset(words: Word[]): CachedWordDataset {
 		words,
 		entries: words.map((word) => getWordRuntimeMetadata(word)),
 		eligibleWordsByLetterSet: new Map(),
+		pangramWordsByLetterSet: new Map(),
 		viableLetterSetsByLetterCount: new Map(),
 	};
 
@@ -175,22 +165,16 @@ function scoreWordLengthProfile(profile: WordLengthProfile): number {
 	);
 }
 
-function addDaysToDateKey(dateKey: string, days: number): string {
-	const date = new Date(`${dateKey}T12:00:00.000Z`);
-	date.setUTCDate(date.getUTCDate() + days);
-	return date.toISOString().slice(0, 10);
-}
-
 function buildLetterSetKey(letters: string[]): string {
 	return [...letters].sort().join("");
 }
 
-function getRecencyWeight(daysAgo: number, windowDays: number): number {
-	if (daysAgo <= 0 || daysAgo > windowDays) {
+function getRecencyWeight(daysAgo: number): number {
+	if (daysAgo <= 0 || daysAgo > HISTORY_LOOKBACK_DAYS) {
 		return 0;
 	}
 
-	return (windowDays - daysAgo + 1) / windowDays;
+	return (HISTORY_LOOKBACK_DAYS - daysAgo + 1) / HISTORY_LOOKBACK_DAYS;
 }
 
 function countIntersection(left: Iterable<string>, right: Set<string>): number {
@@ -203,16 +187,16 @@ function countIntersection(left: Iterable<string>, right: Set<string>): number {
 	return count;
 }
 
-function summarizeDailyGeneration(
+export function toDailyPuzzleHistoryEntry(
+	daysAgo: number,
 	letters: string[],
-	crossword: CrosswordGrid,
-): DailyPuzzleHistorySummary {
+	selectedWordKeys: string[],
+): DailyPuzzleHistoryEntry {
 	return {
+		daysAgo,
 		letters,
 		letterSetKey: buildLetterSetKey(letters),
-		selectedWordKeys: crossword.words.map((placement) =>
-			normalizeWord(placement.word.name),
-		),
+		selectedWordKeys,
 	};
 }
 
@@ -228,28 +212,18 @@ export function calculateCandidateFreshnessPenalty(
 	let penalty = 0;
 
 	for (const historyEntry of recentHistory) {
-		const letterWeight = getRecencyWeight(
-			historyEntry.daysAgo,
-			LETTER_SET_HISTORY_WINDOW_DAYS,
-		);
-
-		if (letterWeight > 0) {
-			if (historyEntry.letterSetKey === letterSetKey) {
-				penalty += EXACT_LETTER_SET_REPEAT_PENALTY * letterWeight;
-			}
-
-			const overlapCount = countIntersection(historyEntry.letters, letterSet);
-			penalty +=
-				Math.max(0, overlapCount - 2) * LETTER_OVERLAP_PENALTY * letterWeight;
-		}
-
-		const wordWeight = getRecencyWeight(
-			historyEntry.daysAgo,
-			WORD_HISTORY_WINDOW_DAYS,
-		);
-		if (wordWeight === 0) {
+		const recencyWeight = getRecencyWeight(historyEntry.daysAgo);
+		if (recencyWeight === 0) {
 			continue;
 		}
+
+		if (historyEntry.letterSetKey === letterSetKey) {
+			penalty += EXACT_LETTER_SET_REPEAT_PENALTY * recencyWeight;
+		}
+
+		const overlapCount = countIntersection(historyEntry.letters, letterSet);
+		penalty +=
+			Math.max(0, overlapCount - 2) * LETTER_OVERLAP_PENALTY * recencyWeight;
 
 		const historicalWords = new Set(historyEntry.selectedWordKeys);
 		for (const wordKey of selectedWordKeys) {
@@ -257,10 +231,10 @@ export function calculateCandidateFreshnessPenalty(
 				continue;
 			}
 
-			penalty += WORD_REPEAT_PENALTY * wordWeight;
+			penalty += WORD_REPEAT_PENALTY * recencyWeight;
 			perWordRepeatWeight.set(
 				wordKey,
-				(perWordRepeatWeight.get(wordKey) ?? 0) + wordWeight,
+				(perWordRepeatWeight.get(wordKey) ?? 0) + recencyWeight,
 			);
 		}
 	}
@@ -349,14 +323,19 @@ export function computeViableLetterSets(
 		return cachedLetterSets;
 	}
 
-	// Find all words with exactly letterCount unique letters (up to 10 long) and
-	// group by letter set
-	const groups = new Map<string, { letters: string[]; maxFrequency: number }>();
+	// Find all placeable words with exactly letterCount unique letters (up to 10
+	// long) and group by letter set. Each set keeps these words, its pangrams,
+	// because every puzzle is built around one of them.
+	const groups = new Map<
+		string,
+		{ letters: string[]; maxFrequency: number; pangramWords: Word[] }
+	>();
 	for (let index = 0; index < dataset.entries.length; index++) {
 		const entry = dataset.entries[index];
 		if (
 			entry.uniqueLetters.length !== letterCount ||
-			entry.normalizedName.length > 10
+			entry.normalizedName.length > 10 ||
+			!entry.isCrosswordCandidate
 		) {
 			continue;
 		}
@@ -367,10 +346,12 @@ export function computeViableLetterSets(
 				existing.maxFrequency,
 				words[index].frequency,
 			);
+			existing.pangramWords.push(words[index]);
 		} else {
 			groups.set(key, {
 				letters: entry.uniqueLetters,
 				maxFrequency: words[index].frequency,
+				pangramWords: [words[index]],
 			});
 		}
 	}
@@ -400,6 +381,7 @@ export function computeViableLetterSets(
 
 		if (eligibleWords.length >= MIN_VIABLE_ELIGIBLE_WORDS) {
 			dataset.eligibleWordsByLetterSet.set(key, eligibleWords);
+			dataset.pangramWordsByLetterSet.set(key, group.pangramWords);
 			result.push({
 				key,
 				letters: group.letters,
@@ -413,15 +395,23 @@ export function computeViableLetterSets(
 	return result;
 }
 
+/**
+ * Words that use every letter of a viable letter set. Empty for any other set.
+ */
+function getPangramWords(words: Word[], letters: string[]): Word[] {
+	return (
+		getCachedWordDataset(words).pangramWordsByLetterSet.get(
+			buildLetterSetKey(letters),
+		) ?? []
+	);
+}
+
 function computeLetterHeat(
 	recentHistory: DailyPuzzleHistoryEntry[],
 ): Map<string, number> {
 	const heat = new Map<string, number>();
 	for (const entry of recentHistory) {
-		const weight = getRecencyWeight(
-			entry.daysAgo,
-			LETTER_SET_HISTORY_WINDOW_DAYS,
-		);
+		const weight = getRecencyWeight(entry.daysAgo);
 		if (weight <= 0) continue;
 		for (const letter of entry.letters) {
 			heat.set(letter, (heat.get(letter) ?? 0) + weight);
@@ -463,7 +453,7 @@ export function getRandomLetterSet(
 
 	// Recent letter sets for hard overlap check
 	const recentLetterSets = recentHistory
-		.filter((e) => e.daysAgo <= LETTER_NOVELTY_WINDOW_DAYS)
+		.filter((e) => getRecencyWeight(e.daysAgo) > 0)
 		.map((e) => new Set(e.letters));
 
 	// Score each viable letter set by frequency, eligible word count, and novelty
@@ -514,73 +504,6 @@ export function getRandomLetterSet(
 	return random.shuffleArray([...selected.ls.letters]);
 }
 
-export function generateDailyCrosswordForSeed(
-	words: Word[],
-	seed: number,
-	minWords = DEFAULT_MIN_WORDS,
-	maxWords = DEFAULT_MAX_WORDS,
-	options: {
-		cache?: Map<number, DailyGenerationResult | null>;
-		// How many letters the requested day gets. The days replayed before it
-		// keep the default.
-		letterCount?: number;
-	} = {},
-): {
-	crossword: CrosswordGrid;
-	letters: string[];
-	shuffledLetters: string[];
-} | null {
-	return generateDailyCrosswordForSeedInternal(
-		words,
-		seed,
-		minWords,
-		maxWords,
-		options.cache ?? new Map(),
-		options.letterCount,
-	);
-}
-
-function generateDailyCrosswordForSeedInternal(
-	words: Word[],
-	seed: number,
-	minWords = DEFAULT_MIN_WORDS,
-	maxWords = DEFAULT_MAX_WORDS,
-	cache: Map<number, DailyGenerationResult | null> = new Map(),
-	letterCount: number = DEFAULT_LETTER_COUNT,
-): DailyGenerationResult | null {
-	const cached = cache.get(seed);
-	if (cached !== undefined) {
-		return cached;
-	}
-
-	// Generate all days in the lookback window iteratively (oldest first)
-	// so each day benefits from cached history of earlier days.
-	// This avoids deep recursion and ensures the freshness system
-	// builds on actual generated puzzles rather than baselines.
-	const dateKey = seedToDateKey(seed);
-	const startDate = addDaysToDateKey(dateKey, -HISTORY_LOOKBACK_DAYS);
-	let currentDate = startDate;
-
-	while (currentDate <= dateKey) {
-		const currentSeed = dateKeyToSeed(currentDate);
-		if (!cache.has(currentSeed)) {
-			const recentHistory = buildHistoryFromCache(currentSeed, cache);
-			const generated = selectBestDailyCrosswordForSeed(
-				words,
-				currentSeed,
-				minWords,
-				maxWords,
-				recentHistory,
-				currentDate === dateKey ? letterCount : DEFAULT_LETTER_COUNT,
-			);
-			cache.set(currentSeed, generated);
-		}
-		currentDate = addDaysToDateKey(currentDate, 1);
-	}
-
-	return cache.get(seed) ?? null;
-}
-
 /**
  * Compute per-word penalties based on recent puzzle history.
  * Words that appeared in recent puzzles receive a negative score
@@ -592,7 +515,7 @@ function computeWordFreshnessPenalties(
 	const penalties = new Map<string, number>();
 
 	for (const entry of recentHistory) {
-		const weight = getRecencyWeight(entry.daysAgo, WORD_HISTORY_WINDOW_DAYS);
+		const weight = getRecencyWeight(entry.daysAgo);
 		if (weight <= 0) continue;
 
 		for (const wordKey of entry.selectedWordKeys) {
@@ -604,14 +527,23 @@ function computeWordFreshnessPenalties(
 	return penalties;
 }
 
-function selectBestDailyCrosswordForSeed(
+export function generateDailyCrosswordForSeed(
 	words: Word[],
 	seed: number,
 	minWords = DEFAULT_MIN_WORDS,
 	maxWords = DEFAULT_MAX_WORDS,
-	recentHistory: DailyPuzzleHistoryEntry[] = [],
-	letterCount: number = DEFAULT_LETTER_COUNT,
-): DailyGenerationResult | null {
+	options: {
+		letterCount?: number;
+		// The puzzles of the days before this one, which it steers away from
+		// repeating.
+		recentHistory?: DailyPuzzleHistoryEntry[];
+	} = {},
+): {
+	crossword: CrosswordGrid;
+	letters: string[];
+	shuffledLetters: string[];
+} | null {
+	const { letterCount = DEFAULT_LETTER_COUNT, recentHistory = [] } = options;
 	const requiredMinWords = Math.max(minWords, DEFAULT_MIN_WORDS);
 	const safeMaxWords = Math.max(maxWords, requiredMinWords);
 	const random = new SeededRandom(seed);
@@ -633,10 +565,16 @@ function selectBestDailyCrosswordForSeed(
 			letterCount,
 		});
 		const filteredWords = filterWordsByLetters(words, letters);
-		if (filteredWords.length < requiredMinWords) {
+		const pangramWords = getPangramWords(words, letters);
+		if (filteredWords.length < requiredMinWords || pangramWords.length === 0) {
 			attempts++;
 			continue;
 		}
+
+		// Pangrams compete like any other word, so one played recently loses to
+		// a fresh one. Building the grid around the winner guarantees the puzzle
+		// has a word with every letter.
+		const [pangramWord] = prioritizeWords(pangramWords, random, wordPenalties);
 
 		try {
 			const result = generateCrossword(
@@ -645,22 +583,15 @@ function selectBestDailyCrosswordForSeed(
 				safeMaxWords,
 				random,
 				wordPenalties,
+				{
+					word: pangramWord,
+					direction: random.next() < 0.5 ? "horizontal" : "vertical",
+				},
 			);
 			if (
 				result.words.length < requiredMinWords ||
 				result.cols < MIN_GRID_COLS
 			) {
-				attempts++;
-				continue;
-			}
-
-			const usedLetters = new Set(
-				result.words.flatMap((placement) =>
-					normalizeWord(placement.word.name).split(""),
-				),
-			);
-
-			if (!letters.every((letter) => usedLetters.has(letter))) {
 				attempts++;
 				continue;
 			}
@@ -706,35 +637,10 @@ function selectBestDailyCrosswordForSeed(
 	}
 
 	return {
-		crossword: bestCrossword,
+		crossword: shuffleWordIds(bestCrossword, random),
 		letters: bestLetters,
 		shuffledLetters: random.shuffleArray(bestLetters),
-		summary: summarizeDailyGeneration(bestLetters, bestCrossword),
 	};
-}
-
-function buildHistoryFromCache(
-	seed: number,
-	cache: Map<number, DailyGenerationResult | null>,
-): DailyPuzzleHistoryEntry[] {
-	const dateKey = seedToDateKey(seed);
-	const history: DailyPuzzleHistoryEntry[] = [];
-
-	for (let daysAgo = 1; daysAgo <= HISTORY_LOOKBACK_DAYS; daysAgo++) {
-		const historicalSeed = dateKeyToSeed(addDaysToDateKey(dateKey, -daysAgo));
-		const generated = cache.get(historicalSeed);
-
-		if (!generated) {
-			continue;
-		}
-
-		history.push({
-			daysAgo,
-			...generated.summary,
-		});
-	}
-
-	return history;
 }
 
 export { shuffleArray } from "@/lib/shuffle";
