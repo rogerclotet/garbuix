@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { resolveFoundWords } from "@/lib/puzzle-client";
+import { isPangram } from "@/lib/puzzle-helpers";
 import { cn } from "@/lib/utils";
 
 export function useCompletionWords({
@@ -26,9 +27,13 @@ export function useCompletionWords({
 export function CompletionWordList({
 	query,
 	displayWords = {},
+	pangramLetters,
 }: {
 	query: ReturnType<typeof useCompletionWords>;
 	displayWords?: Readonly<Record<string, string>>;
+	// The letters of the day. Only the classic game has pangrams, so the other
+	// games leave this out.
+	pangramLetters?: string[];
 }) {
 	const { data: words, isPending, isError, refetch } = query;
 
@@ -49,22 +54,30 @@ export function CompletionWordList({
 				// Nunito's glyph box at 13px is ~17.7px tall, so any tighter line height
 				// spills a pixel past the last row and the list scrolls for nothing.
 				<ul className="flex max-h-32 flex-wrap justify-center gap-x-2 overflow-y-auto">
-					{words.map(({ word, isInPuzzle }) => (
-						<li
-							key={word}
-							className={cn(
-								"max-w-full text-[13px] leading-[18px]",
-								isInPuzzle
-									? "font-semibold text-primary"
-									: "text-muted-foreground",
-							)}
-						>
-							<span className="min-w-0 wrap-anywhere">
-								{(displayWords[word] ?? word).toUpperCase()}
-							</span>
-							{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
-						</li>
-					))}
+					{words.map(({ word, isInPuzzle }) => {
+						const isPangramWord =
+							pangramLetters !== undefined && isPangram(word, pangramLetters);
+						return (
+							<li
+								key={word}
+								className={cn(
+									"max-w-full text-[13px] leading-[18px]",
+									isInPuzzle
+										? "font-semibold text-primary"
+										: "text-muted-foreground",
+									isPangramWord && "text-pangram-foreground",
+								)}
+							>
+								<span className="min-w-0 wrap-anywhere">
+									{(displayWords[word] ?? word).toUpperCase()}
+								</span>
+								{isInPuzzle ? <span className="sr-only">, del joc</span> : null}
+								{isPangramWord ? (
+									<span className="sr-only">, pangrama</span>
+								) : null}
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</section>

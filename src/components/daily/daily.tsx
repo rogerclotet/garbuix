@@ -290,7 +290,10 @@ function DailyGame({
 						</div>
 						{displayComplete ? (
 							<div className="shrink-0 pt-2 pb-2 lg:col-start-1 lg:row-start-3">
-								<CompletionWordList query={completionWords} />
+								<CompletionWordList
+									query={completionWords}
+									pangramLetters={puzzle.letters}
+								/>
 							</div>
 						) : null}
 					</div>
