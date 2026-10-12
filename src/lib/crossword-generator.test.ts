@@ -279,14 +279,10 @@ describe("generated daily puzzles", () => {
 	let puzzles: GeneratedPuzzle[] = [];
 	let sevenLetterPuzzle: GeneratedPuzzle;
 
-	// With no stored history, generating a day also generates the days before
-	// it. Those ranges overlap, so one shared cache pays for them once. Generating here in
-	// a fixed order keeps each puzzle the same whichever tests are selected.
 	beforeAll(() => {
-		const cache = new Map();
 		const generate = (
 			seed: number,
-			options: Parameters<typeof generateDailyCrosswordForSeed>[4],
+			options?: Parameters<typeof generateDailyCrosswordForSeed>[4],
 		) => {
 			const result = generateDailyCrosswordForSeed(
 				allWords,
@@ -301,18 +297,8 @@ describe("generated daily puzzles", () => {
 			return result;
 		};
 
-		const firstPuzzle = generate(260401, { cache });
-		// The letter count only applies to the requested day, so a copy of the
-		// history cached so far still holds and only the days after 2026-04-01
-		// are generated again.
-		sevenLetterPuzzle = generate(260405, {
-			cache: new Map(cache),
-			letterCount: 7,
-		});
-		puzzles = [
-			firstPuzzle,
-			...[260405, 260411].map((seed) => generate(seed, { cache })),
-		];
+		sevenLetterPuzzle = generate(260405, { letterCount: 7 });
+		puzzles = [260401, 260405, 260411].map((seed) => generate(seed));
 	}, 120_000);
 
 	it("uses six letters unless asked for another count", () => {
@@ -350,25 +336,13 @@ describe("generated daily puzzles", () => {
 		}
 	});
 
-	it("builds on stored history instead of replaying earlier days", () => {
-		const seed = 260420;
-		const unrelatedHistory = [
-			toDailyPuzzleHistoryEntry(1, ["q", "x", "z", "k", "w", "y"], []),
-		];
-		const cache = new Map();
-		const first = generateDailyCrosswordForSeed(allWords, seed, 10, 15, {
-			cache,
-			storedHistory: unrelatedHistory,
-		});
-		if (!first) {
-			throw new Error(`Expected crossword for seed ${seed}`);
-		}
+	it("steers away from the puzzles in its history", () => {
+		const [first] = puzzles;
 
 		// The seed fixes every random draw, so only the history can move the
 		// second run away from the letters of the first.
-		const second = generateDailyCrosswordForSeed(allWords, seed, 10, 15, {
-			storedHistory: [
-				...unrelatedHistory,
+		const second = generateDailyCrosswordForSeed(allWords, 260401, 10, 15, {
+			recentHistory: [
 				toDailyPuzzleHistoryEntry(
 					2,
 					first.letters,
@@ -379,8 +353,6 @@ describe("generated daily puzzles", () => {
 			],
 		});
 
-		expect(cache.size).toBe(0);
-		expect(getPangramWords(first).length).toBeGreaterThan(0);
 		expect([...(second?.letters ?? [])].sort()).not.toEqual(
 			[...first.letters].sort(),
 		);

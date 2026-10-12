@@ -499,8 +499,7 @@ The crossword generator:
 - Falls back to simpler layouts if complex generation fails
 
 A new day avoids the letters and words of the puzzles stored for the previous
-45 days. On a database with none stored, it generates the previous 20 days in
-memory to stand in for them.
+45 days.
 
 Each day has six letters. The generator and the keypad also handle seven: pass
 `letterCount` to `generateDailyCrosswordForSeed`. No day is scheduled to use it;

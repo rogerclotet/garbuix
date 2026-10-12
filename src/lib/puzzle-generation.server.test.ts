@@ -83,7 +83,7 @@ describe("puzzle generation history", () => {
 		await ensureDailyPuzzleSnapshot("2026-03-12", { generateClues: false });
 
 		expect(generateCrossword.mock.lastCall?.[4]).toEqual({
-			storedHistory: [
+			recentHistory: [
 				{
 					daysAgo: 3,
 					letters: ["t", "a", "u", "l", "e", "r"],
@@ -100,10 +100,10 @@ describe("puzzle generation history", () => {
 		});
 	});
 
-	it("leaves the history empty on a database with no earlier puzzles", async () => {
+	it("generates without history when no earlier puzzle is stored", async () => {
 		await ensureDailyPuzzleSnapshot("2026-03-12", { generateClues: false });
 
-		expect(generateCrossword.mock.lastCall?.[4]).toEqual({ storedHistory: [] });
+		expect(generateCrossword.mock.lastCall?.[4]).toEqual({ recentHistory: [] });
 	});
 });
 

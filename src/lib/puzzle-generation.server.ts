@@ -174,9 +174,9 @@ export function triggerDailyPuzzleGeneration(
 	inProgressGenerations.set(dateKey, promise);
 }
 
-// The puzzles players actually got in the days before dateKey, which the
-// generator steers away from repeating. Empty on a new database.
-async function loadStoredHistory(
+// The puzzles players got in the days before dateKey, which the generator
+// steers away from repeating.
+async function loadRecentHistory(
 	dateKey: string,
 ): Promise<DailyPuzzleHistoryEntry[]> {
 	const storedPuzzles = await db.query.dailyPuzzles.findMany({
@@ -219,7 +219,7 @@ export async function ensureDailyPuzzleSnapshot(
 		seed,
 		undefined,
 		undefined,
-		{ storedHistory: await loadStoredHistory(dateKey) },
+		{ recentHistory: await loadRecentHistory(dateKey) },
 	);
 
 	if (!generated) {

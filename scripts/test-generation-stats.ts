@@ -3,10 +3,10 @@ import type { Word } from "@/data/types";
 import {
 	computeViableLetterSets,
 	filterWordsByLetters,
-	generateDailyCrosswordForSeed,
 	normalizeWord,
 } from "@/lib/crossword-generator";
-import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
+import { getTodayDateKey } from "@/lib/puzzle-dates";
+import { simulateDailyPuzzles } from "./lib/simulate-daily-puzzles";
 
 const words = allWords as Word[];
 const DEFAULT_DAYS = 180;
@@ -110,19 +110,12 @@ function collectDays(from: string, days: number) {
 	const letterSetStats = new Map<string, LetterSetEntry>();
 	const letterFrequency = new Map<string, number>();
 	const wordStats = new Map<string, WordEntry>();
-	const generationCache = new Map();
 
-	for (let offset = 0; offset < days; offset++) {
-		const dateKey = addDays(from, offset);
-		const seed = dateKeyToSeed(dateKey);
-		const generated = generateDailyCrosswordForSeed(words, seed, 10, 15, {
-			cache: generationCache,
-		});
-
-		if (!generated) {
-			throw new Error(`Failed to generate puzzle for ${dateKey}`);
-		}
-
+	for (const { dateKey, generated } of simulateDailyPuzzles(
+		words,
+		from,
+		days,
+	)) {
 		const letterSetKey = [...generated.letters].sort().join("");
 		const eligibleWords = filterWordsByLetters(words, generated.letters);
 		const selectedWords = generated.crossword.words.map(
