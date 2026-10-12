@@ -177,7 +177,7 @@ describe("generated daily puzzles", () => {
 		ReturnType<typeof generateDailyCrosswordForSeed>
 	>;
 	let puzzles: GeneratedPuzzle[] = [];
-	let sevenLetterSunday: GeneratedPuzzle;
+	let sevenLetterPuzzle: GeneratedPuzzle;
 
 	// Generating a day also generates its lookback window, and these windows
 	// overlap, so one shared cache pays for that history once. Generating here in
@@ -202,12 +202,12 @@ describe("generated daily puzzles", () => {
 		};
 
 		const firstPuzzle = generate(260401, { cache });
-		// 2026-04-05 is a Sunday before the real start date. Moving the start onto
-		// it changes nothing earlier, so a copy of the history cached so far still
-		// holds and only the days after 2026-04-01 are generated again.
-		sevenLetterSunday = generate(260405, {
+		// The letter count only applies to the requested day, so a copy of the
+		// history cached so far still holds and only the days after 2026-04-01
+		// are generated again.
+		sevenLetterPuzzle = generate(260405, {
 			cache: new Map(cache),
-			sevenLetterDaysStart: "2026-04-05",
+			letterCount: 7,
 		});
 		puzzles = [
 			firstPuzzle,
@@ -215,14 +215,14 @@ describe("generated daily puzzles", () => {
 		];
 	}, 120_000);
 
-	it("keeps six letters on Sundays before the seven-letter start date", () => {
+	it("uses six letters unless asked for another count", () => {
 		for (const { letters } of puzzles) {
 			expect(new Set(letters).size).toBe(6);
 		}
 	});
 
-	it("builds a seven-letter puzzle on a Sunday from the start date", () => {
-		const { crossword, letters } = sevenLetterSunday;
+	it("builds a seven-letter puzzle when asked for one", () => {
+		const { crossword, letters } = sevenLetterPuzzle;
 		const placedLetters = new Set(
 			crossword.words.flatMap((placement) => [
 				...normalizeWord(placement.word.name),
