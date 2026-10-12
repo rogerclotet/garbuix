@@ -51,10 +51,13 @@ code {
 	--spacing: 0.25rem;
 	/* A muted amber for the word that uses every letter of the day. */
 	--pangram: oklch(0.66 0.12 75);
+	/* The fill amber is too pale to read as text on the light backgrounds. */
+	--pangram-foreground: oklch(0.54 0.11 75);
 }
 
 .dark {
 	--pangram: oklch(0.8 0.11 80);
+	--pangram-foreground: var(--pangram);
 }
 
 @theme inline {
@@ -91,6 +94,7 @@ code {
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-pangram: var(--pangram);
+	--color-pangram-foreground: var(--pangram-foreground);
 
 	--font-sans: "Nunito Variable", sans-serif;
 	--font-mono: var(--font-mono);
