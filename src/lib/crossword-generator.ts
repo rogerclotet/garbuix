@@ -10,11 +10,13 @@ import {
 	DEFAULT_MIN_WORDS,
 	generateCrossword,
 	MIN_GRID_COLS,
+	shuffleWordIds,
 } from "./crossword/grid-placement";
 import { SeededRandom } from "./crossword/seeded-random";
 import {
 	countSameRootPairs,
 	getWordRuntimeMetadata,
+	prioritizeWords,
 	type WordLike,
 	type WordRuntimeMetadata,
 } from "./crossword/word-metadata";
@@ -23,6 +25,7 @@ export {
 	type CrosswordGrid,
 	type GridCell,
 	generateCrossword,
+	shuffleWordIds,
 	tryGenerateCrossword,
 	type WordPlacement,
 } from "./crossword/grid-placement";
@@ -38,10 +41,13 @@ const LETTER_NOVELTY_WINDOW_DAYS = 21;
 const MAX_LETTER_OVERLAP_HARD = 3;
 const LETTER_SET_HISTORY_WINDOW_DAYS = 28;
 const WORD_HISTORY_WINDOW_DAYS = 45;
-const HISTORY_LOOKBACK_DAYS = Math.max(
+export const HISTORY_LOOKBACK_DAYS = Math.max(
 	LETTER_SET_HISTORY_WINDOW_DAYS,
 	WORD_HISTORY_WINDOW_DAYS,
 );
+// Days generated in memory to stand in for history when no stored puzzle
+// precedes the requested day, as on a new database.
+const FRESH_HISTORY_REPLAY_DAYS = 20;
 const EXACT_LETTER_SET_REPEAT_PENALTY = 14;
 const LETTER_OVERLAP_PENALTY = 1.15;
 const WORD_REPEAT_PENALTY = 1.85;
@@ -80,6 +86,7 @@ type CachedWordDataset = {
 	words: Word[];
 	entries: WordRuntimeMetadata[];
 	eligibleWordsByLetterSet: Map<string, Word[]>;
+	pangramWordsByLetterSet: Map<string, Word[]>;
 	viableLetterSetsByLetterCount: Map<number, ViableLetterSet[]>;
 };
 
@@ -115,6 +122,7 @@ function getCachedWordDataset(words: Word[]): CachedWordDataset {
 		words,
 		entries: words.map((word) => getWordRuntimeMetadata(word)),
 		eligibleWordsByLetterSet: new Map(),
+		pangramWordsByLetterSet: new Map(),
 		viableLetterSetsByLetterCount: new Map(),
 	};
 
@@ -213,6 +221,19 @@ function summarizeDailyGeneration(
 		selectedWordKeys: crossword.words.map((placement) =>
 			normalizeWord(placement.word.name),
 		),
+	};
+}
+
+export function toDailyPuzzleHistoryEntry(
+	daysAgo: number,
+	letters: string[],
+	selectedWordKeys: string[],
+): DailyPuzzleHistoryEntry {
+	return {
+		daysAgo,
+		letters,
+		letterSetKey: buildLetterSetKey(letters),
+		selectedWordKeys,
 	};
 }
 
@@ -349,14 +370,19 @@ export function computeViableLetterSets(
 		return cachedLetterSets;
 	}
 
-	// Find all words with exactly letterCount unique letters (up to 10 long) and
-	// group by letter set
-	const groups = new Map<string, { letters: string[]; maxFrequency: number }>();
+	// Find all placeable words with exactly letterCount unique letters (up to 10
+	// long) and group by letter set. Each set keeps these words, its pangrams,
+	// because every puzzle is built around one of them.
+	const groups = new Map<
+		string,
+		{ letters: string[]; maxFrequency: number; pangramWords: Word[] }
+	>();
 	for (let index = 0; index < dataset.entries.length; index++) {
 		const entry = dataset.entries[index];
 		if (
 			entry.uniqueLetters.length !== letterCount ||
-			entry.normalizedName.length > 10
+			entry.normalizedName.length > 10 ||
+			!entry.isCrosswordCandidate
 		) {
 			continue;
 		}
@@ -367,10 +393,12 @@ export function computeViableLetterSets(
 				existing.maxFrequency,
 				words[index].frequency,
 			);
+			existing.pangramWords.push(words[index]);
 		} else {
 			groups.set(key, {
 				letters: entry.uniqueLetters,
 				maxFrequency: words[index].frequency,
+				pangramWords: [words[index]],
 			});
 		}
 	}
@@ -400,6 +428,7 @@ export function computeViableLetterSets(
 
 		if (eligibleWords.length >= MIN_VIABLE_ELIGIBLE_WORDS) {
 			dataset.eligibleWordsByLetterSet.set(key, eligibleWords);
+			dataset.pangramWordsByLetterSet.set(key, group.pangramWords);
 			result.push({
 				key,
 				letters: group.letters,
@@ -411,6 +440,17 @@ export function computeViableLetterSets(
 
 	dataset.viableLetterSetsByLetterCount.set(letterCount, result);
 	return result;
+}
+
+/**
+ * Words that use every letter of a viable letter set. Empty for any other set.
+ */
+function getPangramWords(words: Word[], letters: string[]): Word[] {
+	return (
+		getCachedWordDataset(words).pangramWordsByLetterSet.get(
+			buildLetterSetKey(letters),
+		) ?? []
+	);
 }
 
 function computeLetterHeat(
@@ -524,12 +564,26 @@ export function generateDailyCrosswordForSeed(
 		// How many letters the requested day gets. The days replayed before it
 		// keep the default.
 		letterCount?: number;
+		// The puzzles already stored for the days before this one. When there are
+		// any they are the whole history, and no earlier day is replayed.
+		storedHistory?: DailyPuzzleHistoryEntry[];
 	} = {},
 ): {
 	crossword: CrosswordGrid;
 	letters: string[];
 	shuffledLetters: string[];
 } | null {
+	if (options.storedHistory && options.storedHistory.length > 0) {
+		return selectBestDailyCrosswordForSeed(
+			words,
+			seed,
+			minWords,
+			maxWords,
+			options.storedHistory,
+			options.letterCount,
+		);
+	}
+
 	return generateDailyCrosswordForSeedInternal(
 		words,
 		seed,
@@ -553,12 +607,12 @@ function generateDailyCrosswordForSeedInternal(
 		return cached;
 	}
 
-	// Generate all days in the lookback window iteratively (oldest first)
-	// so each day benefits from cached history of earlier days.
+	// Generate the days before this one iteratively (oldest first) so each day
+	// benefits from cached history of earlier days.
 	// This avoids deep recursion and ensures the freshness system
 	// builds on actual generated puzzles rather than baselines.
 	const dateKey = seedToDateKey(seed);
-	const startDate = addDaysToDateKey(dateKey, -HISTORY_LOOKBACK_DAYS);
+	const startDate = addDaysToDateKey(dateKey, -FRESH_HISTORY_REPLAY_DAYS);
 	let currentDate = startDate;
 
 	while (currentDate <= dateKey) {
@@ -633,10 +687,16 @@ function selectBestDailyCrosswordForSeed(
 			letterCount,
 		});
 		const filteredWords = filterWordsByLetters(words, letters);
-		if (filteredWords.length < requiredMinWords) {
+		const pangramWords = getPangramWords(words, letters);
+		if (filteredWords.length < requiredMinWords || pangramWords.length === 0) {
 			attempts++;
 			continue;
 		}
+
+		// Pangrams compete like any other word, so one played recently loses to
+		// a fresh one. Building the grid around the winner guarantees the puzzle
+		// has a word with every letter.
+		const [pangramWord] = prioritizeWords(pangramWords, random, wordPenalties);
 
 		try {
 			const result = generateCrossword(
@@ -645,22 +705,15 @@ function selectBestDailyCrosswordForSeed(
 				safeMaxWords,
 				random,
 				wordPenalties,
+				{
+					word: pangramWord,
+					direction: random.next() < 0.5 ? "horizontal" : "vertical",
+				},
 			);
 			if (
 				result.words.length < requiredMinWords ||
 				result.cols < MIN_GRID_COLS
 			) {
-				attempts++;
-				continue;
-			}
-
-			const usedLetters = new Set(
-				result.words.flatMap((placement) =>
-					normalizeWord(placement.word.name).split(""),
-				),
-			);
-
-			if (!letters.every((letter) => usedLetters.has(letter))) {
 				attempts++;
 				continue;
 			}
@@ -706,7 +759,7 @@ function selectBestDailyCrosswordForSeed(
 	}
 
 	return {
-		crossword: bestCrossword,
+		crossword: shuffleWordIds(bestCrossword, random),
 		letters: bestLetters,
 		shuffledLetters: random.shuffleArray(bestLetters),
 		summary: summarizeDailyGeneration(bestLetters, bestCrossword),

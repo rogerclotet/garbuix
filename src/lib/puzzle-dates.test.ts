@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	addDaysToDateKey,
+	countDaysBetween,
 	dateKeyToSeed,
 	formatMadridTime,
 	formatPuzzleDate,
@@ -33,6 +34,16 @@ describe("puzzle-dates", () => {
 		["2026-12-31", "31 de desembre del 2026"],
 	])("formats puzzle date %s in Catalan", (dateKey, expected) => {
 		expect(formatPuzzleDate(dateKey)).toBe(expected);
+	});
+
+	it.each([
+		["2026-03-10", "2026-03-10", 0],
+		["2026-03-10", "2026-03-11", 1],
+		["2026-02-27", "2026-03-02", 3],
+		["2026-03-28", "2026-03-30", 2],
+		["2026-03-11", "2026-03-10", -1],
+	])("counts the days from %s to %s", (from, to, expected) => {
+		expect(countDaysBetween(from, to)).toBe(expected);
 	});
 
 	it("round trips seeds and date keys", () => {

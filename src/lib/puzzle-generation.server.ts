@@ -1,14 +1,24 @@
 import { captureException } from "@sentry/tanstackstart-react";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import guessWords from "@/data/catalan-guess-words.json";
 import allWords from "@/data/catalan-words.json";
 import type { Word } from "@/data/types";
 import { dailyPuzzles } from "@/db/schema";
 import { generateAndStoreCluesForPuzzle } from "@/lib/clue-generator.server";
-import { generateDailyCrosswordForSeed } from "@/lib/crossword-generator";
+import {
+	type DailyPuzzleHistoryEntry,
+	generateDailyCrosswordForSeed,
+	HISTORY_LOOKBACK_DAYS,
+	toDailyPuzzleHistoryEntry,
+} from "@/lib/crossword-generator";
 import { db } from "@/lib/db";
 import { hashText } from "@/lib/puzzle-crypto";
-import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
+import {
+	addDaysToDateKey,
+	countDaysBetween,
+	dateKeyToSeed,
+	getTodayDateKey,
+} from "@/lib/puzzle-dates";
 import {
 	buildNormalizedDictionary,
 	getValidNormalizedGuessesForLetters,
@@ -17,7 +27,7 @@ import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { DailyPuzzlePrivateWord } from "@/lib/puzzle-types";
 import { trackBackgroundTask } from "@/lib/shutdown.server";
 
-export const PUZZLE_ALGORITHM_VERSION = "3";
+export const PUZZLE_ALGORITHM_VERSION = "4";
 
 // Puzzles are generated only from the common-word dictionary (frequency-floored),
 // while guesses are validated against the wider name-only dictionary so players
@@ -164,6 +174,33 @@ export function triggerDailyPuzzleGeneration(
 	inProgressGenerations.set(dateKey, promise);
 }
 
+// The puzzles players actually got in the days before dateKey, which the
+// generator steers away from repeating. Empty on a new database.
+async function loadStoredHistory(
+	dateKey: string,
+): Promise<DailyPuzzleHistoryEntry[]> {
+	const storedPuzzles = await db.query.dailyPuzzles.findMany({
+		where: and(
+			gte(
+				dailyPuzzles.dateKey,
+				addDaysToDateKey(dateKey, -HISTORY_LOOKBACK_DAYS),
+			),
+			lt(dailyPuzzles.dateKey, dateKey),
+		),
+		columns: { dateKey: true, privateSnapshotJson: true },
+	});
+
+	return storedPuzzles.map((storedPuzzle) =>
+		toDailyPuzzleHistoryEntry(
+			countDaysBetween(storedPuzzle.dateKey, dateKey),
+			storedPuzzle.privateSnapshotJson.letters,
+			storedPuzzle.privateSnapshotJson.wordSlots.map(
+				(wordSlot) => wordSlot.normalizedWord,
+			),
+		),
+	);
+}
+
 export async function ensureDailyPuzzleSnapshot(
 	dateKey = getTodayDateKey(),
 	options: { generateClues?: boolean } = {},
@@ -177,7 +214,13 @@ export async function ensureDailyPuzzleSnapshot(
 	}
 
 	const seed = dateKeyToSeed(dateKey);
-	const generated = generateDailyCrosswordForSeed(serverWords, seed);
+	const generated = generateDailyCrosswordForSeed(
+		serverWords,
+		seed,
+		undefined,
+		undefined,
+		{ storedHistory: await loadStoredHistory(dateKey) },
+	);
 
 	if (!generated) {
 		throw new Error(`Failed to generate puzzle for ${dateKey}`);

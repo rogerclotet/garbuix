@@ -2,46 +2,53 @@ import * as Sentry from "@sentry/tanstackstart-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { dailyPuzzles } from "@/db/schema";
 
-const { findFirst, insert, generateClues } = vi.hoisted(() => ({
-	findFirst: vi.fn(),
-	insert: vi.fn(),
-	generateClues: vi.fn().mockResolvedValue(undefined),
-}));
+const { findFirst, findMany, insert, generateClues, generateCrossword } =
+	vi.hoisted(() => ({
+		findFirst: vi.fn(),
+		findMany: vi.fn(),
+		insert: vi.fn(),
+		generateClues: vi.fn().mockResolvedValue(undefined),
+		generateCrossword: vi.fn(),
+	}));
 
 vi.mock("@/lib/db", () => ({
-	db: { query: { dailyPuzzles: { findFirst } }, insert },
+	db: { query: { dailyPuzzles: { findFirst, findMany } }, insert },
 }));
 vi.mock("@/lib/clue-generator.server", () => ({
 	generateAndStoreCluesForPuzzle: generateClues,
 }));
 vi.mock("@/lib/crossword-generator", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/crossword-generator")>()),
-	generateDailyCrosswordForSeed: () => ({
-		letters: ["c", "a", "s"],
-		shuffledLetters: ["s", "a", "c"],
-		crossword: {
-			rows: 1,
-			cols: 3,
-			grid: [[..."cas"].map((letter) => ({ letter, wordIds: [0] }))],
-			words: [
-				{
-					id: 0,
-					startRow: 0,
-					startCol: 0,
-					direction: "horizontal",
-					revealed: false,
-					word: { name: "cas", areatematica: "general", frequency: 4000 },
-				},
-			],
-		},
-	}),
+	generateDailyCrosswordForSeed: generateCrossword,
 }));
+
+const generatedCrossword = {
+	letters: ["c", "a", "s"],
+	shuffledLetters: ["s", "a", "c"],
+	crossword: {
+		rows: 1,
+		cols: 3,
+		grid: [[..."cas"].map((letter) => ({ letter, wordIds: [0] }))],
+		words: [
+			{
+				id: 0,
+				startRow: 0,
+				startCol: 0,
+				direction: "horizontal",
+				revealed: false,
+				word: { name: "cas", areatematica: "general", frequency: 4000 },
+			},
+		],
+	},
+};
 
 import { ensureDailyPuzzleSnapshot } from "@/lib/puzzle-generation.server";
 
 beforeEach(() => {
 	vi.clearAllMocks();
 	findFirst.mockResolvedValue(undefined);
+	findMany.mockResolvedValue([]);
+	generateCrossword.mockReturnValue(generatedCrossword);
 	insert.mockImplementation(() => ({
 		values: (row: typeof dailyPuzzles.$inferInsert) => ({
 			onConflictDoNothing: () => ({
@@ -49,6 +56,55 @@ beforeEach(() => {
 			}),
 		}),
 	}));
+});
+
+describe("puzzle generation history", () => {
+	it("generates against the puzzles stored for the days before", async () => {
+		findMany.mockResolvedValue([
+			{
+				dateKey: "2026-03-09",
+				privateSnapshotJson: {
+					letters: ["t", "a", "u", "l", "e", "r"],
+					wordSlots: [
+						{ normalizedWord: "taula" },
+						{ normalizedWord: "ratera" },
+					],
+				},
+			},
+			{
+				dateKey: "2026-02-27",
+				privateSnapshotJson: {
+					letters: ["c", "a", "s", "o", "n", "e"],
+					wordSlots: [{ normalizedWord: "cases" }],
+				},
+			},
+		]);
+
+		await ensureDailyPuzzleSnapshot("2026-03-12", { generateClues: false });
+
+		expect(generateCrossword.mock.lastCall?.[4]).toEqual({
+			storedHistory: [
+				{
+					daysAgo: 3,
+					letters: ["t", "a", "u", "l", "e", "r"],
+					letterSetKey: "aelrtu",
+					selectedWordKeys: ["taula", "ratera"],
+				},
+				{
+					daysAgo: 13,
+					letters: ["c", "a", "s", "o", "n", "e"],
+					letterSetKey: "acenos",
+					selectedWordKeys: ["cases"],
+				},
+			],
+		});
+	});
+
+	it("leaves the history empty on a database with no earlier puzzles", async () => {
+		await ensureDailyPuzzleSnapshot("2026-03-12", { generateClues: false });
+
+		expect(generateCrossword.mock.lastCall?.[4]).toEqual({ storedHistory: [] });
+	});
 });
 
 describe("puzzle generation clue lifecycle", () => {
