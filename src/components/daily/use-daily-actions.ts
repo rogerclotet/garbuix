@@ -186,7 +186,7 @@ export function useDailyActions({
 			}
 
 			if (isPangramWord) {
-				toast.success("Paraula estrella!", {
+				toast.success("Pangrama!", {
 					description: "Fa servir totes les lletres d'avui.",
 				});
 			}

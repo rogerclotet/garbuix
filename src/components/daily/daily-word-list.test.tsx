@@ -67,7 +67,7 @@ describe("DailyWordList pangram", () => {
 		renderFoundWord([0]);
 
 		expect(
-			screen.getByTitle("Paraula estrella: fa servir totes les lletres"),
+			screen.getByTitle("Pangrama: fa servir totes les lletres"),
 		).toBeTruthy();
 	});
 
@@ -75,7 +75,7 @@ describe("DailyWordList pangram", () => {
 		renderFoundWord([]);
 
 		expect(screen.getByText("COSA")).toBeTruthy();
-		expect(screen.queryByTitle(/Paraula estrella/)).toBeNull();
+		expect(screen.queryByTitle(/Pangrama/)).toBeNull();
 	});
 });
 

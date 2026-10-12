@@ -269,7 +269,7 @@ export function DailyWordList({
 		</div>
 	);
 
-	const pangramTooltip = "Paraula estrella: fa servir totes les lletres";
+	const pangramTooltip = "Pangrama: fa servir totes les lletres";
 
 	const renderFoundSlot = (slot: PuzzleWordSlot) => {
 		const foundClueText = foundClueTextsByWordId[slot.id];
