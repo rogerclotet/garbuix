@@ -2,6 +2,7 @@ import { createBrowserHistory, createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { RouterErrorComponent } from "@/components/router-error";
 import { withGameHistory } from "@/lib/game-history";
+import { rememberRenderedLoaderData } from "@/lib/offline-loader";
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 
 // Import the generated route tree
@@ -24,6 +25,8 @@ export const getRouter = () => {
 		defaultErrorComponent: RouterErrorComponent,
 		defaultPreload: "intent",
 	});
+
+	if (typeof window !== "undefined") rememberRenderedLoaderData(router);
 
 	setupRouterSsrQueryIntegration({
 		router,

@@ -159,7 +159,10 @@ it.each(["offline", "storage blocked"])(
 			expect(events).toHaveLength(0);
 			expect(reload).not.toHaveBeenCalled();
 			expect(
-				screen.getByRole("button", { name: "Recarrega la pàgina" }),
+				screen.getByRole("button", {
+					name:
+						reason === "offline" ? "Torna-ho a provar" : "Recarrega la pàgina",
+				}),
 			).toBeTruthy();
 		} finally {
 			await client?.close();
@@ -180,8 +183,61 @@ it("offers a manual reload while offline", () => {
 	vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
 	renderError();
 	expect(reload).not.toHaveBeenCalled();
-	fireEvent.click(screen.getByRole("button", { name: "Recarrega la pàgina" }));
+	expect(screen.getByText("Sense connexió")).toBeDefined();
+	fireEvent.click(screen.getByRole("button", { name: "Torna-ho a provar" }));
 	expect(reload).toHaveBeenCalledTimes(1);
+});
+
+it("reloads a missing route bundle once the connection returns", () => {
+	const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+	renderError();
+	expect(reload).not.toHaveBeenCalled();
+	onLine.mockReturnValue(true);
+	fireEvent(window, new Event("online"));
+	expect(reload).toHaveBeenCalledTimes(1);
+});
+
+it("reads a page's data again once the connection returns, without reporting it", async () => {
+	const events: Sentry.ErrorEvent[] = [];
+	const client = Sentry.init({
+		dsn: "https://public@example.com/1",
+		defaultIntegrations: false,
+		beforeSend(event) {
+			events.push(event);
+			return null;
+		},
+	});
+	try {
+		let online = false;
+		const loader = vi.fn(async () => {
+			if (!online) throw new TypeError("Failed to fetch");
+			return "Classificació d'avui";
+		});
+		const root = createRootRoute();
+		const route = createRoute({
+			getParentRoute: () => root,
+			path: "/classificacio",
+			loader,
+			component: () => <p>{route.useLoaderData()}</p>,
+		});
+		const router = createRouter({
+			routeTree: root.addChildren([route]),
+			history: createMemoryHistory({ initialEntries: ["/classificacio"] }),
+			defaultErrorComponent: RouterErrorComponent,
+		});
+		await router.load();
+		render(<RouterProvider router={router} />);
+		await screen.findByText("Sense connexió");
+		await Sentry.flush();
+		expect(events).toHaveLength(0);
+
+		online = true;
+		fireEvent(window, new Event("online"));
+		await screen.findByText("Classificació d'avui");
+		expect(reload).not.toHaveBeenCalled();
+	} finally {
+		await client?.close();
+	}
 });
 
 it("recovers a failed split loader through the actual router error boundary", async () => {

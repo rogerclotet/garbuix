@@ -4,6 +4,7 @@ import { Daily } from "@/components/daily/daily";
 import type { DailyData } from "@/components/daily/daily-types";
 import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
 import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
+import { withOfflineFallback } from "@/lib/offline-loader";
 import {
 	getDailyPuzzlePageData,
 	pollDailyPuzzleReady,
@@ -11,7 +12,7 @@ import {
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 
 export const Route = createFileRoute("/")({
-	loader: () => getDailyPuzzlePageData(),
+	loader: withOfflineFallback(() => getDailyPuzzlePageData()),
 	// Only reached when the read is slow enough for the router's pending delay
 	// to elapse; a normal navigation stays on the current page until the board
 	// is ready to render.

@@ -76,14 +76,26 @@ function retainSessionUserReference(
 	return next;
 }
 
+// better-auth keeps the last session it read when a refetch fails, and only
+// clears it on a 401. A first read that fails some other way, most often one
+// made offline from a page the service worker cached, never reached a server
+// that could say who is signed in. Treating that as signed out would move a
+// signed-in player onto guest progress, so it counts as still pending.
+function hasUnansweredSessionRead(error: unknown) {
+	if (!error) return false;
+	return (error as { status?: unknown }).status !== 401;
+}
+
 export function useActiveSessionUser(fallbackUser: SessionUser) {
 	const session = authClient.useSession();
 	const authUser = session.data?.user;
 	const cachedUserRef = useRef<SessionUser>(null);
+	const sessionUnknown =
+		session.isPending || (!authUser && hasUnansweredSessionRead(session.error));
 
 	const activeUser = useMemo((): SessionUser => {
 		let next: SessionUser;
-		if (session.isPending) {
+		if (sessionUnknown) {
 			next = fallbackUser;
 		} else if (!authUser) {
 			next = null;
@@ -91,7 +103,7 @@ export function useActiveSessionUser(fallbackUser: SessionUser) {
 			next = mergeSessionUser(authUser, fallbackUser);
 		}
 		return retainSessionUserReference(next, cachedUserRef);
-	}, [session.isPending, authUser, fallbackUser]);
+	}, [sessionUnknown, authUser, fallbackUser]);
 
 	return {
 		activeUser,

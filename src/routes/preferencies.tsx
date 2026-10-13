@@ -33,6 +33,7 @@ import {
 	setVibrationPreference,
 } from "@/lib/anon-identity";
 import { authClient } from "@/lib/auth-client";
+import { forgetCachedPages } from "@/lib/page-cache";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import {
@@ -241,6 +242,9 @@ function PreferencesPage() {
 				toast.error("No s'ha pogut tancar la sessió. Torna-ho a provar.");
 				return;
 			}
+			await forgetCachedPages().catch((error: unknown) => {
+				console.warn("Could not forget cached pages", error);
+			});
 			await session.refetch();
 			await router.invalidate({ sync: true });
 			await router.navigate({ to: "/" });
