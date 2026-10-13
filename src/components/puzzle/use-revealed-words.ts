@@ -1,18 +1,19 @@
 import { useEffect, useEffectEvent } from "react";
-import { findFullyRevealedWords, type RevealedWord } from "@/lib/puzzle-client";
-import { buildCellLetters } from "@/lib/puzzle-helpers";
+import { createPuzzleEvent, resolveGuess } from "@/lib/puzzle-client";
+import { buildCellLetters, getDisplayedSlotWord } from "@/lib/puzzle-helpers";
 import type {
 	DailyPuzzlePublic,
+	GuessAddedEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 
-// Reports words that hints and crossing words have fully spelled on the board,
-// so the player does not have to type what is already showing.
+// Hints and crossing words can spell a whole word on the board. Guesses it for
+// the player, so they do not have to type what is already showing.
 export function useRevealedWords({
 	puzzle,
 	snapshot,
 	enabled,
-	onRevealed,
+	onFound,
 }: {
 	puzzle: DailyPuzzlePublic;
 	snapshot: {
@@ -21,20 +22,35 @@ export function useRevealedWords({
 		hints: Record<string, string>;
 	} | null;
 	enabled: boolean;
-	onRevealed: (words: RevealedWord[]) => void;
+	onFound: (guesses: GuessAddedEvent[]) => void;
 }) {
-	const reportRevealed = useEffectEvent(onRevealed);
+	const reportFound = useEffectEvent(onFound);
 
 	useEffect(() => {
 		if (!enabled || !snapshot) return;
 		let cancelled = false;
-		findFullyRevealedWords(
-			puzzle,
-			snapshot.progress.guessedWordIds,
-			buildCellLetters(puzzle.wordSlots, snapshot.answers, snapshot.hints),
+		const { progress, answers, hints } = snapshot;
+		const cellLetters = buildCellLetters(puzzle.wordSlots, answers, hints);
+		const spelledWords = puzzle.wordSlots
+			.filter((slot) => !progress.guessedWordIds.includes(slot.id))
+			.map((slot) => getDisplayedSlotWord(slot, cellLetters))
+			// A cell that is still hidden shows as "_".
+			.filter((word) => !word.includes("_"));
+		Promise.all(
+			spelledWords.map((guess) => resolveGuess({ puzzle, progress, guess })),
 		)
-			.then((words) => {
-				if (!cancelled && words.length > 0) reportRevealed(words);
+			.then((guesses) => {
+				const found = guesses.filter(({ kind }) => kind === "new_word");
+				if (cancelled || found.length === 0) return;
+				reportFound(
+					found.map((guess) =>
+						createPuzzleEvent("guess_added", {
+							guessHash: guess.guessHash,
+							matchedWordId: guess.matchedSlotId,
+							unlockToken: guess.unlockToken,
+						}),
+					),
+				);
 			})
 			.catch((error: unknown) => {
 				// The word stays unfound and the player can still type it.

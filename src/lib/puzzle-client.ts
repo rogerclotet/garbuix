@@ -5,7 +5,6 @@ import {
 	openAnswerCapsule,
 	openHintCapsule,
 } from "@/lib/puzzle-crypto";
-import { getRevealedSlotWord } from "@/lib/puzzle-helpers";
 import { normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzlePublic,
@@ -18,8 +17,6 @@ export type GuessFeedbackKind =
 	| "already_found"
 	| "valid_but_not_in_puzzle"
 	| "not_in_dictionary";
-
-export type RevealedWord = { wordId: number; unlockToken: string };
 
 export async function resolveGuess(options: {
 	puzzle: DailyPuzzlePublic;
@@ -114,32 +111,6 @@ export async function findMatchingWordSlot(
 	}
 
 	return null;
-}
-
-// Words the player has not found whose every cell is already on the board,
-// filled in by hints or by crossing words. The letters are checked against the
-// answer hash, exactly as a typed guess would be.
-export async function findFullyRevealedWords(
-	puzzle: DailyPuzzlePublic,
-	guessedWordIds: number[],
-	cellLetters: Map<string, string>,
-): Promise<RevealedWord[]> {
-	const words = await Promise.all(
-		puzzle.wordSlots
-			.filter((slot) => !guessedWordIds.includes(slot.id))
-			.map(async (slot) => {
-				const word = getRevealedSlotWord(slot, cellLetters);
-				if (word === null) return null;
-				const answerHash = await createAnswerHash(slot.slotSalt, word);
-				if (answerHash !== slot.answerHash) return null;
-				return {
-					wordId: slot.id,
-					unlockToken: await createUnlockToken(slot.slotSalt, word),
-				};
-			}),
-	);
-
-	return words.filter((word) => word !== null);
 }
 
 export async function decryptWordFromGuess(

@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import dictionary from "@/data/catalan-syllables.json";
 import { SYLLABLE_WORDS } from "@/data/syllable-words";
-import { createWordsRevealedEvent } from "@/lib/mini-progress";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
 	decodeRevealedAnswers,
-	findFullyRevealedWords,
 	resolveFoundWords,
 } from "@/lib/puzzle-client";
 import { addDaysToDateKey } from "@/lib/puzzle-dates";
@@ -207,36 +205,5 @@ describe("syllable puzzles", () => {
 			),
 		).toBe(progress);
 		expect(applySyllableEvent(puzzle, progress, event)).toBe(progress);
-	});
-
-	it("completes a board revealed only by hints, with accented syllables and no tries", async () => {
-		const { puzzle } = await syllableFixture();
-		let progress = createEmptyProgressState(puzzle);
-		for (const { cellKey } of puzzle.hintCapsules) {
-			progress = applySyllableEvent(
-				puzzle,
-				progress,
-				createPuzzleEvent("hint_used", { cellKey }),
-			);
-		}
-		const words = await findFullyRevealedWords(
-			puzzle,
-			progress.guessedWordIds,
-			buildCellLetters(
-				puzzle.wordSlots,
-				{},
-				await decodeHintLetters(puzzle, progress),
-			),
-		);
-		expect(words.map(({ wordId }) => wordId)).toEqual(
-			puzzle.wordSlots.map(({ id }) => id),
-		);
-		const event = createWordsRevealedEvent(words);
-		progress = applySyllableEvent(puzzle, progress, event);
-		expect(progress.completedAt).toBe(event.at);
-		expect(progress.guessCount).toBe(0);
-		expect(
-			Object.values(await decodeRevealedAnswers(puzzle, progress)),
-		).toContain("català");
 	});
 });

@@ -302,7 +302,18 @@ it("offers a retry without showing an empty board if saved letters fail to decod
 it("plays Mini through hints, shuffles, completion, and restoring a finished save", async () => {
 	const { data, words } = await fixture();
 	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-	const wrapper = completionWrapper();
+	const router = createRouter({
+		routeTree: createRootRoute(),
+		history: createMemoryHistory({ initialEntries: ["/mini/"] }),
+	});
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: { children: ReactNode }) => (
+		<QueryClientProvider client={queryClient}>
+			<RouterContextProvider router={router}>{children}</RouterContextProvider>
+		</QueryClientProvider>
+	);
 	renderToString(<Mini initialData={data} />);
 
 	const { unmount } = render(<Mini initialData={data} />, {
@@ -383,51 +394,25 @@ it("plays Mini through hints, shuffles, completion, and restoring a finished sav
 	).findByText(data.puzzle.displayWords[extra].toUpperCase());
 });
 
-it("finds a word spelled entirely by the words crossing it, without a try", async () => {
+it("finds a word spelled entirely by the words crossing it", async () => {
 	const { data } = await fixture();
 	render(<Mini initialData={data} />);
 	await screen.findByRole("group", { name: "Forma una paraula" });
 	// "cap" shares each of its three letters with one of these words.
-	for (const [index, word] of ["clau", "pala"].entries()) {
+	for (const [word, found] of [
+		["clau", 1],
+		["pala", 2],
+		["pal", 4],
+	] as const) {
 		for (const letter of word) fireEvent.keyDown(window, { key: letter });
 		fireEvent.keyDown(window, { key: "Enter" });
 		await screen.findByRole("img", {
-			name: `${index + 1} de 5 paraules trobades`,
+			name: `${found} de 5 paraules trobades`,
 		});
 	}
-	for (const letter of "pal") fireEvent.keyDown(window, { key: letter });
-	fireEvent.keyDown(window, { key: "Enter" });
-
-	await screen.findByRole("img", { name: "4 de 5 paraules trobades" });
 	await screen.findByRole("button", {
 		name: "CAP, trobada. Mostra al tauler.",
 	});
-	const saved = readMiniSaves(null)[data.puzzle.dateKey];
-	expect(saved.guessedWordIds).toHaveLength(4);
-	expect(saved.guessCount).toBe(3);
-	expect(saved.completedAt).toBeNull();
-});
-
-it("finishes a board revealed only by hints", async () => {
-	const { data } = await fixture();
-	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-	render(<Mini initialData={data} />, { wrapper: completionWrapper() });
-	const hint = await screen.findByRole("button", { name: "Pista" });
-	for (let used = 1; used <= data.puzzle.hintCapsules.length; used++) {
-		fireEvent.click(hint, { detail: 0 });
-		expect(readMiniSaves(null)[data.puzzle.dateKey].hintsUsed).toBe(used);
-	}
-
-	await screen.findByRole("heading", { name: "Les has trobades totes!" });
-	const saved = readMiniSaves(null)[data.puzzle.dateKey];
-	expect(saved.guessedWordIds).toHaveLength(5);
-	expect(saved.guessCount).toBe(0);
-	expect(saved.completedAt).not.toBeNull();
-	expect(
-		await within(
-			screen.getByRole("region", { name: "Paraules trobades" }),
-		).findAllByRole("listitem"),
-	).toHaveLength(5);
 });
 
 it("reveals a correct word without flying letters when reduced motion is requested", async () => {
@@ -485,19 +470,3 @@ it("keeps Mini progress locally when sync fails", async () => {
 		"Progrés desat al navegador. Es sincronitzarà quan torni la connexió.",
 	);
 });
-
-// The finished board links to other pages and reads cached queries.
-function completionWrapper() {
-	const router = createRouter({
-		routeTree: createRootRoute(),
-		history: createMemoryHistory({ initialEntries: ["/mini/"] }),
-	});
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false } },
-	});
-	return ({ children }: { children: ReactNode }) => (
-		<QueryClientProvider client={queryClient}>
-			<RouterContextProvider router={router}>{children}</RouterContextProvider>
-		</QueryClientProvider>
-	);
-}

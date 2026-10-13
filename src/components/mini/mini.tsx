@@ -16,7 +16,6 @@ import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
 import { useRevealedWords } from "@/components/puzzle/use-revealed-words";
 import { Button } from "@/components/ui/button";
-import { createWordsRevealedEvent } from "@/lib/mini-progress";
 import {
 	isMiniWordLength,
 	MINI_MAX_WORD_LENGTH,
@@ -98,13 +97,13 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		puzzle,
 		snapshot,
 		enabled: !expired && !complete,
-		onRevealed: (words) => {
-			dispatch(createWordsRevealedEvent(words));
-			const foundWordIds = new Set([
-				...progress.guessedWordIds,
-				...words.map(({ wordId }) => wordId),
-			]);
-			if (foundWordIds.size === puzzle.wordSlots.length) setCelebrate(true);
+		onFound: (guesses) => {
+			for (const guess of guesses) dispatch(guess);
+			if (
+				progress.guessedWordIds.length + guesses.length ===
+				puzzle.wordSlots.length
+			)
+				setCelebrate(true);
 		},
 	});
 

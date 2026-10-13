@@ -14,7 +14,6 @@ import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { useRevealedWords } from "@/components/puzzle/use-revealed-words";
 import { useSyllableProgress } from "@/components/syllables/use-syllable-progress";
 import { Button } from "@/components/ui/button";
-import { createWordsRevealedEvent } from "@/lib/mini-progress";
 import { createPuzzleEvent } from "@/lib/puzzle-client";
 import {
 	buildCellLetters,
@@ -96,13 +95,13 @@ function SyllableGame({
 		puzzle,
 		snapshot,
 		enabled: !expired && !complete,
-		onRevealed: (words) => {
-			dispatch(createWordsRevealedEvent(words));
-			const foundWordIds = new Set([
-				...progress.guessedWordIds,
-				...words.map(({ wordId }) => wordId),
-			]);
-			if (foundWordIds.size === puzzle.wordSlots.length) setCelebrate(true);
+		onFound: (guesses) => {
+			for (const guess of guesses) dispatch(guess);
+			if (
+				progress.guessedWordIds.length + guesses.length ===
+				puzzle.wordSlots.length
+			)
+				setCelebrate(true);
 		},
 	});
 

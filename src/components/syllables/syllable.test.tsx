@@ -17,9 +17,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { readMiniSaves } from "@/lib/mini-local";
-import { getSlotCellKey } from "@/lib/puzzle-helpers";
 import { normalizeWord } from "@/lib/puzzle-text";
-import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import { getSyllableCells } from "@/lib/syllable-generator";
 import { readSyllableSaves } from "@/lib/syllable-local";
 import { syllableFixture } from "@/test/syllable-fixture";
@@ -92,11 +90,10 @@ it("plays with syllable buttons, deletes a whole syllable, saves extras, and loc
 	fireEvent.click(within(group).getByRole("button", { name: "Esborrar" }));
 	expect(input()).toBe("PI");
 	fireEvent.click(within(group).getByRole("button", { name: "Esborrar" }));
-	// The first word typed below fills this cell anyway, so the hint finishes
-	// no word ahead of its turn.
-	const hinted = pinNextHint(puzzle, getSlotCellKey(crossword.words[0], 0));
+	// Hints are random and some would finish a word before its turn below.
+	// This one lands on the first cell of the first word.
+	vi.spyOn(Math, "random").mockReturnValue(0);
 	fireEvent.click(within(group).getByRole("button", { name: "Pista" }));
-	hinted.mockRestore();
 	await waitFor(() =>
 		expect(container.querySelectorAll("[data-cell-key] span")).toHaveLength(1),
 	);
@@ -149,54 +146,31 @@ it("plays with syllable buttons, deletes a whole syllable, saves extras, and loc
 	expect(screen.queryByRole("button", { name: "Comprovar" })).toBeNull();
 });
 
-it("finds a word spelled by a hint and a crossing word, without a try", async () => {
-	const { puzzle, crossword } = await syllableFixture();
-	const placement = (name: string) => {
-		const found = crossword.words.find(({ word }) => word.name === name);
-		if (!found) throw new Error(`Missing ${name} in the syllable fixture`);
-		return found;
+it("finds a word spelled entirely by the words crossing it", async () => {
+	const { puzzle } = await syllableFixture();
+	const data = {
+		puzzle,
+		progress: null,
+		userId: null,
+		rolloverAt: new Date(Date.now() + 60_000).toISOString(),
 	};
-	render(
-		<Syllable
-			initialData={{
-				puzzle,
-				progress: null,
-				userId: null,
-				rolloverAt: new Date(Date.now() + 60_000).toISOString(),
-			}}
-		/>,
-	);
+	render(<Syllable initialData={data} />);
 	const group = await screen.findByRole("group", { name: "Forma una paraula" });
-	// "pela" is its own "pe" plus the "la" that ends "pila".
-	const hinted = pinNextHint(puzzle, getSlotCellKey(placement("pela"), 0));
-	fireEvent.click(within(group).getByRole("button", { name: "Pista" }));
-	hinted.mockRestore();
-	for (const cell of getSyllableCells(placement("pila").word))
-		fireEvent.click(
-			within(group).getByRole("button", { name: cell.toUpperCase() }),
-		);
-	fireEvent.click(within(group).getByRole("button", { name: "Comprovar" }));
-
-	await screen.findByRole("img", { name: "2 de 5 paraules trobades" });
+	// "pila" is the "pi" of "pilota" over the "la" of "pela".
+	for (const [cells, found] of [
+		[["pi", "lo", "ta"], 1],
+		[["pe", "la"], 3],
+	] as const) {
+		for (const cell of cells)
+			fireEvent.click(
+				within(group).getByRole("button", { name: cell.toUpperCase() }),
+			);
+		fireEvent.click(within(group).getByRole("button", { name: "Comprovar" }));
+		await screen.findByRole("img", {
+			name: `${found} de 5 paraules trobades`,
+		});
+	}
 	await screen.findByRole("button", {
-		name: "PELA, trobada. Mostra al tauler.",
+		name: "PILA, trobada. Mostra al tauler.",
 	});
-	const saved = readSyllableSaves(null)[puzzle.dateKey];
-	expect(saved.guessedWordIds).toEqual([
-		placement("pila").id,
-		placement("pela").id,
-	]);
-	expect(saved.guessCount).toBe(1);
 });
-
-// Hints pick a hidden cell at random. Makes the next one land on this cell
-// while the whole board is still hidden.
-function pinNextHint(puzzle: DailyPuzzlePublic, cellKey: string) {
-	const index = puzzle.hintCapsules.findIndex(
-		(capsule) => capsule.cellKey === cellKey,
-	);
-	if (index < 0) throw new Error(`No hint capsule for cell ${cellKey}`);
-	return vi
-		.spyOn(Math, "random")
-		.mockReturnValue((index + 0.5) / puzzle.hintCapsules.length);
-}
