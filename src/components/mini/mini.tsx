@@ -14,6 +14,7 @@ import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
+import { useRevealedWords } from "@/components/puzzle/use-revealed-words";
 import { Button } from "@/components/ui/button";
 import {
 	isMiniWordLength,
@@ -91,6 +92,21 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 		ready &&
 		!complete &&
 		puzzle.hintCapsules.some(({ cellKey }) => !revealedCells.has(cellKey));
+
+	useRevealedWords({
+		puzzle,
+		snapshot,
+		enabled: !expired && !complete,
+		onFound: (guesses) => {
+			for (const guess of guesses) dispatch(guess);
+			if (
+				progress.guessedWordIds.length + guesses.length ===
+				puzzle.wordSlots.length
+			)
+				setCelebrate(true);
+		},
+	});
+
 	const appendLetter = useCallback(
 		(letter: string) => {
 			clearSubmitFeedback();

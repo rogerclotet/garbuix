@@ -11,6 +11,7 @@ import { SimpleWordList } from "@/components/puzzle/simple-word-list";
 import { useDailyRollover } from "@/components/puzzle/use-daily-rollover";
 import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
+import { useRevealedWords } from "@/components/puzzle/use-revealed-words";
 import { useSyllableProgress } from "@/components/syllables/use-syllable-progress";
 import { Button } from "@/components/ui/button";
 import { createPuzzleEvent } from "@/lib/puzzle-client";
@@ -89,6 +90,21 @@ function SyllableGame({
 		ready &&
 		!complete &&
 		puzzle.hintCapsules.some(({ cellKey }) => !revealedCells.has(cellKey));
+
+	useRevealedWords({
+		puzzle,
+		snapshot,
+		enabled: !expired && !complete,
+		onFound: (guesses) => {
+			for (const guess of guesses) dispatch(guess);
+			if (
+				progress.guessedWordIds.length + guesses.length ===
+				puzzle.wordSlots.length
+			)
+				setCelebrate(true);
+		},
+	});
+
 	const appendSyllable = useCallback(
 		(letter: string) => {
 			clearSubmitFeedback();

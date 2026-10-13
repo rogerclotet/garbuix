@@ -394,6 +394,27 @@ it("plays Mini through hints, shuffles, completion, and restoring a finished sav
 	).findByText(data.puzzle.displayWords[extra].toUpperCase());
 });
 
+it("finds a word spelled entirely by the words crossing it", async () => {
+	const { data } = await fixture();
+	render(<Mini initialData={data} />);
+	await screen.findByRole("group", { name: "Forma una paraula" });
+	// "cap" shares each of its three letters with one of these words.
+	for (const [word, found] of [
+		["clau", 1],
+		["pala", 2],
+		["pal", 4],
+	] as const) {
+		for (const letter of word) fireEvent.keyDown(window, { key: letter });
+		fireEvent.keyDown(window, { key: "Enter" });
+		await screen.findByRole("img", {
+			name: `${found} de 5 paraules trobades`,
+		});
+	}
+	await screen.findByRole("button", {
+		name: "CAP, trobada. Mostra al tauler.",
+	});
+});
+
 it("reveals a correct word without flying letters when reduced motion is requested", async () => {
 	vi.stubGlobal("matchMedia", (query: string) => ({
 		matches: query === "(prefers-reduced-motion: reduce)",
