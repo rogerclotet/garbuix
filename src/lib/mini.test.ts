@@ -2,16 +2,27 @@ import { describe, expect, it } from "vitest";
 import { MINI_WORDS } from "@/data/mini-words";
 import { getMiniDictionary } from "@/lib/mini-dictionary.server";
 import { generateMiniCrossword } from "@/lib/mini-generator";
-import { applyMiniEvent, mergeMiniProgress } from "@/lib/mini-progress";
+import {
+	applyMiniEvent,
+	createWordsRevealedEvent,
+	mergeMiniProgress,
+} from "@/lib/mini-progress";
 import {
 	createPuzzleEvent,
 	decodeHintLetters,
+	decodeRevealedAnswers,
+	findFullyRevealedWords,
 	resolveFoundWords,
 	resolveGuess,
 } from "@/lib/puzzle-client";
 import { createGuessHash } from "@/lib/puzzle-crypto";
 import { addDaysToDateKey } from "@/lib/puzzle-dates";
-import { buildRevealedCells, getRandomHintCellKey } from "@/lib/puzzle-helpers";
+import {
+	buildCellLetters,
+	buildRevealedCells,
+	getRandomHintCellKey,
+	getSlotCellKey,
+} from "@/lib/puzzle-helpers";
 import {
 	applyPuzzleEvent,
 	createEmptyProgressState,
@@ -181,5 +192,78 @@ describe("Mini puzzles", () => {
 		expect(progress.guessedWordIds).toHaveLength(5);
 		expect(progress.completedAt).not.toBeNull();
 		expect(mergeMiniProgress(progress, progress).guessCount).toBe(5);
+	});
+
+	it("finds a word that crossing words and a hint spelled, without adding a try", async () => {
+		const { publicSnapshot: puzzle, privateSnapshot } = await fixture();
+		const slotOf = (word: string) => {
+			const id = privateSnapshot.wordSlots.find(
+				({ displayWord }) => displayWord === word,
+			)?.id;
+			const slot = puzzle.wordSlots.find((item) => item.id === id);
+			if (!slot) throw new Error(`Missing ${word} in the Mini fixture`);
+			return slot;
+		};
+		const revealedWords = async (state: typeof progress) =>
+			findFullyRevealedWords(
+				puzzle,
+				state.guessedWordIds,
+				buildCellLetters(
+					puzzle.wordSlots,
+					await decodeRevealedAnswers(puzzle, state),
+					await decodeHintLetters(puzzle, state),
+				),
+			);
+		// "oca" crosses "coco" and "bola" on its first and last letters.
+		const oca = slotOf("oca");
+		let progress = createEmptyProgressState(puzzle);
+		for (const word of ["coco", "bola"]) {
+			const guess = await resolveGuess({ puzzle, progress, guess: word });
+			progress = applyMiniEvent(
+				puzzle,
+				progress,
+				createPuzzleEvent("guess_added", {
+					guessHash: guess.guessHash,
+					matchedWordId: guess.matchedSlotId,
+					unlockToken: guess.unlockToken,
+				}),
+			);
+		}
+		expect(await revealedWords(progress)).toEqual([]);
+
+		progress = applyMiniEvent(
+			puzzle,
+			progress,
+			createPuzzleEvent("hint_used", { cellKey: getSlotCellKey(oca, 1) }),
+		);
+		const words = await revealedWords(progress);
+		const typed = await resolveGuess({ puzzle, progress, guess: "oca" });
+		expect(words).toEqual([{ wordId: oca.id, unlockToken: typed.unlockToken }]);
+
+		const event = createWordsRevealedEvent(words);
+		const found = applyMiniEvent(puzzle, progress, event);
+		expect(found.guessedWordIds).toEqual([...progress.guessedWordIds, oca.id]);
+		expect(found.guessCount).toBe(2);
+		expect(found.completedAt).toBeNull();
+		expect(applyMiniEvent(puzzle, found, event)).toBe(found);
+		expect(await decodeRevealedAnswers(puzzle, found)).toMatchObject({
+			[oca.id]: "oca",
+		});
+		expect(await revealedWords(found)).toEqual([]);
+		expect(
+			(await resolveGuess({ puzzle, progress: found, guess: "oca" })).kind,
+		).toBe("already_found");
+	});
+
+	it("ignores a full row of letters that is not the answer", async () => {
+		const { publicSnapshot: puzzle } = await fixture();
+		const slot = puzzle.wordSlots[0];
+		const cells = new Map(
+			Array.from({ length: slot.length }, (_, index) => [
+				getSlotCellKey(slot, index),
+				"x",
+			]),
+		);
+		expect(await findFullyRevealedWords(puzzle, [], cells)).toEqual([]);
 	});
 });

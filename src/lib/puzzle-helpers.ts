@@ -257,6 +257,22 @@ export function getDisplayedSlotWord(
 	return injectMiddleDots(letters, slot.middleDotAfterIndices);
 }
 
+// The normalized word a slot's cells spell, or null while any cell is empty.
+export function getRevealedSlotWord(
+	slot: PuzzleWordSlot,
+	cellLetters: Map<string, string>,
+): string | null {
+	let word = "";
+
+	for (let index = 0; index < slot.length; index += 1) {
+		const cell = cellLetters.get(getSlotCellKey(slot, index));
+		if (!cell) return null;
+		word += cell;
+	}
+
+	return normalizeWord(word);
+}
+
 function countDisplayedSlotLetters(
 	slot: PuzzleWordSlot,
 	cellLetters: Map<string, string>,

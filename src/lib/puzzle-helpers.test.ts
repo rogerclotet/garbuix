@@ -6,6 +6,7 @@ import {
 	getGuessKeyboardAction,
 	getOptimotDefinitionUrl,
 	getRandomHintCellKey,
+	getRevealedSlotWord,
 	getSlotHintCellKey,
 	getSortedWordSlots,
 	isPangram,
@@ -319,6 +320,41 @@ describe("getSortedWordSlots", () => {
 
 		expect(getDisplayedSlotWord(slot, cellLetters)).toBe("CAMIÓ");
 		expect(cellLetters.get("0,4")).toBe("ó");
+	});
+});
+
+describe("getRevealedSlotWord", () => {
+	const slot = {
+		id: 0,
+		startRow: 0,
+		startCol: 0,
+		direction: "horizontal" as const,
+		length: 3,
+	};
+
+	it("waits until every cell of the word has a letter", () => {
+		expect(
+			getRevealedSlotWord(
+				slot,
+				new Map([
+					["0,0", "p"],
+					["0,2", "l"],
+				]),
+			),
+		).toBeNull();
+	});
+
+	it("spells the word as a guess would, without accents", () => {
+		expect(
+			getRevealedSlotWord(
+				slot,
+				new Map([
+					["0,0", "ca"],
+					["0,1", "ta"],
+					["0,2", "là"],
+				]),
+			),
+		).toBe("catala");
 	});
 });
 
