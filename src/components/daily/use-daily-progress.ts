@@ -16,6 +16,7 @@ import {
 } from "@/lib/anon-identity";
 import { rememberAnonParticipantId } from "@/lib/anon-participant-store";
 import { useBeforeAppReload } from "@/lib/app-reload";
+import { isLikelyNetworkError } from "@/lib/network-error";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import {
 	addAnonymousPeerClueWordIds,
@@ -64,32 +65,6 @@ function hasMeaningfulProgress(progress: PuzzleProgressState) {
 		progress.guessedWordIds.length > 0 ||
 		progress.guessCount > 0 ||
 		Boolean(progress.completedAt)
-	);
-}
-
-function isLikelyOfflineOrNetworkError(error: unknown) {
-	if (typeof navigator !== "undefined" && !navigator.onLine) {
-		return true;
-	}
-
-	if (error instanceof DOMException && error.name === "AbortError") {
-		return true;
-	}
-
-	const message =
-		error instanceof Error
-			? error.message
-			: typeof error === "string"
-				? error
-				: "";
-
-	const normalizedMessage = message.toLowerCase();
-
-	return (
-		normalizedMessage.includes("failed to fetch") ||
-		normalizedMessage.includes("networkerror") ||
-		normalizedMessage.includes("network error") ||
-		normalizedMessage.includes("load failed")
 	);
 }
 
@@ -557,7 +532,7 @@ export function useDailyProgress({
 					SYNC_INITIAL_RETRY_DELAY_MS * 2 ** (failureCount - 1),
 					SYNC_MAX_RETRY_DELAY_MS,
 				);
-				const isNetworkError = isLikelyOfflineOrNetworkError(error);
+				const isNetworkError = isLikelyNetworkError(error);
 
 				syncFailureCountRef.current = failureCount;
 				setNextSyncRetryAt(Date.now() + retryDelayMs);

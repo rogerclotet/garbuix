@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PuzzleLoadingPage } from "@/components/puzzle/puzzle-loading";
 import { Syllable } from "@/components/syllables/syllable";
+import { withOfflineFallback } from "@/lib/offline-loader";
 import { getSyllablePageData } from "@/lib/syllable-server-fns";
 
 export const Route = createFileRoute("/sillabes/")({
-	loader: () => getSyllablePageData(),
+	loader: withOfflineFallback(() => getSyllablePageData()),
 	pendingComponent: PuzzleLoadingPage,
 	head: () => ({ meta: [{ title: "Garbuix síl·labes" }] }),
 	component: SyllablePage,
