@@ -63,7 +63,7 @@ export function CompletionWordList({
 								className={cn(
 									"max-w-full text-[13px] leading-[18px]",
 									isInPuzzle
-										? "font-semibold text-primary"
+										? "font-extrabold text-primary"
 										: "text-muted-foreground",
 									isPangramWord && "text-pangram-foreground",
 								)}
