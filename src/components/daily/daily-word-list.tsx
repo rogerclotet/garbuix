@@ -192,7 +192,7 @@ export function DailyWordList({
 							request={request}
 							onRespond={(requestId, text) => respondAndRecord(requestId, text)}
 							onDone={closeComposer}
-							intro={`Dóna una pista a ${request.requesterName}`}
+							intro={`Dona una pista a ${request.requesterName}`}
 							initialText={prefillText}
 						/>
 					) : (
@@ -215,7 +215,7 @@ export function DailyWordList({
 						className={`${helpRowClassName} text-muted-foreground`}
 					>
 						<Check className="size-3.5 shrink-0" />
-						Has ajudat a {record.requesterName}
+						Has ajudat {record.requesterName}
 					</span>
 				))}
 			</div>
