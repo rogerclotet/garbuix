@@ -31,8 +31,11 @@ import {
 	type HistorySummaryEntry,
 } from "@/lib/puzzle-types";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
+import { useLeaderboard } from "@/lib/use-leaderboard";
 
 const rootRoute = getRouteApi("__root__");
+
+const LEADERBOARD_COLLAPSED_COUNT = 10;
 
 type AccountHistoryPage = {
 	entries: HistorySummaryEntry[];
@@ -65,6 +68,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 	const yesterdayPuzzle = initialData.yesterdayPuzzle;
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
+	const { localParticipantId } = useLeaderboard();
 	const fetchHistory = useServerFn(getHistoryPageData);
 	const fetchMoreHistory = useServerFn(getMoreHistoryEntries);
 	const importProgress = useServerFn(importAnonymousProgress);
@@ -198,6 +202,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 			stats={stats}
 			yesterdayPuzzle={yesterdayPuzzle}
 			yesterdayLeaderboard={initialData.yesterdayLeaderboard}
+			localParticipantId={localParticipantId}
 			hasMore={hasMore}
 			isLoadingMore={isLoadingMore}
 			onLoadMore={handleLoadMore}
@@ -210,6 +215,7 @@ export function HistoryView({
 	stats,
 	yesterdayPuzzle,
 	yesterdayLeaderboard,
+	localParticipantId = null,
 	hasMore,
 	isLoadingMore,
 	onLoadMore,
@@ -220,6 +226,7 @@ export function HistoryView({
 	stats: HistoryStats;
 	yesterdayPuzzle: HistoryData["yesterdayPuzzle"];
 	yesterdayLeaderboard?: LeaderboardSnapshot;
+	localParticipantId?: string | null;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	onLoadMore: () => void;
@@ -382,6 +389,8 @@ export function HistoryView({
 									</h4>
 									<LeaderboardList
 										entries={yesterdayLeaderboard.entries}
+										localParticipantId={localParticipantId}
+										collapsedCount={LEADERBOARD_COLLAPSED_COUNT}
 										emptyMessage="Ningú no va aparèixer ahir al rànquing."
 									/>
 								</div>
