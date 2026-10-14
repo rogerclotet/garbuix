@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     container:
-      image: node:25.2-slim
+      image: node:26.11-slim
     services:
       postgres:
         image: postgres:17-alpine

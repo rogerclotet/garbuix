@@ -96,7 +96,7 @@ Migration `0008` adds the `mini_puzzles` and `mini_progress` tables.
 
 ### Prerequisites
 
-- Node.js 25.2.x (see `engines.node` in `package.json`)
+- Node.js 26.11.x (see `engines.node` in `package.json`)
 - pnpm (recommended) or npm
 
 ### Installation
