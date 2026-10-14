@@ -132,3 +132,27 @@ it("marks the middle dot between the cells of yesterday's solution", async () =>
 		"A",
 	]);
 });
+
+it.each([
+	[[true], "1 jugador · 1 el va completar"],
+	[[false, false], "2 jugadors · ningú no el va completar"],
+	[[true, true, false], "3 jugadors · 2 el van completar"],
+])(
+	"summarises yesterday's players and completions as %s",
+	async (completions, expected) => {
+		const { formatParticipationSummary } = await import("./history");
+		const entries = completions.map((completed, index) => ({
+			participantId: `anon:${index}`,
+			kind: "anon" as const,
+			name: `Jugador ${index}`,
+			image: null,
+			wordsFound: completed ? 10 : 5,
+			totalWords: 10,
+			clueCount: 3,
+			tryCount: 12,
+			completedAt: completed ? "2026-10-14T10:00:00.000Z" : null,
+			updatedAt: "2026-10-14T10:00:00.000Z",
+		}));
+		expect(formatParticipationSummary(entries)).toBe(expected);
+	},
+);
