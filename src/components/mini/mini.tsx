@@ -257,7 +257,7 @@ function MiniGame({ data, expired }: { data: MiniPageData; expired: boolean }) {
 				<div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:h-full">
 					<div
 						ref={gridRef}
-						className="mx-auto flex min-h-0 w-full max-w-xs flex-1 lg:max-w-sm"
+						className="mx-auto flex min-h-0 w-full max-w-xs flex-1 [--max-cell-size:2.5rem] lg:[--max-cell-size:3.5rem] lg:max-w-sm"
 					>
 						<PuzzleGrid
 							fitHeight

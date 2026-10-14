@@ -118,6 +118,10 @@ export function PuzzleGrid({
 	// stays in CSS and the server-rendered board is the right size on first
 	// paint, with no measuring pass to wait for.
 	const heightBoundWidth = `calc((100cqh - var(--grid-gap) * ${puzzle.rows - 1}) / ${puzzle.rows} * ${puzzle.cols} + var(--grid-gap) * ${puzzle.cols - 1})`;
+	// A parent can cap each cell with --max-cell-size so a small board does not
+	// stretch its few cells across the whole box. Unset, the bound is never the
+	// smallest.
+	const cellBoundWidth = `calc(var(--max-cell-size, 42rem) * ${puzzle.cols} + var(--grid-gap) * ${puzzle.cols - 1})`;
 
 	return (
 		<div
@@ -133,9 +137,9 @@ export function PuzzleGrid({
 						gap: "var(--grid-gap)",
 						gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
 						// 42rem is max-w-2xl, the cap the width-driven board already had.
-						...(fitHeight
-							? { maxWidth: `min(42rem, ${heightBoundWidth})` }
-							: null),
+						maxWidth: fitHeight
+							? `min(42rem, ${heightBoundWidth}, ${cellBoundWidth})`
+							: `min(42rem, ${cellBoundWidth})`,
 					} as CSSProperties
 				}
 			>
