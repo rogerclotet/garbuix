@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-FROM node:25.2-slim AS base
+FROM node:26.11-slim AS base
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm@11.25.0
+RUN npm install -g pnpm@12.11.2
 
 WORKDIR /app
 
