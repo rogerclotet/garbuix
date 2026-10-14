@@ -134,9 +134,9 @@ it("marks the middle dot between the cells of yesterday's solution", async () =>
 });
 
 it.each([
-	[[true], "1 jugador · 1 l'ha completat"],
-	[[false, false], "2 jugadors · ningú no l'ha completat"],
-	[[true, true, false], "3 jugadors · 2 l'han completat"],
+	[[true], "1 jugador · 1 el va completar"],
+	[[false, false], "2 jugadors · ningú no el va completar"],
+	[[true, true, false], "3 jugadors · 2 el van completar"],
 ])(
 	"summarises yesterday's players and completions as %s",
 	async (completions, expected) => {

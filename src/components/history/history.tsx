@@ -425,10 +425,10 @@ export function formatParticipationSummary(
 	const playersLabel = players === 1 ? "1 jugador" : `${players} jugadors`;
 	const completedLabel =
 		completed === 0
-			? "ningú no l'ha completat"
+			? "ningú no el va completar"
 			: completed === 1
-				? "1 l'ha completat"
-				: `${completed} l'han completat`;
+				? "1 el va completar"
+				: `${completed} el van completar`;
 	return `${playersLabel} · ${completedLabel}`;
 }
 
