@@ -184,7 +184,7 @@ export function DailyWordList({
 		if (openRequests.length === 0 && helpedForWord.length === 0) return null;
 
 		return (
-			<div className="flex min-w-0 flex-col pl-7">
+			<div className="mt-1 flex min-w-0 flex-col pl-7">
 				{openRequests.map((request) =>
 					activeRequestId === request.id ? (
 						<ClueResponder
@@ -263,7 +263,7 @@ export function DailyWordList({
 			<div
 				key={slot.id}
 				id={`${idPrefix}${wordRowId(slot.id)}`}
-				className="flex min-w-0 flex-col gap-1 border-b border-border/60 py-2 pl-2 scroll-mt-4"
+				className="flex min-w-0 flex-col border-b border-border/60 py-2 pl-2 scroll-mt-4"
 			>
 				<div className="flex min-h-11 items-center gap-2">
 					<Check className="size-5 shrink-0 text-primary" aria-hidden="true" />
