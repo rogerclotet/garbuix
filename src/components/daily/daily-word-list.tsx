@@ -162,31 +162,31 @@ export function DailyWordList({
 		openComposer(target.id, clueText);
 	};
 
-	const renderIncomingRequests = (wordId: number) => {
-		const requests = requestsByWordId.get(wordId);
-		if (!requests || requests.length === 0 || !onRespondToClue) {
-			return null;
-		}
+	// "Ajuda" buttons and "Has ajudat" confirmations share one list and one row
+	// height, so a word mixing both keeps its rows evenly spaced.
+	const helpRowClassName =
+		"flex min-h-9 max-w-full w-fit items-center gap-1.5 py-1.5 text-left text-sm font-ui lg:min-h-8";
+
+	const renderHelpRows = (wordId: number) => {
+		// Open requests come first so the actionable rows sit together above the
+		// ones already answered.
+		const openRequests = onRespondToClue
+			? (requestsByWordId.get(wordId) ?? []).filter(
+					(request) =>
+						!helpedKeys.has(
+							clueHelpGivenField(request.requesterId, request.wordId),
+						),
+				)
+			: [];
+		const helpedForWord = helpGivenRecords.filter(
+			(record) => record.wordId === wordId,
+		);
+		if (openRequests.length === 0 && helpedForWord.length === 0) return null;
 
 		return (
-			<div className="flex min-w-0 flex-col gap-2 pl-7">
-				{requests.map((request) => {
-					const helpedKey = clueHelpGivenField(
-						request.requesterId,
-						request.wordId,
-					);
-					if (helpedKeys.has(helpedKey)) {
-						return (
-							<span
-								key={helpedKey}
-								className="flex items-center gap-1.5 text-sm font-ui text-primary"
-							>
-								<Check className="size-3.5 shrink-0" />
-								Has ajudat a {request.requesterName}
-							</span>
-						);
-					}
-					return activeRequestId === request.id ? (
+			<div className="flex min-w-0 flex-col pl-7">
+				{openRequests.map((request) =>
+					activeRequestId === request.id ? (
 						<ClueResponder
 							key={`${request.id}:${composerNonceRef.current}`}
 							request={request}
@@ -201,34 +201,18 @@ export function DailyWordList({
 							type="button"
 							variant="text"
 							size="sm"
-							className="h-auto min-h-11 max-w-full w-fit justify-start gap-1.5 border-0 px-0 py-2 text-left text-sm font-normal whitespace-normal font-ui text-primary lg:min-h-9"
+							className={`${helpRowClassName} h-auto justify-start border-0 px-0 font-normal whitespace-normal text-primary`}
 							onClick={() => openComposer(request.id, "")}
 						>
 							<HelpingHand className="size-3.5" />
 							Ajuda {request.requesterName}
 						</Button>
-					);
-				})}
-			</div>
-		);
-	};
-
-	const renderHelpedConfirmation = (wordId: number) => {
-		const helpedForWord = helpGivenRecords.filter(
-			(record) => record.wordId === wordId,
-		);
-		const requests = requestsByWordId.get(wordId) ?? [];
-		const helpedWithoutOpenRequest = helpedForWord.filter(
-			(record) =>
-				!requests.some((request) => request.requesterId === record.requesterId),
-		);
-		if (helpedWithoutOpenRequest.length === 0) return null;
-		return (
-			<div className="flex min-w-0 flex-col gap-1.5 pl-7">
-				{helpedWithoutOpenRequest.map((record) => (
+					),
+				)}
+				{helpedForWord.map((record) => (
 					<span
 						key={clueHelpGivenField(record.requesterId, record.wordId)}
-						className="flex items-center gap-1.5 text-sm font-ui text-primary"
+						className={`${helpRowClassName} text-muted-foreground`}
 					>
 						<Check className="size-3.5 shrink-0" />
 						Has ajudat a {record.requesterName}
@@ -311,8 +295,7 @@ export function DailyWordList({
 					</span>
 				</div>
 				{foundClueText ? renderClueLine(slot.id, foundClueText, "muted") : null}
-				{renderIncomingRequests(slot.id)}
-				{renderHelpedConfirmation(slot.id)}
+				{renderHelpRows(slot.id)}
 			</div>
 		);
 	};
