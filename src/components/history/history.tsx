@@ -9,7 +9,10 @@ import { PuzzleTitle } from "@/components/puzzle-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import type { LeaderboardSnapshot } from "@/lib/leaderboard-types";
+import type {
+	LeaderboardEntry,
+	LeaderboardSnapshot,
+} from "@/lib/leaderboard-types";
 import { formatPuzzleDate } from "@/lib/puzzle-dates";
 import {
 	buildAnonymousImportPayload,
@@ -384,9 +387,18 @@ export function HistoryView({
 
 							{yesterdayLeaderboard ? (
 								<div className="space-y-3 border-t border-border/50 pt-4">
-									<h4 className="text-base font-semibold">
-										Classificació d'ahir
-									</h4>
+									<div className="space-y-0.5">
+										<h4 className="text-base font-semibold">
+											Classificació d'ahir
+										</h4>
+										{yesterdayLeaderboard.entries.length > 0 ? (
+											<p className="text-sm text-muted-foreground font-ui">
+												{formatParticipationSummary(
+													yesterdayLeaderboard.entries,
+												)}
+											</p>
+										) : null}
+									</div>
 									<LeaderboardList
 										entries={yesterdayLeaderboard.entries}
 										localParticipantId={localParticipantId}
@@ -401,6 +413,23 @@ export function HistoryView({
 			</div>
 		</div>
 	);
+}
+
+export function formatParticipationSummary(
+	entries: LeaderboardEntry[],
+): string {
+	const players = entries.length;
+	const completed = entries.filter(
+		(entry) => entry.completedAt !== null,
+	).length;
+	const playersLabel = players === 1 ? "1 jugador" : `${players} jugadors`;
+	const completedLabel =
+		completed === 0
+			? "ningú no l'ha completat"
+			: completed === 1
+				? "1 l'ha completat"
+				: `${completed} l'han completat`;
+	return `${playersLabel} · ${completedLabel}`;
 }
 
 type SolvedBoard = {
