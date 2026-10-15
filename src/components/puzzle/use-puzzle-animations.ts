@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSubmitFeedbackDuration } from "@/components/puzzle/puzzle-animation-timing";
+import {
+	getPangramWaveDuration,
+	getSubmitFeedbackDuration,
+} from "@/components/puzzle/puzzle-animation-timing";
 import {
 	buildFlyingLetterPaths,
 	type FlyingLettersAnimation,
@@ -13,8 +16,6 @@ import { getPlayableWordLetters } from "@/lib/puzzle-text";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 
 const LOCATE_FLASH_MS = 1300;
-// How long a found pangram keeps its own color once its letters have settled.
-const PANGRAM_LINGER_MS = 900;
 export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 	const [highlightedWordId, setHighlightedWordId] = useState<number | null>(
 		null,
@@ -59,16 +60,27 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 		},
 		[],
 	);
+	// The pangram wave starts as soon as the first letter lands. It moves along
+	// the word slower than the letters land, so it never reaches an empty cell.
+	const isPangramWaving =
+		pangramWordId != null &&
+		(animatingWordId !== pangramWordId || landedAnimatingCells.size > 0);
 	useEffect(() => {
-		if (pangramWordId == null || animatingWordId === pangramWordId) {
+		if (!isPangramWaving) {
 			return;
 		}
 
-		const timer = window.setTimeout(() => {
-			setPangramWordId(null);
-		}, PANGRAM_LINGER_MS);
+		const slot = puzzle.wordSlots.find(
+			(wordSlot) => wordSlot.id === pangramWordId,
+		);
+		const timer = window.setTimeout(
+			() => {
+				setPangramWordId(null);
+			},
+			getPangramWaveDuration(slot?.length ?? 0),
+		);
 		return () => window.clearTimeout(timer);
-	}, [animatingWordId, pangramWordId]);
+	}, [isPangramWaving, pangramWordId, puzzle.wordSlots]);
 	const showSubmitFeedback = useCallback(
 		(word: string, kind: PuzzleSubmitFeedback["kind"]) => {
 			const nextFeedbackId = submitFeedbackIdRef.current + 1;
@@ -281,7 +293,7 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 			landedAnimatingCells,
 			bounceCells,
 			locateCells,
-			pangramWordId,
+			pangramWordId: isPangramWaving ? pangramWordId : null,
 		},
 		flyingLettersProps: {
 			animation: flyingLettersAnimation,

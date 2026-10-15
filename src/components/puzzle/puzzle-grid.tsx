@@ -1,4 +1,8 @@
 import { type CSSProperties, useMemo } from "react";
+import {
+	PANGRAM_WAVE_CELL_MS,
+	PANGRAM_WAVE_STAGGER_MS,
+} from "@/components/puzzle/puzzle-animation-timing";
 import { getSlotCellKey } from "@/lib/puzzle-helpers";
 import type { DailyPuzzlePublic, PuzzleWordSlot } from "@/lib/puzzle-types";
 
@@ -21,7 +25,7 @@ type PuzzleGridProps = {
 	clueCells?: Set<string>;
 	clueCellsFading?: boolean;
 	locateCells?: Set<string>;
-	// The word that uses every letter of the day, while it is being celebrated.
+	// The word that uses every letter of the day, while its wave plays.
 	pangramWordId?: number | null;
 	// Classic board: keep the width-driven grid, but never let it grow taller
 	// than the box it sits in.
@@ -76,17 +80,19 @@ export function PuzzleGrid({
 			]),
 		);
 	}, [highlightedWordId, puzzle.wordSlots]);
-	const pangramCells = useMemo(() => {
+	const pangramCellOrder = useMemo(() => {
 		const slot = puzzle.wordSlots.find(
 			(wordSlot) => wordSlot.id === pangramWordId,
 		);
+		if (!slot) {
+			return new Map<string, number>();
+		}
 
-		return new Set<string>(
-			slot
-				? Array.from({ length: slot.length }, (_, index) =>
-						getSlotCellKey(slot, index),
-					)
-				: [],
+		return new Map<string, number>(
+			Array.from({ length: slot.length }, (_, index) => [
+				getSlotCellKey(slot, index),
+				index,
+			]),
 		);
 	}, [pangramWordId, puzzle.wordSlots]);
 	const middleDotMarkers = useMemo(() => {
@@ -165,7 +171,7 @@ export function PuzzleGrid({
 				const isJustGuessed = isJustLanded || highlightedLetterIndex != null;
 				const isClueCell = clueCells?.has(key) ?? false;
 				const isLocateCell = locateCells?.has(key) ?? false;
-				const isPangramCell = pangramCells.has(key);
+				const pangramLetterIndex = pangramCellOrder.get(key);
 				const middleDotMarker = middleDotMarkers.get(key);
 
 				if (!cell) {
@@ -174,6 +180,8 @@ export function PuzzleGrid({
 				const cellStyle: CSSProperties & {
 					"--cell-characters": number;
 					"--guess-letter-delay"?: string;
+					"--pangram-wave-delay"?: string;
+					"--pangram-wave-duration"?: string;
 				} = {
 					"--cell-characters": cellLetters.get(key)?.length ?? 1,
 					...(isJustGuessed
@@ -181,6 +189,12 @@ export function PuzzleGrid({
 								"--guess-letter-delay": isJustLanded
 									? "0ms"
 									: `${(highlightedLetterIndex ?? 0) * 34}ms`,
+							}
+						: {}),
+					...(pangramLetterIndex != null
+						? {
+								"--pangram-wave-delay": `${pangramLetterIndex * PANGRAM_WAVE_STAGGER_MS}ms`,
+								"--pangram-wave-duration": `${PANGRAM_WAVE_CELL_MS}ms`,
 							}
 						: {}),
 				};
@@ -191,12 +205,10 @@ export function PuzzleGrid({
 						data-cell-key={key}
 						style={cellStyle}
 						className={`puzzle-cell relative border flex items-center justify-center font-bold leading-none transition-colors duration-300 aspect-square text-[clamp(0.25rem,calc(50cqi/var(--cols)),1.5rem)] ${
-							isPangramCell
-								? "grid-pangram-cell bg-pangram/25 border-pangram/70 text-foreground"
-								: isRevealed
-									? "bg-primary/12 border-primary/40 text-foreground"
-									: "bg-muted border-border/50"
-						} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
+							isRevealed
+								? "bg-primary/12 border-primary/40 text-foreground"
+								: "bg-muted border-border/50"
+						} ${pangramLetterIndex != null ? "grid-pangram-wave-cell" : ""} ${isClueCell ? "clue-gradient-cell" : ""} ${isClueCell && clueCellsFading ? "clue-gradient-cell-hidden" : ""} ${isLocateCell ? "grid-locate-cell" : ""} ${isJustGuessed ? "grid-word-just-guessed-cell" : ""}`}
 					>
 						{showLetter ? (
 							<span

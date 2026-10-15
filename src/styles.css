@@ -249,17 +249,40 @@ code {
 	animation-delay: var(--guess-letter-delay, 0ms);
 }
 
-/* A found pangram lands in its own color before settling into the usual one. */
-.grid-pangram-cell {
-	--guess-flash-color: var(--color-pangram);
-}
-
 .grid-word-just-guessed-letter {
 	display: inline-block;
 	animation: grid-word-just-guessed-letter-bounce 220ms
 		cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
 	animation-delay: var(--guess-letter-delay, 0ms);
 	will-change: transform, opacity;
+}
+
+/* A found pangram's cells turn amber and back one after another. The keyframes
+   leave out 0% and 100% so each cell starts from and returns to its own fill. */
+@keyframes grid-pangram-wave {
+	30%,
+	45% {
+		background-color: color-mix(
+			in oklab,
+			var(--color-pangram) 25%,
+			transparent
+		);
+		border-color: color-mix(in oklab, var(--color-pangram) 70%, transparent);
+	}
+}
+
+.grid-pangram-wave-cell {
+	animation: grid-pangram-wave var(--pangram-wave-duration) ease-in-out;
+	animation-delay: var(--pangram-wave-delay, 0ms);
+}
+
+/* Without flying letters the word flashes and waves at the same time. */
+.grid-word-just-guessed-cell.grid-pangram-wave-cell {
+	animation:
+		grid-word-just-guessed-cell-flash 260ms ease-out both,
+		grid-pangram-wave var(--pangram-wave-duration) ease-in-out;
+	animation-delay:
+		var(--guess-letter-delay, 0ms), var(--pangram-wave-delay, 0ms);
 }
 
 @keyframes daily-submit-feedback-burst {
@@ -410,6 +433,12 @@ code {
 @media (prefers-reduced-motion: reduce) {
 	.grid-word-just-guessed-cell {
 		animation: none;
+	}
+
+	/* The color change stays, but the whole word changes at once. */
+	.grid-pangram-wave-cell,
+	.grid-word-just-guessed-cell.grid-pangram-wave-cell {
+		animation: grid-pangram-wave var(--pangram-wave-duration) ease-in-out;
 	}
 
 	.grid-word-just-guessed-letter {
