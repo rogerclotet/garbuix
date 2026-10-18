@@ -17,6 +17,7 @@ import { openHowToPlay } from "@/components/daily/how-to-play-store";
 import { Logo, QuadratLogo } from "@/components/logo";
 import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -48,6 +49,8 @@ const OTHER_GAMES = [
 		label: "Garbuix mini",
 		color: "var(--game-mini)",
 		Icon: Logo,
+		iconClassName: "size-4",
+		beta: false,
 	},
 	{
 		game: "syllables",
@@ -55,6 +58,8 @@ const OTHER_GAMES = [
 		label: "Garbuix síl·labes",
 		color: "var(--game-syllables)",
 		Icon: Logo,
+		iconClassName: "size-4",
+		beta: false,
 	},
 	{
 		game: "quadrat",
@@ -62,6 +67,10 @@ const OTHER_GAMES = [
 		label: "Garbuix quadrat",
 		color: "var(--game-quadrat)",
 		Icon: QuadratLogo,
+		// A full square of cells outweighs the narrow G at the same size. The
+		// padding shrinks it inside the same slot, so the labels stay aligned.
+		iconClassName: "size-4 p-0.5",
+		beta: true,
 	},
 ] as const;
 
@@ -247,13 +256,27 @@ export function UserMenu({
 				)}
 				{OTHER_GAMES.filter((other) => other.game !== game).map((other) => (
 					<DropdownMenuItem key={other.game} asChild>
-						<Link to={other.to}>
+						<Link
+							to={other.to}
+							aria-label={other.beta ? `${other.label}, beta` : undefined}
+						>
 							<other.Icon
-								className="size-4"
+								className={other.iconClassName}
 								style={{ color: other.color }}
 								aria-hidden
 							/>
 							<span>{other.label}</span>
+							{other.beta ? (
+								<Badge
+									className="ml-auto h-4 px-1.5 text-[0.625rem] font-semibold"
+									style={{
+										color: other.color,
+										backgroundColor: `color-mix(in srgb, ${other.color} 14%, transparent)`,
+									}}
+								>
+									Beta
+								</Badge>
+							) : null}
 						</Link>
 					</DropdownMenuItem>
 				))}
