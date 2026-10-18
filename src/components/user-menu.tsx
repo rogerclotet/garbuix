@@ -41,12 +41,24 @@ const HISTORY_PATHS = {
 } as const satisfies Record<GameMode, string>;
 
 // The other games, in the order the menu lists them. Garbuix! itself has its
-// own entry because returning to it rewinds the browser history.
+// own entry because returning to it rewinds the browser history. name is the
+// word after "Garbuix", drawn in the game's colour.
 const OTHER_GAMES = [
+	{
+		game: "quadrat",
+		to: "/quadrat",
+		name: "quadrat",
+		color: "var(--game-quadrat)",
+		Icon: QuadratLogo,
+		// A full square of cells outweighs the narrow G at the same size. The
+		// padding shrinks it inside the same slot, so the labels stay aligned.
+		iconClassName: "size-4 p-0.5",
+		beta: true,
+	},
 	{
 		game: "mini",
 		to: "/mini",
-		label: "Garbuix mini",
+		name: "mini",
 		color: "var(--game-mini)",
 		Icon: Logo,
 		iconClassName: "size-4",
@@ -55,22 +67,11 @@ const OTHER_GAMES = [
 	{
 		game: "syllables",
 		to: "/sillabes",
-		label: "Garbuix síl·labes",
+		name: "síl·labes",
 		color: "var(--game-syllables)",
 		Icon: Logo,
 		iconClassName: "size-4",
 		beta: false,
-	},
-	{
-		game: "quadrat",
-		to: "/quadrat",
-		label: "Garbuix quadrat",
-		color: "var(--game-quadrat)",
-		Icon: QuadratLogo,
-		// A full square of cells outweighs the narrow G at the same size. The
-		// padding shrinks it inside the same slot, so the labels stay aligned.
-		iconClassName: "size-4 p-0.5",
-		beta: true,
 	},
 ] as const;
 
@@ -258,14 +259,18 @@ export function UserMenu({
 					<DropdownMenuItem key={other.game} asChild>
 						<Link
 							to={other.to}
-							aria-label={other.beta ? `${other.label}, beta` : undefined}
+							aria-label={
+								other.beta ? `Garbuix ${other.name}, beta` : undefined
+							}
 						>
 							<other.Icon
 								className={other.iconClassName}
 								style={{ color: other.color }}
 								aria-hidden
 							/>
-							<span>{other.label}</span>
+							<span>
+								Garbuix <span style={{ color: other.color }}>{other.name}</span>
+							</span>
 							{other.beta ? (
 								<Badge
 									className="ml-auto h-4 px-1.5 text-[0.625rem] font-semibold"
