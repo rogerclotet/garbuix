@@ -10,7 +10,14 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
-import { getCellCol, getCellRow, getWordFromPath } from "@/lib/quadrat-board";
+import {
+	connectionKey,
+	findWordPaths,
+	getCellCol,
+	getCellRow,
+	getPathConnectionKeys,
+	getWordFromPath,
+} from "@/lib/quadrat-board";
 import { markQuadratTutorialSeen, readQuadratSaves } from "@/lib/quadrat-local";
 import { getQuadratClues } from "@/lib/quadrat-server-fns";
 import type {
@@ -260,6 +267,60 @@ it("keeps the word list beside the board on a desktop", async () => {
 
 	expect(screen.getByRole("region", { name: "Paraules del dia" })).toBeTruthy();
 	expect(screen.queryByRole("button", { name: /^Paraules/ })).toBeNull();
+});
+
+// The first traced path of a valid guess that is not one of the day's words.
+function findExtraWordPath(): { word: string; path: number[] } {
+	const drawn = new Set(
+		puzzle.connections.map(({ cells: [left, right] }) =>
+			connectionKey(left, right),
+		),
+	);
+	for (const word of puzzle.validNormalizedGuesses) {
+		const path = findWordPaths(puzzle.letters, word).find((candidate) =>
+			getPathConnectionKeys(candidate).every((key) => drawn.has(key)),
+		);
+		if (path) return { word, path };
+	}
+	throw new Error("Fixture has no traceable extra word");
+}
+
+it("lists the day's words and the extra ones under a finished board", async () => {
+	renderQuadrat();
+	const board = await screen.findByRole("group", { name: /Tauler de lletres/ });
+	const extra = findExtraWordPath();
+
+	drag(board, extra.path);
+	await waitFor(() =>
+		expect(readQuadratSaves(null)[puzzle.dateKey]?.guessHashes.length).toBe(1),
+	);
+	for (const [index, word] of privateSnapshot.words.entries()) {
+		drag(board, word.path);
+		await waitFor(() =>
+			expect(
+				readQuadratSaves(null)[puzzle.dateKey]?.guessedWordIds,
+			).toHaveLength(index + 1),
+		);
+	}
+
+	const list = await screen.findByRole(
+		"region",
+		{ name: "Paraules trobades" },
+		{ timeout: 5_000 },
+	);
+	const items = await within(list).findAllByRole("listitem");
+	expect(items).toHaveLength(privateSnapshot.words.length + 1);
+	for (const word of privateSnapshot.words) {
+		expect(within(list).getByText(word.displayWord.toUpperCase())).toBeTruthy();
+	}
+	expect(within(list).getByText(extra.word.toUpperCase())).toBeTruthy();
+	expect(screen.queryByRole("button", { name: /^Paraules/ })).toBeNull();
+
+	// The list with definitions follows below the board on a phone.
+	const wordsPanel = screen.getByRole("region", { name: "Paraules del dia" });
+	expect(
+		within(wordsPanel).getAllByRole("link", { name: /a l'Optimot$/ }),
+	).toHaveLength(privateSnapshot.words.length);
 });
 
 function TutorialProbe() {
