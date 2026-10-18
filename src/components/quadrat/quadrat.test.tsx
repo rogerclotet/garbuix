@@ -234,7 +234,8 @@ it("spends a clue on an unfound word and marks where it starts", async () => {
 	const clued = privateSnapshot.words.find(({ id }) => id === cluedId);
 	if (!clued) throw new Error("Clue went to an unknown word");
 
-	expect(screen.getByRole("button", { name: /Pista \(2\)/ })).toBeTruthy();
+	// The label follows the decoded progress, which can land a beat later.
+	await screen.findByRole("button", { name: /Pista \(2\)/ });
 	await waitFor(() =>
 		expect(
 			document
