@@ -238,7 +238,8 @@ export function QuadratBoard({
 					<ConnectionLine
 						key={`${cells[0]}-${cells[1]}`}
 						cells={cells}
-						className="stroke-primary/30"
+						// Opaque, so crossing lines do not darken where they overlap.
+						className="stroke-border"
 						width={0.09}
 					/>
 				))}
