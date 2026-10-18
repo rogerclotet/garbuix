@@ -101,3 +101,11 @@ export function markQuadratTutorialSeen(): void {
 		if (!(error instanceof DOMException)) throw error;
 	}
 }
+
+// A finished or skipped tutorial, or a save from any move, means the player
+// has found the game already.
+export function hasPlayedQuadrat(userId: string | null): boolean {
+	if (hasSeenQuadratTutorial()) return true;
+	if (Object.keys(readQuadratSaves(null)).length > 0) return true;
+	return userId !== null && Object.keys(readQuadratSaves(userId)).length > 0;
+}

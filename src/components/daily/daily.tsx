@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
-import { MiniAnnouncementDialog } from "@/components/mini/mini-announcement-dialog";
 import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
 import {
 	KEYPAD_FALLBACK_HEIGHT,
@@ -13,6 +12,7 @@ import { useDecodedProgress } from "@/components/puzzle/use-decoded-progress";
 import { useLetterLayout } from "@/components/puzzle/use-letter-layout";
 import { usePuzzleAnimations } from "@/components/puzzle/use-puzzle-animations";
 import { usePuzzleKeyboard } from "@/components/puzzle/use-puzzle-keyboard";
+import { QuadratAnnouncementDialog } from "@/components/quadrat/quadrat-announcement-dialog";
 import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { WORD_LIST_SECTION_ID } from "@/lib/clue-request-types";
 import {
@@ -161,8 +161,8 @@ function DailyGame({
 	});
 	const {
 		welcomeOpen,
-		miniAnnouncementOpen,
-		setMiniAnnouncementOpen,
+		quadratAnnouncementOpen,
+		setQuadratAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,
@@ -217,7 +217,7 @@ function DailyGame({
 	});
 	usePuzzleKeyboard({
 		enabled:
-			isPresentable && !isComplete && !tutorialOpen && !miniAnnouncementOpen,
+			isPresentable && !isComplete && !tutorialOpen && !quadratAnnouncementOpen,
 		letters: derivedProgress.shuffledLetters,
 		guess: currentGuess,
 		minimumGuessLength: 4,
@@ -363,9 +363,9 @@ function DailyGame({
 				onOpenChange={handleWelcomeOpenChange}
 				onSignIn={handleWelcomeSignIn}
 			/>
-			<MiniAnnouncementDialog
-				open={miniAnnouncementOpen}
-				onOpenChange={setMiniAnnouncementOpen}
+			<QuadratAnnouncementDialog
+				open={quadratAnnouncementOpen}
+				onOpenChange={setQuadratAnnouncementOpen}
 			/>
 			<SharePreviewDialog
 				open={sharePreviewOpen}

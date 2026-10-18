@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeRevealedAnswers } from "@/lib/puzzle-client";
 import {
 	getSortedAnonymousHistoryEntries,
-	hasSeenMiniAnnouncement,
+	hasSeenQuadratAnnouncement,
 } from "@/lib/puzzle-local";
 import type { SessionUser } from "@/lib/puzzle-types";
 import { Daily } from "./daily";
@@ -278,6 +278,21 @@ function dailyView() {
 	);
 }
 
+const quadratSave = {
+	puzzleId: "quadrat:2026-04-10",
+	guessHashes: [],
+	guessedWordIds: [0],
+	revealedWordTokens: {},
+	hintedCells: [],
+	clueWordIds: [],
+	hintsUsed: 0,
+	guessCount: 1,
+	bonusWordsFound: 0,
+	shuffledLetters: [],
+	completedAt: null,
+	lastSyncedAt: null,
+};
+
 function renderDaily() {
 	return render(dailyView());
 }
@@ -289,13 +304,13 @@ function renderAnnouncementVisit() {
 		path: "/",
 		component: dailyView,
 	});
-	const mini = createRoute({
+	const quadrat = createRoute({
 		getParentRoute: () => root,
-		path: "/mini",
-		component: () => <h1>Mini game</h1>,
+		path: "/quadrat",
+		component: () => <h1>Quadrat game</h1>,
 	});
 	const router = createRouter({
-		routeTree: root.addChildren([home, mini]),
+		routeTree: root.addChildren([home, quadrat]),
 		history: createMemoryHistory({ initialEntries: ["/"] }),
 	});
 	return { ...render(<RouterProvider router={router} />), router };
@@ -329,7 +344,7 @@ async function submitCurrentGuess() {
 
 describe("Daily submit feedback", () => {
 	beforeEach(() => {
-		installLocalStorageMock({ "garbuix-mini-announcement-seen-v1": "1" });
+		installLocalStorageMock({ "garbuix-quadrat-announcement-seen-v1": "1" });
 		sessionState.activeUser = null;
 		progressState.guessCount = 0;
 		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([]);
@@ -635,7 +650,7 @@ describe("Daily submit feedback", () => {
 	});
 
 	it.each(["local", "google"])(
-		"announces Mini only once for an existing %s session",
+		"announces Quadrat only once for an existing %s session",
 		async (kind) => {
 			installLocalStorageMock();
 			if (kind === "local") progressState.guessCount = 3;
@@ -646,14 +661,14 @@ describe("Daily submit feedback", () => {
 					email: "parent@example.com",
 				};
 			const first = renderAnnouncementVisit();
-			await screen.findByRole("alertdialog", { name: "Garbuix mini" });
-			expect(screen.getByText("Pels més petits de la casa")).toBeTruthy();
+			await screen.findByRole("alertdialog", { name: "Garbuix quadrat" });
+			expect(screen.getByText("Quinze paraules en setze lletres")).toBeTruthy();
 			expect(
 				screen
-					.getByRole("link", { name: "Provar Garbuix mini" })
+					.getByRole("link", { name: "Provar Garbuix quadrat" })
 					.getAttribute("href"),
-			).toBe("/mini");
-			expect(hasSeenMiniAnnouncement()).toBe(true);
+			).toBe("/quadrat");
+			expect(hasSeenQuadratAnnouncement()).toBe(true);
 			for (const key of "cosa") fireEvent.keyDown(window, { key });
 			fireEvent.keyDown(window, { key: "Enter" });
 			expect(resolveGuessMock).not.toHaveBeenCalled();
@@ -668,7 +683,7 @@ describe("Daily submit feedback", () => {
 		},
 	);
 
-	it("lets a returning local player open Mini even before starting today's puzzle", async () => {
+	it("lets a returning local player open Quadrat even before starting today's puzzle", async () => {
 		installLocalStorageMock();
 		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([
 			{
@@ -684,14 +699,52 @@ describe("Daily submit feedback", () => {
 		]);
 		const { router } = renderAnnouncementVisit();
 		fireEvent.click(
-			await screen.findByRole("link", { name: "Provar Garbuix mini" }),
+			await screen.findByRole("link", { name: "Provar Garbuix quadrat" }),
 		);
-		await screen.findByRole("heading", { name: "Mini game" });
-		expect(router.state.location.pathname).toBe("/mini");
-		expect(hasSeenMiniAnnouncement()).toBe(true);
+		await screen.findByRole("heading", { name: "Quadrat game" });
+		expect(router.state.location.pathname).toBe("/quadrat");
+		expect(hasSeenQuadratAnnouncement()).toBe(true);
 	});
 
-	it("does not announce Mini to a new local player or interrupt their first guesses", async () => {
+	it.each([
+		[
+			"finished the Quadrat tutorial",
+			{ "garbuix-quadrat-tutorial-seen-v1": "1" },
+		],
+		[
+			"has a guest Quadrat save",
+			{
+				"garbuix-quadrat-v1:guest": JSON.stringify({
+					"2026-04-10": quadratSave,
+				}),
+			},
+		],
+	])("does not announce Quadrat to a player who %s", async (_, storage) => {
+		installLocalStorageMock(storage);
+		progressState.guessCount = 3;
+		renderDaily();
+		await screen.findByTestId("daily-grid");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(hasSeenQuadratAnnouncement()).toBe(false);
+	});
+
+	it("does not announce Quadrat to an account that played it on this device", async () => {
+		installLocalStorageMock({
+			"garbuix-quadrat-v1:parent": JSON.stringify({
+				"2026-04-10": quadratSave,
+			}),
+		});
+		sessionState.activeUser = {
+			id: "parent",
+			name: "Parent",
+			email: "parent@example.com",
+		};
+		renderDaily();
+		await screen.findByTestId("daily-grid");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+	});
+
+	it("does not announce Quadrat to a new local player or interrupt their first guesses", async () => {
 		installLocalStorageMock();
 		const view = renderDaily();
 		await screen.findByTestId("daily-grid");
@@ -699,7 +752,7 @@ describe("Daily submit feedback", () => {
 		progressState.guessCount = 1;
 		view.rerender(dailyView());
 		expect(screen.queryByRole("alertdialog")).toBeNull();
-		expect(hasSeenMiniAnnouncement()).toBe(false);
+		expect(hasSeenQuadratAnnouncement()).toBe(false);
 	});
 
 	it("holds the welcome dialog back on the day of the tutorial", async () => {
@@ -711,16 +764,16 @@ describe("Daily submit feedback", () => {
 		expect(screen.queryByText("Desa el teu progrés")).toBeNull();
 	});
 
-	it("keeps the welcome dialog and does not follow it with a Mini announcement", async () => {
+	it("keeps the welcome dialog and does not follow it with a Quadrat announcement", async () => {
 		installLocalStorageMock();
 		progressState.guessCount = 3;
 		hasSeenWelcomeMock.mockReturnValue(false);
 		renderDaily();
 		await screen.findByRole("alertdialog", { name: "Desa el teu progrés" });
-		expect(screen.queryByText("Pels més petits de la casa")).toBeNull();
+		expect(screen.queryByText("Quinze paraules en setze lletres")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Ara no" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-		expect(hasSeenMiniAnnouncement()).toBe(false);
+		expect(hasSeenQuadratAnnouncement()).toBe(false);
 	});
 
 	it("opens only the sign-in dialog when the welcome ends in Entrar", async () => {
@@ -738,7 +791,7 @@ describe("Daily submit feedback", () => {
 	});
 
 	it.each(["tutorial", "profile tip"])(
-		"defers Mini for the whole visit when the %s is due",
+		"defers Quadrat for the whole visit when the %s is due",
 		async (kind) => {
 			installLocalStorageMock();
 			progressState.guessCount = 3;
@@ -756,7 +809,7 @@ describe("Daily submit feedback", () => {
 			hasSeenProfilePreferencesTipMock.mockReturnValue(true);
 			view.rerender(dailyView());
 			expect(screen.queryByRole("alertdialog")).toBeNull();
-			expect(hasSeenMiniAnnouncement()).toBe(false);
+			expect(hasSeenQuadratAnnouncement()).toBe(false);
 		},
 	);
 
