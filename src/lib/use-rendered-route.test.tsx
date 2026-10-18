@@ -10,9 +10,7 @@ import {
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useMiniRoute } from "@/lib/use-mini-route";
-import { useRenderedPathname } from "@/lib/use-rendered-route";
-import { useSyllableRoute } from "@/lib/use-syllable-route";
+import { useRenderedGame, useRenderedPathname } from "@/lib/use-rendered-route";
 
 beforeEach(() => {
 	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
@@ -23,15 +21,10 @@ afterEach(() => {
 });
 
 function Shell() {
-	const mini = useMiniRoute();
-	const syllables = useSyllableRoute();
+	const game = useRenderedGame();
 	const pathname = useRenderedPathname();
 	return (
-		<div
-			data-testid="shell"
-			data-game={syllables ? "syllables" : mini ? "mini" : "regular"}
-			data-pathname={pathname}
-		>
+		<div data-testid="shell" data-game={game} data-pathname={pathname}>
 			<Outlet />
 		</div>
 	);
@@ -66,6 +59,8 @@ function setup() {
 		),
 		page("/mini/dies-anteriors"),
 		page("/sillabes/"),
+		page("/quadrat/"),
+		page("/quadrat/dies-anteriors"),
 	]);
 	const router = createRouter({
 		routeTree,
@@ -116,4 +111,13 @@ it("recognises each game's index and inner pages", async () => {
 
 	await act(async () => router.navigate({ to: "/sillabes" }));
 	expect(shell()).toEqual({ game: "syllables", pathname: "/sillabes" });
+
+	await act(async () => router.navigate({ to: "/quadrat" }));
+	expect(shell()).toEqual({ game: "quadrat", pathname: "/quadrat" });
+
+	await act(async () => router.navigate({ to: "/quadrat/dies-anteriors" }));
+	expect(shell()).toEqual({
+		game: "quadrat",
+		pathname: "/quadrat/dies-anteriors",
+	});
 });

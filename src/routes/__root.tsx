@@ -25,8 +25,7 @@ import { materialThemeCss } from "@/lib/material-theme";
 import { getTodayDateKey } from "@/lib/puzzle-dates";
 import { getSessionUser } from "@/lib/puzzle-server-fns";
 import type { SignInMethod } from "@/lib/sign-in-methods";
-import { useMiniRoute } from "@/lib/use-mini-route";
-import { useSyllableRoute } from "@/lib/use-syllable-route";
+import { useRenderedGame } from "@/lib/use-rendered-route";
 import appCss from "@/styles.css?url";
 
 interface MyRouterContext {
@@ -106,16 +105,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
-	const mini = useMiniRoute();
-	const syllables = useSyllableRoute();
+	const game = useRenderedGame();
 	const showDevtools = import.meta.env.DEV;
 
 	return (
-		<html
-			lang="ca"
-			data-game={syllables ? "syllables" : mini ? "mini" : "regular"}
-			suppressHydrationWarning
-		>
+		<html lang="ca" data-game={game} suppressHydrationWarning>
 			<head>
 				<HeadContent />
 				<style>{materialThemeCss}</style>
@@ -128,7 +122,7 @@ function RootDocument() {
 					enableSystem
 				>
 					<TooltipProvider delayDuration={300}>
-						<ThemeMeta mini={mini} syllables={syllables} />
+						<ThemeMeta game={game} />
 						<OrientationLock />
 						<ServiceWorkerRegister />
 						<LeaderboardRoot>
@@ -147,7 +141,7 @@ function RootDocument() {
 								</div>
 								<Toaster position="top-center" />
 								<SignInDialog />
-								{mini || syllables ? null : <LeaderboardToasts />}
+								{game === "regular" ? <LeaderboardToasts /> : null}
 							</ClueRequestsRoot>
 						</LeaderboardRoot>
 						{showDevtools ? (

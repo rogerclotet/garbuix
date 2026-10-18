@@ -17,15 +17,19 @@ import {
 	setProfilePreferencesTipOpen,
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
+import { QuadratHelpDialog } from "@/components/quadrat/quadrat-help-dialog";
 import { SyllableHelpDialog } from "@/components/syllables/syllable-help-dialog";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { WORD_LIST_SECTION_ID, wordRowId } from "@/lib/clue-request-types";
 import { getGameHistory } from "@/lib/game-history";
 import { useClueRequests } from "@/lib/use-clue-requests";
-import { useMiniRoute } from "@/lib/use-mini-route";
-import { useRenderedPathname } from "@/lib/use-rendered-route";
-import { useSyllableRoute } from "@/lib/use-syllable-route";
+import {
+	GAME_PATHS,
+	type GamePath,
+	useRenderedGame,
+	useRenderedPathname,
+} from "@/lib/use-rendered-route";
 
 const INNER_PAGE_TITLES: Record<string, string> = {
 	"/classificacio": "Classificació",
@@ -36,12 +40,12 @@ const INNER_PAGE_TITLES: Record<string, string> = {
 	"/condicions": "Condicions d'ús",
 	"/mini/dies-anteriors": "Historial mini",
 	"/sillabes/dies-anteriors": "Historial síl·labes",
+	"/quadrat/dies-anteriors": "Historial quadrat",
 };
 
 export default function Header() {
-	const mini = useMiniRoute();
-	const syllables = useSyllableRoute();
-	const gamePath = syllables ? "/sillabes" : mini ? "/mini" : "/";
+	const game = useRenderedGame();
+	const gamePath = GAME_PATHS[game];
 	const pathname = useRenderedPathname();
 	const location = useRouterState({ select: (s) => s.location });
 	const historyIndex = location.state.__TSR_index;
@@ -80,7 +84,7 @@ export default function Header() {
 		});
 	};
 
-	const returnToGame = (to: "/" | "/mini" | "/sillabes") => {
+	const returnToGame = (to: GamePath) => {
 		const gameHistoryIndex = gameHistoryIndices[to];
 
 		// Reuse the game entry so Back cannot revisit the pages we're leaving.
@@ -145,12 +149,17 @@ export default function Header() {
 
 	const dialogs = (
 		<>
-			{syllables ? (
+			{game === "quadrat" ? (
+				<QuadratHelpDialog
+					open={howToPlayOpen}
+					onOpenChange={setHowToPlayOpen}
+				/>
+			) : game === "syllables" ? (
 				<SyllableHelpDialog
 					open={howToPlayOpen}
 					onOpenChange={setHowToPlayOpen}
 				/>
-			) : mini ? (
+			) : game === "mini" ? (
 				<MiniHelpDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
 			) : (
 				<HowToPlayDialog open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
@@ -188,14 +197,21 @@ export default function Header() {
 							className="hover:opacity-80 transition-opacity"
 						>
 							<h1 className="text-2xl font-bold text-primary">
-								{syllables ? (
+								{game === "quadrat" ? (
+									<>
+										Garbuix{" "}
+										<span className="text-[var(--quadrat-accent)]">
+											quadrat
+										</span>
+									</>
+								) : game === "syllables" ? (
 									<>
 										Garbuix{" "}
 										<span className="text-[var(--syllable-star)]">
 											síl·labes
 										</span>
 									</>
-								) : mini ? (
+								) : game === "mini" ? (
 									<>
 										Garbuix{" "}
 										<span className="text-[var(--mini-gold)]">mini</span>
@@ -206,7 +222,7 @@ export default function Header() {
 							</h1>
 						</Link>
 					)}
-					{actionButtons(!innerTitle && !mini && !syllables)}
+					{actionButtons(!innerTitle && game === "regular")}
 				</div>
 			</div>
 			{dialogs}

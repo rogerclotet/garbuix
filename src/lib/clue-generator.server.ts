@@ -240,6 +240,48 @@ export async function generateAndStoreCluesForPuzzle(options: {
 	wordSlots: DailyPuzzlePrivateWord[];
 	replaceExisting?: boolean;
 }): Promise<void> {
+	await generateAndStoreClues({
+		puzzleId: options.puzzleId,
+		words: options.wordSlots,
+		storeClue: async (word, generated) => {
+			const insert = db.insert(puzzleWordClues).values({
+				id: crypto.randomUUID(),
+				puzzleId: options.puzzleId,
+				wordId: word.id,
+				normalizedWord: word.normalizedWord,
+				sonnetModel: generated.model,
+				sonnetClue: generated.clue,
+			});
+			if (options.replaceExisting) {
+				await insert.onConflictDoUpdate({
+					target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
+					set: {
+						normalizedWord: word.normalizedWord,
+						sonnetModel: generated.model,
+						sonnetClue: generated.clue,
+						createdAt: new Date(),
+					},
+				});
+			} else {
+				await insert.onConflictDoNothing({
+					target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
+				});
+			}
+		},
+	});
+}
+
+export type ClueWord = Pick<
+	DailyPuzzlePrivateWord,
+	"id" | "displayWord" | "normalizedWord"
+>;
+
+// Each game keeps clues in its own table, so the caller writes them.
+export async function generateAndStoreClues(options: {
+	puzzleId: string;
+	words: ClueWord[];
+	storeClue: (word: ClueWord, generated: GeneratedWordClue) => Promise<void>;
+}): Promise<void> {
 	if (!getServerEnv().ANTHROPIC_API_KEY) {
 		const error = new Error(
 			"ANTHROPIC_API_KEY missing; skipping clue generation",
@@ -248,7 +290,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 		return;
 	}
 
-	const totalWords = options.wordSlots.length;
+	const totalWords = options.words.length;
 	let completedWords = 0;
 	let failedWords = 0;
 	let apiResponses = 0;
@@ -275,7 +317,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 		offset < totalWords;
 		offset += CLUE_GENERATION_BATCH_SIZE
 	) {
-		const batch = options.wordSlots.slice(
+		const batch = options.words.slice(
 			offset,
 			offset + CLUE_GENERATION_BATCH_SIZE,
 		);
@@ -308,29 +350,7 @@ export async function generateAndStoreCluesForPuzzle(options: {
 					});
 
 					failureStage = "storage";
-					const insert = db.insert(puzzleWordClues).values({
-						id: crypto.randomUUID(),
-						puzzleId: options.puzzleId,
-						wordId: slot.id,
-						normalizedWord: slot.normalizedWord,
-						sonnetModel: generated.model,
-						sonnetClue: generated.clue,
-					});
-					if (options.replaceExisting) {
-						await insert.onConflictDoUpdate({
-							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
-							set: {
-								normalizedWord: slot.normalizedWord,
-								sonnetModel: generated.model,
-								sonnetClue: generated.clue,
-								createdAt: new Date(),
-							},
-						});
-					} else {
-						await insert.onConflictDoNothing({
-							target: [puzzleWordClues.puzzleId, puzzleWordClues.wordId],
-						});
-					}
+					await options.storeClue(slot, generated);
 
 					completedWords += 1;
 					console.info(

@@ -27,11 +27,40 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { useMiniRoute } from "@/lib/use-mini-route";
-import { useSyllableRoute } from "@/lib/use-syllable-route";
+import { type GameMode, useRenderedGame } from "@/lib/use-rendered-route";
 import { initialsFromName } from "@/lib/user-profile";
 
 const REDDIT_COMMUNITY_URL = "https://www.reddit.com/r/garbuix";
+
+const HISTORY_PATHS = {
+	regular: "/dies-anteriors",
+	mini: "/mini/dies-anteriors",
+	syllables: "/sillabes/dies-anteriors",
+	quadrat: "/quadrat/dies-anteriors",
+} as const satisfies Record<GameMode, string>;
+
+// The other games, in the order the menu lists them. Garbuix! itself has its
+// own entry because returning to it rewinds the browser history.
+const OTHER_GAMES = [
+	{
+		game: "mini",
+		to: "/mini",
+		label: "Garbuix mini",
+		color: "var(--game-mini)",
+	},
+	{
+		game: "syllables",
+		to: "/sillabes",
+		label: "Garbuix síl·labes",
+		color: "var(--game-syllables)",
+	},
+	{
+		game: "quadrat",
+		to: "/quadrat",
+		label: "Garbuix quadrat",
+		color: "var(--game-quadrat)",
+	},
+] as const;
 
 const rootRoute = getRouteApi("__root__");
 
@@ -70,8 +99,8 @@ export function UserMenu({
 }: {
 	onReturnToGarbuix: () => void;
 }) {
-	const mini = useMiniRoute();
-	const syllables = useSyllableRoute();
+	const game = useRenderedGame();
+	const isRegular = game === "regular";
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const [open, setOpen] = useState(false);
@@ -144,7 +173,7 @@ export function UserMenu({
 						<DropdownMenuSeparator />
 					</>
 				)}
-				{!mini && !syllables ? (
+				{isRegular ? (
 					<DropdownMenuItem asChild>
 						<a
 							href={REDDIT_COMMUNITY_URL}
@@ -157,15 +186,7 @@ export function UserMenu({
 					</DropdownMenuItem>
 				) : null}
 				<DropdownMenuItem asChild>
-					<Link
-						to={
-							syllables
-								? "/sillabes/dies-anteriors"
-								: mini
-									? "/mini/dies-anteriors"
-									: "/dies-anteriors"
-						}
-					>
+					<Link to={HISTORY_PATHS[game]}>
 						<History className="size-4" />
 						<span>Historial</span>
 					</Link>
@@ -184,7 +205,7 @@ export function UserMenu({
 						<span>Sobre el joc</span>
 					</Link>
 				</DropdownMenuItem>
-				{!mini && !syllables ? (
+				{isRegular ? (
 					<DropdownMenuItem asChild>
 						<Link to="/preferencies">
 							<Settings className="size-4" />
@@ -194,60 +215,45 @@ export function UserMenu({
 				) : null}
 				<ThemeMenuToggle />
 				<DropdownMenuSeparator />
-				<DropdownMenuItem asChild>
-					<Link
-						to={mini || syllables ? "/" : "/mini"}
-						onClick={(event) => {
-							if (
-								(mini || syllables) &&
-								event.button === 0 &&
-								!event.metaKey &&
-								!event.ctrlKey &&
-								!event.shiftKey &&
-								!event.altKey
-							) {
-								event.preventDefault();
-								setOpen(false);
-								onReturnToGarbuix();
-							}
-						}}
-					>
-						<Logo
-							className="size-4"
-							style={{
-								color:
-									mini || syllables
-										? "var(--game-regular)"
-										: "var(--game-mini)",
+				{isRegular ? null : (
+					<DropdownMenuItem asChild>
+						<Link
+							to="/"
+							onClick={(event) => {
+								if (
+									event.button === 0 &&
+									!event.metaKey &&
+									!event.ctrlKey &&
+									!event.shiftKey &&
+									!event.altKey
+								) {
+									event.preventDefault();
+									setOpen(false);
+									onReturnToGarbuix();
+								}
 							}}
-							aria-hidden
-						/>
-						<span>{mini || syllables ? "Garbuix!" : "Garbuix mini"}</span>
-					</Link>
-				</DropdownMenuItem>
-				{syllables ? (
-					<DropdownMenuItem asChild>
-						<Link to="/mini">
+						>
 							<Logo
 								className="size-4"
-								style={{ color: "var(--game-mini)" }}
+								style={{ color: "var(--game-regular)" }}
 								aria-hidden
 							/>
-							<span>Garbuix mini</span>
-						</Link>
-					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem asChild>
-						<Link to="/sillabes">
-							<Logo
-								className="size-4"
-								style={{ color: "var(--game-syllables)" }}
-								aria-hidden
-							/>
-							<span>Garbuix síl·labes</span>
+							<span>Garbuix!</span>
 						</Link>
 					</DropdownMenuItem>
 				)}
+				{OTHER_GAMES.filter((other) => other.game !== game).map((other) => (
+					<DropdownMenuItem key={other.game} asChild>
+						<Link to={other.to}>
+							<Logo
+								className="size-4"
+								style={{ color: other.color }}
+								aria-hidden
+							/>
+							<span>{other.label}</span>
+						</Link>
+					</DropdownMenuItem>
+				))}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

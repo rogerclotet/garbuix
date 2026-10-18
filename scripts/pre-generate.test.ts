@@ -64,11 +64,11 @@ it("skips all generation before the Madrid window", () => {
 	expect(result.stdout).toContain("skipping");
 });
 
-it("generates tomorrow's puzzle and clues in order inside the window", () => {
+it("generates tomorrow's puzzles and clues in order inside the window", () => {
 	// 23:00 Madrid
 	const result = preGenerate("2026-10-03T21:00:00Z");
 	expect(result.status, result.stderr).toBe(0);
 	expect(result.calls).toBe(
-		"backfill:puzzles --from 2026-10-04 --to 2026-10-04\nclues:backfill --from 2026-10-04 --to 2026-10-04\n",
+		"backfill:puzzles --from 2026-10-04 --to 2026-10-04\nclues:backfill --from 2026-10-04 --to 2026-10-04\nquadrat:backfill --from 2026-10-04 --to 2026-10-04\n",
 	);
 });

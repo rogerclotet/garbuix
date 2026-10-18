@@ -17,6 +17,10 @@ import type {
 	HistorySummaryEntry,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import type {
+	QuadratPuzzlePrivate,
+	QuadratPuzzlePublic,
+} from "@/lib/quadrat-types";
 import type { SyllablePuzzlePublic } from "@/lib/syllable-types";
 
 type StoredPuzzleEventPayload = Record<string, unknown>;
@@ -80,6 +84,61 @@ export const syllableProgress = pgTable(
 		uniqueIndex("syllable_progress_user_puzzle_idx").on(
 			table.userId,
 			table.puzzleId,
+		),
+	],
+);
+
+export const quadratPuzzles = pgTable("quadrat_puzzles", {
+	id: text("id").primaryKey(),
+	dateKey: date("date_key").notNull().unique(),
+	publicSnapshotJson: jsonb("public_snapshot_json")
+		.$type<QuadratPuzzlePublic>()
+		.notNull(),
+	privateSnapshotJson: jsonb("private_snapshot_json")
+		.$type<QuadratPuzzlePrivate>()
+		.notNull(),
+});
+
+export const quadratProgress = pgTable(
+	"quadrat_progress",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		puzzleId: text("puzzle_id")
+			.notNull()
+			.references(() => quadratPuzzles.id, { onDelete: "cascade" }),
+		progressJson: jsonb("progress_json").$type<PuzzleProgressState>().notNull(),
+	},
+	(table) => [
+		uniqueIndex("quadrat_progress_user_puzzle_idx").on(
+			table.userId,
+			table.puzzleId,
+		),
+	],
+);
+
+// The classic clue table points at daily_puzzles, so Quadrat keeps its own.
+export const quadratWordClues = pgTable(
+	"quadrat_word_clues",
+	{
+		id: text("id").primaryKey(),
+		puzzleId: text("puzzle_id")
+			.notNull()
+			.references(() => quadratPuzzles.id, { onDelete: "cascade" }),
+		wordId: integer("word_id").notNull(),
+		normalizedWord: text("normalized_word").notNull(),
+		model: text("model").notNull(),
+		clue: text("clue").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		uniqueIndex("quadrat_word_clues_puzzle_word_idx").on(
+			table.puzzleId,
+			table.wordId,
 		),
 	],
 );

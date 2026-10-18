@@ -15,6 +15,41 @@ A responsive web application for a Catalan crossword-style word game.
 
 ## How to Play
 
+### Garbuix quadrat
+
+`/quadrat` is a daily game on a 4×4 board of letters, listed in the menu with
+the other modes. Fifteen words of four letters or more hide in it. Players drag
+from letter to letter, horizontally, vertically or diagonally, without reusing
+a cell, and release to check the word. The panel above the board shows the word
+being formed.
+
+Each letter shows in its corner how many unfound words pass through it, and a
+line joins two letters while an unfound word steps between them. Finding a word
+lowers its letters' counts and removes lines no other word needs. A letter at
+zero dims and no longer accepts a drag, and a drag only follows drawn lines.
+Valid dictionary words that are not among the fifteen show as valid but change
+nothing, and appear as extras once the board is done.
+
+Words come from the classic generation dictionary: frequency-floored, each with
+a Viccionari definition, scored the same way. `src/lib/quadrat-generator.ts`
+anneals the board's letters until fifteen words fit, each tracing exactly one
+path, together using all sixteen cells, with no two sharing a root and fewer
+repeats from the last 45 days of Quadrat. One path per word means the path a
+player drags is always the one whose counts drop, and the client recovers a
+found word's path from its letters.
+
+Three AI clues a day work like the classic ones and come from the same model and
+prompt. A clue's text goes on a random unfound word's row in the list, and the
+board lights that word's first letter and first line until it is found. Found
+words show their clue as a description.
+
+Boards, progress and clues live in `quadrat_puzzles`, `quadrat_progress` and
+`quadrat_word_clues` (migration `0013_quadrat.sql`). Browser saves, account
+sync, guest imports and `/quadrat/dies-anteriors` history are separate from the
+other modes, and there is no leaderboard. The nightly job runs
+`pnpm quadrat:backfill` after the classic puzzle and clues; a board created by a
+visit instead gets its clues in the background. The theme is blue.
+
 ### Garbuix síl·labes
 
 `/sillabes` is a daily game for early readers, available alongside Garbuix and

@@ -30,6 +30,8 @@ import {
 	dailyPuzzles,
 	miniPuzzles,
 	puzzleWordClues,
+	quadratPuzzles,
+	quadratWordClues,
 	syllablePuzzles,
 	userPuzzleEvents,
 	userPuzzleProgress,
@@ -62,6 +64,13 @@ import type {
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import {
+	ensureQuadratPuzzle,
+	getQuadratCluesData,
+	getQuadratHistory,
+	getQuadratProgress,
+	saveQuadratProgress,
+} from "@/lib/quadrat.server";
 import {
 	ensureSyllablePuzzle,
 	getSyllableHistory,
@@ -842,6 +851,140 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				await db
 					.delete(syllablePuzzles)
 					.where(eq(syllablePuzzles.id, syllable.id));
+			}
+		});
+
+		it("merges Quadrat across devices, holds clues to three and freezes completed games", async () => {
+			const fixture = await createFixture();
+			const [quadrat, sameQuadrat] = await Promise.all([
+				ensureQuadratPuzzle("2026-03-11"),
+				ensureQuadratPuzzle("2026-03-11"),
+			]);
+			expect(quadrat.publicSnapshotJson).toEqual(
+				sameQuadrat.publicSnapshotJson,
+			);
+			try {
+				const puzzle = quadrat.publicSnapshotJson;
+				const empty = createEmptyProgressState({
+					id: puzzle.id,
+					initialShuffledLetters: [],
+				});
+				const before = await getHistoryEntriesForUser(fixture.id);
+				const tokens = await Promise.all(
+					puzzle.wordSlots.map(async (slot) => {
+						const answer = quadrat.privateSnapshotJson.words.find(
+							(word) => word.id === slot.id,
+						);
+						if (!answer) throw new Error("Missing test answer");
+						return [
+							String(slot.id),
+							await createUnlockToken(slot.slotSalt, answer.normalizedWord),
+						] as const;
+					}),
+				);
+				const [extra] = puzzle.validNormalizedGuesses;
+				if (!extra) throw new Error("Missing test extra");
+				const bonusHash = await createGuessHash(puzzle.id, extra);
+				const ids = puzzle.wordSlots.map((slot) => slot.id);
+
+				await Promise.all([
+					saveQuadratProgress(fixture.id, {
+						...empty,
+						guessedWordIds: ids.slice(0, 3),
+						revealedWordTokens: {
+							...Object.fromEntries(tokens.slice(0, 2)),
+							// A forged token never unlocks its word.
+							[String(ids[2])]: "0".repeat(64),
+						},
+						guessHashes: ["first", "second", bonusHash],
+						clueWordIds: [ids[5] as number, 99],
+						hintsUsed: 0,
+						bonusWordsFound: 999,
+						hintedCells: ["0,0"],
+					}),
+					saveQuadratProgress(fixture.id, {
+						...empty,
+						guessedWordIds: ids.slice(3, 10),
+						revealedWordTokens: Object.fromEntries(tokens.slice(3, 10)),
+						guessHashes: ["third"],
+						clueWordIds: ids.slice(10, 14),
+					}),
+				]);
+				const partial = await getQuadratProgress(fixture.id, puzzle.id);
+				expect(partial?.guessedWordIds).toHaveLength(9);
+				expect(partial?.guessedWordIds).not.toContain(ids[2]);
+				expect(partial?.clueWordIds).toHaveLength(3);
+				expect(partial?.clueWordIds).not.toContain(99);
+				expect(partial?.hintsUsed).toBe(3);
+				expect(partial?.hintedCells).toEqual([]);
+				expect(partial?.bonusWordsFound).toBe(1);
+				expect(partial?.completedAt).toBeNull();
+
+				// Accounts read clues they asked for or words they found; guests
+				// read any clue of a playable board.
+				await db.insert(quadratWordClues).values(
+					puzzle.wordSlots.map((slot) => ({
+						id: crypto.randomUUID(),
+						puzzleId: puzzle.id,
+						wordId: slot.id,
+						normalizedWord: `word-${slot.id}`,
+						model: "test",
+						clue: `clue ${slot.id}`,
+					})),
+				);
+				const allowed = new Set([
+					...(partial?.clueWordIds ?? []),
+					...(partial?.guessedWordIds ?? []),
+				]);
+				const accountClues = await getQuadratCluesData({
+					puzzleId: puzzle.id,
+					wordIds: ids,
+					userId: fixture.id,
+				});
+				expect(Object.keys(accountClues).map(Number).sort()).toEqual(
+					[...allowed].sort(),
+				);
+				expect(
+					Object.keys(
+						await getQuadratCluesData({
+							puzzleId: puzzle.id,
+							wordIds: ids,
+							userId: null,
+						}),
+					),
+				).toHaveLength(ids.length);
+
+				const saved = await saveQuadratProgress(fixture.id, {
+					...empty,
+					guessedWordIds: ids,
+					revealedWordTokens: Object.fromEntries(tokens),
+					guessHashes: ["last"],
+				});
+				expect(saved.guessedWordIds).toHaveLength(ids.length);
+				expect(saved.completedAt).not.toBeNull();
+				expect(
+					await saveQuadratProgress(fixture.id, {
+						...empty,
+						guessHashes: ["late-guess"],
+					}),
+				).toEqual(saved);
+				expect(await getQuadratHistory(fixture.id)).toEqual([
+					expect.objectContaining({
+						dateKey: "2026-03-11",
+						totalWords: 15,
+						guessedWords: 15,
+						hintsUsed: 3,
+						completed: true,
+					}),
+				]);
+				expect(await getHistoryEntriesForUser(fixture.id)).toEqual(before);
+				await expect(
+					saveQuadratProgress(fixture.id, { ...empty, puzzleId: fixture.id }),
+				).rejects.toThrow("not found");
+			} finally {
+				await db
+					.delete(quadratPuzzles)
+					.where(eq(quadratPuzzles.id, quadrat.id));
 			}
 		});
 	},

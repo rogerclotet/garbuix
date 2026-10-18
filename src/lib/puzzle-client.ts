@@ -8,9 +8,24 @@ import {
 import { normalizeWord } from "@/lib/puzzle-text";
 import type {
 	DailyPuzzlePublic,
+	DailyPuzzleWordSlot,
 	PuzzleClientEvent,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+
+// What checking a guess needs from a board. Quadrat boards have no crossword
+// layout but share these fields.
+type GuessableWordSlot = Pick<
+	DailyPuzzleWordSlot,
+	"id" | "slotSalt" | "answerHash" | "answerCapsule"
+>;
+
+type GuessablePuzzle = Pick<
+	DailyPuzzlePublic,
+	"id" | "validNormalizedGuesses"
+> & {
+	wordSlots: GuessableWordSlot[];
+};
 
 export type GuessFeedbackKind =
 	| "new_word"
@@ -19,7 +34,7 @@ export type GuessFeedbackKind =
 	| "not_in_dictionary";
 
 export async function resolveGuess(options: {
-	puzzle: DailyPuzzlePublic;
+	puzzle: GuessablePuzzle;
 	progress: PuzzleProgressState;
 	guess: string;
 }) {
@@ -99,10 +114,10 @@ export async function resolveGuess(options: {
 	};
 }
 
-export async function findMatchingWordSlot(
-	puzzle: DailyPuzzlePublic,
+export async function findMatchingWordSlot<Slot extends GuessableWordSlot>(
+	puzzle: { wordSlots: Slot[] },
 	normalizedGuess: string,
-) {
+): Promise<Slot | null> {
 	for (const slot of puzzle.wordSlots) {
 		const answerHash = await createAnswerHash(slot.slotSalt, normalizedGuess);
 		if (answerHash === slot.answerHash) {
@@ -114,7 +129,7 @@ export async function findMatchingWordSlot(
 }
 
 export async function decryptWordFromGuess(
-	slot: DailyPuzzlePublic["wordSlots"][number],
+	slot: GuessableWordSlot,
 	normalizedGuess: string,
 ) {
 	const unlockToken = await createUnlockToken(slot.slotSalt, normalizedGuess);
@@ -122,7 +137,7 @@ export async function decryptWordFromGuess(
 }
 
 export async function decodeRevealedAnswers(
-	puzzle: DailyPuzzlePublic,
+	puzzle: { wordSlots: GuessableWordSlot[] },
 	progress: PuzzleProgressState,
 ) {
 	const entries = await Promise.all(

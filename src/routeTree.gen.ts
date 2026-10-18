@@ -20,6 +20,8 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
+import { Route as QuadratIndexRouteImport } from './routes/quadrat.index'
+import { Route as QuadratDiesAnteriorsRouteImport } from './routes/quadrat.dies-anteriors'
 import { Route as SillabesIndexRouteImport } from './routes/sillabes.index'
 import { Route as SillabesDiesAnteriorsRouteImport } from './routes/sillabes.dies-anteriors'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -81,6 +83,16 @@ const MiniDiesAnteriorsRoute = MiniDiesAnteriorsRouteImport.update({
   path: '/mini/dies-anteriors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QuadratIndexRoute = QuadratIndexRouteImport.update({
+  id: '/quadrat/',
+  path: '/quadrat/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuadratDiesAnteriorsRoute = QuadratDiesAnteriorsRouteImport.update({
+  id: '/quadrat/dies-anteriors',
+  path: '/quadrat/dies-anteriors',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SillabesIndexRoute = SillabesIndexRouteImport.update({
   id: '/sillabes/',
   path: '/sillabes/',
@@ -118,8 +130,10 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
+  '/quadrat/': typeof QuadratIndexRoute
   '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -136,8 +150,10 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini': typeof MiniIndexRoute
+  '/quadrat': typeof QuadratIndexRoute
   '/sillabes': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -155,8 +171,10 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
+  '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
+  '/quadrat/': typeof QuadratIndexRoute
   '/sillabes/': typeof SillabesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/clue-requests/$': typeof ApiClueRequestsSplatRoute
@@ -175,8 +193,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini/'
+    | '/quadrat/'
     | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -193,8 +213,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini'
+    | '/quadrat'
     | '/sillabes'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -211,8 +233,10 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
+    | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini/'
+    | '/quadrat/'
     | '/sillabes/'
     | '/api/auth/$'
     | '/api/clue-requests/$'
@@ -230,8 +254,10 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
+  QuadratDiesAnteriorsRoute: typeof QuadratDiesAnteriorsRoute
   SillabesDiesAnteriorsRoute: typeof SillabesDiesAnteriorsRoute
   MiniIndexRoute: typeof MiniIndexRoute
+  QuadratIndexRoute: typeof QuadratIndexRoute
   SillabesIndexRoute: typeof SillabesIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiClueRequestsSplatRoute: typeof ApiClueRequestsSplatRoute
@@ -317,6 +343,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MiniDiesAnteriorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/quadrat/': {
+      id: '/quadrat/'
+      path: '/quadrat'
+      fullPath: '/quadrat/'
+      preLoaderRoute: typeof QuadratIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quadrat/dies-anteriors': {
+      id: '/quadrat/dies-anteriors'
+      path: '/quadrat/dies-anteriors'
+      fullPath: '/quadrat/dies-anteriors'
+      preLoaderRoute: typeof QuadratDiesAnteriorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sillabes/': {
       id: '/sillabes/'
       path: '/sillabes'
@@ -366,8 +406,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
+  QuadratDiesAnteriorsRoute: QuadratDiesAnteriorsRoute,
   SillabesDiesAnteriorsRoute: SillabesDiesAnteriorsRoute,
   MiniIndexRoute: MiniIndexRoute,
+  QuadratIndexRoute: QuadratIndexRoute,
   SillabesIndexRoute: SillabesIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiClueRequestsSplatRoute: ApiClueRequestsSplatRoute,

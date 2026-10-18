@@ -1,8 +1,9 @@
 import type { HistoryState, RouterHistory } from "@tanstack/react-router";
+import { GAME_PATHS, type GamePath } from "@/lib/use-rendered-route";
 
 type GameLocation = Pick<RouterHistory["location"], "pathname" | "state">;
 
-type GameHistory = Partial<Record<"/" | "/mini" | "/sillabes", number>>;
+type GameHistory = Partial<Record<GamePath, number>>;
 
 declare module "@tanstack/react-router" {
 	interface HistoryState {
@@ -10,7 +11,7 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-const games = ["/", "/mini", "/sillabes"] as const;
+const games = Object.values(GAME_PATHS);
 
 function previousGames(location: GameLocation): GameHistory {
 	const indices = { ...location.state.garbuixGameHistory };
@@ -24,12 +25,13 @@ function previousGames(location: GameLocation): GameHistory {
 
 export function getGameHistory(location: GameLocation): GameHistory {
 	const indices = previousGames(location);
-	const path = location.pathname;
-	if (path === "/" || path === "/mini" || path === "/mini/") {
-		indices[path === "/" ? "/" : "/mini"] = location.state.__TSR_index;
-	}
-	if (path === "/sillabes" || path === "/sillabes/")
-		indices["/sillabes"] = location.state.__TSR_index;
+	// An index route can arrive with or without its trailing slash.
+	const path =
+		location.pathname.length > 1
+			? location.pathname.replace(/\/$/, "")
+			: location.pathname;
+	const game = games.find((gamePath) => gamePath === path);
+	if (game) indices[game] = location.state.__TSR_index;
 	return indices;
 }
 

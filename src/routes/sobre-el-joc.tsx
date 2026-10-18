@@ -41,6 +41,11 @@ function AboutPage() {
 					llegir.
 				</p>
 				<p>
+					Garbuix quadrat tria les paraules del mateix diccionari i amb el
+					mateix criteri que els mots encreuats, i les amaga en un quadrat de
+					setze lletres.
+				</p>
+				<p>
 					Garbuix síl·labes fa servir els patrons de{" "}
 					<a
 						href="https://github.com/jaumeortola/hyphen-ca"

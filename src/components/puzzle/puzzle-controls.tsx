@@ -1,18 +1,12 @@
-import {
-	CornerDownLeft,
-	Delete,
-	Lightbulb,
-	Shuffle,
-	Sparkles,
-} from "lucide-react";
+import { CornerDownLeft, Delete, Shuffle } from "lucide-react";
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import type { LetterLayout } from "@/lib/anon-identity";
 import { cn } from "@/lib/utils";
+import { PuzzleGuessDisplay } from "./puzzle-guess-display";
+import { PuzzleHintButton } from "./puzzle-hint-button";
 import type { PuzzleSubmitFeedback } from "./puzzle-types";
-
-const HINT_HOLD_MS = 600;
 
 // Room the pinned keypad claims until it has reported its real height (see
 // onHeightChange). The panel reports as it mounts, so this is only painted
@@ -128,17 +122,6 @@ export function PuzzleControls({
 	runClickAction,
 	runPressAction,
 }: PuzzleControlsProps) {
-	const [hintHoldProgress, setHintHoldProgress] = useState(0);
-	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-	const hintHoldFrameRef = useRef<number | null>(null);
-	useEffect(
-		() => () => {
-			if (hintHoldFrameRef.current != null) {
-				cancelAnimationFrame(hintHoldFrameRef.current);
-			}
-		},
-		[],
-	);
 	// Measures the panel for as long as it is on screen. A finished puzzle
 	// unmounts the keypad, and the cleanup hands its room back.
 	const measurePanel = useCallback(
@@ -171,59 +154,6 @@ export function PuzzleControls({
 		},
 		[onHeightChange],
 	);
-
-	useEffect(() => {
-		if (
-			typeof window === "undefined" ||
-			typeof window.matchMedia !== "function"
-		) {
-			return;
-		}
-
-		const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-		const updateReducedMotion = () => {
-			setPrefersReducedMotion(mediaQuery.matches);
-		};
-
-		updateReducedMotion();
-		mediaQuery.addEventListener("change", updateReducedMotion);
-
-		return () => {
-			mediaQuery.removeEventListener("change", updateReducedMotion);
-		};
-	}, []);
-
-	const cancelHintHold = () => {
-		if (hintHoldFrameRef.current != null) {
-			cancelAnimationFrame(hintHoldFrameRef.current);
-			hintHoldFrameRef.current = null;
-		}
-		setHintHoldProgress(0);
-	};
-
-	const handleHintPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-		if (!canUseHint || isComplete) return;
-		if (event.pointerType === "mouse" && event.button !== 0) return;
-		event.preventDefault();
-		event.currentTarget.setPointerCapture(event.pointerId);
-
-		const startTime = performance.now();
-
-		const tick = (now: number) => {
-			const progress = Math.min((now - startTime) / HINT_HOLD_MS, 1);
-			setHintHoldProgress(progress);
-
-			if (progress < 1) {
-				hintHoldFrameRef.current = requestAnimationFrame(tick);
-			} else {
-				hintHoldFrameRef.current = null;
-				setHintHoldProgress(0);
-				onHint();
-			}
-		};
-
-		hintHoldFrameRef.current = requestAnimationFrame(tick);
-	};
 
 	if (isComplete) {
 		return null;
@@ -366,50 +296,20 @@ export function PuzzleControls({
 				<Delete className="w-4 h-4" />
 				Esborrar
 			</Button>
-			<Button
-				variant="ghost"
-				onPointerDown={handleHintPointerDown}
-				onPointerUp={cancelHintHold}
-				onPointerLeave={cancelHintHold}
-				onPointerCancel={cancelHintHold}
-				onClick={(event) => {
-					// Keyboard and assistive-technology activation has no pointer hold.
-					if (event.detail === 0 && canUseHint) onHint();
-				}}
-				onContextMenu={(e) => e.preventDefault()}
-				className={cn(
-					"daily-pressable daily-pressable-action gap-2 h-9 sm:h-10 touch-manipulation relative overflow-hidden select-none",
-					tutorialTarget?.kind === "hint" &&
-						"ring-2 ring-amber-500 ring-offset-2 ring-offset-background bg-amber-500/10",
-				)}
-				disabled={!canUseHint || isComplete}
-				size="lg"
-				aria-description={
+			<PuzzleHintButton
+				canUseHint={canUseHint}
+				aiClueMode={aiClueMode}
+				label={mini ? "Pista" : `Pista (${3 - hintsUsed})`}
+				description={
 					mini
 						? "Mantén premut per revelar una lletra. Pistes il·limitades."
 						: aiClueMode
 							? "Mantén premut per rebre una pista de la IA"
 							: "Mantén premut per revelar una lletra"
 				}
-			>
-				<span
-					className="absolute inset-0 bg-amber-400/25 origin-left"
-					style={{ transform: `scaleX(${hintHoldProgress})` }}
-					aria-hidden
-				/>
-				{aiClueMode ? (
-					<Sparkles
-						className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-					/>
-				) : (
-					<Lightbulb
-						className={`relative w-4 h-4 ${canUseHint ? "text-amber-500" : "text-muted-foreground/40"}`}
-					/>
-				)}
-				<span className="relative">
-					{mini ? "Pista" : `Pista (${3 - hintsUsed})`}
-				</span>
-			</Button>
+				highlighted={tutorialTarget?.kind === "hint"}
+				onHint={onHint}
+			/>
 			<Button
 				variant="ghost"
 				onPointerDown={(event) => runPressAction(event, onShuffle)}
@@ -506,19 +406,6 @@ export function PuzzleControls({
 		</>
 	);
 
-	const submitFeedbackToneClass =
-		submitFeedback?.kind === "new_word"
-			? mini
-				? "text-teal-600 dark:text-teal-400"
-				: "text-primary"
-			: submitFeedback?.kind === "valid_but_not_in_puzzle" ||
-					(mini && submitFeedback?.kind === "already_found")
-				? "text-muted-foreground opacity-65"
-				: submitFeedback?.kind === "not_in_dictionary" ||
-						submitFeedback?.kind === "invalid_input"
-					? "text-destructive"
-					: "text-foreground";
-
 	return (
 		<div
 			ref={measurePanel}
@@ -537,29 +424,11 @@ export function PuzzleControls({
 			>
 				<div className="p-2 lg:px-0 lg:pt-2">
 					<div className="flex flex-col items-center gap-3 lg:gap-6">
-						<div className="relative w-full overflow-hidden h-9 sm:h-12 border-b-2 border-primary/60">
-							<div className="absolute inset-0 flex items-center justify-center text-center text-xl font-bold tracking-widest uppercase sm:text-3xl">
-								<span data-slot="current-guess">{currentGuess}</span>
-								{submitFeedback ? (
-									<span
-										key={submitFeedback.id}
-										data-feedback-kind={submitFeedback.kind}
-										data-reduced-motion={
-											prefersReducedMotion ? "true" : "false"
-										}
-										data-slot="submit-feedback"
-										className={cn(
-											"pointer-events-none absolute inset-0 flex items-center justify-center daily-submit-feedback",
-											submitFeedbackToneClass,
-											prefersReducedMotion &&
-												"daily-submit-feedback-reduced-motion",
-										)}
-									>
-										{submitFeedback.word}
-									</span>
-								) : null}
-							</div>
-						</div>
+						<PuzzleGuessDisplay
+							currentGuess={currentGuess}
+							submitFeedback={submitFeedback}
+							mini={mini}
+						/>
 
 						{keypad}
 					</div>

@@ -1,7 +1,7 @@
 import { captureException } from "@sentry/tanstackstart-react";
 import { getRouteApi } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-list";
 import { type PuzzleBoard, PuzzleGrid } from "@/components/puzzle/puzzle-grid";
@@ -227,14 +227,17 @@ export function HistoryView({
 }: {
 	entries: HistorySummaryEntry[];
 	stats: HistoryStats;
-	yesterdayPuzzle: HistoryData["yesterdayPuzzle"];
+	// Games without a crossword draw their own solution.
+	yesterdayPuzzle:
+		| HistoryData["yesterdayPuzzle"]
+		| { dateKey: string; solution: ReactNode };
 	yesterdayLeaderboard?: LeaderboardSnapshot;
 	localParticipantId?: string | null;
 	hasMore: boolean;
 	isLoadingMore: boolean;
 	onLoadMore: () => void;
 	mini?: boolean;
-	mode?: "regular" | "syllables";
+	mode?: "regular" | "syllables" | "quadrat";
 }) {
 	const statCards = [
 		{
@@ -248,7 +251,7 @@ export function HistoryView({
 		{
 			label: "Pistes donades",
 			value: stats.cluesGiven,
-			hidden: mini || mode === "syllables",
+			hidden: mini || mode !== "regular",
 		},
 		{
 			label: "Ratxa actual",
@@ -268,11 +271,13 @@ export function HistoryView({
 		<div className="min-h-screen px-3 sm:px-4 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-16">
 			<div className="max-w-5xl mx-auto space-y-6">
 				<p className="text-sm text-muted-foreground font-ui">
-					{mode === "syllables"
-						? "El teu progrés a Garbuix síl·labes, amb les seves pròpies estadístiques."
-						: mini
-							? "El teu progrés a Garbuixmini, amb les seves pròpies estadístiques."
-							: "Consulta els resultats dels dies passats i el teu progrés."}
+					{mode === "quadrat"
+						? "El teu progrés a Garbuix quadrat, amb les seves pròpies estadístiques."
+						: mode === "syllables"
+							? "El teu progrés a Garbuix síl·labes, amb les seves pròpies estadístiques."
+							: mini
+								? "El teu progrés a Garbuixmini, amb les seves pròpies estadístiques."
+								: "Consulta els resultats dels dies passats i el teu progrés."}
 				</p>
 
 				<div className="grid gap-6 lg:grid-cols-2">
@@ -381,7 +386,11 @@ export function HistoryView({
 										/>
 									</div>
 
-									<SolvedPuzzleGrid preview={yesterdayPuzzle.preview} />
+									{"preview" in yesterdayPuzzle ? (
+										<SolvedPuzzleGrid preview={yesterdayPuzzle.preview} />
+									) : (
+										yesterdayPuzzle.solution
+									)}
 								</>
 							) : null}
 
