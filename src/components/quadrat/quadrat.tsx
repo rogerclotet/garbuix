@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+	CompletionWordList,
+	useCompletionWords,
+} from "@/components/daily/completion-word-list";
 import { DailyWordsMeter } from "@/components/daily/daily-status";
 import { HELD_FOUND_WORD_MS } from "@/components/puzzle/puzzle-animation-timing";
 import { PuzzleCompletionBanner } from "@/components/puzzle/puzzle-completion-banner";
@@ -21,7 +25,6 @@ import { getQuadratClues, getQuadratPageData } from "@/lib/quadrat-server-fns";
 import { QUADRAT_MIN_WORD_LENGTH } from "@/lib/quadrat-types";
 import { useWordClues } from "@/lib/use-word-clues";
 import { QuadratBoard } from "./quadrat-board";
-import { QuadratExtraWords } from "./quadrat-extra-words";
 import { openQuadratTutorial } from "./quadrat-tutorial-store";
 import { QuadratWordList } from "./quadrat-word-list";
 import { QuadratWordSheet } from "./quadrat-word-sheet";
@@ -111,6 +114,12 @@ function QuadratGame({
 	// Keep the board still until the last word's feedback and flash are over.
 	const displayComplete =
 		complete && submitFeedback === null && flashPath === null;
+	const completionWords = useCompletionWords({
+		puzzle,
+		guessHashes: visibleProgress.guessHashes,
+		revealedAnswers: frame?.answers ?? {},
+		enabled: displayComplete,
+	});
 	const interactive = ready && frame !== null && !busy && !complete && !expired;
 	const clueCandidates = puzzle.wordSlots.filter(
 		(slot) =>
@@ -208,118 +217,134 @@ function QuadratGame({
 	const foundCount = visibleProgress.guessedWordIds.length;
 	const totalWords = puzzle.wordSlots.length;
 	const wordList = (
-		<>
-			<QuadratWordList
-				wordSlots={puzzle.wordSlots}
-				guessedWordIds={visibleProgress.guessedWordIds}
-				answers={frame.answers}
-				clueWordIds={visibleProgress.clueWordIds}
-				clueTexts={clueTexts}
-			/>
-			{displayComplete ? (
-				<QuadratExtraWords
-					puzzle={puzzle}
-					guessHashes={visibleProgress.guessHashes}
-					revealedAnswers={frame.answers}
-				/>
-			) : null}
-		</>
+		<QuadratWordList
+			wordSlots={puzzle.wordSlots}
+			guessedWordIds={visibleProgress.guessedWordIds}
+			answers={frame.answers}
+			clueWordIds={visibleProgress.clueWordIds}
+			clueTexts={clueTexts}
+		/>
+	);
+
+	const wordsSection = (className: string) => (
+		<section aria-label="Paraules del dia" className={className}>
+			<h3 className="mb-3 text-xl font-extrabold tracking-tight">Paraules</h3>
+			{wordList}
+		</section>
 	);
 
 	return (
-		<div className="mx-auto flex h-full max-w-5xl flex-col gap-3 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:grid lg:grid-cols-2 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-10 lg:gap-y-6 lg:px-6 lg:pt-6 lg:pb-6">
-			<PuzzleConfetti fire={celebrate && displayComplete} />
-			<div className="shrink-0 lg:col-span-2">
-				{displayComplete ? (
-					<PuzzleCompletionBanner>
-						<p className="text-sm text-muted-foreground font-ui">
-							{visibleProgress.guessCount} intents ·{" "}
-							{visibleProgress.hintsUsed === 1
-								? "1 pista"
-								: `${visibleProgress.hintsUsed} pistes`}
+		<>
+			<div className="mx-auto flex h-full max-w-5xl flex-col gap-3 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:grid lg:grid-cols-2 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-10 lg:gap-y-6 lg:px-6 lg:pt-6 lg:pb-6">
+				<PuzzleConfetti fire={celebrate && displayComplete} />
+				<div className="shrink-0 lg:col-span-2">
+					{displayComplete ? (
+						<PuzzleCompletionBanner>
+							<p className="text-sm text-muted-foreground font-ui">
+								{visibleProgress.guessCount} intents ·{" "}
+								{visibleProgress.hintsUsed === 1
+									? "1 pista"
+									: `${visibleProgress.hintsUsed} pistes`}
+							</p>
+						</PuzzleCompletionBanner>
+					) : (
+						<div className="overflow-hidden rounded-lg">
+							<DailyWordsMeter
+								foundCount={foundCount}
+								totalWords={totalWords}
+								guessCount={visibleProgress.guessCount}
+							/>
+						</div>
+					)}
+					{expired ? (
+						<p role="status" className="mt-2 text-sm text-muted-foreground">
+							Estem preparant el nou Garbuix quadrat...
 						</p>
-					</PuzzleCompletionBanner>
-				) : (
-					<div className="overflow-hidden rounded-lg">
-						<DailyWordsMeter
-							foundCount={foundCount}
-							totalWords={totalWords}
-							guessCount={visibleProgress.guessCount}
-						/>
-					</div>
-				)}
-				{expired ? (
-					<p role="status" className="mt-2 text-sm text-muted-foreground">
-						Estem preparant el nou Garbuix quadrat...
-					</p>
-				) : null}
-				{syncFailed ? (
-					<p role="status" className="mt-2 text-sm text-muted-foreground">
-						Progrés desat al navegador. Es sincronitzarà quan torni la connexió.
-					</p>
-				) : null}
-				{decoded.hasError ? (
-					<Button variant="outline" onClick={decoded.retry} className="mt-2">
-						Torna a carregar el tauler
-					</Button>
-				) : null}
-			</div>
-			{isDesktop ? (
-				<section
-					aria-label="Paraules del dia"
-					className="min-h-0 overflow-y-auto lg:col-start-2 lg:row-start-2"
-				>
-					<h3 className="mb-3 text-xl font-extrabold tracking-tight">
-						Paraules
-					</h3>
-					{wordList}
-				</section>
-			) : null}
-			<div className="flex min-h-0 flex-1 flex-col items-center gap-6 lg:col-start-1 lg:row-start-2 lg:justify-center lg:gap-8">
-				{/* On a phone the panel and the board fill whatever the column leaves
-				    above the buttons: the board as wide as the screen allows and no
-				    taller than the room under the panel. The side padding keeps a drag
-				    that starts near the edge away from the system back gesture. */}
-				<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-4 [container-type:size] lg:flex-none lg:gap-8 lg:px-0 lg:[container-type:normal]">
-					{displayComplete ? null : (
-						<PuzzleGuessDisplay
-							currentGuess={getWordFromPath(puzzle.letters, path).toUpperCase()}
-							submitFeedback={submitFeedback}
-							quadrat
-						/>
-					)}
-					<div className="w-[min(100cqw,calc(100cqh-4.5rem),28rem)] lg:w-full lg:max-w-[min(24rem,48svh)]">
-						<QuadratBoard
-							letters={puzzle.letters}
-							connections={puzzle.connections}
-							board={board}
-							path={path}
-							interactive={interactive}
-							complete={displayComplete}
-							clueStarts={clueStarts}
-							flashPath={flashPath}
-							onPathChange={handlePathChange}
-							onRelease={(released) => void handleRelease(released)}
-						/>
-					</div>
+					) : null}
+					{syncFailed ? (
+						<p role="status" className="mt-2 text-sm text-muted-foreground">
+							Progrés desat al navegador. Es sincronitzarà quan torni la
+							connexió.
+						</p>
+					) : null}
+					{decoded.hasError ? (
+						<Button variant="outline" onClick={decoded.retry} className="mt-2">
+							Torna a carregar el tauler
+						</Button>
+					) : null}
 				</div>
-				<div className="flex shrink-0 items-center justify-center gap-2">
-					{displayComplete ? null : (
-						<PuzzleHintButton
-							canUseHint={canUseHint}
-							aiClueMode
-							label={`Pista (${cluesLeft})`}
-							description="Mantén premut per rebre la pista d'una paraula i veure on comença al tauler"
-							onHint={handleHint}
-						/>
-					)}
-					{isDesktop ? null : (
-						<QuadratWordSheet foundCount={foundCount} totalWords={totalWords}>
-							{wordList}
-						</QuadratWordSheet>
+				{isDesktop
+					? wordsSection(
+							"min-h-0 overflow-y-auto lg:col-start-2 lg:row-start-2",
+						)
+					: null}
+				<div className="flex min-h-0 flex-1 flex-col items-center gap-6 lg:col-start-1 lg:row-start-2 lg:justify-center lg:gap-8">
+					{/* On a phone the panel and the board fill whatever the column leaves
+					    above the buttons: the board as wide as the screen allows and no
+					    taller than the room under the panel. The side padding keeps a drag
+					    that starts near the edge away from the system back gesture. */}
+					<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-4 [container-type:size] lg:flex-none lg:gap-8 lg:px-0 lg:[container-type:normal]">
+						{displayComplete ? null : (
+							<PuzzleGuessDisplay
+								currentGuess={getWordFromPath(
+									puzzle.letters,
+									path,
+								).toUpperCase()}
+								submitFeedback={submitFeedback}
+								quadrat
+							/>
+						)}
+						<div className="w-[min(100cqw,calc(100cqh-4.5rem),28rem)] lg:w-full lg:max-w-[min(24rem,48svh)]">
+							<QuadratBoard
+								letters={puzzle.letters}
+								connections={puzzle.connections}
+								board={board}
+								path={path}
+								interactive={interactive}
+								complete={displayComplete}
+								clueStarts={clueStarts}
+								flashPath={flashPath}
+								onPathChange={handlePathChange}
+								onRelease={(released) => void handleRelease(released)}
+							/>
+						</div>
+					</div>
+					{/* A finished day lists every word right under the board, the day's
+					    and the extra ones, as the classic game does. */}
+					{displayComplete ? (
+						<div className="w-full shrink-0">
+							<CompletionWordList query={completionWords} />
+						</div>
+					) : (
+						<div className="flex shrink-0 items-center justify-center gap-2">
+							<PuzzleHintButton
+								canUseHint={canUseHint}
+								aiClueMode
+								label={`Pista (${cluesLeft})`}
+								description="Mantén premut per rebre la pista d'una paraula i veure on comença al tauler"
+								onHint={handleHint}
+							/>
+							{isDesktop ? null : (
+								<QuadratWordSheet
+									foundCount={foundCount}
+									totalWords={totalWords}
+								>
+									{wordList}
+								</QuadratWordSheet>
+							)}
+						</div>
 					)}
 				</div>
 			</div>
-		</div>
+			{/* A finished board fills the phone screen as before; the list with its
+			    clues and definitions waits under it, as in the classic game. The
+			    page's own scroll reaches it because the board box above is exactly
+			    one screen tall. */}
+			{displayComplete && !isDesktop
+				? wordsSection(
+						"mx-auto max-w-5xl px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]",
+					)
+				: null}
+		</>
 	);
 }
