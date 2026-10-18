@@ -67,6 +67,14 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+function stubDesktopLayout() {
+	vi.stubGlobal("matchMedia", (query: string) => ({
+		matches: query === "(min-width: 1024px)",
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	}));
+}
+
 function renderQuadrat() {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -131,9 +139,37 @@ it("finds a word by dragging, lowers its letters' counts and saves it", async ()
 	);
 	fireEvent.pointerUp(board, { pointerId: 1 });
 
-	const found = await screen.findByText(word.displayWord.toUpperCase());
-	expect(found).toBeTruthy();
-	expect(screen.getByText(`1/${puzzle.wordSlots.length}`)).toBeTruthy();
+	// The found word stays over the panel in green.
+	await waitFor(() => {
+		const feedback = container.querySelector('[data-slot="submit-feedback"]');
+		expect(feedback?.getAttribute("data-feedback-kind")).toBe("new_word");
+		expect(feedback?.classList.contains("held-found-word")).toBe(true);
+	});
+	// The meter follows the decoded progress, which can land a beat later.
+	await waitFor(() =>
+		expect(
+			screen
+				.getByRole("progressbar", { name: "Paraules trobades" })
+				.getAttribute("aria-valuenow"),
+		).toBe("1"),
+	);
+	// The word's tiles light up in green while it shows.
+	for (const cell of word.path) {
+		expect(
+			document
+				.querySelector(`[data-cell="${cell}"]`)
+				?.classList.contains("quadrat-found-cell"),
+		).toBe(true);
+	}
+
+	// On a phone the list waits in a sheet under the board.
+	fireEvent.click(
+		screen.getByRole("button", {
+			name: `Paraules, 1 de ${puzzle.wordSlots.length} trobades`,
+		}),
+	);
+	const sheet = await screen.findByRole("dialog", { name: "Paraules" });
+	expect(within(sheet).getByText(word.displayWord.toUpperCase())).toBeTruthy();
 	await waitFor(() =>
 		expect(word.path.map(usesOf)).toEqual(usesBefore.map((uses) => uses - 1)),
 	);
@@ -176,6 +212,7 @@ it("keeps a drag on drawn connections and away from visited letters", async () =
 });
 
 it("spends a clue on an unfound word and marks where it starts", async () => {
+	stubDesktopLayout();
 	vi.mocked(getQuadratClues).mockImplementation(async ({ data }) => ({
 		kind: "ok",
 		clues: Object.fromEntries(
@@ -197,8 +234,8 @@ it("spends a clue on an unfound word and marks where it starts", async () => {
 	const clued = privateSnapshot.words.find(({ id }) => id === cluedId);
 	if (!clued) throw new Error("Clue went to an unknown word");
 
-	await screen.findByText(`Pista de la paraula ${clued.id}.`);
-	expect(screen.getByRole("button", { name: /Pista \(2\)/ })).toBeTruthy();
+	// The label follows the decoded progress, which can land a beat later.
+	await screen.findByRole("button", { name: /Pista \(2\)/ });
 	await waitFor(() =>
 		expect(
 			document
@@ -207,5 +244,15 @@ it("spends a clue on an unfound word and marks where it starts", async () => {
 		).toBe(true),
 	);
 	const list = screen.getByRole("region", { name: "Paraules del dia" });
+	await within(list).findByText(`Pista de la paraula ${clued.id}.`);
 	expect(within(list).getAllByText(/Per descobrir/)).toHaveLength(1);
+});
+
+it("keeps the word list beside the board on a desktop", async () => {
+	stubDesktopLayout();
+	renderQuadrat();
+	await screen.findByRole("group", { name: /Tauler de lletres/ });
+
+	expect(screen.getByRole("region", { name: "Paraules del dia" })).toBeTruthy();
+	expect(screen.queryByRole("button", { name: /^Paraules/ })).toBeNull();
 });

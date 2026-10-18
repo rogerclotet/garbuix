@@ -213,6 +213,7 @@ ${toCssVariables({
 	input: "#d1dcee",
 	ring: "var(--game-quadrat)",
 	"quadrat-accent": "#a15c07",
+	"quadrat-found": "#15803d",
 	"locate-color": "#9dbbe6",
 })}
 }
@@ -237,6 +238,7 @@ ${toCssVariables({
 	input: "#35455e",
 	ring: "var(--game-quadrat)",
 	"quadrat-accent": "#f6c46b",
+	"quadrat-found": "#4ade80",
 	"locate-color": "#5d82b8",
 })}
 }

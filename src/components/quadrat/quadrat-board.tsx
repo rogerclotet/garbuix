@@ -5,6 +5,7 @@ import {
 	useMemo,
 	useRef,
 } from "react";
+import { HELD_FOUND_WORD_MS } from "@/components/puzzle/puzzle-animation-timing";
 import {
 	canExtendPath,
 	getCellCol,
@@ -57,11 +58,13 @@ function ConnectionLine({
 	cells: [from, to],
 	className,
 	stroke,
+	style,
 	width,
 }: {
 	cells: readonly [number, number];
 	className?: string;
 	stroke?: string;
+	style?: CSSProperties;
 	width: number;
 }) {
 	const start = getCellCenter(from);
@@ -74,6 +77,7 @@ function ConnectionLine({
 			y2={end.y}
 			className={className}
 			stroke={stroke}
+			style={style}
 			strokeWidth={width}
 			strokeLinecap="round"
 		/>
@@ -98,10 +102,10 @@ export function QuadratBoard({
 	// The drag in progress.
 	path: number[];
 	interactive: boolean;
-	// A finished board shows its letters plainly, without counts or lines.
+	// A finished board shows every letter and line plainly, without counts.
 	complete: boolean;
 	clueStarts: Array<[number, number]>;
-	// The word just found, flashed letter by letter.
+	// The word just found, lit letter by letter while it shows above the board.
 	flashPath: number[] | null;
 	onPathChange: (path: number[]) => void;
 	onRelease: (path: number[]) => void;
@@ -110,8 +114,8 @@ export function QuadratBoard({
 	// The live drag, read by pointer handlers between renders.
 	const dragRef = useRef<{ pointerId: number; path: number[] } | null>(null);
 	const gradientIdPrefix = useId();
-	const remainingConnections = complete
-		? []
+	const visibleConnections = complete
+		? connections
 		: connections.filter(({ cells: [from, to] }) =>
 				isConnectionAvailable(board, from, to),
 			);
@@ -183,6 +187,14 @@ export function QuadratBoard({
 	const pathConnections = path
 		.slice(1)
 		.map((cell, index) => [path[index] as number, cell] as const);
+	const flashConnections = (flashPath ?? [])
+		.slice(1)
+		.map((cell, index) => [flashPath?.[index] as number, cell] as const);
+	// Every tile and line lets go at the same moment, however late it lit.
+	const flashTiming = (delayMs: number) => ({
+		animationDelay: `${delayMs}ms`,
+		animationDuration: `${HELD_FOUND_WORD_MS - delayMs}ms`,
+	});
 
 	return (
 		<fieldset
@@ -222,11 +234,12 @@ export function QuadratBoard({
 						);
 					})}
 				</defs>
-				{remainingConnections.map(({ cells }) => (
+				{visibleConnections.map(({ cells }) => (
 					<ConnectionLine
 						key={`${cells[0]}-${cells[1]}`}
 						cells={cells}
-						className="stroke-primary/30"
+						// Opaque, so crossing lines do not darken where they overlap.
+						className="stroke-border"
 						width={0.09}
 					/>
 				))}
@@ -240,6 +253,15 @@ export function QuadratBoard({
 								width={0.16}
 							/>
 						))}
+				{flashConnections.map((cells, index) => (
+					<ConnectionLine
+						key={`found-${cells[0]}-${cells[1]}`}
+						cells={cells}
+						className="quadrat-found-line stroke-[var(--quadrat-found)]"
+						style={flashTiming((index + 1) * FLASH_STAGGER_MS)}
+						width={0.2}
+					/>
+				))}
 				{pathConnections.map((cells) => (
 					<ConnectionLine
 						key={`path-${cells[0]}-${cells[1]}`}
@@ -254,16 +276,15 @@ export function QuadratBoard({
 				const uses = board.cellUses[cell] ?? 0;
 				const selected = path.includes(cell);
 				const flashIndex = flashPath?.indexOf(cell) ?? -1;
+				const flashing = flashIndex >= 0;
 				const { x, y } = getCellCenter(cell);
-				const style: CSSProperties & { "--guess-letter-delay"?: string } = {
+				const style: CSSProperties = {
 					left: toPercent(x - 0.5),
 					top: toPercent(y - 0.5),
 					width: toPercent(1),
 					height: toPercent(1),
 					fontSize: `calc(100cqi / ${SPAN} * 0.46)`,
-					...(flashIndex >= 0
-						? { "--guess-letter-delay": `${flashIndex * FLASH_STAGGER_MS}ms` }
-						: {}),
+					...(flashing ? flashTiming(flashIndex * FLASH_STAGGER_MS) : {}),
 				};
 				const label = letter.toUpperCase();
 				// Only dimming fades: a tile joins the drag the moment the finger
@@ -281,13 +302,14 @@ export function QuadratBoard({
 									: `${label}, ${uses} paraules`
 						}
 						className={cn(
-							"puzzle-cell absolute flex items-center justify-center border font-bold leading-none transition-opacity duration-300",
+							"puzzle-cell quadrat-cell absolute flex items-center justify-center border-2 font-bold leading-none transition-opacity duration-300",
 							selected
 								? "border-primary bg-primary text-primary-foreground"
 								: "border-border bg-card text-foreground",
-							!complete && uses === 0 && "opacity-30",
+							// A tile the word used up dims once its light goes out.
+							!complete && uses === 0 && !flashing && "opacity-30",
 							!complete && clueStartCells.has(cell) && "clue-gradient-cell",
-							flashIndex >= 0 && "grid-word-just-guessed-cell",
+							flashing && "quadrat-found-cell",
 						)}
 						style={style}
 					>
@@ -297,9 +319,11 @@ export function QuadratBoard({
 								aria-hidden
 								className={cn(
 									"absolute top-[10%] right-[13%] text-[0.4em] font-semibold tabular-nums leading-none",
-									selected
-										? "text-primary-foreground/80"
-										: "text-muted-foreground",
+									flashing
+										? "opacity-80"
+										: selected
+											? "text-primary-foreground/80"
+											: "text-muted-foreground",
 								)}
 							>
 								{uses}

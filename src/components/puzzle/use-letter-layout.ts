@@ -4,32 +4,7 @@ import {
 	getLetterLayout,
 	type LetterLayout,
 } from "@/lib/anon-identity";
-
-// The width at which the classic board switches to its two-column desktop
-// layout, where the keypad lives in a narrow side column. Matches the `lg:`
-// breakpoint the classic layout is built on.
-const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
-
-// Starts false so the server and the first client render agree; the real value
-// lands right after mount, before anything the player can act on.
-function useIsDesktopLayout(): boolean {
-	const [isDesktop, setIsDesktop] = useState(false);
-
-	useEffect(() => {
-		if (typeof window.matchMedia !== "function") {
-			return;
-		}
-
-		const mediaQuery = window.matchMedia(DESKTOP_LAYOUT_QUERY);
-		const update = () => setIsDesktop(mediaQuery.matches);
-
-		update();
-		mediaQuery.addEventListener("change", update);
-		return () => mediaQuery.removeEventListener("change", update);
-	}, []);
-
-	return isDesktop;
-}
+import { useIsDesktopLayout } from "./use-is-desktop-layout";
 
 // The letters arrangement the player chose in /preferencies, adjusted to what
 // the current screen can hold.

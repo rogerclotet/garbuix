@@ -1,5 +1,7 @@
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { HELD_FOUND_WORD_MS } from "./puzzle-animation-timing";
 import type { PuzzleSubmitFeedback } from "./puzzle-types";
 
 function usePrefersReducedMotion(): boolean {
@@ -35,17 +37,23 @@ export function PuzzleGuessDisplay({
 	currentGuess,
 	submitFeedback,
 	mini = false,
+	quadrat = false,
 }: {
 	currentGuess: string;
 	submitFeedback: PuzzleSubmitFeedback | null;
 	mini?: boolean;
+	// Holds a found word in the quadrat green instead of flashing it.
+	quadrat?: boolean;
 }) {
 	const prefersReducedMotion = usePrefersReducedMotion();
+	const heldFoundWord = quadrat && submitFeedback?.kind === "new_word";
 	const submitFeedbackToneClass =
 		submitFeedback?.kind === "new_word"
 			? mini
 				? "text-teal-600 dark:text-teal-400"
-				: "text-primary"
+				: quadrat
+					? "text-[var(--quadrat-found)]"
+					: "text-primary"
 			: submitFeedback?.kind === "valid_but_not_in_puzzle" ||
 					(mini && submitFeedback?.kind === "already_found")
 				? "text-muted-foreground opacity-65"
@@ -65,12 +73,25 @@ export function PuzzleGuessDisplay({
 						data-reduced-motion={prefersReducedMotion ? "true" : "false"}
 						data-slot="submit-feedback"
 						className={cn(
-							"pointer-events-none absolute inset-0 flex items-center justify-center daily-submit-feedback",
+							"pointer-events-none absolute inset-0 flex items-center justify-center",
+							heldFoundWord ? "held-found-word" : "daily-submit-feedback",
 							submitFeedbackToneClass,
 							prefersReducedMotion && "daily-submit-feedback-reduced-motion",
 						)}
+						style={
+							heldFoundWord
+								? { animationDuration: `${HELD_FOUND_WORD_MS}ms` }
+								: undefined
+						}
 					>
-						{submitFeedback.word}
+						{heldFoundWord ? (
+							<span className="flex items-center gap-[0.3em]">
+								<Check className="size-[0.9em]" strokeWidth={3.5} aria-hidden />
+								{submitFeedback.word}
+							</span>
+						) : (
+							submitFeedback.word
+						)}
 					</span>
 				) : null}
 			</div>

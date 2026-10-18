@@ -44,12 +44,6 @@ export function QuadratWordList({
 
 	return (
 		<div className="flex min-w-0 flex-col">
-			<h3 className="mb-3 flex shrink-0 items-baseline justify-between text-2xl font-extrabold tracking-tight lg:text-xl">
-				Paraules
-				<span className="text-base font-bold tabular-nums text-muted-foreground font-ui">
-					{guessedWordIds.length}/{wordSlots.length}
-				</span>
-			</h3>
 			<div className="min-w-0 px-1 pb-1">
 				{missingSlots.length > 0 ? (
 					<h4 className="mb-1 flex items-center justify-between text-[0.625rem] font-medium uppercase tracking-wider text-muted-foreground font-ui">

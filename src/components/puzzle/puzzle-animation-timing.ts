@@ -1,4 +1,7 @@
 const SUBMIT_FEEDBACK_DURATION_MS = 520;
+// Garbuix quadrat has no list beside the board on a phone, so a found word
+// stays over the panel long enough to read.
+export const HELD_FOUND_WORD_MS = 1600;
 const REDUCED_MOTION_SUBMIT_FEEDBACK_DURATION_MS = 200;
 export function getSubmitFeedbackDuration() {
 	if (
