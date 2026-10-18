@@ -309,6 +309,35 @@ code {
 	will-change: transform, opacity;
 }
 
+/* A found word pops in, stays readable, and fades out at the very end. */
+@keyframes held-found-word {
+	0% {
+		transform: scale(1);
+	}
+
+	12% {
+		transform: scale(1.1);
+	}
+
+	24% {
+		transform: scale(1);
+	}
+
+	82% {
+		opacity: 1;
+	}
+
+	100% {
+		transform: scale(1);
+		opacity: 0;
+	}
+}
+
+.held-found-word {
+	animation: held-found-word 1600ms ease-out both;
+	will-change: transform, opacity;
+}
+
 .daily-submit-feedback-reduced-motion {
 	animation: none;
 	text-shadow: none;

@@ -4,7 +4,11 @@ import type { PuzzleSubmitFeedback } from "@/components/puzzle/puzzle-types";
 
 // The verdict on the last guess, shown over the input panel until its
 // animation ends.
-export function useSubmitFeedback() {
+export function useSubmitFeedback({
+	newWordDurationMs,
+}: {
+	newWordDurationMs?: number;
+} = {}) {
 	const [submitFeedback, setSubmitFeedback] =
 		useState<PuzzleSubmitFeedback | null>(null);
 	const submitFeedbackIdRef = useRef(0);
@@ -20,6 +24,10 @@ export function useSubmitFeedback() {
 
 	const showSubmitFeedback = useCallback(
 		(word: string, kind: PuzzleSubmitFeedback["kind"]) => {
+			const duration =
+				kind === "new_word" && newWordDurationMs !== undefined
+					? newWordDurationMs
+					: getSubmitFeedbackDuration();
 			const nextFeedbackId = submitFeedbackIdRef.current + 1;
 			submitFeedbackIdRef.current = nextFeedbackId;
 			setSubmitFeedback({
@@ -37,9 +45,9 @@ export function useSubmitFeedback() {
 					current?.id === nextFeedbackId ? null : current,
 				);
 				submitFeedbackResetTimerRef.current = null;
-			}, getSubmitFeedbackDuration());
+			}, duration);
 		},
-		[],
+		[newWordDurationMs],
 	);
 
 	const clearSubmitFeedback = useCallback(() => {
