@@ -479,6 +479,13 @@ code {
 	}
 }
 
+/* Garbuix quadrat's tiles have a thicker border, which the clue ring covers
+   instead of sitting inside. */
+.quadrat-cell.clue-gradient-cell::before {
+	inset: -2px;
+	border-width: 2px;
+}
+
 /* When the requested-clue ring has been lit for its 5s window, fade it back to
    the regular cell colors instead of removing it instantly. */
 .clue-gradient-cell-hidden::before {

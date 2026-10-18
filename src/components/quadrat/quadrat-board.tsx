@@ -301,7 +301,7 @@ export function QuadratBoard({
 									: `${label}, ${uses} paraules`
 						}
 						className={cn(
-							"puzzle-cell absolute flex items-center justify-center border font-bold leading-none transition-opacity duration-300",
+							"puzzle-cell quadrat-cell absolute flex items-center justify-center border-2 font-bold leading-none transition-opacity duration-300",
 							selected
 								? "border-primary bg-primary text-primary-foreground"
 								: "border-border bg-card text-foreground",
