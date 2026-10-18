@@ -14,9 +14,10 @@ import {
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
-import { Logo } from "@/components/logo";
+import { Logo, QuadratLogo } from "@/components/logo";
 import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -27,11 +28,52 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
-import { useMiniRoute } from "@/lib/use-mini-route";
-import { useSyllableRoute } from "@/lib/use-syllable-route";
+import { type GameMode, useRenderedGame } from "@/lib/use-rendered-route";
 import { initialsFromName } from "@/lib/user-profile";
 
 const REDDIT_COMMUNITY_URL = "https://www.reddit.com/r/garbuix";
+
+const HISTORY_PATHS = {
+	regular: "/dies-anteriors",
+	mini: "/mini/dies-anteriors",
+	syllables: "/sillabes/dies-anteriors",
+	quadrat: "/quadrat/dies-anteriors",
+} as const satisfies Record<GameMode, string>;
+
+// The other games, in the order the menu lists them. Garbuix! itself has its
+// own entry because returning to it rewinds the browser history. name is the
+// word after "Garbuix", drawn in the game's colour.
+const OTHER_GAMES = [
+	{
+		game: "quadrat",
+		to: "/quadrat",
+		name: "quadrat",
+		color: "var(--game-quadrat)",
+		Icon: QuadratLogo,
+		// A full square of cells outweighs the narrow G at the same size. The
+		// padding shrinks it inside the same slot, so the labels stay aligned.
+		iconClassName: "size-4 p-0.5",
+		beta: true,
+	},
+	{
+		game: "mini",
+		to: "/mini",
+		name: "mini",
+		color: "var(--game-mini)",
+		Icon: Logo,
+		iconClassName: "size-4",
+		beta: false,
+	},
+	{
+		game: "syllables",
+		to: "/sillabes",
+		name: "síl·labes",
+		color: "var(--game-syllables)",
+		Icon: Logo,
+		iconClassName: "size-4",
+		beta: false,
+	},
+] as const;
 
 const rootRoute = getRouteApi("__root__");
 
@@ -70,8 +112,8 @@ export function UserMenu({
 }: {
 	onReturnToGarbuix: () => void;
 }) {
-	const mini = useMiniRoute();
-	const syllables = useSyllableRoute();
+	const game = useRenderedGame();
+	const isRegular = game === "regular";
 	const rootData = rootRoute.useLoaderData();
 	const { activeUser, session } = useActiveSessionUser(rootData.sessionUser);
 	const [open, setOpen] = useState(false);
@@ -144,7 +186,7 @@ export function UserMenu({
 						<DropdownMenuSeparator />
 					</>
 				)}
-				{!mini && !syllables ? (
+				{isRegular ? (
 					<DropdownMenuItem asChild>
 						<a
 							href={REDDIT_COMMUNITY_URL}
@@ -157,15 +199,7 @@ export function UserMenu({
 					</DropdownMenuItem>
 				) : null}
 				<DropdownMenuItem asChild>
-					<Link
-						to={
-							syllables
-								? "/sillabes/dies-anteriors"
-								: mini
-									? "/mini/dies-anteriors"
-									: "/dies-anteriors"
-						}
-					>
+					<Link to={HISTORY_PATHS[game]}>
 						<History className="size-4" />
 						<span>Historial</span>
 					</Link>
@@ -184,7 +218,7 @@ export function UserMenu({
 						<span>Sobre el joc</span>
 					</Link>
 				</DropdownMenuItem>
-				{!mini && !syllables ? (
+				{isRegular ? (
 					<DropdownMenuItem asChild>
 						<Link to="/preferencies">
 							<Settings className="size-4" />
@@ -194,60 +228,63 @@ export function UserMenu({
 				) : null}
 				<ThemeMenuToggle />
 				<DropdownMenuSeparator />
-				<DropdownMenuItem asChild>
-					<Link
-						to={mini || syllables ? "/" : "/mini"}
-						onClick={(event) => {
-							if (
-								(mini || syllables) &&
-								event.button === 0 &&
-								!event.metaKey &&
-								!event.ctrlKey &&
-								!event.shiftKey &&
-								!event.altKey
-							) {
-								event.preventDefault();
-								setOpen(false);
-								onReturnToGarbuix();
-							}
-						}}
-					>
-						<Logo
-							className="size-4"
-							style={{
-								color:
-									mini || syllables
-										? "var(--game-regular)"
-										: "var(--game-mini)",
+				{isRegular ? null : (
+					<DropdownMenuItem asChild>
+						<Link
+							to="/"
+							onClick={(event) => {
+								if (
+									event.button === 0 &&
+									!event.metaKey &&
+									!event.ctrlKey &&
+									!event.shiftKey &&
+									!event.altKey
+								) {
+									event.preventDefault();
+									setOpen(false);
+									onReturnToGarbuix();
+								}
 							}}
-							aria-hidden
-						/>
-						<span>{mini || syllables ? "Garbuix!" : "Garbuix mini"}</span>
-					</Link>
-				</DropdownMenuItem>
-				{syllables ? (
-					<DropdownMenuItem asChild>
-						<Link to="/mini">
+						>
 							<Logo
 								className="size-4"
-								style={{ color: "var(--game-mini)" }}
+								style={{ color: "var(--game-regular)" }}
 								aria-hidden
 							/>
-							<span>Garbuix mini</span>
-						</Link>
-					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem asChild>
-						<Link to="/sillabes">
-							<Logo
-								className="size-4"
-								style={{ color: "var(--game-syllables)" }}
-								aria-hidden
-							/>
-							<span>Garbuix síl·labes</span>
+							<span>Garbuix!</span>
 						</Link>
 					</DropdownMenuItem>
 				)}
+				{OTHER_GAMES.filter((other) => other.game !== game).map((other) => (
+					<DropdownMenuItem key={other.game} asChild>
+						<Link
+							to={other.to}
+							aria-label={
+								other.beta ? `Garbuix ${other.name}, beta` : undefined
+							}
+						>
+							<other.Icon
+								className={other.iconClassName}
+								style={{ color: other.color }}
+								aria-hidden
+							/>
+							<span>
+								Garbuix <span style={{ color: other.color }}>{other.name}</span>
+							</span>
+							{other.beta ? (
+								<Badge
+									className="ml-auto h-4 px-1.5 text-[0.625rem] font-semibold"
+									style={{
+										color: other.color,
+										backgroundColor: `color-mix(in srgb, ${other.color} 14%, transparent)`,
+									}}
+								>
+									Beta
+								</Badge>
+							) : null}
+						</Link>
+					</DropdownMenuItem>
+				))}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

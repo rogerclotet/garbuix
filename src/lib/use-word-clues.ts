@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { getWordClues } from "@/lib/puzzle-server-fns";
+import type { WordCluesResult } from "@/lib/word-clues";
+
+export type FetchWordClues = (input: {
+	data: { puzzleId: string; wordIds: number[] };
+}) => Promise<WordCluesResult>;
 
 // Retry late generation and transient fetch failures without spending most of
 // the hourly quota on one missing clue.
@@ -31,8 +36,15 @@ export function useWordClues(options: {
 	userId: string | null;
 	wordIds: number[];
 	pendingEventCount: number;
+	// Each game reads clues from its own table.
+	fetchClues?: FetchWordClues;
 }) {
-	const { puzzleId, userId, pendingEventCount } = options;
+	const {
+		puzzleId,
+		userId,
+		pendingEventCount,
+		fetchClues = getWordClues,
+	} = options;
 	const wordIdsKey = [...new Set(options.wordIds)]
 		.sort((a, b) => a - b)
 		.join(",");
@@ -91,7 +103,7 @@ export function useWordClues(options: {
 
 		const requested = ready.slice(0, MAX_WORDS_PER_REQUEST);
 		cache.inFlight = true;
-		void getWordClues({
+		void fetchClues({
 			data: { puzzleId: cache.puzzleId, wordIds: requested },
 		})
 			.then((result) => {
@@ -129,7 +141,7 @@ export function useWordClues(options: {
 				cache.inFlight = false;
 				refresh();
 			});
-	}, [cache, canFetch, wordIdsKey, revision]);
+	}, [cache, canFetch, fetchClues, wordIdsKey, revision]);
 
 	return cache.clues;
 }

@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	getPangramWaveDuration,
-	getSubmitFeedbackDuration,
-} from "@/components/puzzle/puzzle-animation-timing";
+import { getPangramWaveDuration } from "@/components/puzzle/puzzle-animation-timing";
 import {
 	buildFlyingLetterPaths,
 	type FlyingLettersAnimation,
@@ -10,7 +7,7 @@ import {
 	getWordCellKeysInOrder,
 	HIGHLIGHT_AFTER_LAND_MS,
 } from "@/components/puzzle/puzzle-flying-letters";
-import type { PuzzleSubmitFeedback } from "@/components/puzzle/puzzle-types";
+import { useSubmitFeedback } from "@/components/puzzle/use-submit-feedback";
 import { getWordCellKeys } from "@/lib/puzzle-helpers";
 import { getPlayableWordLetters } from "@/lib/puzzle-text";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
@@ -36,20 +33,17 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 		wordId: number;
 		pathCount: number;
 	} | null>(null);
-	const [submitFeedback, setSubmitFeedback] =
-		useState<PuzzleSubmitFeedback | null>(null);
+	const { submitFeedback, showSubmitFeedback, clearSubmitFeedback } =
+		useSubmitFeedback();
 	// Transient outline on a word's grid cells when its list row is tapped.
 	const [locateCells, setLocateCells] = useState<Set<string>>(new Set());
 	const locateClearTimerRef = useRef<number | null>(null);
 	const gridRef = useRef<HTMLDivElement>(null);
 	const highlightResetTimerRef = useRef<number | null>(null);
-	const submitFeedbackIdRef = useRef(0);
-	const submitFeedbackResetTimerRef = useRef<number | null>(null);
 	useEffect(
 		() => () => {
 			for (const timer of [
 				highlightResetTimerRef.current,
-				submitFeedbackResetTimerRef.current,
 				locateClearTimerRef.current,
 			]) {
 				if (timer != null) window.clearTimeout(timer);
@@ -81,38 +75,6 @@ export function usePuzzleAnimations(puzzle: DailyPuzzlePublic) {
 		);
 		return () => window.clearTimeout(timer);
 	}, [isPangramWaving, pangramWordId, puzzle.wordSlots]);
-	const showSubmitFeedback = useCallback(
-		(word: string, kind: PuzzleSubmitFeedback["kind"]) => {
-			const nextFeedbackId = submitFeedbackIdRef.current + 1;
-			submitFeedbackIdRef.current = nextFeedbackId;
-			setSubmitFeedback({
-				id: nextFeedbackId,
-				word,
-				kind,
-			});
-
-			if (submitFeedbackResetTimerRef.current != null) {
-				window.clearTimeout(submitFeedbackResetTimerRef.current);
-			}
-
-			submitFeedbackResetTimerRef.current = window.setTimeout(() => {
-				setSubmitFeedback((current) =>
-					current?.id === nextFeedbackId ? null : current,
-				);
-				submitFeedbackResetTimerRef.current = null;
-			}, getSubmitFeedbackDuration());
-		},
-		[],
-	);
-
-	const clearSubmitFeedback = useCallback(() => {
-		if (submitFeedbackResetTimerRef.current != null) {
-			window.clearTimeout(submitFeedbackResetTimerRef.current);
-			submitFeedbackResetTimerRef.current = null;
-		}
-		setSubmitFeedback(null);
-	}, []);
-
 	const startWordHighlight = useCallback((wordId: number) => {
 		setHighlightedWordId(wordId);
 		if (highlightResetTimerRef.current != null) {

@@ -84,6 +84,7 @@ ${toCssVariables({
 	"game-regular": appScheme.light.primary,
 	"game-mini": "#7953a5",
 	"game-syllables": "#b84c13",
+	"game-quadrat": "#2a5ea8",
 })}
 }
 
@@ -93,6 +94,7 @@ ${toCssVariables({
 	"game-regular": appScheme.dark.primary,
 	"game-mini": "#c7a3ed",
 	"game-syllables": "#ffb782",
+	"game-quadrat": "#a6c8ff",
 })}
 }
 
@@ -190,6 +192,54 @@ ${toCssVariables({
 	"locate-color": "#d4864a",
 })}
 }
+
+:root[data-game="quadrat"] {
+${toCssVariables({
+	background: "#f8faff",
+	foreground: "#1c2738",
+	card: "#f8faff",
+	"card-foreground": "#1c2738",
+	popover: "#f8faff",
+	"popover-foreground": "#1c2738",
+	primary: "var(--game-quadrat)",
+	"primary-foreground": "#ffffff",
+	secondary: "#e2eaf7",
+	"secondary-foreground": "#1c2738",
+	muted: "#ecf1fa",
+	"muted-foreground": "#5b6a80",
+	accent: "#e2eaf7",
+	"accent-foreground": "#1c2738",
+	border: "#d1dcee",
+	input: "#d1dcee",
+	ring: "var(--game-quadrat)",
+	"quadrat-accent": "#a15c07",
+	"locate-color": "#9dbbe6",
+})}
+}
+
+:root.dark[data-game="quadrat"] {
+${toCssVariables({
+	background: "#161c26",
+	foreground: "#e3eaf5",
+	card: "#161c26",
+	"card-foreground": "#e3eaf5",
+	popover: "#161c26",
+	"popover-foreground": "#e3eaf5",
+	primary: "var(--game-quadrat)",
+	"primary-foreground": "#0d2a52",
+	secondary: "#27344a",
+	"secondary-foreground": "#e3eaf5",
+	muted: "#212c3d",
+	"muted-foreground": "#a3b2c7",
+	accent: "#27344a",
+	"accent-foreground": "#e3eaf5",
+	border: "#35455e",
+	input: "#35455e",
+	ring: "var(--game-quadrat)",
+	"quadrat-accent": "#f6c46b",
+	"locate-color": "#5d82b8",
+})}
+}
 `.trim();
 
 export const miniThemeMetaColors = { light: "#fbf8fc", dark: "#211a29" };
@@ -200,3 +250,5 @@ export const materialThemeMetaColors = {
 } as const;
 
 export const syllableThemeMetaColors = { light: "#fff9f3", dark: "#291d16" };
+
+export const quadratThemeMetaColors = { light: "#f8faff", dark: "#161c26" };

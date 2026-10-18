@@ -169,7 +169,7 @@ function buildLetterSetKey(letters: string[]): string {
 	return [...letters].sort().join("");
 }
 
-function getRecencyWeight(daysAgo: number): number {
+export function getRecencyWeight(daysAgo: number): number {
 	if (daysAgo <= 0 || daysAgo > HISTORY_LOOKBACK_DAYS) {
 		return 0;
 	}

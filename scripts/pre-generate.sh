@@ -22,3 +22,8 @@ pnpm backfill:puzzles --from "$TOMORROW" --to "$TOMORROW"
 # exit. Generate clues here and await all writes before closing this process's pool.
 echo "[pre-generator] Ensuring AI clues for $TOMORROW"
 pnpm clues:backfill --from "$TOMORROW" --to "$TOMORROW"
+
+# Quadrat has its own tables, so its board and clues come after the classic
+# game's and never hold them up.
+echo "[pre-generator] Ensuring Quadrat board and clues for $TOMORROW"
+pnpm quadrat:backfill --from "$TOMORROW" --to "$TOMORROW"

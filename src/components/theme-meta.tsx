@@ -3,21 +3,20 @@ import { useEffect, useState } from "react";
 import {
 	materialThemeMetaColors,
 	miniThemeMetaColors,
+	quadratThemeMetaColors,
 	syllableThemeMetaColors,
 } from "@/lib/material-theme";
+import type { GameMode } from "@/lib/use-rendered-route";
 
-export function ThemeMeta({
-	mini = false,
-	syllables = false,
-}: {
-	mini?: boolean;
-	syllables?: boolean;
-}) {
-	const colors = syllables
-		? syllableThemeMetaColors
-		: mini
-			? miniThemeMetaColors
-			: materialThemeMetaColors;
+const THEME_META_COLORS: Record<GameMode, { light: string; dark: string }> = {
+	regular: materialThemeMetaColors,
+	mini: miniThemeMetaColors,
+	syllables: syllableThemeMetaColors,
+	quadrat: quadratThemeMetaColors,
+};
+
+export function ThemeMeta({ game = "regular" }: { game?: GameMode }) {
+	const colors = THEME_META_COLORS[game];
 	const { theme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 
