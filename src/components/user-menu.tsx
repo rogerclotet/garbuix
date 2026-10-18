@@ -14,7 +14,7 @@ import {
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { openHowToPlay } from "@/components/daily/how-to-play-store";
-import { Logo } from "@/components/logo";
+import { Logo, QuadratLogo } from "@/components/logo";
 import { openSignIn } from "@/components/sign-in/sign-in-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -47,18 +47,21 @@ const OTHER_GAMES = [
 		to: "/mini",
 		label: "Garbuix mini",
 		color: "var(--game-mini)",
+		Icon: Logo,
 	},
 	{
 		game: "syllables",
 		to: "/sillabes",
 		label: "Garbuix síl·labes",
 		color: "var(--game-syllables)",
+		Icon: Logo,
 	},
 	{
 		game: "quadrat",
 		to: "/quadrat",
 		label: "Garbuix quadrat",
 		color: "var(--game-quadrat)",
+		Icon: QuadratLogo,
 	},
 ] as const;
 
@@ -245,7 +248,7 @@ export function UserMenu({
 				{OTHER_GAMES.filter((other) => other.game !== game).map((other) => (
 					<DropdownMenuItem key={other.game} asChild>
 						<Link to={other.to}>
-							<Logo
+							<other.Icon
 								className="size-4"
 								style={{ color: other.color }}
 								aria-hidden
