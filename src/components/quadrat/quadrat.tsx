@@ -263,7 +263,7 @@ function QuadratGame({
 					/>
 				) : null}
 			</section>
-			<div className="flex shrink-0 flex-col items-center gap-3 lg:order-1 lg:justify-center">
+			<div className="flex shrink-0 flex-col items-center gap-6 lg:order-1 lg:justify-center lg:gap-8">
 				{displayComplete ? null : (
 					<PuzzleGuessDisplay
 						currentGuess={getWordFromPath(puzzle.letters, path).toUpperCase()}
