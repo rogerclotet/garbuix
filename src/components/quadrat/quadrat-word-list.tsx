@@ -18,7 +18,7 @@ export function QuadratWordList({
 	clueWordIds,
 	clueTexts,
 }: {
-	wordSlots: QuadratWordSlot[];
+	wordSlots: Pick<QuadratWordSlot, "id" | "length">[];
 	guessedWordIds: number[];
 	answers: Record<number, string>;
 	clueWordIds: number[];

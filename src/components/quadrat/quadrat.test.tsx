@@ -11,7 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { getCellCol, getCellRow, getWordFromPath } from "@/lib/quadrat-board";
-import { readQuadratSaves } from "@/lib/quadrat-local";
+import { markQuadratTutorialSeen, readQuadratSaves } from "@/lib/quadrat-local";
 import { getQuadratClues } from "@/lib/quadrat-server-fns";
 import type {
 	QuadratPuzzlePrivate,
@@ -19,6 +19,10 @@ import type {
 } from "@/lib/quadrat-types";
 import { quadratFixture } from "@/test/quadrat-fixture";
 import { Quadrat } from "./quadrat";
+import {
+	setQuadratTutorialOpen,
+	useQuadratTutorialOpen,
+} from "./quadrat-tutorial-store";
 
 vi.mock("@/lib/quadrat-server-fns", () => ({
 	getQuadratPageData: vi.fn(),
@@ -63,6 +67,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	setQuadratTutorialOpen(false);
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -255,4 +260,23 @@ it("keeps the word list beside the board on a desktop", async () => {
 
 	expect(screen.getByRole("region", { name: "Paraules del dia" })).toBeTruthy();
 	expect(screen.queryByRole("button", { name: /^Paraules/ })).toBeNull();
+});
+
+function TutorialProbe() {
+	return useQuadratTutorialOpen() ? <p>Tutorial obert</p> : null;
+}
+
+it("opens the tutorial until the player finishes or skips it", async () => {
+	renderQuadrat();
+	render(<TutorialProbe />);
+	await screen.findByRole("group", { name: /Tauler de lletres/ });
+	expect(screen.getByText("Tutorial obert")).toBeTruthy();
+
+	cleanup();
+	setQuadratTutorialOpen(false);
+	markQuadratTutorialSeen();
+	renderQuadrat();
+	render(<TutorialProbe />);
+	await screen.findByRole("group", { name: /Tauler de lletres/ });
+	expect(screen.queryByText("Tutorial obert")).toBeNull();
 });

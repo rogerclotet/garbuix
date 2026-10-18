@@ -31,6 +31,7 @@ const MOVE_HIT_RADIUS = 0.48;
 const START_HIT_RADIUS = 0.7;
 const FLASH_STAGGER_MS = 34;
 const CELLS = Array.from({ length: QUADRAT_CELL_COUNT }, (_, cell) => cell);
+const NO_GUIDE: number[] = [];
 
 function getCellCenter(cell: number) {
 	return {
@@ -93,6 +94,7 @@ export function QuadratBoard({
 	complete,
 	clueStarts,
 	flashPath,
+	guidePath = NO_GUIDE,
 	onPathChange,
 	onRelease,
 }: {
@@ -107,6 +109,9 @@ export function QuadratBoard({
 	clueStarts: Array<[number, number]>;
 	// The word just found, lit letter by letter while it shows above the board.
 	flashPath: number[] | null;
+	// The tutorial's marked route: its tiles and lines stand out, and its
+	// first tile pulses until a drag starts.
+	guidePath?: number[];
 	onPathChange: (path: number[]) => void;
 	onRelease: (path: number[]) => void;
 }) {
@@ -123,6 +128,7 @@ export function QuadratBoard({
 		() => new Set(clueStarts.map(([first]) => first)),
 		[clueStarts],
 	);
+	const guideCells = useMemo(() => new Set(guidePath), [guidePath]);
 
 	const toBoardUnits = (event: { clientX: number; clientY: number }) => {
 		const rect = boardRef.current?.getBoundingClientRect();
@@ -187,6 +193,9 @@ export function QuadratBoard({
 	const pathConnections = path
 		.slice(1)
 		.map((cell, index) => [path[index] as number, cell] as const);
+	const guideConnections = guidePath
+		.slice(1)
+		.map((cell, index) => [guidePath[index] as number, cell] as const);
 	const flashConnections = (flashPath ?? [])
 		.slice(1)
 		.map((cell, index) => [flashPath?.[index] as number, cell] as const);
@@ -253,6 +262,14 @@ export function QuadratBoard({
 								width={0.16}
 							/>
 						))}
+				{guideConnections.map((cells) => (
+					<ConnectionLine
+						key={`guide-${cells[0]}-${cells[1]}`}
+						cells={cells}
+						className="stroke-primary/50"
+						width={0.16}
+					/>
+				))}
 				{flashConnections.map((cells, index) => (
 					<ConnectionLine
 						key={`found-${cells[0]}-${cells[1]}`}
@@ -305,7 +322,12 @@ export function QuadratBoard({
 							"puzzle-cell quadrat-cell absolute flex items-center justify-center border-2 font-bold leading-none transition-opacity duration-300",
 							selected
 								? "border-primary bg-primary text-primary-foreground"
-								: "border-border bg-card text-foreground",
+								: guideCells.has(cell)
+									? "border-primary bg-primary/10 text-foreground"
+									: "border-border bg-card text-foreground",
+							path.length === 0 &&
+								cell === guidePath[0] &&
+								"quadrat-guide-start",
 							// A tile the word used up dims once its light goes out.
 							!complete && uses === 0 && !flashing && "opacity-30",
 							!complete && clueStartCells.has(cell) && "clue-gradient-cell",

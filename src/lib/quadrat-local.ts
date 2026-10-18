@@ -77,3 +77,27 @@ export function quadratHistoryEntries(
 		}))
 		.sort((left, right) => right.dateKey.localeCompare(left.dateKey));
 }
+
+const TUTORIAL_SEEN_KEY = "garbuix-quadrat-tutorial-seen-v1";
+
+// Set when the player finishes or skips the tutorial. Leaving halfway shows
+// it again on the next visit.
+export function hasSeenQuadratTutorial(): boolean {
+	if (typeof window === "undefined") return true;
+	try {
+		return localStorage.getItem(TUTORIAL_SEEN_KEY) === "1";
+	} catch (error) {
+		// Without storage the tutorial would come back on every visit.
+		if (error instanceof DOMException) return true;
+		throw error;
+	}
+}
+
+export function markQuadratTutorialSeen(): void {
+	try {
+		localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+	} catch (error) {
+		// A blocked write only means the tutorial shows again next time.
+		if (!(error instanceof DOMException)) throw error;
+	}
+}

@@ -18,6 +18,11 @@ import {
 	useProfilePreferencesTipOpen,
 } from "@/components/profile-preferences-tip-store";
 import { QuadratHelpDialog } from "@/components/quadrat/quadrat-help-dialog";
+import { QuadratTutorialDialog } from "@/components/quadrat/quadrat-tutorial-dialog";
+import {
+	setQuadratTutorialOpen,
+	useQuadratTutorialOpen,
+} from "@/components/quadrat/quadrat-tutorial-store";
 import { SyllableHelpDialog } from "@/components/syllables/syllable-help-dialog";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -53,6 +58,7 @@ export default function Header() {
 
 	const innerTitle = INNER_PAGE_TITLES[pathname];
 	const howToPlayOpen = useHowToPlayOpen();
+	const quadratTutorialOpen = useQuadratTutorialOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const dailySummary = useDailyHeaderSummary();
 	const navigate = useNavigate();
@@ -150,10 +156,16 @@ export default function Header() {
 	const dialogs = (
 		<>
 			{game === "quadrat" ? (
-				<QuadratHelpDialog
-					open={howToPlayOpen}
-					onOpenChange={setHowToPlayOpen}
-				/>
+				<>
+					<QuadratHelpDialog
+						open={howToPlayOpen}
+						onOpenChange={setHowToPlayOpen}
+					/>
+					<QuadratTutorialDialog
+						open={quadratTutorialOpen}
+						onOpenChange={setQuadratTutorialOpen}
+					/>
+				</>
 			) : game === "syllables" ? (
 				<SyllableHelpDialog
 					open={howToPlayOpen}

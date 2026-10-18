@@ -15,14 +15,17 @@ import { createPuzzleEvent } from "@/lib/puzzle-client";
 import { formatGuess } from "@/lib/puzzle-text";
 import { getRemainingBoard, getWordFromPath } from "@/lib/quadrat-board";
 import { resolveQuadratGuess } from "@/lib/quadrat-client";
+import { hasSeenQuadratTutorial } from "@/lib/quadrat-local";
 import { QUADRAT_CLUE_LIMIT } from "@/lib/quadrat-progress";
 import { getQuadratClues, getQuadratPageData } from "@/lib/quadrat-server-fns";
 import { QUADRAT_MIN_WORD_LENGTH } from "@/lib/quadrat-types";
 import { useWordClues } from "@/lib/use-word-clues";
 import { QuadratBoard } from "./quadrat-board";
 import { QuadratExtraWords } from "./quadrat-extra-words";
+import { openQuadratTutorial } from "./quadrat-tutorial-store";
 import { QuadratWordList } from "./quadrat-word-list";
 import { QuadratWordSheet } from "./quadrat-word-sheet";
+import { useFlashPath } from "./use-flash-path";
 import { useQuadratDecoded } from "./use-quadrat-decoded";
 import { useQuadratProgress } from "./use-quadrat-progress";
 
@@ -36,6 +39,9 @@ export function Quadrat({ initialData }: { initialData: QuadratPageData }) {
 		setData(await getQuadratPageData());
 	}, []);
 	const expired = useDailyRollover(data.rolloverAt, refresh);
+	useEffect(() => {
+		if (!hasSeenQuadratTutorial()) openQuadratTutorial();
+	}, []);
 	return (
 		<QuadratGame
 			key={`${data.puzzle.id}:${data.userId}`}
@@ -60,25 +66,15 @@ function QuadratGame({
 	const visibleProgress = frame?.progress ?? progress;
 	const complete = visibleProgress.completedAt !== null;
 	const [path, setPath] = useState<number[]>([]);
-	const [flashPath, setFlashPath] = useState<number[] | null>(null);
+	const { flashPath, flashFoundPath, clearFlashPath } = useFlashPath();
 	const [celebrate, setCelebrate] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const submitting = useRef(false);
-	const flashTimerRef = useRef<number | null>(null);
 	// Clues the player just asked for, announced once their text arrives.
 	const pendingClueToastsRef = useRef(new Set<number>());
 	const { submitFeedback, showSubmitFeedback, clearSubmitFeedback } =
 		useSubmitFeedback({ newWordDurationMs: HELD_FOUND_WORD_MS });
 	const isDesktop = useIsDesktopLayout();
-
-	useEffect(
-		() => () => {
-			if (flashTimerRef.current != null) {
-				window.clearTimeout(flashTimerRef.current);
-			}
-		},
-		[],
-	);
 
 	const board = useMemo(
 		() => getRemainingBoard(puzzle, Object.values(frame?.paths ?? {})),
@@ -125,25 +121,6 @@ function QuadratGame({
 		interactive &&
 		visibleProgress.clueWordIds.length < QUADRAT_CLUE_LIMIT &&
 		clueCandidates.length > 0;
-
-	const flashFoundPath = useCallback((found: number[]) => {
-		if (flashTimerRef.current != null) {
-			window.clearTimeout(flashTimerRef.current);
-		}
-		setFlashPath(found);
-		flashTimerRef.current = window.setTimeout(() => {
-			setFlashPath(null);
-			flashTimerRef.current = null;
-		}, HELD_FOUND_WORD_MS);
-	}, []);
-
-	const clearFlashPath = useCallback(() => {
-		if (flashTimerRef.current != null) {
-			window.clearTimeout(flashTimerRef.current);
-			flashTimerRef.current = null;
-		}
-		setFlashPath(null);
-	}, []);
 
 	const handlePathChange = useCallback(
 		(next: number[]) => {

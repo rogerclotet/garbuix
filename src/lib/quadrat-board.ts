@@ -1,6 +1,7 @@
 import {
 	QUADRAT_CELL_COUNT,
 	QUADRAT_SIZE,
+	type QuadratConnection,
 	type QuadratPuzzlePublic,
 } from "@/lib/quadrat-types";
 
@@ -77,6 +78,35 @@ export function findWordPaths(
 
 	for (let cell = 0; cell < QUADRAT_CELL_COUNT; cell++) visit(cell);
 	return paths;
+}
+
+// The counts and connections a board shows for these word paths.
+export function summarizeQuadratPaths(paths: readonly (readonly number[])[]): {
+	cellUses: number[];
+	connections: QuadratConnection[];
+} {
+	const cellUses = new Array<number>(QUADRAT_CELL_COUNT).fill(0);
+	const connectionUses = new Map<string, QuadratConnection>();
+	for (const path of paths) {
+		path.forEach((cell, index) => {
+			cellUses[cell] = (cellUses[cell] ?? 0) + 1;
+			const previous = path[index - 1];
+			if (previous === undefined) return;
+			const key = connectionKey(previous, cell);
+			const existing = connectionUses.get(key);
+			if (existing) existing.uses++;
+			else
+				connectionUses.set(key, {
+					cells: [Math.min(previous, cell), Math.max(previous, cell)],
+					uses: 1,
+				});
+		});
+	}
+	const connections = [...connectionUses.values()].sort(
+		(left, right) =>
+			left.cells[0] - right.cells[0] || left.cells[1] - right.cells[1],
+	);
+	return { cellUses, connections };
 }
 
 // Counts and connections left once the found words stop using them.

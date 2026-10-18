@@ -2,16 +2,19 @@ import { ChevronDown, ListChecks } from "lucide-react";
 import { Dialog } from "radix-ui";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 // On a phone the board takes the screen, and the list waits in a sheet that
 // slides up from a button under it.
 export function QuadratWordSheet({
 	foundCount,
 	totalWords,
+	triggerClassName,
 	children,
 }: {
 	foundCount: number;
 	totalWords: number;
+	triggerClassName?: string;
 	children: ReactNode;
 }) {
 	return (
@@ -20,7 +23,10 @@ export function QuadratWordSheet({
 				<Button
 					variant="ghost"
 					size="lg"
-					className="daily-pressable daily-pressable-action h-9 gap-2 touch-manipulation sm:h-10"
+					className={cn(
+						"daily-pressable daily-pressable-action h-9 gap-2 touch-manipulation sm:h-10",
+						triggerClassName,
+					)}
 					aria-label={`Paraules, ${foundCount} de ${totalWords} trobades`}
 				>
 					<ListChecks className="size-4 text-primary" aria-hidden />
