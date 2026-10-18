@@ -7,15 +7,16 @@ import { openSignIn } from "@/components/sign-in/sign-in-store";
 import {
 	getSortedAnonymousHistoryEntries,
 	hasSeenHowToPlay,
-	hasSeenMiniAnnouncement,
 	hasSeenProfilePreferencesTip,
+	hasSeenQuadratAnnouncement,
 	hasSeenWelcome,
 	isWelcomePostponedToday,
-	markMiniAnnouncementSeen,
 	markProfilePreferencesTipSeen,
+	markQuadratAnnouncementSeen,
 	markWelcomeSeen,
 } from "@/lib/puzzle-local";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import { hasPlayedQuadrat } from "@/lib/quadrat-local";
 import type { DailySessionUser } from "./daily-types";
 import { openHowToPlay, useHowToPlayOpen } from "./how-to-play-store";
 
@@ -33,7 +34,7 @@ export function useDailyOnboarding({
 	winDialogOpen: boolean;
 }) {
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
-	const [miniAnnouncementOpen, setMiniAnnouncementOpen] = useState(false);
+	const [quadratAnnouncementOpen, setQuadratAnnouncementOpen] = useState(false);
 	const tutorialOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const firstVisitChecked = useRef(false);
@@ -76,7 +77,8 @@ export function useDailyOnboarding({
 			welcomeOpen ||
 			sharePreviewOpen ||
 			winDialogOpen ||
-			hasSeenMiniAnnouncement()
+			hasSeenQuadratAnnouncement() ||
+			hasPlayedQuadrat(activeUser?.id ?? null)
 		)
 			return;
 		const hasLocalPlay =
@@ -87,8 +89,8 @@ export function useDailyOnboarding({
 					entry.guessCount > 0 || entry.hintsUsed > 0 || entry.guessedWords > 0,
 			);
 		if (!activeUser && !hasLocalPlay) return;
-		markMiniAnnouncementSeen();
-		setMiniAnnouncementOpen(true);
+		markQuadratAnnouncementSeen();
+		setQuadratAnnouncementOpen(true);
 	}, [
 		activeUser,
 		openHowToPlayIfFirstVisit,
@@ -131,8 +133,8 @@ export function useDailyOnboarding({
 
 	return {
 		welcomeOpen,
-		miniAnnouncementOpen,
-		setMiniAnnouncementOpen,
+		quadratAnnouncementOpen,
+		setQuadratAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,

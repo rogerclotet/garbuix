@@ -19,7 +19,7 @@ const PROFILE_PREFERENCES_TIP_SEEN_KEY =
 	"paraules-profile-preferences-tip-seen-v1";
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
 const WELCOME_POSTPONED_DATE_KEY = "garbuix-welcome-postponed-date-v1";
-const MINI_ANNOUNCEMENT_SEEN_KEY = "garbuix-mini-announcement-seen-v1";
+const QUADRAT_ANNOUNCEMENT_SEEN_KEY = "garbuix-quadrat-announcement-seen-v1";
 // Re-show the welcome dialog to anonymous users periodically so they keep
 // getting nudged to sign in. We store the last-shown timestamp and only
 // suppress the dialog within this cooldown window.
@@ -228,22 +228,24 @@ export function isWelcomePostponedToday(): boolean {
 	);
 }
 
-export function hasSeenMiniAnnouncement(): boolean {
+export function hasSeenQuadratAnnouncement(): boolean {
 	if (typeof window === "undefined") return true;
 	try {
-		return window.localStorage.getItem(MINI_ANNOUNCEMENT_SEEN_KEY) === "1";
-	} catch {
+		return window.localStorage.getItem(QUADRAT_ANNOUNCEMENT_SEEN_KEY) === "1";
+	} catch (error) {
 		// Skip announcements when we cannot remember that they have been shown.
-		return true;
+		if (error instanceof DOMException) return true;
+		throw error;
 	}
 }
 
-export function markMiniAnnouncementSeen() {
+export function markQuadratAnnouncementSeen(): void {
 	if (typeof window === "undefined") return;
 	try {
-		window.localStorage.setItem(MINI_ANNOUNCEMENT_SEEN_KEY, "1");
-	} catch {
+		window.localStorage.setItem(QUADRAT_ANNOUNCEMENT_SEEN_KEY, "1");
+	} catch (error) {
 		// A blocked storage write must not interrupt the game.
+		if (!(error instanceof DOMException)) throw error;
 	}
 }
 
