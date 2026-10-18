@@ -7,6 +7,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { openQuadratTutorial } from "./quadrat-tutorial-store";
 
 export function QuadratHelpDialog({
 	open,
@@ -49,6 +50,15 @@ export function QuadratHelpDialog({
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
+					<Button
+						variant="outline"
+						onClick={() => {
+							onOpenChange(false);
+							openQuadratTutorial();
+						}}
+					>
+						Fes el tutorial
+					</Button>
 					<Button onClick={() => onOpenChange(false)}>Som-hi!</Button>
 				</AlertDialogFooter>
 			</AlertDialogContent>
