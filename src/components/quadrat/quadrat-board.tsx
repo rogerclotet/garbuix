@@ -102,7 +102,7 @@ export function QuadratBoard({
 	// The drag in progress.
 	path: number[];
 	interactive: boolean;
-	// A finished board shows its letters plainly, without counts or lines.
+	// A finished board shows every letter and line plainly, without counts.
 	complete: boolean;
 	clueStarts: Array<[number, number]>;
 	// The word just found, lit letter by letter while it shows above the board.
@@ -114,8 +114,8 @@ export function QuadratBoard({
 	// The live drag, read by pointer handlers between renders.
 	const dragRef = useRef<{ pointerId: number; path: number[] } | null>(null);
 	const gradientIdPrefix = useId();
-	const remainingConnections = complete
-		? []
+	const visibleConnections = complete
+		? connections
 		: connections.filter(({ cells: [from, to] }) =>
 				isConnectionAvailable(board, from, to),
 			);
@@ -234,7 +234,7 @@ export function QuadratBoard({
 						);
 					})}
 				</defs>
-				{remainingConnections.map(({ cells }) => (
+				{visibleConnections.map(({ cells }) => (
 					<ConnectionLine
 						key={`${cells[0]}-${cells[1]}`}
 						cells={cells}

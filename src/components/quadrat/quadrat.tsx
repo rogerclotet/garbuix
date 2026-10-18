@@ -301,8 +301,9 @@ function QuadratGame({
 			<div className="flex min-h-0 flex-1 flex-col items-center gap-6 lg:col-start-1 lg:row-start-2 lg:justify-center lg:gap-8">
 				{/* On a phone the panel and the board fill whatever the column leaves
 				    above the buttons: the board as wide as the screen allows and no
-				    taller than the room under the panel. */}
-				<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 [container-type:size] lg:flex-none lg:gap-8 lg:[container-type:normal]">
+				    taller than the room under the panel. The side padding keeps a drag
+				    that starts near the edge away from the system back gesture. */}
+				<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6 px-4 [container-type:size] lg:flex-none lg:gap-8 lg:px-0 lg:[container-type:normal]">
 					{displayComplete ? null : (
 						<PuzzleGuessDisplay
 							currentGuess={getWordFromPath(puzzle.letters, path).toUpperCase()}
