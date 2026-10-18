@@ -26,7 +26,6 @@ import { QuadratWordSheet } from "./quadrat-word-sheet";
 import { useQuadratDecoded } from "./use-quadrat-decoded";
 import { useQuadratProgress } from "./use-quadrat-progress";
 
-const FOUND_FLASH_MS = 700;
 const CLUE_TOAST_MS = 10_000;
 
 export type QuadratPageData = Awaited<ReturnType<typeof getQuadratPageData>>;
@@ -135,15 +134,24 @@ function QuadratGame({
 		flashTimerRef.current = window.setTimeout(() => {
 			setFlashPath(null);
 			flashTimerRef.current = null;
-		}, FOUND_FLASH_MS);
+		}, HELD_FOUND_WORD_MS);
+	}, []);
+
+	const clearFlashPath = useCallback(() => {
+		if (flashTimerRef.current != null) {
+			window.clearTimeout(flashTimerRef.current);
+			flashTimerRef.current = null;
+		}
+		setFlashPath(null);
 	}, []);
 
 	const handlePathChange = useCallback(
 		(next: number[]) => {
 			clearSubmitFeedback();
+			clearFlashPath();
 			setPath(next);
 		},
-		[clearSubmitFeedback],
+		[clearFlashPath, clearSubmitFeedback],
 	);
 
 	const handleRelease = useCallback(

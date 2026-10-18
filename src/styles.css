@@ -257,6 +257,65 @@ code {
 	will-change: transform, opacity;
 }
 
+/* Garbuix quadrat lights a found word's tiles in its accent one after another,
+   and they all let go when the word above the board fades. The tiles set
+   their own delay and duration so they end together. */
+@keyframes quadrat-found-cell {
+	0% {
+		transform: scale(1);
+		border-color: var(--color-border);
+		background-color: var(--color-card);
+		color: var(--color-foreground);
+	}
+
+	12% {
+		transform: scale(1.08);
+		border-color: var(--quadrat-accent);
+		background-color: var(--quadrat-accent);
+		color: var(--color-background);
+	}
+
+	24%,
+	82% {
+		transform: scale(1);
+		border-color: var(--quadrat-accent);
+		background-color: var(--quadrat-accent);
+		color: var(--color-background);
+	}
+
+	100% {
+		transform: scale(1);
+		border-color: var(--color-border);
+		background-color: var(--color-card);
+		color: var(--color-foreground);
+	}
+}
+
+@keyframes quadrat-found-line {
+	0%,
+	100% {
+		opacity: 0;
+	}
+
+	12%,
+	82% {
+		opacity: 1;
+	}
+}
+
+.quadrat-found-cell {
+	animation-name: quadrat-found-cell;
+	animation-timing-function: ease-out;
+	animation-fill-mode: both;
+	will-change: transform, background-color;
+}
+
+.quadrat-found-line {
+	animation-name: quadrat-found-line;
+	animation-timing-function: ease-out;
+	animation-fill-mode: both;
+}
+
 /* A found pangram's cells turn amber and back one after another. The keyframes
    leave out 0% and 100% so each cell starts from and returns to its own fill. */
 @keyframes grid-pangram-wave {
@@ -461,6 +520,18 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
 	.grid-word-just-guessed-cell {
+		animation: none;
+	}
+
+	/* The found word's colour stays, without the pop. */
+	.quadrat-found-cell {
+		border-color: var(--quadrat-accent);
+		background-color: var(--quadrat-accent);
+		color: var(--color-background);
+		animation: none;
+	}
+
+	.quadrat-found-line {
 		animation: none;
 	}
 

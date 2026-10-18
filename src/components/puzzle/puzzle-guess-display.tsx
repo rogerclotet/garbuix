@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { HELD_FOUND_WORD_MS } from "./puzzle-animation-timing";
@@ -84,7 +85,8 @@ export function PuzzleGuessDisplay({
 						}
 					>
 						{heldFoundWord ? (
-							<span className="rounded-md bg-[color-mix(in_srgb,var(--quadrat-accent)_14%,transparent)] px-2 sm:px-3">
+							<span className="flex items-center gap-[0.3em]">
+								<Check className="size-[0.9em]" strokeWidth={3.5} aria-hidden />
 								{submitFeedback.word}
 							</span>
 						) : (

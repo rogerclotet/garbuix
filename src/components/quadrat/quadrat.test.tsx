@@ -145,11 +145,22 @@ it("finds a word by dragging, lowers its letters' counts and saves it", async ()
 		expect(feedback?.getAttribute("data-feedback-kind")).toBe("new_word");
 		expect(feedback?.classList.contains("held-found-word")).toBe(true);
 	});
-	expect(
-		screen
-			.getByRole("progressbar", { name: "Paraules trobades" })
-			.getAttribute("aria-valuenow"),
-	).toBe("1");
+	// The meter follows the decoded progress, which can land a beat later.
+	await waitFor(() =>
+		expect(
+			screen
+				.getByRole("progressbar", { name: "Paraules trobades" })
+				.getAttribute("aria-valuenow"),
+		).toBe("1"),
+	);
+	// The word's tiles light up in the accent while it shows.
+	for (const cell of word.path) {
+		expect(
+			document
+				.querySelector(`[data-cell="${cell}"]`)
+				?.classList.contains("quadrat-found-cell"),
+		).toBe(true);
+	}
 
 	// On a phone the list waits in a sheet under the board.
 	fireEvent.click(
