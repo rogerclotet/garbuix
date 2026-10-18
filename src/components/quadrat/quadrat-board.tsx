@@ -256,7 +256,7 @@ export function QuadratBoard({
 					<ConnectionLine
 						key={`found-${cells[0]}-${cells[1]}`}
 						cells={cells}
-						className="quadrat-found-line stroke-[var(--quadrat-accent)]"
+						className="quadrat-found-line stroke-[var(--quadrat-found)]"
 						style={flashTiming((index + 1) * FLASH_STAGGER_MS)}
 						width={0.2}
 					/>

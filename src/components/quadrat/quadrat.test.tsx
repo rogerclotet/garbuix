@@ -139,7 +139,7 @@ it("finds a word by dragging, lowers its letters' counts and saves it", async ()
 	);
 	fireEvent.pointerUp(board, { pointerId: 1 });
 
-	// The found word stays over the panel in the quadrat accent.
+	// The found word stays over the panel in green.
 	await waitFor(() => {
 		const feedback = container.querySelector('[data-slot="submit-feedback"]');
 		expect(feedback?.getAttribute("data-feedback-kind")).toBe("new_word");
@@ -153,7 +153,7 @@ it("finds a word by dragging, lowers its letters' counts and saves it", async ()
 				.getAttribute("aria-valuenow"),
 		).toBe("1"),
 	);
-	// The word's tiles light up in the accent while it shows.
+	// The word's tiles light up in green while it shows.
 	for (const cell of word.path) {
 		expect(
 			document

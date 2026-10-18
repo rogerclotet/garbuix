@@ -42,7 +42,7 @@ export function PuzzleGuessDisplay({
 	currentGuess: string;
 	submitFeedback: PuzzleSubmitFeedback | null;
 	mini?: boolean;
-	// Holds a found word in the quadrat accent instead of flashing it.
+	// Holds a found word in the quadrat green instead of flashing it.
 	quadrat?: boolean;
 }) {
 	const prefersReducedMotion = usePrefersReducedMotion();
@@ -52,7 +52,7 @@ export function PuzzleGuessDisplay({
 			? mini
 				? "text-teal-600 dark:text-teal-400"
 				: quadrat
-					? "text-[var(--quadrat-accent)]"
+					? "text-[var(--quadrat-found)]"
 					: "text-primary"
 			: submitFeedback?.kind === "valid_but_not_in_puzzle" ||
 					(mini && submitFeedback?.kind === "already_found")

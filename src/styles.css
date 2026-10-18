@@ -257,7 +257,7 @@ code {
 	will-change: transform, opacity;
 }
 
-/* Garbuix quadrat lights a found word's tiles in its accent one after another,
+/* Garbuix quadrat lights a found word's tiles in green one after another,
    and they all let go when the word above the board fades. The tiles set
    their own delay and duration so they end together. */
 @keyframes quadrat-found-cell {
@@ -270,16 +270,16 @@ code {
 
 	12% {
 		transform: scale(1.08);
-		border-color: var(--quadrat-accent);
-		background-color: var(--quadrat-accent);
+		border-color: var(--quadrat-found);
+		background-color: var(--quadrat-found);
 		color: var(--color-background);
 	}
 
 	24%,
 	82% {
 		transform: scale(1);
-		border-color: var(--quadrat-accent);
-		background-color: var(--quadrat-accent);
+		border-color: var(--quadrat-found);
+		background-color: var(--quadrat-found);
 		color: var(--color-background);
 	}
 
@@ -525,8 +525,8 @@ code {
 
 	/* The found word's colour stays, without the pop. */
 	.quadrat-found-cell {
-		border-color: var(--quadrat-accent);
-		background-color: var(--quadrat-accent);
+		border-color: var(--quadrat-found);
+		background-color: var(--quadrat-found);
 		color: var(--color-background);
 		animation: none;
 	}
