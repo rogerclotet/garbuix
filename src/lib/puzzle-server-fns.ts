@@ -223,8 +223,11 @@ export const importAnonymousProgress = createServerFn({ method: "POST" })
 	)
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
+		// The client imports as soon as it sees an account, and the session can
+		// end before the request lands (signed out in another tab). Nothing was
+		// imported, so the client leaves the data unmarked for the next sign-in.
 		if (!session) {
-			throw new Error("Unauthorized");
+			return null;
 		}
 
 		return importAnonymousProgressForUser({

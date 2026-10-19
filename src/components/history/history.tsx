@@ -70,7 +70,9 @@ const EMPTY_STATS: HistoryStats = {
 export function History({ initialData }: { initialData: HistoryData }) {
 	const yesterdayPuzzle = initialData.yesterdayPuzzle;
 	const rootData = rootRoute.useLoaderData();
-	const { activeUser } = useActiveSessionUser(rootData.sessionUser);
+	const { activeUser, sessionConfirmed } = useActiveSessionUser(
+		rootData.sessionUser,
+	);
 	const { localParticipantId } = useLeaderboard();
 	const fetchHistory = useServerFn(getHistoryPageData);
 	const fetchMoreHistory = useServerFn(getMoreHistoryEntries);
@@ -103,7 +105,10 @@ export function History({ initialData }: { initialData: HistoryData }) {
 				return;
 			}
 
+			// Importing for an unconfirmed user would ask the server to merge into
+			// an account it may no longer have a session for.
 			if (
+				sessionConfirmed &&
 				!hasImportedAnonymousData(activeUser.id) &&
 				importAttemptedRef.current !== activeUser.id
 			) {
@@ -114,15 +119,17 @@ export function History({ initialData }: { initialData: HistoryData }) {
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					await importProgress({
+					const result = await importProgress({
 						data: {
 							deviceId,
 							payload,
 						},
 					});
-					markAnonymousDataImported(activeUser.id);
-					if (hasLocalProgress) {
-						toast.success("S'han sincronitzat els resultats locals");
+					if (result) {
+						markAnonymousDataImported(activeUser.id);
+						if (hasLocalProgress) {
+							toast.success("S'han sincronitzat els resultats locals");
+						}
 					}
 				} catch (error) {
 					captureException(error);
@@ -146,7 +153,7 @@ export function History({ initialData }: { initialData: HistoryData }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [activeUser, deviceId, fetchHistory, importProgress]);
+	}, [activeUser, sessionConfirmed, deviceId, fetchHistory, importProgress]);
 
 	const entries = activeUser
 		? (accountHistory?.entries ?? [])

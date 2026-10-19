@@ -40,6 +40,22 @@ it("keeps the rendered user while the session read cannot reach the server", () 
 	expect(result.current.activeUserId).toBe("user-1");
 });
 
+it("does not confirm the rendered user until the server answers", () => {
+	const { result, rerender } = renderHook(() =>
+		useActiveSessionUser(renderedUser),
+	);
+	expect(result.current.activeUserId).toBe("user-1");
+	expect(result.current.sessionConfirmed).toBe(false);
+
+	session = {
+		data: { user: { id: "user-1", name: "Marta", email: "marta@example.com" } },
+		error: null,
+		isPending: false,
+	};
+	rerender();
+	expect(result.current.sessionConfirmed).toBe(true);
+});
+
 it("keeps the rendered user when the server fails to answer", () => {
 	session = {
 		data: null,

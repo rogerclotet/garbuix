@@ -42,9 +42,16 @@ export function Daily({ initialData }: { initialData: DailyData }) {
 }
 
 function DailySession({ initialData }: { initialData: DailyData }) {
-	const { activeUser, session } = useActiveSessionUser(initialData.sessionUser);
+	const { activeUser, sessionConfirmed, session } = useActiveSessionUser(
+		initialData.sessionUser,
+	);
 	const deviceId = useMemo(() => getDeviceId(), []);
-	const progressState = useDailyProgress({ activeUser, deviceId, initialData });
+	const progressState = useDailyProgress({
+		activeUser,
+		sessionConfirmed,
+		deviceId,
+		initialData,
+	});
 	return (
 		<DailyGame
 			key={activeUser?.id ?? "anonymous"}
