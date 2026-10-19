@@ -116,12 +116,16 @@ function readLocalProgressState(options: {
 
 type UseDailyProgressOptions = {
 	activeUser: DailySessionUser;
+	// Whether better-auth has answered for activeUser, rather than it being the
+	// user the page was rendered for. See useActiveSessionUser.
+	sessionConfirmed: boolean;
 	deviceId: string;
 	initialData: DailyData;
 };
 
 export function useDailyProgress({
 	activeUser,
+	sessionConfirmed,
 	deviceId,
 	initialData,
 }: UseDailyProgressOptions) {
@@ -299,7 +303,10 @@ export function useDailyProgress({
 		let cancelled = false;
 
 		const syncWithServer = async () => {
+			// Importing for an unconfirmed user would ask the server to merge into
+			// an account it may no longer have a session for.
 			if (
+				sessionConfirmed &&
 				!hasImportedAnonymousData(activeUserId) &&
 				importAttemptedRef.current !== activeUserId
 			) {
@@ -310,15 +317,17 @@ export function useDailyProgress({
 					Object.keys(payload.activeProgressByDate).length > 0;
 
 				try {
-					await importProgress({
+					const result = await importProgress({
 						data: {
 							deviceId,
 							payload,
 						},
 					});
-					markAnonymousDataImported(activeUserId);
-					if (hasLocalProgress) {
-						toast.success("S'han sincronitzat els resultats locals");
+					if (result) {
+						markAnonymousDataImported(activeUserId);
+						if (hasLocalProgress) {
+							toast.success("S'han sincronitzat els resultats locals");
+						}
 					}
 				} catch (error) {
 					captureException(error);
@@ -335,7 +344,13 @@ export function useDailyProgress({
 		return () => {
 			cancelled = true;
 		};
-	}, [activeUserId, deviceId, importProgress, refreshProgressFromServer]);
+	}, [
+		activeUserId,
+		sessionConfirmed,
+		deviceId,
+		importProgress,
+		refreshProgressFromServer,
+	]);
 
 	useEffect(() => {
 		if (!activeUserId) return;

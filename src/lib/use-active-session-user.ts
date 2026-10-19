@@ -108,6 +108,10 @@ export function useActiveSessionUser(fallbackUser: SessionUser) {
 	return {
 		activeUser,
 		activeUserId: activeUser?.id ?? null,
+		// False while activeUser is still the rendered fallback, which can name
+		// an account whose session has since ended: a page the service worker
+		// cached, or loader data kept from earlier in this document.
+		sessionConfirmed: !sessionUnknown,
 		session,
 	};
 }

@@ -34,8 +34,13 @@ const progressState = vi.hoisted(() => {
 });
 
 const sessionState = vi.hoisted(
-	(): { activeUser: SessionUser; session: { isPending: boolean } } => ({
+	(): {
+		activeUser: SessionUser;
+		sessionConfirmed: boolean;
+		session: { isPending: boolean };
+	} => ({
 		activeUser: null,
+		sessionConfirmed: true,
 		session: { isPending: false },
 	}),
 );

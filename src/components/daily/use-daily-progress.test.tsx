@@ -11,6 +11,7 @@ import {
 	getAnonymousHistoryEntries,
 	getAnonymousPeerClueWordIds,
 	getAnonymousProgress,
+	hasImportedAnonymousData,
 	saveAccountPuzzleCache,
 	saveAnonymousProgress,
 } from "@/lib/puzzle-local";
@@ -145,6 +146,7 @@ function createMemoryStorage(): Storage {
 function Probe({ activeUser }: { activeUser: SessionUser }) {
 	const { derivedProgress, isReady } = useDailyProgress({
 		activeUser,
+		sessionConfirmed: true,
 		deviceId: "device-1",
 		initialData: INITIAL_DATA,
 	});
@@ -161,6 +163,7 @@ function Probe({ activeUser }: { activeUser: SessionUser }) {
 function SwitchableProbe({ activeUser }: { activeUser: SessionUser | null }) {
 	const { derivedProgress } = useDailyProgress({
 		activeUser,
+		sessionConfirmed: true,
 		deviceId: "device-1",
 		initialData: {
 			...INITIAL_DATA,
@@ -230,6 +233,7 @@ describe("useDailyProgress local state", () => {
 		const { result } = renderHook(() =>
 			useDailyProgress({
 				activeUser: { id: USER_ID, name: "Roger", email: "roger@example.com" },
+				sessionConfirmed: true,
 				deviceId: "device-1",
 				initialData: INITIAL_DATA,
 			}),
@@ -254,6 +258,7 @@ describe("useDailyProgress local state", () => {
 						name: "Roger",
 						email: "roger@example.com",
 					},
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -299,6 +304,7 @@ describe("useDailyProgress local state", () => {
 						name: "Roger",
 						email: "roger@example.com",
 					},
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -326,6 +332,7 @@ describe("useDailyProgress local state", () => {
 						name: "Roger",
 						email: "roger@example.com",
 					},
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -367,6 +374,7 @@ describe("useDailyProgress local state", () => {
 		const { result } = renderHook(() =>
 			useDailyProgress({
 				activeUser: { id: USER_ID, name: "Roger", email: "roger@example.com" },
+				sessionConfirmed: true,
 				deviceId: "device-1",
 				initialData: INITIAL_DATA,
 			}),
@@ -412,6 +420,7 @@ describe("useDailyProgress local state", () => {
 						name: "Roger",
 						email: "roger@example.com",
 					},
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -471,6 +480,7 @@ describe("useDailyProgress local state", () => {
 						name: "Roger",
 						email: "roger@example.com",
 					},
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -494,6 +504,7 @@ describe("useDailyProgress local state", () => {
 			({ activeUser }: { activeUser: SessionUser }) =>
 				useDailyProgress({
 					activeUser,
+					sessionConfirmed: true,
 					deviceId: "device-1",
 					initialData: INITIAL_DATA,
 				}),
@@ -547,6 +558,7 @@ describe("useDailyProgress local state", () => {
 		const { rerender } = renderHook(() =>
 			useDailyProgress({
 				activeUser: null,
+				sessionConfirmed: true,
 				deviceId: "device-1",
 				initialData: INITIAL_DATA,
 			}),
@@ -718,6 +730,45 @@ describe("useDailyProgress local state", () => {
 		});
 		container.remove();
 	});
+	it("imports guest progress only once the session is confirmed", async () => {
+		const { rerender } = renderHook(
+			({ sessionConfirmed }: { sessionConfirmed: boolean }) =>
+				useDailyProgress({
+					activeUser: {
+						id: USER_ID,
+						name: "Roger",
+						email: "roger@example.com",
+					},
+					sessionConfirmed,
+					deviceId: "device-1",
+					initialData: INITIAL_DATA,
+				}),
+			{ initialProps: { sessionConfirmed: false } },
+		);
+		await act(async () => {});
+		expect(importProgressMock).not.toHaveBeenCalled();
+
+		rerender({ sessionConfirmed: true });
+		await act(async () => {});
+		expect(importProgressMock).toHaveBeenCalledTimes(1);
+		expect(hasImportedAnonymousData(USER_ID)).toBe(true);
+	});
+
+	it("leaves guest progress unmarked when the server has no session", async () => {
+		importProgressMock.mockResolvedValue(null);
+		renderHook(() =>
+			useDailyProgress({
+				activeUser: { id: USER_ID, name: "Roger", email: "roger@example.com" },
+				sessionConfirmed: true,
+				deviceId: "device-1",
+				initialData: INITIAL_DATA,
+			}),
+		);
+		await act(async () => {});
+		expect(importProgressMock).toHaveBeenCalledTimes(1);
+		expect(hasImportedAnonymousData(USER_ID)).toBe(false);
+	});
+
 	it("checkpoints the account outbox before refresh and replays it on remount", async () => {
 		const activeUser = {
 			id: USER_ID,
@@ -726,6 +777,7 @@ describe("useDailyProgress local state", () => {
 		};
 		const props = {
 			activeUser,
+			sessionConfirmed: true,
 			deviceId: "device-1",
 			initialData: INITIAL_DATA,
 		};
@@ -760,6 +812,7 @@ describe("useDailyProgress local state", () => {
 		const first = renderHook(() =>
 			useDailyProgress({
 				activeUser: null,
+				sessionConfirmed: true,
 				deviceId: "device-1",
 				initialData: INITIAL_DATA,
 			}),
