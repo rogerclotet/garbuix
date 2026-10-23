@@ -77,9 +77,6 @@ export async function getMiniHistory(userId: string) {
 export async function saveMiniProgress(
 	userId: string,
 	incoming: PuzzleProgressState,
-	// The sync request's headers, to count the player in the usage statistics.
-	// Absent outside a request, as in tests.
-	requestHeaders?: Headers,
 ) {
 	const row = await db.query.miniPuzzles.findFirst({
 		where: eq(miniPuzzles.id, incoming.puzzleId),
@@ -168,13 +165,11 @@ export async function saveMiniProgress(
 			});
 		return progress;
 	});
-	if (requestHeaders) {
-		recordSyncedProgressUsage(requestHeaders, {
-			game: "mini",
-			dateKey: row.dateKey,
-			userId,
-			progress: saved,
-		});
-	}
+	recordSyncedProgressUsage({
+		game: "mini",
+		dateKey: row.dateKey,
+		userId,
+		progress: saved,
+	});
 	return saved;
 }

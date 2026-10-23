@@ -2,11 +2,6 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
-import {
-	browserAsksNotToTrack,
-	canReportUsage,
-	setUsageStatsOptOut,
-} from "@/lib/usage-stats-preference";
 import { useGuestProgressReport } from "@/lib/use-guest-progress-report";
 
 type Progress = Pick<PuzzleProgressState, "guessCount" | "completedAt">;
@@ -19,13 +14,6 @@ const FINISHED: Progress = {
 };
 
 const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
-
-function setGlobalPrivacyControl(value: boolean | undefined): void {
-	Object.defineProperty(navigator, "globalPrivacyControl", {
-		configurable: true,
-		value,
-	});
-}
 
 function renderReport(progress: Progress, userId: string | null = null) {
 	return renderHook(
@@ -51,31 +39,11 @@ function reportedBodies(): unknown[] {
 beforeEach(() => {
 	vi.stubGlobal("fetch", fetchMock);
 	fetchMock.mockClear();
-	setUsageStatsOptOut(false);
-	setGlobalPrivacyControl(undefined);
 });
 
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
-});
-
-describe("usage statistics preference", () => {
-	it("remembers turning statistics off in a cookie", () => {
-		setUsageStatsOptOut(true);
-		expect(document.cookie).toContain("garbuix_stats_off=1");
-		expect(canReportUsage()).toBe(false);
-
-		setUsageStatsOptOut(false);
-		expect(document.cookie).not.toContain("garbuix_stats_off");
-		expect(canReportUsage()).toBe(true);
-	});
-
-	it("follows Global Privacy Control", () => {
-		setGlobalPrivacyControl(true);
-		expect(browserAsksNotToTrack()).toBe(true);
-		expect(canReportUsage()).toBe(false);
-	});
 });
 
 describe("useGuestProgressReport", () => {
@@ -98,12 +66,6 @@ describe("useGuestProgressReport", () => {
 
 	it("leaves signed-in players to their progress sync", () => {
 		renderReport(FINISHED, "user-1");
-		expect(fetchMock).not.toHaveBeenCalled();
-	});
-
-	it("sends nothing once statistics are off", () => {
-		setUsageStatsOptOut(true);
-		renderReport(FINISHED);
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

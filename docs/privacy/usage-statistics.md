@@ -47,7 +47,10 @@ which rules out retention and weekly or monthly totals. That limit is
 deliberate.
 
 Balancing. Players expect a free web game to know roughly how many people
-play it. The data says nothing about a person beyond "played this game today
+play it. The counts come from progress the game already sends for the
+leaderboard and for sync, so they add no new collection for signed-in players
+or classic guests, and only a start and finish flag for the other guests. The
+data says nothing about a person beyond "played this game today
 and finished or not", can't be tied back to them by us after two days or by
 PostHog at any time, and is never used to decide anything about an individual.
 Some players are likely children, which weighs against intrusive processing;
@@ -56,12 +59,22 @@ this processing is not intrusive, and it needs no consent that a child under
 
 - daily key that expires, no stored mapping
 - no IP address, user agent or account data sent to PostHog
-- opt-out switch in Preferències (`garbuix_stats_off` cookie)
-- Global Privacy Control and Do Not Track honoured as an objection, as GDPR
-  art. 21(5) allows
 - only today's and yesterday's puzzles counted, so no backfill of history
 
 Outcome: the interest is not overridden by the players' interests or rights.
+
+## Objections (GDPR art. 21)
+
+Players can object by email, as the privacy policy says. There is no switch in
+the app: the AEPD guide doesn't require one for exempt measurement, and
+anything that silently drops players would make the counts wrong. Events
+already sent can't be traced to anyone. If an objection arrives, stop counting
+that account or guest id from then on, for example with an exclusion list in
+`usage-stats.server.ts`. None exists yet.
+
+Global Privacy Control and Do Not Track are not treated as objections. Neither
+is binding in the EU, and some browsers send GPC by default, so honouring it
+would drop players who never chose to object.
 
 ## AEPD consent exemption (LSSI art. 22.2)
 
@@ -79,7 +92,7 @@ technologies" in its terms, so the check applies.
 | No transfer to third parties | PostHog is a processor and receives no personal data. |
 | No tracking across sites or apps | Ids are per day and per site. |
 | Measurements within the guide's list | Per-page audience and user actions, aggregated daily. |
-| Users informed, for example in the privacy policy | "Estadístiques d'ús" in `/privacitat`, linked from Preferències. |
+| Users informed, for example in the privacy policy | "Estadístiques d'ús" in `/privacitat`, linked from the menu. |
 | Identifier lifetime at most 13 months, never extended | Daily id: 1 day. Guest cookie: 395 days, set once when minted. |
 | Data kept at most 25 months | Redis key: 48 hours. PostHog free plan: 1 year. The privacy policy promises 25 months at most. |
 | Lifetime and retention reviewed periodically | This page, reviewed yearly. |

@@ -59,7 +59,6 @@ import {
 	buildUsageEvent,
 	dailyPlayerId,
 	isCountableDateKey,
-	isUsageStatsRefused,
 	type PuzzleUsage,
 	recordPuzzleUsage,
 	sendPuzzleUsage,
@@ -92,31 +91,6 @@ async function send(
 	});
 	return messages;
 }
-
-describe("isUsageStatsRefused", () => {
-	it("honours Global Privacy Control", () => {
-		expect(isUsageStatsRefused(new Headers({ "Sec-GPC": "1" }))).toBe(true);
-	});
-
-	it("honours Do Not Track", () => {
-		expect(isUsageStatsRefused(new Headers({ DNT: "1" }))).toBe(true);
-	});
-
-	it("honours the opt-out cookie among others", () => {
-		expect(
-			isUsageStatsRefused(
-				new Headers({ Cookie: "garbuix_guest=abc.def; garbuix_stats_off=1" }),
-			),
-		).toBe(true);
-	});
-
-	it("counts a request with no signal", () => {
-		expect(
-			isUsageStatsRefused(new Headers({ Cookie: "garbuix_stats_off=0" })),
-		).toBe(false);
-		expect(isUsageStatsRefused(new Headers())).toBe(false);
-	});
-});
 
 describe("isCountableDateKey", () => {
 	beforeEach(() => {
@@ -250,7 +224,7 @@ describe("recordPuzzleUsage", () => {
 	});
 
 	it("counts a player in the background", async () => {
-		recordPuzzleUsage(new Headers(), usage({ completed: true }));
+		recordPuzzleUsage(usage({ completed: true }));
 		await Promise.all(backgroundTasks);
 
 		expect(captured.map((message) => message.event)).toEqual([
@@ -259,25 +233,15 @@ describe("recordPuzzleUsage", () => {
 		]);
 	});
 
-	it("does nothing for a player who turned statistics off", () => {
-		recordPuzzleUsage(
-			new Headers({ Cookie: "garbuix_stats_off=1" }),
-			usage({ completed: true }),
-		);
-
-		expect(backgroundTasks).toEqual([]);
-		expect(storeRef.current?.values.size).toBe(0);
-	});
-
 	it("ignores puzzles older than yesterday", () => {
-		recordPuzzleUsage(new Headers(), usage({ dateKey: "2026-10-20" }));
+		recordPuzzleUsage(usage({ dateKey: "2026-10-20" }));
 
 		expect(backgroundTasks).toEqual([]);
 	});
 
 	it("does nothing without Redis", () => {
 		storeRef.current = null;
-		recordPuzzleUsage(new Headers(), usage());
+		recordPuzzleUsage(usage());
 
 		expect(backgroundTasks).toEqual([]);
 	});
@@ -288,7 +252,7 @@ describe("recordPuzzleUsage", () => {
 		vi.resetModules();
 		const fresh = await import("@/lib/usage-stats.server");
 
-		fresh.recordPuzzleUsage(new Headers(), usage());
+		fresh.recordPuzzleUsage(usage());
 
 		expect(backgroundTasks).toEqual([]);
 	});

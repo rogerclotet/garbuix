@@ -6,18 +6,18 @@ const { recorded } = vi.hoisted(() => ({
 
 vi.mock("@/lib/usage-stats.server", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/usage-stats.server")>()),
-	recordPuzzleUsage: (_headers: Headers, usage: unknown) => {
+	recordPuzzleUsage: (usage: unknown) => {
 		recorded.push(usage);
 	},
 }));
 
 import { handleGuestProgressReport } from "@/lib/guest-progress-report.server";
 
-function report(body: unknown, headers: Record<string, string> = {}) {
+function report(body: unknown) {
 	return handleGuestProgressReport(
 		new Request("http://localhost/api/guest-progress", {
 			method: "POST",
-			headers: { "Content-Type": "application/json", ...headers },
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(body),
 		}),
 	);
@@ -46,17 +46,6 @@ describe("handleGuestProgressReport", () => {
 				completed: false,
 			},
 		]);
-	});
-
-	it("neither counts nor mints an identity once statistics are off", async () => {
-		const response = await report(
-			{ game: "mini", dateKey: "2026-10-24", completed: true },
-			{ "Sec-GPC": "1" },
-		);
-
-		expect(response.status).toBe(204);
-		expect(response.headers.get("Set-Cookie")).toBeNull();
-		expect(recorded).toEqual([]);
 	});
 
 	it("rejects classic reports, which arrive through the leaderboard", async () => {

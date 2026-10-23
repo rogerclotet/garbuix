@@ -275,9 +275,6 @@ export async function getQuadratSolution(dateKey: string) {
 export async function saveQuadratProgress(
 	userId: string,
 	incoming: PuzzleProgressState,
-	// The sync request's headers, to count the player in the usage statistics.
-	// Absent outside a request, as in tests.
-	requestHeaders?: Headers,
 ): Promise<PuzzleProgressState> {
 	const row = await db.query.quadratPuzzles.findFirst({
 		where: eq(quadratPuzzles.id, incoming.puzzleId),
@@ -366,14 +363,12 @@ export async function saveQuadratProgress(
 			});
 		return progress;
 	});
-	if (requestHeaders) {
-		recordSyncedProgressUsage(requestHeaders, {
-			game: "quadrat",
-			dateKey: row.dateKey,
-			userId,
-			progress: saved,
-		});
-	}
+	recordSyncedProgressUsage({
+		game: "quadrat",
+		dateKey: row.dateKey,
+		userId,
+		progress: saved,
+	});
 	return saved;
 }
 

@@ -258,9 +258,6 @@ export async function syncPuzzleEventsForUser(options: {
 	userId: string;
 	deviceId: string;
 	events: PuzzleClientEvent[];
-	// The sync request's headers, to count the player in the usage statistics.
-	// Absent outside a request, as in tests.
-	requestHeaders?: Headers;
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
 
@@ -417,14 +414,12 @@ export async function syncPuzzleEventsForUser(options: {
 		);
 	}
 
-	if (options.requestHeaders) {
-		recordSyncedProgressUsage(options.requestHeaders, {
-			game: "regular",
-			dateKey: puzzleRow.dateKey,
-			userId,
-			progress: nextProgress,
-		});
-	}
+	recordSyncedProgressUsage({
+		game: "regular",
+		dateKey: puzzleRow.dateKey,
+		userId,
+		progress: nextProgress,
+	});
 
 	return {
 		ackedEventIds,

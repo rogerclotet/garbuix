@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/privacitat")({
@@ -126,15 +126,8 @@ function PrivacyPage() {
 					millorar-lo, article 6.1.f del RGPD. Com que es limita a mesurar
 					l'audiència per a ús propi, no requereix el teu consentiment, d'acord
 					amb l'article 22.2 de la LSSI i la guia de l'Agència Espanyola de
-					Protecció de Dades sobre eines de mesura d'audiència.
-				</p>
-				<p>
-					Pots desactivar les estadístiques a{" "}
-					<Link to="/preferencies" className="text-link">
-						Preferències
-					</Link>
-					; la tria es desa en aquest dispositiu. Si el navegador envia el
-					senyal Global Privacy Control o Do Not Track, no et comptem.
+					Protecció de Dades sobre eines de mesura d'audiència. Pots oposar-te a
+					aquest tractament escrivint-nos.
 				</p>
 			</section>
 
@@ -146,9 +139,7 @@ function PrivacyPage() {
 					El joc utilitza galetes de sessió i de convidat, emmagatzematge local
 					i memòria cau per recordar les partides, les preferències i permetre
 					el funcionament sense connexió. La galeta de convidat té una durada
-					màxima de 13 mesos. Si desactives les estadístiques d'ús, una galeta
-					ho recorda perquè el servidor no et compti. No utilitzem galetes
-					publicitàries.
+					màxima de 13 mesos. No utilitzem galetes publicitàries.
 				</p>
 				<p>
 					Pots esborrar aquestes dades des de la configuració del navegador.

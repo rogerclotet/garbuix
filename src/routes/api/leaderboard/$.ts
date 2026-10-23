@@ -187,7 +187,7 @@ async function handlePost(request: Request) {
 		previousWordsFound: payload.previousWordsFound,
 		previousCompletedAt: payload.previousCompletedAt ?? null,
 	});
-	recordPuzzleUsage(request.headers, {
+	recordPuzzleUsage({
 		game: "regular",
 		dateKey: parsed.dateKey,
 		player: { kind: "guest", id: session.deviceId },

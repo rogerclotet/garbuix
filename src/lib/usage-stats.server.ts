@@ -1,6 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { type EventMessage, PostHog } from "posthog-node";
-import { readCookie } from "@/lib/cookies.server";
 import { getTodayDateKey, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
 import { getRedis } from "@/lib/redis.server";
@@ -9,7 +8,6 @@ import {
 	registerResourceCloser,
 	trackBackgroundTask,
 } from "@/lib/shutdown.server";
-import { USAGE_STATS_OFF_COOKIE } from "@/lib/usage-stats";
 import type { GameMode } from "@/lib/use-rendered-route";
 
 // Counts who starts and who finishes each game's puzzle per day, for totals in
@@ -49,16 +47,6 @@ export type UsageStatsStore = {
 	): Promise<"OK" | null>;
 	get(key: string): Promise<string | null>;
 };
-
-// Global Privacy Control and Do Not Track count as an objection, as GDPR art.
-// 21(5) allows. Browsers send both on every request.
-export function isUsageStatsRefused(headers: Headers): boolean {
-	return (
-		headers.get("sec-gpc") === "1" ||
-		headers.get("dnt") === "1" ||
-		readCookie(headers, USAGE_STATS_OFF_COOKIE) === "1"
-	);
-}
 
 // Today's puzzle, or yesterday's for a player who finished before midnight and
 // synced after it. Any older date's key has expired or is about to.
@@ -182,14 +170,11 @@ function getPostHog(): PostHog | null {
 
 // Called with the progress a request just saved or reported. Returns at once;
 // the counting runs in the background so it never slows down play.
-export function recordPuzzleUsage(
-	requestHeaders: Headers,
-	usage: PuzzleUsage,
-): void {
-	if (isUsageStatsRefused(requestHeaders)) return;
+export function recordPuzzleUsage(usage: PuzzleUsage): void {
 	if (!isCountableDateKey(usage.dateKey)) return;
 
-	// Like the leaderboard, statistics need Redis and do nothing without it.
+	// Like the leaderboard, statistics need Redis and do nothing without it, and
+	// they do nothing in tests or development (see getPostHog).
 	const posthog = getPostHog();
 	const store = posthog ? getRedis() : null;
 	if (!posthog || !store) return;
@@ -206,16 +191,13 @@ export function recordPuzzleUsage(
 }
 
 // Signed-in players are counted from the progress their sync just saved.
-export function recordSyncedProgressUsage(
-	requestHeaders: Headers,
-	sync: {
-		game: GameMode;
-		dateKey: string;
-		userId: string;
-		progress: Pick<PuzzleProgressState, "guessCount" | "completedAt">;
-	},
-): void {
-	recordPuzzleUsage(requestHeaders, {
+export function recordSyncedProgressUsage(sync: {
+	game: GameMode;
+	dateKey: string;
+	userId: string;
+	progress: Pick<PuzzleProgressState, "guessCount" | "completedAt">;
+}): void {
+	recordPuzzleUsage({
 		game: sync.game,
 		dateKey: sync.dateKey,
 		player: { kind: "user", id: sync.userId },

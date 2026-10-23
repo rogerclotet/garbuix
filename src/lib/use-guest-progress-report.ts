@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
 import type { GuestProgressReport } from "@/lib/usage-stats";
-import { canReportUsage } from "@/lib/usage-stats-preference";
 
 // Tells the server when a guest starts or finishes the day's Mini, Síl·labes
 // or Quadrat, for the usage statistics. Their progress never leaves the browser
@@ -27,7 +26,6 @@ export function useGuestProgressReport({
 		if (!ready || userId || !started) return;
 		const reportKey = `${dateKey}:${completed}`;
 		if (lastReported.current === reportKey) return;
-		if (!canReportUsage()) return;
 		lastReported.current = reportKey;
 
 		const report: GuestProgressReport = { game, dateKey, completed };

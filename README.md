@@ -305,10 +305,9 @@ code.
 of the account or guest id under a random key per puzzle date. The key lives
 only in Redis and expires after two days, so PostHog can't link ids across days
 or back to a player. Events carry the game, the puzzle date and that id, with no
-IP address or user agent. Players can turn statistics off in Preferències,
-which sets the `garbuix_stats_off` cookie, and the server also honours Global
-Privacy Control and Do Not Track. Statistics need Redis and send nothing outside
-production, because worktrees share one `.env`.
+IP address or user agent. Players can object by email, as the privacy policy
+says. Statistics need Redis and send nothing outside production, because
+worktrees share one `.env`.
 
 The design relies on the AEPD's consent exemption for audience measurement.
 `docs/privacy/usage-statistics.md` records the assessment, and the privacy

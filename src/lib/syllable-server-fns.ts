@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeaders } from "@tanstack/react-start/server";
 import { getNextRolloverAt, getYesterdayDateKey } from "@/lib/puzzle-dates";
 import { progressStateSchema } from "@/lib/puzzle-event-schemas";
 import { getAuthSession } from "@/lib/puzzle-service.server";
@@ -33,11 +32,7 @@ export const syncSyllableProgress = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
 		if (!session) throw new Error("Unauthorized");
-		return saveSyllableProgress(
-			session.user.id,
-			data,
-			new Headers(getRequestHeaders()),
-		);
+		return saveSyllableProgress(session.user.id, data);
 	});
 
 export const getSyllableHistoryData = createServerFn({ method: "GET" }).handler(

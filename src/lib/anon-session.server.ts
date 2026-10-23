@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readCookie } from "@/lib/cookies.server";
 import { getServerEnv } from "@/lib/server-env";
 
 // Identity for players with no account. The device id used to come straight
@@ -70,10 +69,29 @@ export function serializeAnonCookie(deviceId: string): string {
 	return parts.join("; ");
 }
 
+function readCookie(request: Request, name: string): string | null {
+	const header = request.headers.get("cookie");
+	if (!header) {
+		return null;
+	}
+
+	for (const pair of header.split(";")) {
+		const separatorIndex = pair.indexOf("=");
+		if (separatorIndex === -1) {
+			continue;
+		}
+		if (pair.slice(0, separatorIndex).trim() === name) {
+			return pair.slice(separatorIndex + 1).trim();
+		}
+	}
+
+	return null;
+}
+
 // Returns the device id only when the cookie carries a signature this server
 // produced. An unsigned, tampered, or absent cookie yields null.
 export function readAnonDeviceId(request: Request): string | null {
-	const raw = readCookie(request.headers, ANON_COOKIE_NAME);
+	const raw = readCookie(request, ANON_COOKIE_NAME);
 	if (!raw) {
 		return null;
 	}
