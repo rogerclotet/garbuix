@@ -6,9 +6,10 @@ apply, because the processing isn't occasional. Last reviewed: 24 October 2026.
 Controller: Roger Clotet, roger@clotet.dev. No data protection officer is
 required (GDPR art. 37, LOPDGDD art. 34).
 
-Hosting: a VPS in the EU behind a Pangolin reverse proxy, with request log
-retention turned off. Postgres and Redis run on the same host. Provider:
-_fill in_.
+Hosting: a VPS at OVHcloud (OVH SAS, France) in the EU, behind a Pangolin
+reverse proxy with request log retention turned off. Postgres and Redis run on
+the same host. OVHcloud is a processor under the data processing terms of its
+contract; nothing hosted there leaves the EU.
 
 ## Activities
 
@@ -83,9 +84,11 @@ _fill in_.
 - Purpose: stop floods of leaderboard reports, clue requests and clue
   generation.
 - Basis: art. 6.1.f, protecting the service.
-- Data: IP address and account or guest id in rate-limit counters.
+- Data: IP address and account or guest id in rate-limit counters. Better
+  Auth also limits sign-in requests per IP address, in memory.
 - Recipients: none.
-- Retention: Redis, the length of each window, at most 1 hour.
+- Retention: Redis, the length of each window, at most 1 hour; Better Auth's
+  counters last seconds.
 
 ### 8. Usage statistics
 

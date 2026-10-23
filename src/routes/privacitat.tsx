@@ -100,6 +100,23 @@ function PrivacyPage() {
 				</p>
 			</section>
 
+			<section className="space-y-3" aria-labelledby="abusos">
+				<h2 id="abusos" className="text-base font-semibold">
+					Protecció contra abusos
+				</h2>
+				<p>
+					Per evitar que algú saturi el servei, falsegi la classificació o abusi
+					de les pistes, comptem quantes peticions fa cada adreça IP, cada
+					convidat i cada compte durant un període curt. Si algú supera el
+					límit, el servidor rebutja les seves peticions una estona. No fem
+					servir aquests comptadors per a res més.
+				</p>
+				<p>
+					Ho fem per mantenir el joc segur i disponible, sobre la base del
+					nostre interès legítim, article 6.1.f del RGPD.
+				</p>
+			</section>
+
 			<section className="space-y-3" aria-labelledby="estadistiques">
 				<h2 id="estadistiques" className="text-base font-semibold">
 					Estadístiques d'ús
@@ -183,13 +200,13 @@ function PrivacyPage() {
 					Proveïdors i transferències
 				</h2>
 				<p>
-					Els proveïdors d'allotjament intervenen en el funcionament del servei.
-					Google intervé quan tries iniciar-hi sessió. Resend envia els correus
-					amb el codi per entrar. Fem servir Anthropic per generar pistes a
-					partir de paraules del diccionari; no hi enviem el perfil del jugador
-					per generar-les. PostHog desa les estadístiques d'ús, que rep sense
-					dades que t'identifiquin. Reddit allotja la comunitat r/garbuix i
-					executa l'aplicació que hi publica el joc de cada dia.
+					OVHcloud allotja el servidor del joc a la Unió Europea. Google intervé
+					quan tries iniciar-hi sessió. Resend envia els correus amb el codi per
+					entrar. Fem servir Anthropic per generar pistes a partir de paraules
+					del diccionari; no hi enviem el perfil del jugador per generar-les.
+					PostHog desa les estadístiques d'ús, que rep sense dades que
+					t'identifiquin. Reddit allotja la comunitat r/garbuix i executa
+					l'aplicació que hi publica el joc de cada dia.
 				</p>
 				<p>
 					Els informes d'errors s'envien a la nostra instància de GlitchTip, i
@@ -214,7 +231,8 @@ function PrivacyPage() {
 					l'última actualització. Les pistes compartides i els registres de
 					peticions tenen un termini de caducitat de 24 hores. Els informes
 					d'errors tenen un termini de retenció de 90 dies, segons la
-					configuració predeterminada de GlitchTip que utilitzem. Les
+					configuració predeterminada de GlitchTip que utilitzem. Els comptadors
+					contra abusos s'esborren al cap d'una hora com a màxim, i les
 					estadístiques d'ús es conserven un màxim de 25 mesos.
 				</p>
 			</section>
