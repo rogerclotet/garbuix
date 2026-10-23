@@ -133,6 +133,7 @@ export const syncUserPuzzleEvents = createServerFn({ method: "POST" })
 			userId: session.user.id,
 			deviceId: data.deviceId,
 			events: data.events,
+			requestHeaders: new Headers(getRequestHeaders()),
 		});
 	});
 

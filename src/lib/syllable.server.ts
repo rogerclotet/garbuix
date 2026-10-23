@@ -17,6 +17,7 @@ import {
 	SYLLABLE_ALGORITHM_VERSION,
 } from "@/lib/syllable-generator";
 import { mergeSyllableProgress } from "@/lib/syllable-progress";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 export async function ensureSyllablePuzzle(dateKey = getTodayDateKey()) {
 	if (!isPlayableDateKey(dateKey)) throw new Error("Invalid puzzle date");
@@ -89,6 +90,9 @@ export async function getSyllableHistory(userId: string) {
 export async function saveSyllableProgress(
 	userId: string,
 	incoming: PuzzleProgressState,
+	// The sync request's headers, to count the player in the usage statistics.
+	// Absent outside a request, as in tests.
+	requestHeaders?: Headers,
 ) {
 	const row = await db.query.syllablePuzzles.findFirst({
 		where: eq(syllablePuzzles.id, incoming.puzzleId),
@@ -179,5 +183,13 @@ export async function saveSyllableProgress(
 			});
 		return progress;
 	});
+	if (requestHeaders) {
+		recordSyncedProgressUsage(requestHeaders, {
+			game: "syllables",
+			dateKey: row.dateKey,
+			userId,
+			progress: saved,
+		});
+	}
 	return saved;
 }

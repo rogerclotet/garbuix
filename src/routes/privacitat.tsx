@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/privacitat")({
@@ -19,11 +19,12 @@ function PrivacyPage() {
 					/>
 					<p className="text-base text-muted-foreground">
 						Pots jugar sense compte. Desem el progrés per poder continuar la
-						partida i recollim informació tècnica limitada per corregir errors.
+						partida, recollim informació tècnica limitada per corregir errors i
+						comptem quanta gent juga sense saber qui és.
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzada el 8 d'octubre de 2026
+					Actualitzada el 24 d'octubre de 2026
 				</p>
 			</header>
 
@@ -32,8 +33,9 @@ function PrivacyPage() {
 					Qui és el responsable?
 				</h2>
 				<p>
-					Roger Clotet és el responsable del tractament de dades de Garbuix i
-					Garbuix mini. Per a qualsevol consulta de privacitat, escriu a{" "}
+					Roger Clotet és el responsable del tractament de dades de Garbuix,
+					Garbuix mini, Garbuix síl·labes i Garbuix quadrat. Per a qualsevol
+					consulta de privacitat, escriu a{" "}
 					<a href="mailto:roger@clotet.dev" className="text-link">
 						roger@clotet.dev
 					</a>
@@ -98,6 +100,44 @@ function PrivacyPage() {
 				</p>
 			</section>
 
+			<section className="space-y-3" aria-labelledby="estadistiques">
+				<h2 id="estadistiques" className="text-base font-semibold">
+					Estadístiques d'ús
+				</h2>
+				<p>
+					Per saber quanta gent juga a cada joc i quantes partides s'acaben, el
+					servidor anota quan comences i quan acabes la partida del dia. Per
+					comptar cada jugador una sola vegada al dia, calcula un codi a partir
+					del compte o de l'identificador de convidat amb una clau que canvia
+					cada dia i que esborrem al cap de dos dies. No desem la relació entre
+					el codi i el teu compte, de manera que no podem saber qui ets ni
+					seguir les teves partides d'un dia per l'altre.
+				</p>
+				<p>
+					A PostHog només hi enviem el joc, el dia de la partida, si l'has
+					començada o acabada i aquest codi. No hi enviem el compte, el nom de
+					jugador, l'adreça IP, les dades del navegador ni les paraules que
+					escrius.
+				</p>
+				<p>
+					Només fem servir aquestes dades per obtenir xifres agregades per a ús
+					propi, com el nombre de jugadors de cada joc per dia. La base és el
+					nostre interès legítim a entendre com es fa servir el joc per
+					millorar-lo, article 6.1.f del RGPD. Com que es limita a mesurar
+					l'audiència per a ús propi, no requereix el teu consentiment, d'acord
+					amb l'article 22.2 de la LSSI i la guia de l'Agència Espanyola de
+					Protecció de Dades sobre eines de mesura d'audiència.
+				</p>
+				<p>
+					Pots desactivar les estadístiques a{" "}
+					<Link to="/preferencies" className="text-link">
+						Preferències
+					</Link>
+					; la tria es desa en aquest dispositiu. Si el navegador envia el
+					senyal Global Privacy Control o Do Not Track, no et comptem.
+				</p>
+			</section>
+
 			<section className="space-y-3" aria-labelledby="emmagatzematge">
 				<h2 id="emmagatzematge" className="text-base font-semibold">
 					Galetes i emmagatzematge al dispositiu
@@ -106,7 +146,9 @@ function PrivacyPage() {
 					El joc utilitza galetes de sessió i de convidat, emmagatzematge local
 					i memòria cau per recordar les partides, les preferències i permetre
 					el funcionament sense connexió. La galeta de convidat té una durada
-					màxima de 400 dies. No utilitzem galetes publicitàries.
+					màxima de 13 mesos. Si desactives les estadístiques d'ús, una galeta
+					ho recorda perquè el servidor no et compti. No utilitzem galetes
+					publicitàries.
 				</p>
 				<p>
 					Pots esborrar aquestes dades des de la configuració del navegador.
@@ -151,13 +193,15 @@ function PrivacyPage() {
 					Google intervé quan tries iniciar-hi sessió. Resend envia els correus
 					amb el codi per entrar. Fem servir Anthropic per generar pistes a
 					partir de paraules del diccionari; no hi enviem el perfil del jugador
-					per generar-les. Reddit allotja la comunitat r/garbuix i executa
-					l'aplicació que hi publica el joc de cada dia.
+					per generar-les. PostHog desa les estadístiques d'ús, que rep sense
+					dades que t'identifiquin. Reddit allotja la comunitat r/garbuix i
+					executa l'aplicació que hi publica el joc de cada dia.
 				</p>
 				<p>
-					Els informes d'errors s'envien a la nostra instància de GlitchTip.
-					Pots demanar-nos informació sobre l'allotjament i el tractament
-					d'aquestes dades per correu.
+					Els informes d'errors s'envien a la nostra instància de GlitchTip, i
+					les estadístiques d'ús, al servei de PostHog a la Unió Europea. Pots
+					demanar-nos informació sobre l'allotjament i el tractament d'aquestes
+					dades per correu.
 				</p>
 			</section>
 
@@ -176,7 +220,8 @@ function PrivacyPage() {
 					l'última actualització. Les pistes compartides i els registres de
 					peticions tenen un termini de caducitat de 24 hores. Els informes
 					d'errors tenen un termini de retenció de 90 dies, segons la
-					configuració predeterminada de GlitchTip que utilitzem.
+					configuració predeterminada de GlitchTip que utilitzem. Les
+					estadístiques d'ús es conserven un màxim de 25 mesos.
 				</p>
 			</section>
 

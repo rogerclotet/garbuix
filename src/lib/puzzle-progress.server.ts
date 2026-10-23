@@ -29,6 +29,7 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { trackBackgroundTask } from "@/lib/shutdown.server";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 // Guess hashes of the valid words that aren't answers: the only guesses that
 // count toward a bonus clue.
@@ -257,6 +258,9 @@ export async function syncPuzzleEventsForUser(options: {
 	userId: string;
 	deviceId: string;
 	events: PuzzleClientEvent[];
+	// The sync request's headers, to count the player in the usage statistics.
+	// Absent outside a request, as in tests.
+	requestHeaders?: Headers;
 }) {
 	const { deviceId, events, puzzleId, userId } = options;
 
@@ -411,6 +415,15 @@ export async function syncPuzzleEventsForUser(options: {
 				previousCompletedAt,
 			}),
 		);
+	}
+
+	if (options.requestHeaders) {
+		recordSyncedProgressUsage(options.requestHeaders, {
+			game: "regular",
+			dateKey: puzzleRow.dateKey,
+			userId,
+			progress: nextProgress,
+		});
 	}
 
 	return {

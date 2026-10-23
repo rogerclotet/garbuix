@@ -1,6 +1,7 @@
 import {
 	createFileRoute,
 	getRouteApi,
+	Link,
 	useRouter,
 } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -35,6 +36,11 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { forgetCachedPages } from "@/lib/page-cache";
 import { getSessionUser, updateUserProfile } from "@/lib/puzzle-server-fns";
+import {
+	browserAsksNotToTrack,
+	hasUsageStatsOptOut,
+	setUsageStatsOptOut,
+} from "@/lib/usage-stats-preference";
 import { useActiveSessionUser } from "@/lib/use-active-session-user";
 import {
 	DISPLAY_NAME_MAX_LENGTH,
@@ -166,6 +172,7 @@ function PreferencesPage() {
 	const fetchSessionUser = useServerFn(getSessionUser);
 	const sharePreviewToggleId = useId();
 	const vibrationToggleId = useId();
+	const usageStatsToggleId = useId();
 	const letterLayoutGroupId = useId();
 	const themeSelectId = useId();
 	const displayNameInputId = useId();
@@ -173,6 +180,8 @@ function PreferencesPage() {
 	const { theme, setTheme } = useTheme();
 	const [showSharePreview, setShowSharePreview] = useState(true);
 	const [vibrationEnabled, setVibrationEnabled] = useState(true);
+	const [usageStatsEnabled, setUsageStatsEnabled] = useState(true);
+	const [browserRefusesTracking, setBrowserRefusesTracking] = useState(false);
 	const [letterLayout, setLetterLayoutState] = useState<LetterLayout>(
 		DEFAULT_LETTER_LAYOUT,
 	);
@@ -188,6 +197,8 @@ function PreferencesPage() {
 	useEffect(() => {
 		setShowSharePreview(!getSkipSharePreview());
 		setVibrationEnabled(isVibrationEnabled());
+		setUsageStatsEnabled(!hasUsageStatsOptOut());
+		setBrowserRefusesTracking(browserAsksNotToTrack());
 		setLetterLayoutState(getLetterLayout());
 		setMounted(true);
 	}, []);
@@ -217,6 +228,11 @@ function PreferencesPage() {
 	const handleToggleVibration = (next: boolean) => {
 		setVibrationEnabled(next);
 		setVibrationPreference(next);
+	};
+
+	const handleToggleUsageStats = (next: boolean) => {
+		setUsageStatsEnabled(next);
+		setUsageStatsOptOut(!next);
 	};
 
 	const handleLayoutChange = (next: LetterLayout) => {
@@ -546,6 +562,33 @@ function PreferencesPage() {
 						})}
 					</fieldset>
 				</div>
+			</section>
+			<section className="rounded-xl border border-border/40 bg-muted/30">
+				<label
+					htmlFor={usageStatsToggleId}
+					className={cn(
+						"flex items-start justify-between gap-4 p-4 sm:p-5",
+						browserRefusesTracking ? "cursor-default" : "cursor-pointer",
+					)}
+				>
+					<div className="space-y-1">
+						<div className="font-medium">Estadístiques d'ús</div>
+						<p className="text-sm text-muted-foreground font-ui">
+							{browserRefusesTracking
+								? "El navegador demana no ser rastrejat, així que no et comptem."
+								: "Ens diu quanta gent juga a cada joc i quantes partides s'acaben, sense saber qui hi juga. La tria només s'aplica a aquest dispositiu."}{" "}
+							<Link to="/privacitat" hash="estadistiques" className="text-link">
+								Més informació
+							</Link>
+						</p>
+					</div>
+					<Switch
+						id={usageStatsToggleId}
+						checked={usageStatsEnabled && !browserRefusesTracking}
+						disabled={browserRefusesTracking}
+						onCheckedChange={handleToggleUsageStats}
+					/>
+				</label>
 			</section>
 			{activeUser ? (
 				<section className="flex flex-col gap-4 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">

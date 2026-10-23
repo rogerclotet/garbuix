@@ -12,6 +12,7 @@ import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 	const existing = await db.query.miniPuzzles.findFirst({
@@ -76,6 +77,9 @@ export async function getMiniHistory(userId: string) {
 export async function saveMiniProgress(
 	userId: string,
 	incoming: PuzzleProgressState,
+	// The sync request's headers, to count the player in the usage statistics.
+	// Absent outside a request, as in tests.
+	requestHeaders?: Headers,
 ) {
 	const row = await db.query.miniPuzzles.findFirst({
 		where: eq(miniPuzzles.id, incoming.puzzleId),
@@ -164,5 +168,13 @@ export async function saveMiniProgress(
 			});
 		return progress;
 	});
+	if (requestHeaders) {
+		recordSyncedProgressUsage(requestHeaders, {
+			game: "mini",
+			dateKey: row.dateKey,
+			userId,
+			progress: saved,
+		});
+	}
 	return saved;
 }

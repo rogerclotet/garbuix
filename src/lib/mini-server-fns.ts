@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import {
 	ensureMiniPuzzle,
 	getMiniHistory,
@@ -35,7 +36,11 @@ export const syncMiniProgress = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
 		if (!session) throw new Error("Unauthorized");
-		return saveMiniProgress(session.user.id, data);
+		return saveMiniProgress(
+			session.user.id,
+			data,
+			new Headers(getRequestHeaders()),
+		);
 	});
 
 export const getMiniHistoryData = createServerFn({ method: "GET" }).handler(

@@ -292,6 +292,34 @@ prove ingestion or notification delivery. Browser blockers and network failures
 can prevent client delivery. Errors thrown directly in the browser console do
 not exercise the normal application capture path.
 
+### Usage statistics
+
+The server counts who starts and who finishes each game's puzzle per day and
+sends the events to PostHog. It counts from requests the game already makes:
+signed-in progress syncs, the classic guest leaderboard report, and a small
+report from guests in Mini, Síl·labes and Quadrat (`/api/guest-progress`),
+whose progress otherwise stays in the browser. The browser loads no analytics
+code.
+
+`src/lib/usage-stats.server.ts` derives each player's id for the day as an HMAC
+of the account or guest id under a random key per puzzle date. The key lives
+only in Redis and expires after two days, so PostHog can't link ids across days
+or back to a player. Events carry the game, the puzzle date and that id, with no
+IP address or user agent. Players can turn statistics off in Preferències,
+which sets the `garbuix_stats_off` cookie, and the server also honours Global
+Privacy Control and Do Not Track. Statistics need Redis and send nothing outside
+production, because worktrees share one `.env`.
+
+The design relies on the AEPD's consent exemption for audience measurement.
+`docs/privacy/usage-statistics.md` records the assessment, and the privacy
+policy's "Estadístiques d'ús" section describes the same behaviour, so change
+them together.
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTHOG_PROJECT_KEY` | Project key of a PostHog Cloud EU project. Empty sends nothing. |
+| `POSTHOG_HOST` | Ingestion host. Defaults to `https://eu.i.posthog.com`. |
+
 ## Docker Compose
 
 Copy the example env first:
@@ -312,12 +340,14 @@ The app will be available at `http://localhost:3000` and Postgres at `localhost:
 
 ### Privacy
 
-The app does not send analytics, error reports, session recordings, or performance
-telemetry. Game progress, account sessions, leaderboards, and peer clues still use
-the app server and its database. Google sign-in and avatars contact Google;
-emailed sign-in codes are sent through Resend;
-optional AI clue generation sends puzzle words to Anthropic. Fonts are bundled
-locally.
+The browser loads no third-party analytics, session recording or performance
+telemetry. Errors go to GlitchTip through `sentry-privacy.ts`, and usage
+statistics go from the server to PostHog Cloud EU as described under
+[Usage statistics](#usage-statistics). Game progress, account sessions,
+leaderboards, and peer clues still use the app server and its database. Google
+sign-in and avatars contact Google; emailed sign-in codes are sent through
+Resend; optional AI clue generation sends puzzle words to Anthropic. Fonts are
+bundled locally.
 
 ### Production
 

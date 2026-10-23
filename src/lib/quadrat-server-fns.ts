@@ -38,7 +38,11 @@ export const syncQuadratProgress = createServerFn({ method: "POST" })
 	.handler(async ({ data }) => {
 		const session = await getAuthSession();
 		if (!session) throw new Error("Unauthorized");
-		return saveQuadratProgress(session.user.id, data);
+		return saveQuadratProgress(
+			session.user.id,
+			data,
+			new Headers(getRequestHeaders()),
+		);
 	});
 
 export const getQuadratHistoryData = createServerFn({ method: "GET" }).handler(

@@ -11,6 +11,7 @@ import {
 } from "@/lib/quadrat-progress";
 import { syncQuadratProgress } from "@/lib/quadrat-server-fns";
 import type { QuadratPuzzlePublic } from "@/lib/quadrat-types";
+import { useGuestProgressReport } from "@/lib/use-guest-progress-report";
 
 const SYNC_INTERVAL_MS = 3000;
 
@@ -157,6 +158,14 @@ export function useQuadratProgress({
 			writeQuadratSave(userId, dateKey, saved);
 		}
 		writeQuadratSave(userId, puzzle.dateKey, current.current);
+	});
+
+	useGuestProgressReport({
+		game: "quadrat",
+		dateKey: puzzle.dateKey,
+		progress,
+		userId,
+		ready,
 	});
 
 	return { progress, ready, dispatch, syncFailed, syncPending };

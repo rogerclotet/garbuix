@@ -62,4 +62,33 @@ describe("getServerEnv", () => {
 
 		expect(getServerEnv().BETTER_AUTH_SECRET).toBe(REAL_SECRET);
 	});
+
+	it("sends usage statistics to PostHog's EU host by default", async () => {
+		const getServerEnv = await loadServerEnv({
+			NODE_ENV: "development",
+			POSTHOG_HOST: "",
+		});
+
+		expect(getServerEnv().POSTHOG_HOST).toBe("https://eu.i.posthog.com");
+	});
+
+	it("accepts a self-hosted PostHog by address or container name", async () => {
+		for (const host of ["http://127.0.0.1:8000", "http://posthog:8000"]) {
+			const getServerEnv = await loadServerEnv({
+				NODE_ENV: "development",
+				POSTHOG_HOST: host,
+			});
+
+			expect(getServerEnv().POSTHOG_HOST).toBe(host);
+		}
+	});
+
+	it("refuses a PostHog host that is not an HTTP URL", async () => {
+		const getServerEnv = await loadServerEnv({
+			NODE_ENV: "development",
+			POSTHOG_HOST: "/ingest",
+		});
+
+		expect(() => getServerEnv()).toThrow(/POSTHOG_HOST/);
+	});
 });

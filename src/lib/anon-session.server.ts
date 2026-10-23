@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { readCookie } from "@/lib/cookies.server";
 import { getServerEnv } from "@/lib/server-env";
 
 // Identity for players with no account. The device id used to come straight
@@ -15,8 +16,11 @@ import { getServerEnv } from "@/lib/server-env";
 
 const ANON_COOKIE_NAME = "garbuix_guest";
 // Long-lived so a guest keeps their streak position across sessions; the data
-// it identifies (leaderboard, clue inbox) expires far sooner on its own.
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
+// it identifies (leaderboard, clue inbox) expires far sooner on its own. The
+// usage statistics count guests by this id too, and the AEPD caps identifiers
+// used for audience measurement at 13 months, so it stops short of the 400 days
+// browsers allow. It is only set when minted, so visits never extend it.
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 395;
 const DEVICE_ID_BYTES = 16;
 
 function getSigningKey(): string {
@@ -66,29 +70,10 @@ export function serializeAnonCookie(deviceId: string): string {
 	return parts.join("; ");
 }
 
-function readCookie(request: Request, name: string): string | null {
-	const header = request.headers.get("cookie");
-	if (!header) {
-		return null;
-	}
-
-	for (const pair of header.split(";")) {
-		const separatorIndex = pair.indexOf("=");
-		if (separatorIndex === -1) {
-			continue;
-		}
-		if (pair.slice(0, separatorIndex).trim() === name) {
-			return pair.slice(separatorIndex + 1).trim();
-		}
-	}
-
-	return null;
-}
-
 // Returns the device id only when the cookie carries a signature this server
 // produced. An unsigned, tampered, or absent cookie yields null.
 export function readAnonDeviceId(request: Request): string | null {
-	const raw = readCookie(request, ANON_COOKIE_NAME);
+	const raw = readCookie(request.headers, ANON_COOKIE_NAME);
 	if (!raw) {
 		return null;
 	}
