@@ -50,15 +50,19 @@ vi.mock("@/lib/shutdown.server", () => ({
 
 vi.mock("@/lib/server-env", () => ({
 	getServerEnv: () => ({
+		BETTER_AUTH_SECRET: "test-secret",
 		POSTHOG_PROJECT_KEY: "phc_test",
 		POSTHOG_HOST: "https://eu.i.posthog.com",
 	}),
 }));
 
+import { serializeAnonCookie } from "@/lib/anon-session.server";
 import {
 	buildUsageEvent,
 	dailyPlayerId,
 	isCountableDateKey,
+	linkGuestOnSignIn,
+	linkGuestToAccount,
 	type PuzzleUsage,
 	recordPuzzleUsage,
 	sendPuzzleUsage,
@@ -203,6 +207,111 @@ describe("sendPuzzleUsage", () => {
 
 		expect(await send(store, { started: false })).toEqual([]);
 		expect(store.values.size).toBe(0);
+	});
+});
+
+describe("linkGuestToAccount", () => {
+	const guest = { kind: "guest", id: "device-1" } as const;
+	const account = { kind: "user", id: "user-1" } as const;
+	const link = { guestId: "device-1", userId: "user-1", dateKey: TODAY };
+
+	it("counts a guest who signs in as one player", async () => {
+		const store = new FakeStore();
+		const [asGuest] = await send(store, { player: guest });
+
+		expect(await linkGuestToAccount(store, link)).toBe(true);
+		const afterSignIn = await send(store, { player: account });
+		const finish = await send(store, { player: account, completed: true });
+
+		// The import replays the guest's start, which the day already has.
+		expect(afterSignIn).toEqual([]);
+		expect(finish.map((message) => message.event)).toEqual([
+			"puzzle_completed",
+		]);
+		expect(finish[0]?.distinctId).toBe(asGuest?.distinctId);
+	});
+
+	it("leaves an account alone when the guest never played", async () => {
+		const store = new FakeStore();
+		await send(store, { player: { kind: "guest", id: "someone-else" } });
+
+		expect(await linkGuestToAccount(store, link)).toBe(false);
+	});
+
+	it("keeps an account that already played today on its own id", async () => {
+		const store = new FakeStore();
+		await send(store, { player: account, game: "quadrat" });
+		await send(store, { player: guest });
+
+		expect(await linkGuestToAccount(store, link)).toBe(false);
+	});
+
+	it("gives a guest id to one account only", async () => {
+		const store = new FakeStore();
+		await send(store, { player: guest });
+
+		expect(await linkGuestToAccount(store, link)).toBe(true);
+		expect(await linkGuestToAccount(store, { ...link, userId: "user-2" })).toBe(
+			false,
+		);
+		// Signing in again on the same device keeps the link.
+		expect(await linkGuestToAccount(store, link)).toBe(true);
+	});
+
+	it("does nothing on a date nobody has played", async () => {
+		const store = new FakeStore();
+
+		expect(await linkGuestToAccount(store, link)).toBe(false);
+		expect(store.values.size).toBe(0);
+	});
+});
+
+describe("linkGuestOnSignIn", () => {
+	const originalNodeEnv = process.env.NODE_ENV;
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.setSystemTime(NOW);
+		process.env.NODE_ENV = "production";
+		storeRef.current = new FakeStore();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		process.env.NODE_ENV = originalNodeEnv;
+	});
+
+	it("reads the guest from the sign-in request's cookie", async () => {
+		const store = storeRef.current as FakeStore;
+		await send(store, { player: { kind: "guest", id: "device-1" } });
+		const cookie = serializeAnonCookie("device-1").split(";")[0] ?? "";
+
+		await linkGuestOnSignIn("user-1", new Headers({ Cookie: cookie }));
+
+		const [, accountMessage] = await Promise.all([
+			send(store, { player: { kind: "guest", id: "device-1" } }),
+			send(store, { player: { kind: "user", id: "user-1" }, completed: true }),
+		]);
+		expect(accountMessage.map((message) => message.event)).toEqual([
+			"puzzle_completed",
+		]);
+	});
+
+	it("ignores a forged guest cookie", async () => {
+		const store = storeRef.current as FakeStore;
+		await send(store, { player: { kind: "guest", id: "device-1" } });
+
+		await linkGuestOnSignIn(
+			"user-1",
+			new Headers({ Cookie: "garbuix_guest=device-1.forged" }),
+		);
+
+		const accountMessages = await send(store, {
+			player: { kind: "user", id: "user-1" },
+		});
+		expect(accountMessages.map((message) => message.event)).toEqual([
+			"puzzle_started",
+		]);
 	});
 });
 

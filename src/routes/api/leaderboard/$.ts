@@ -19,7 +19,6 @@ import {
 } from "@/lib/rate-limit.server";
 import { isRedisConfigured } from "@/lib/redis.server";
 import { createRedisSseStream } from "@/lib/redis-sse.server";
-import { recordPuzzleUsage } from "@/lib/usage-stats.server";
 import { normalizeDisplayNameInput } from "@/lib/user-profile";
 
 export const Route = createFileRoute("/api/leaderboard/$")({
@@ -186,13 +185,6 @@ async function handlePost(request: Request) {
 		completedAt,
 		previousWordsFound: payload.previousWordsFound,
 		previousCompletedAt: payload.previousCompletedAt ?? null,
-	});
-	recordPuzzleUsage({
-		game: "regular",
-		dateKey: parsed.dateKey,
-		player: { kind: "guest", id: session.deviceId },
-		started: tryCount > 0,
-		completed: completedAt !== null,
 	});
 	// The id is public (it labels the guest's row on every viewer's board);
 	// only the cookie's signature proves ownership of it. Returning it lets

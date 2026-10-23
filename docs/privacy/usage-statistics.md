@@ -21,13 +21,20 @@ The player id is `HMAC-SHA256(dayKey, "user:<account id>")` or
 puzzle date, held only in Redis, which deletes it 48 hours after it was made.
 Nothing stores which id belongs to which player.
 
-The server counts from requests the game already makes:
+Where the events come from:
 
-- signed-in players: the progress sync of each game
-- classic guests: the leaderboard report
-- Mini, Síl·labes and Quadrat guests: `POST /api/guest-progress`, which sends
-  the game, the date and whether the puzzle is finished. The server counts it
-  and stores nothing.
+- signed-in players: the progress sync of each game, which the game makes
+  anyway
+- guests: `POST /api/guest-progress`, which sends the game, the date and
+  whether the puzzle is finished. The server counts it and stores nothing.
+  Reports made offline wait in the browser's localStorage until the server
+  answers, and are dropped once their puzzle is older than yesterday.
+
+When a guest signs in, the account takes over the guest's daily id for today
+and yesterday, so the progress that moves to the account isn't counted again.
+Redis keeps the link between the two derived ids (never the raw ones) for 48
+hours. It only links a guest who played that day to an account that hadn't,
+and each guest id to one account.
 
 PostHog never receives an IP address, a user agent, an account or guest id, a
 display name or a guess. The server sends the events itself, so the player's
@@ -47,9 +54,9 @@ which rules out retention and weekly or monthly totals. That limit is
 deliberate.
 
 Balancing. Players expect a free web game to know roughly how many people
-play it. The counts come from progress the game already sends for the
-leaderboard and for sync, so they add no new collection for signed-in players
-or classic guests, and only a start and finish flag for the other guests. The
+play it. Signed-in players are counted from the progress sync the game makes
+anyway, and guests add only a start and finish flag to what they already send
+for the leaderboard and clues. The
 data says nothing about a person beyond "played this game today
 and finished or not", can't be tied back to them by us after two days or by
 PostHog at any time, and is never used to decide anything about an individual.

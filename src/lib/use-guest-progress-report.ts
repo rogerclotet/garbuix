@@ -1,10 +1,14 @@
 import { useEffect, useRef } from "react";
+import {
+	flushGuestProgressReports,
+	reportGuestProgress,
+} from "@/lib/guest-progress-outbox";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
 import type { GuestProgressReport } from "@/lib/usage-stats";
 
-// Tells the server when a guest starts or finishes the day's Mini, Síl·labes
-// or Quadrat, for the usage statistics. Their progress never leaves the browser
-// otherwise. Signed-in players are counted from their progress sync instead.
+// Tells the server when a guest starts or finishes the day's puzzle, for the
+// usage statistics. Signed-in players are counted from their progress sync
+// instead. Reports made offline go out once the connection is back.
 export function useGuestProgressReport({
 	game,
 	dateKey,
@@ -27,16 +31,13 @@ export function useGuestProgressReport({
 		const reportKey = `${dateKey}:${completed}`;
 		if (lastReported.current === reportKey) return;
 		lastReported.current = reportKey;
-
-		const report: GuestProgressReport = { game, dateKey, completed };
-		void fetch("/api/guest-progress", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(report),
-			// The finishing move can be the last thing before the tab closes.
-			keepalive: true,
-		}).catch(() => {
-			// Non-fatal: a lost report only undercounts the day's statistics.
-		});
+		void reportGuestProgress({ game, dateKey, completed });
 	}, [completed, dateKey, game, ready, started, userId]);
+
+	useEffect(() => {
+		void flushGuestProgressReports();
+		const flush = () => void flushGuestProgressReports();
+		window.addEventListener("online", flush);
+		return () => window.removeEventListener("online", flush);
+	}, []);
 }

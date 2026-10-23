@@ -52,6 +52,7 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { useClueRequests } from "@/lib/use-clue-requests";
+import { useGuestProgressReport } from "@/lib/use-guest-progress-report";
 import { useIsomorphicLayoutEffect } from "@/lib/use-isomorphic-layout-effect";
 import type { DailyData, DailySessionUser } from "./daily-types";
 
@@ -767,6 +768,14 @@ export function useDailyProgress({
 			applyPuzzleEvent(previous, event, totalWords),
 		);
 	};
+
+	useGuestProgressReport({
+		game: "regular",
+		dateKey: puzzle.dateKey,
+		progress: derivedProgress,
+		userId: activeUserId,
+		ready: hasLoadedLocalState,
+	});
 
 	return {
 		applyLocalEvent,

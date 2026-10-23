@@ -295,11 +295,12 @@ not exercise the normal application capture path.
 ### Usage statistics
 
 The server counts who starts and who finishes each game's puzzle per day and
-sends the events to PostHog. It counts from requests the game already makes:
-signed-in progress syncs, the classic guest leaderboard report, and a small
-report from guests in Mini, Síl·labes and Quadrat (`/api/guest-progress`),
-whose progress otherwise stays in the browser. The browser loads no analytics
-code.
+sends the events to PostHog. Signed-in players are counted from their progress
+syncs. Guests, whose progress stays in the browser, send a small report
+(`/api/guest-progress`) when they start or finish; reports made offline wait in
+localStorage until the server answers. A guest who signs in keeps their daily
+id for the rest of the day, so the progress that moves to the account isn't
+counted twice. The browser loads no analytics code.
 
 `src/lib/usage-stats.server.ts` derives each player's id for the day as an HMAC
 of the account or guest id under a random key per puzzle date. The key lives

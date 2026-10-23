@@ -48,9 +48,9 @@ describe("handleGuestProgressReport", () => {
 		]);
 	});
 
-	it("rejects classic reports, which arrive through the leaderboard", async () => {
+	it("rejects a game that doesn't exist", async () => {
 		const response = await report({
-			game: "regular",
+			game: "crossword",
 			dateKey: "2026-10-24",
 			completed: false,
 		});

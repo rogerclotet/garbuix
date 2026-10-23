@@ -106,12 +106,15 @@ function PrivacyPage() {
 				</h2>
 				<p>
 					Per saber quanta gent juga a cada joc i quantes partides s'acaben, el
-					servidor anota quan comences i quan acabes la partida del dia. Per
-					comptar cada jugador una sola vegada al dia, calcula un codi a partir
-					del compte o de l'identificador de convidat amb una clau que canvia
-					cada dia i que esborrem al cap de dos dies. No desem la relació entre
-					el codi i el teu compte, de manera que no podem saber qui ets ni
-					seguir les teves partides d'un dia per l'altre.
+					servidor anota quan comences i quan acabes la partida del dia. Si
+					jugues sense connexió, ho anota quan el joc torna a estar en línia.
+					Per comptar cada jugador una sola vegada al dia, calcula un codi a
+					partir del compte o de l'identificador de convidat amb una clau que
+					canvia cada dia i que esborrem al cap de dos dies. Si jugues com a
+					convidat i després entres al compte, el compte fa servir el mateix
+					codi aquell dia. No desem la relació entre el codi i el teu compte, de
+					manera que no podem saber qui ets ni seguir les teves partides d'un
+					dia per l'altre.
 				</p>
 				<p>
 					A PostHog només hi enviem el joc, el dia de la partida, si l'has
