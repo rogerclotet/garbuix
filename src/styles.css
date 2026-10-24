@@ -601,7 +601,8 @@ code {
 	}
 }
 
-/* Whole syllables need room for up to four characters in each crossword cell. */
+/* Whole syllables need room for up to four characters in each crossword cell.
+   --cell-characters is the board's longest syllable, so every cell matches. */
 :root[data-game="syllables"] [data-cell-key] {
 	font-size: clamp(
 		0.5rem,

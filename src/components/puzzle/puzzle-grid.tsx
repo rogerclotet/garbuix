@@ -118,6 +118,16 @@ export function PuzzleGrid({
 
 		return markers;
 	}, [puzzle.wordSlots]);
+	// Syllable cells all take the font size that fits the board's longest
+	// syllable, so a three-letter cell does not read smaller than its neighbours.
+	const cellCharacters = useMemo(
+		() =>
+			Math.max(
+				1,
+				...puzzle.wordSlots.flatMap((slot) => slot.cellLengths ?? []),
+			),
+		[puzzle.wordSlots],
+	);
 
 	// The widest the grid can be before its square cells stack up taller than the
 	// box around it. Container query units read that box's height, so the fit
@@ -140,6 +150,7 @@ export function PuzzleGrid({
 				style={
 					{
 						"--cols": puzzle.cols,
+						"--cell-characters": cellCharacters,
 						gap: "var(--grid-gap)",
 						gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
 						// 42rem is max-w-2xl, the cap the width-driven board already had.
@@ -178,12 +189,10 @@ export function PuzzleGrid({
 					return <div key={key} className="aspect-square bg-transparent" />;
 				}
 				const cellStyle: CSSProperties & {
-					"--cell-characters": number;
 					"--guess-letter-delay"?: string;
 					"--pangram-wave-delay"?: string;
 					"--pangram-wave-duration"?: string;
 				} = {
-					"--cell-characters": cellLetters.get(key)?.length ?? 1,
 					...(isJustGuessed
 						? {
 								"--guess-letter-delay": isJustLanded
