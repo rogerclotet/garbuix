@@ -239,7 +239,7 @@ function ChipComposer({
 				) : null}
 				<ChoiceChip
 					icon={Pencil}
-					label="Escriu"
+					label="Escriu-la"
 					selected={choice?.kind === "own"}
 					onSelect={() => select({ kind: "own" })}
 				/>
@@ -343,7 +343,7 @@ export const prototypeA: CluePrototype = {
 	id: "a",
 	name: "Suggeriments",
 	summary:
-		"«Ajuda X» desplega les opcions a sota: copiar la pista de la paraula, reenviar una de les teves d'avui o escriure'n una. El quadre de text només surt amb «Escriu».",
+		"«Ajuda X» desplega les opcions a sota: copiar la pista de la paraula, reenviar una de les teves d'avui o escriure'n una. El quadre de text només surt amb «Escriu-la».",
 	HelpRows,
 	hidesAiClue: () => false,
 };
