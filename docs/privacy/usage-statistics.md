@@ -18,7 +18,7 @@ with three fields: the game, the puzzle date, and a player id for that day.
 
 The player id is `HMAC-SHA256(dayKey, "user:<account id>")` or
 `HMAC-SHA256(dayKey, "guest:<guest id>")`. `dayKey` is 32 random bytes per
-puzzle date, held only in Redis, which deletes it 48 hours after it was made.
+puzzle date, held only in Redis, which deletes it 50 hours after it was made.
 Nothing stores which id belongs to which player.
 
 Where the events come from:
@@ -32,7 +32,7 @@ Where the events come from:
 
 When a guest signs in, the account takes over the guest's daily id for today
 and yesterday, so the progress that moves to the account isn't counted again.
-Redis keeps the link between the two derived ids (never the raw ones) for 48
+Redis keeps the link between the two derived ids (never the raw ones) for 50
 hours. It only links a guest who played that day to an account that hadn't,
 and each guest id to one account.
 
@@ -58,7 +58,7 @@ play it. Signed-in players are counted from the progress sync the game makes
 anyway, and guests add only a start and finish flag to what they already send
 for the leaderboard and clues. The
 data says nothing about a person beyond "played this game today
-and finished or not", can't be tied back to them by us after two days or by
+and finished or not", can't be tied back to them by us after 50 hours or by
 PostHog at any time, and is never used to decide anything about an individual.
 Some players are likely children, which weighs against intrusive processing;
 this processing is not intrusive, and it needs no consent that a child under
@@ -101,7 +101,7 @@ technologies" in its terms, so the check applies.
 | Measurements within the guide's list | Per-page audience and user actions, aggregated daily. |
 | Users informed, for example in the privacy policy | "Estadístiques d'ús" in `/privacitat`, linked from the menu. |
 | Identifier lifetime at most 13 months, never extended | Daily id: 1 day. Guest cookie: 395 days, set once when minted. |
-| Data kept at most 25 months | Redis key: 48 hours. PostHog free plan: 1 year. The privacy policy promises 25 months at most. |
+| Data kept at most 25 months | Redis key: 50 hours. PostHog free plan: 1 year. The privacy policy promises 25 months at most. |
 | Lifetime and retention reviewed periodically | This page, reviewed yearly. |
 | Provider: art. 28 contract without reuse of the data | PostHog's DPA is signed. Since PostHog receives no personal data, reuse of personal data can't happen. |
 | Provider: transfers outside the EU meet the GDPR | PostHog Cloud EU; DPF and SCCs in the DPA for anything processed in the US. |

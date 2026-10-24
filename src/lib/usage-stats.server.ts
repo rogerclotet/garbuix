@@ -17,7 +17,7 @@ import type { GameMode } from "@/lib/use-rendered-route";
 //
 // PostHog never learns who played. A player's id for the day is an HMAC of
 // their account or guest id under a random key for that puzzle date. The key
-// lives only in Redis and expires two days after it is made, and nothing records
+// lives only in Redis and expires 50 hours after it is made, and nothing records
 // which id belongs to whom, so ids can't be linked across days or back to a
 // player. Events carry the game, the puzzle date and that id. No IP address and
 // no user agent: the server sends them, not the browser.
@@ -26,7 +26,10 @@ import type { GameMode } from "@/lib/use-rendered-route";
 // guest's daily id (see linkGuestOnSignIn), just as it takes over their
 // progress. The link is between two derived ids and expires with the day.
 
-const DAY_KEY_TTL_SECONDS = 60 * 60 * 48;
+// A date stays countable until the end of the next day: 48 hours, or 49 when
+// either day is Madrid's 25-hour autumn clock change. A key that expired first
+// would be replaced, and that last hour's players counted again.
+const DAY_KEY_TTL_SECONDS = 60 * 60 * 50;
 const DAY_KEY_BYTES = 32;
 
 export type UsagePlayer = { kind: "user" | "guest"; id: string };

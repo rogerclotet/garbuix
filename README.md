@@ -304,7 +304,7 @@ counted twice. The browser loads no analytics code.
 
 `src/lib/usage-stats.server.ts` derives each player's id for the day as an HMAC
 of the account or guest id under a random key per puzzle date. The key lives
-only in Redis and expires after two days, so PostHog can't link ids across days
+only in Redis and expires after 50 hours, so PostHog can't link ids across days
 or back to a player. Events carry the game, the puzzle date and that id, with no
 IP address or user agent. Players can object by email, as the privacy policy
 says. Statistics need Redis and send nothing outside production, because

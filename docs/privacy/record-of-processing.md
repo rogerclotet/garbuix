@@ -99,7 +99,7 @@ contract; nothing hosted there leaves the EU.
   PostHog receives only the game, the puzzle date and that daily id.
 - Recipients: PostHog Cloud EU, as a processor, with a signed DPA.
 - Transfers: none of personal data.
-- Retention: daily key 48 hours; PostHog events at most 25 months.
+- Retention: daily key 50 hours; PostHog events at most 25 months.
 
 ### 9. AI clues
 
