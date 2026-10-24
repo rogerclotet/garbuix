@@ -143,13 +143,18 @@ export const SCENARIOS: Scenario[] = [
 		id: "reutilitza",
 		label: "Pistes per reutilitzar",
 		description:
-			"La Marta demana CAVALL. Avui ja n'has donat dues pistes, a l'Anna i al Pau.",
+			"La Marta demana CAVALL. Avui ja n'has donat dues pistes, a l'Anna i al Pau (una de molt llarga).",
 		build: () =>
 			stateWithHints(
 				[request(1, "Marta")],
 				[
 					hint(1, "Hi puja un genet", ["Anna"], 42),
-					hint(1, "Té ferradures i menja palla", ["Pau"], 12),
+					hint(
+						1,
+						"Té ferradures a les potes perquè no se li gastin les peülles, menja palla i civada a l'estable i els genets el munten pel bosc",
+						["Pau"],
+						12,
+					),
 				],
 			),
 	},
@@ -201,16 +206,16 @@ export const SCENARIOS: Scenario[] = [
 						1,
 						"Animal que trobaràs als estables, que menja palla i civada i que porta ferradures a les potes perquè no se li gastin les peülles",
 						["Anna"],
-						55,
+						4,
 					),
 					hint(
 						1,
 						"El cowboy de les pel·lícules de l'oest sempre en porta un, el lliga davant del saloon abans d'entrar-hi a beure",
 						["Pau"],
-						31,
+						9,
 					),
 					hint(1, "Hi puja un genet", ["Jordi", "Guineu àgil"], 18),
-					hint(1, "Fa renills", ["Lluna"], 4),
+					hint(1, "Fa renills", ["Lluna"], 31),
 				],
 			),
 	},

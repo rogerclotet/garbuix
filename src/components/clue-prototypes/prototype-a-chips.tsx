@@ -237,6 +237,19 @@ function ChipComposer({
 					selected={choice?.kind === "own"}
 					onSelect={() => select({ kind: "own" })}
 				/>
+				{/* Shares the last row of chips when it fits, else wraps to the right. */}
+				<Button
+					className="ml-auto h-auto min-h-9 gap-1.5 rounded-full px-3.5 text-xs font-ui hover:bg-primary/85 lg:min-h-8"
+					onClick={() => void submit()}
+					disabled={pending || textToSend.length === 0}
+				>
+					{pending ? (
+						<Loader2 className="size-3.5 animate-spin" />
+					) : (
+						<Send className="size-3.5" />
+					)}
+					Enviar
+				</Button>
 			</div>
 			<Reveal open={selectedHint != null || choice?.kind === "own"}>
 				{selectedHint ? <HintPreview hint={selectedHint} /> : null}
@@ -263,24 +276,6 @@ function ChipComposer({
 				) : null}
 			</Reveal>
 			{error ? <p className="text-xs text-destructive">{error}</p> : null}
-			<div className="flex items-center justify-end gap-2">
-				<Button variant="text" size="sm" onClick={onDone} disabled={pending}>
-					Ara no
-				</Button>
-				<Button
-					size="sm"
-					className="gap-1.5 hover:bg-primary/85"
-					onClick={() => void submit()}
-					disabled={pending || textToSend.length === 0}
-				>
-					{pending ? (
-						<Loader2 className="size-4 animate-spin" />
-					) : (
-						<Send className="size-4" />
-					)}
-					Enviar
-				</Button>
-			</div>
 		</div>
 	);
 }
