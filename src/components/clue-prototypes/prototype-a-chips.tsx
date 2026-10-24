@@ -75,6 +75,7 @@ function ChoiceChip({
 	title,
 	selected,
 	disabled = false,
+	short = false,
 	onSelect,
 }: {
 	icon: LucideIcon;
@@ -82,6 +83,8 @@ function ChoiceChip({
 	title?: string;
 	selected: boolean;
 	disabled?: boolean;
+	// Cut free text early: the preview below shows it in full once picked.
+	short?: boolean;
 	onSelect: () => void;
 }) {
 	return (
@@ -91,7 +94,9 @@ function ChoiceChip({
 			title={title}
 			aria-pressed={selected}
 			disabled={disabled}
-			className={`flex min-h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-xs font-ui transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-8 ${
+			className={`flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-ui transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-8 ${
+				short ? "max-w-36" : "max-w-full"
+			} ${
 				selected
 					? "border-primary bg-primary/10 text-primary"
 					: "border-border bg-background text-foreground enabled:hover:border-primary/60"
@@ -138,7 +143,7 @@ function ChipComposer({
 
 	// Opening the panel, and any choice that grows it, can push Enviar past the
 	// bottom of the screen; bring the whole panel back into view once it settles.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: choice changes the panel's height.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: choice and showAllHints change the panel's height.
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
 			composerRef.current?.scrollIntoView({
@@ -147,7 +152,7 @@ function ChipComposer({
 			});
 		}, REVEAL_MS);
 		return () => window.clearTimeout(timer);
-	}, [choice]);
+	}, [choice, showAllHints]);
 
 	const visibleHints = showAllHints
 		? givenHints
@@ -218,6 +223,7 @@ function ChipComposer({
 						icon={History}
 						label={given.text}
 						title={given.text}
+						short
 						selected={choice?.kind === "given" && choice.id === given.id}
 						onSelect={() => select({ kind: "given", id: given.id })}
 					/>
@@ -233,7 +239,7 @@ function ChipComposer({
 				) : null}
 				<ChoiceChip
 					icon={Pencil}
-					label="Escriu-ne una"
+					label="Escriu"
 					selected={choice?.kind === "own"}
 					onSelect={() => select({ kind: "own" })}
 				/>
@@ -337,7 +343,7 @@ export const prototypeA: CluePrototype = {
 	id: "a",
 	name: "Suggeriments",
 	summary:
-		"«Ajuda X» desplega les opcions a sota: copiar la pista de la paraula, reenviar una de les teves d'avui o escriure'n una. El quadre de text només surt amb «Escriu-ne una».",
+		"«Ajuda X» desplega les opcions a sota: copiar la pista de la paraula, reenviar una de les teves d'avui o escriure'n una. El quadre de text només surt amb «Escriu».",
 	HelpRows,
 	hidesAiClue: () => false,
 };
