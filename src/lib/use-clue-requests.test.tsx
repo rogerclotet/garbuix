@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, render } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClueRequestStreamEvent } from "@/lib/clue-request-types";
 import { ClueRequestsProvider, useClueRequests } from "./use-clue-requests";
@@ -244,6 +245,36 @@ describe("ClueRequestsProvider snapshot replay", () => {
 		});
 
 		expect(context().requestedHelpWordIds).toContain(5);
+	});
+
+	it("restores help already given from the snapshot, under StrictMode too", () => {
+		render(
+			<StrictMode>
+				<ClueRequestsProvider dateKey={DATE_KEY} localUserId={USER_ID}>
+					<Probe />
+				</ClueRequestsProvider>
+			</StrictMode>,
+		);
+		const helped = {
+			requesterId: "marta",
+			wordId: 5,
+			requesterName: "Marta",
+			at: "2026-06-11T08:00:00.000Z",
+			text: "Hi puja un genet",
+		};
+
+		// The snapshot sets several pieces of state at once, so React applies
+		// these updates during render, where StrictMode runs each updater twice.
+		act(() => {
+			lastEventSource().emit("snapshot", {
+				dateKey: DATE_KEY,
+				requests: [],
+				responses: [],
+				helpGiven: [helped],
+			});
+		});
+
+		expect(context().helpGivenRecords).toEqual([helped]);
 	});
 
 	it("keeps the waiting state when the server reports a duplicate request", async () => {

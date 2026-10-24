@@ -208,7 +208,7 @@ function TutorialPuzzle({ onFinish }: { onFinish: () => void }) {
 					: step === "finish"
 						? `Troba ${TUTORIAL_WORDS.length - state.foundWordIds.length === 1 ? "la paraula que falta" : `les ${TUTORIAL_WORDS.length - state.foundWordIds.length} paraules que falten`} amb les mateixes lletres. Les lletres que es creuen i les pistes t'ajudaran.`
 						: step === "help"
-							? "Quan algú necessita una paraula que ja has trobat, pots ajudar-lo. Toca Ajuda la Marta: pots fer servir la definició o la pista que ja tens, o escriure qualsevol cosa que la pugui ajudar, sense dir la resposta."
+							? "Quan algú necessita una paraula que ja has trobat, pots ajudar-lo. Toca Ajuda la Marta: pots copiar la pista que ja tens o escriure qualsevol cosa que la pugui ajudar, com la definició, sense dir la resposta."
 							: "Has trobat les 5 paraules i has practicat com ajudar algú. El repte d'avui t'espera!";
 
 	const isPlaying = step !== "help" && step !== "complete";

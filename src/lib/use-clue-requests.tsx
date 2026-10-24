@@ -110,7 +110,6 @@ export function ClueRequestsProvider({
 	// Asker+word pairs this user has already helped, seeded from the snapshot so
 	// a reload keeps requests hidden and confirmations visible.
 	const [helpGivenRecords, setHelpGivenRecords] = useState<ClueHelpGiven[]>([]);
-	const helpGivenKeysRef = useRef<Set<string>>(new Set());
 	// Words this user has solved, published by the puzzle page. Used to hide
 	// requests for words still unsolved on their own board.
 	const [solvedWordIds, setSolvedWordIds] = useState<number[]>([]);
@@ -213,19 +212,25 @@ export function ClueRequestsProvider({
 		if (records.length === 0) {
 			return;
 		}
+		// Known keys come from the state itself, not a ref: React may run this
+		// updater twice (StrictMode does in development), and a ref filled by the
+		// first run made the second drop every record, so a reload lost them.
 		setHelpGivenRecords((current) => {
-			let changed = false;
-			const next = [...current];
+			const known = new Set(
+				current.map((record) =>
+					clueHelpGivenField(record.requesterId, record.wordId),
+				),
+			);
+			const fresh: ClueHelpGiven[] = [];
 			for (const record of records) {
 				const key = clueHelpGivenField(record.requesterId, record.wordId);
-				if (helpGivenKeysRef.current.has(key)) {
+				if (known.has(key)) {
 					continue;
 				}
-				helpGivenKeysRef.current.add(key);
-				next.push(record);
-				changed = true;
+				known.add(key);
+				fresh.push(record);
 			}
-			return changed ? next : current;
+			return fresh.length > 0 ? [...current, ...fresh] : current;
 		});
 	}, []);
 
@@ -485,6 +490,7 @@ export function ClueRequestsProvider({
 								wordId: request.wordId,
 								requesterName: request.requesterName,
 								at: new Date().toISOString(),
+								text: text.trim(),
 							},
 						]);
 					}

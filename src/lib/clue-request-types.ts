@@ -38,6 +38,9 @@ export type ClueHelpGiven = {
 	wordId: number;
 	requesterName: string;
 	at: string;
+	// The hint that was sent, offered back to the responder when someone else
+	// asks for the same word. Absent on records written before hints were kept.
+	text?: string;
 };
 
 export type ClueRequestStreamEvent =

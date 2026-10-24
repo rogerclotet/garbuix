@@ -29,6 +29,8 @@ const getClientRects = vi.fn(() => new FakeDOMRectList());
 if (typeof HTMLElement !== "undefined") {
 	HTMLElement.prototype.getBoundingClientRect = getBoundingClientRect;
 	HTMLElement.prototype.getClientRects = getClientRects;
+	// The clue responder scrolls itself into view after opening.
+	HTMLElement.prototype.scrollIntoView = vi.fn();
 }
 
 if (typeof Range !== "undefined") {

@@ -292,6 +292,7 @@ export async function publishClueResponse(options: {
 		wordId: options.request.wordId,
 		requesterName: options.request.requesterName,
 		at: new Date().toISOString(),
+		text: response.text,
 	};
 
 	try {

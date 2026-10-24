@@ -119,12 +119,9 @@ describe("guided tutorial", () => {
 		expect(screen.getByText("Pas 4 de 4")).toBeTruthy();
 		expect(screen.getByText("Ajuda altres jugadors")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Ajuda la Marta" }));
-		fireEvent.click(
-			screen.getByRole("button", { name: "Fes servir aquesta pista" }),
-		);
-		expect(
-			screen.getByDisplayValue("La part de la terra que toca el mar."),
-		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Copia la pista" }));
+		// Copying sends the clue as it is: no text box to edit it in.
+		expect(screen.queryByRole("textbox")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
 		expect(await screen.findByText("Ja saps jugar a Garbuix!")).toBeTruthy();
 		expect(hasSeenHowToPlay()).toBe(false);
@@ -144,6 +141,8 @@ describe("guided tutorial", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Pista (3)" }));
 		for (const word of ["costa", "carta", "rosa", "tros"]) typeWord(word);
 		fireEvent.click(screen.getByRole("button", { name: "Ajuda la Marta" }));
+		expect(screen.queryByRole("textbox")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Escriu-la" }));
 		const input = screen.getByRole("textbox");
 		expect(fireEvent.keyDown(input, { key: "c" })).toBe(true);
 		expect(document.activeElement).toBe(input);
