@@ -53,6 +53,18 @@ const serverEnvSchema = z.object({
 		.default("Garbuix <codi@garbuix.app>"),
 	REDIS_URL: optionalEnvString,
 	ANTHROPIC_API_KEY: optionalEnvString,
+	// Usage statistics go to this PostHog project. Without a key nothing is
+	// sent; see usage-stats.server.ts.
+	POSTHOG_PROJECT_KEY: optionalEnvString,
+	POSTHOG_HOST: z
+		.preprocess(
+			(value) =>
+				typeof value === "string" && value.length === 0 ? undefined : value,
+			// Not z.httpUrl(), which rejects IP addresses and single-label hosts
+			// such as a self-hosted instance's container name.
+			z.url({ protocol: /^https?$/ }).optional(),
+		)
+		.default("https://eu.i.posthog.com"),
 });
 
 let cachedServerEnv: z.infer<typeof serverEnvSchema> | null = null;

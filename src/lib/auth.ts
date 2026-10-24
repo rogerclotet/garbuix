@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { resolveNewUserProfile } from "@/lib/new-user-profile";
 import { getServerEnv } from "@/lib/server-env";
 import { SIGN_IN_CODE_TTL_MINUTES } from "@/lib/sign-in-email.server";
+import { linkGuestOnSignIn } from "@/lib/usage-stats.server";
 
 const serverEnv = getServerEnv();
 
@@ -60,6 +61,13 @@ export const auth = betterAuth({
 						path: ctx?.path,
 					});
 					return { data: { ...newUser, ...profile } };
+				},
+			},
+		},
+		session: {
+			create: {
+				after: async (session, ctx) => {
+					await linkGuestOnSignIn(session.userId, ctx?.headers);
 				},
 			},
 		},

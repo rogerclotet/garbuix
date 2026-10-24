@@ -37,6 +37,7 @@ import {
 import { buildQuadratSnapshots } from "@/lib/quadrat-snapshot";
 import type { QuadratPuzzlePublic } from "@/lib/quadrat-types";
 import { trackBackgroundTask } from "@/lib/shutdown.server";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 export type QuadratPuzzleRow = typeof quadratPuzzles.$inferSelect;
 
@@ -314,7 +315,7 @@ export async function saveQuadratProgress(
 		completedAt: null,
 	};
 
-	return db.transaction(async (transaction) => {
+	const saved = await db.transaction(async (transaction) => {
 		await transaction.execute(
 			sql`select pg_advisory_xact_lock(hashtextextended(${`quadrat:${userId}:${puzzle.id}`}, 0))`,
 		);
@@ -362,6 +363,13 @@ export async function saveQuadratProgress(
 			});
 		return progress;
 	});
+	recordSyncedProgressUsage({
+		game: "quadrat",
+		dateKey: row.dateKey,
+		userId,
+		progress: saved,
+	});
+	return saved;
 }
 
 // Guests can read any clue of a playable board, as in the classic game.

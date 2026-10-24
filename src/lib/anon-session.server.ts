@@ -15,8 +15,11 @@ import { getServerEnv } from "@/lib/server-env";
 
 const ANON_COOKIE_NAME = "garbuix_guest";
 // Long-lived so a guest keeps their streak position across sessions; the data
-// it identifies (leaderboard, clue inbox) expires far sooner on its own.
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
+// it identifies (leaderboard, clue inbox) expires far sooner on its own. The
+// usage statistics count guests by this id too, and the AEPD caps identifiers
+// used for audience measurement at 13 months, so it stops short of the 400 days
+// browsers allow. It is only set when minted, so visits never extend it.
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 395;
 const DEVICE_ID_BYTES = 16;
 
 function getSigningKey(): string {

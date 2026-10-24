@@ -12,6 +12,7 @@ import { dateKeyToSeed, getTodayDateKey } from "@/lib/puzzle-dates";
 import { buildHistoryEntry } from "@/lib/puzzle-helpers";
 import { buildPuzzleSnapshots } from "@/lib/puzzle-snapshot";
 import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 export async function ensureMiniPuzzle(dateKey = getTodayDateKey()) {
 	const existing = await db.query.miniPuzzles.findFirst({
@@ -163,6 +164,12 @@ export async function saveMiniProgress(
 				set: { progressJson: progress },
 			});
 		return progress;
+	});
+	recordSyncedProgressUsage({
+		game: "mini",
+		dateKey: row.dateKey,
+		userId,
+		progress: saved,
 	});
 	return saved;
 }

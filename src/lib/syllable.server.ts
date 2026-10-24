@@ -17,6 +17,7 @@ import {
 	SYLLABLE_ALGORITHM_VERSION,
 } from "@/lib/syllable-generator";
 import { mergeSyllableProgress } from "@/lib/syllable-progress";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 export async function ensureSyllablePuzzle(dateKey = getTodayDateKey()) {
 	if (!isPlayableDateKey(dateKey)) throw new Error("Invalid puzzle date");
@@ -178,6 +179,12 @@ export async function saveSyllableProgress(
 				set: { progressJson: progress },
 			});
 		return progress;
+	});
+	recordSyncedProgressUsage({
+		game: "syllables",
+		dateKey: row.dateKey,
+		userId,
+		progress: saved,
 	});
 	return saved;
 }

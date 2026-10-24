@@ -13,6 +13,7 @@ import {
 	type SyllableEvent,
 } from "@/lib/syllable-progress";
 import { syncSyllableProgress } from "@/lib/syllable-server-fns";
+import { useGuestProgressReport } from "@/lib/use-guest-progress-report";
 
 export function useSyllableProgress({
 	puzzle,
@@ -122,6 +123,14 @@ export function useSyllableProgress({
 			writeSyllableSave(userId, dateKey, saved);
 		}
 		writeSyllableSave(userId, puzzle.dateKey, current.current);
+	});
+
+	useGuestProgressReport({
+		game: "syllables",
+		dateKey: puzzle.dateKey,
+		progress,
+		userId,
+		ready,
 	});
 
 	return { progress, ready, dispatch, syncFailed };

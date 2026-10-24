@@ -19,11 +19,12 @@ function PrivacyPage() {
 					/>
 					<p className="text-base text-muted-foreground">
 						Pots jugar sense compte. Desem el progrés per poder continuar la
-						partida i recollim informació tècnica limitada per corregir errors.
+						partida, recollim informació tècnica limitada per corregir errors i
+						comptem quanta gent juga sense saber qui és.
 					</p>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Actualitzada el 8 d'octubre de 2026
+					Actualitzada el 24 d'octubre de 2026
 				</p>
 			</header>
 
@@ -32,8 +33,9 @@ function PrivacyPage() {
 					Qui és el responsable?
 				</h2>
 				<p>
-					Roger Clotet és el responsable del tractament de dades de Garbuix i
-					Garbuix mini. Per a qualsevol consulta de privacitat, escriu a{" "}
+					Roger Clotet és el responsable del tractament de dades de Garbuix,
+					Garbuix mini, Garbuix síl·labes i Garbuix quadrat. Per a qualsevol
+					consulta de privacitat, escriu a{" "}
 					<a href="mailto:roger@clotet.dev" className="text-link">
 						roger@clotet.dev
 					</a>
@@ -98,6 +100,57 @@ function PrivacyPage() {
 				</p>
 			</section>
 
+			<section className="space-y-3" aria-labelledby="abusos">
+				<h2 id="abusos" className="text-base font-semibold">
+					Protecció contra abusos
+				</h2>
+				<p>
+					Per evitar que algú saturi el servei, falsegi la classificació o abusi
+					de les pistes, comptem quantes peticions fa cada adreça IP, cada
+					convidat i cada compte durant un període curt. Si algú supera el
+					límit, el servidor rebutja les seves peticions una estona. No fem
+					servir aquests comptadors per a res més.
+				</p>
+				<p>
+					Ho fem per mantenir el joc segur i disponible, sobre la base del
+					nostre interès legítim, article 6.1.f del RGPD.
+				</p>
+			</section>
+
+			<section className="space-y-3" aria-labelledby="estadistiques">
+				<h2 id="estadistiques" className="text-base font-semibold">
+					Estadístiques d'ús
+				</h2>
+				<p>
+					Per saber quanta gent juga a cada joc i quantes partides s'acaben, el
+					servidor anota quan comences i quan acabes la partida del dia. Si
+					jugues sense connexió, ho anota quan el joc torna a estar en línia.
+					Per comptar cada jugador una sola vegada al dia, calcula un codi a
+					partir del compte o de l'identificador de convidat amb una clau que
+					canvia cada dia i que esborrem al cap de poc més de dos dies. Si
+					jugues com a convidat i després entres al compte, el compte fa servir
+					el mateix codi aquell dia. No desem la relació entre el codi i el teu
+					compte, de manera que no podem saber qui ets ni seguir les teves
+					partides d'un dia per l'altre.
+				</p>
+				<p>
+					A PostHog només hi enviem el joc, el dia de la partida, si l'has
+					començada o acabada i aquest codi. No hi enviem el compte, el nom de
+					jugador, l'adreça IP, les dades del navegador ni les paraules que
+					escrius.
+				</p>
+				<p>
+					Només fem servir aquestes dades per obtenir xifres agregades per a ús
+					propi, com el nombre de jugadors de cada joc per dia. La base és el
+					nostre interès legítim a entendre com es fa servir el joc per
+					millorar-lo, article 6.1.f del RGPD. Com que es limita a mesurar
+					l'audiència per a ús propi, no requereix el teu consentiment, d'acord
+					amb l'article 22.2 de la LSSI i la guia de l'Agència Espanyola de
+					Protecció de Dades sobre eines de mesura d'audiència. Pots oposar-te a
+					aquest tractament escrivint-nos.
+				</p>
+			</section>
+
 			<section className="space-y-3" aria-labelledby="emmagatzematge">
 				<h2 id="emmagatzematge" className="text-base font-semibold">
 					Galetes i emmagatzematge al dispositiu
@@ -106,7 +159,7 @@ function PrivacyPage() {
 					El joc utilitza galetes de sessió i de convidat, emmagatzematge local
 					i memòria cau per recordar les partides, les preferències i permetre
 					el funcionament sense connexió. La galeta de convidat té una durada
-					màxima de 400 dies. No utilitzem galetes publicitàries.
+					màxima de 13 mesos. No utilitzem galetes publicitàries.
 				</p>
 				<p>
 					Pots esborrar aquestes dades des de la configuració del navegador.
@@ -147,17 +200,19 @@ function PrivacyPage() {
 					Proveïdors i transferències
 				</h2>
 				<p>
-					Els proveïdors d'allotjament intervenen en el funcionament del servei.
-					Google intervé quan tries iniciar-hi sessió. Resend envia els correus
-					amb el codi per entrar. Fem servir Anthropic per generar pistes a
-					partir de paraules del diccionari; no hi enviem el perfil del jugador
-					per generar-les. Reddit allotja la comunitat r/garbuix i executa
+					OVHcloud allotja el servidor del joc a la Unió Europea. Google intervé
+					quan tries iniciar-hi sessió. Resend envia els correus amb el codi per
+					entrar. Fem servir Anthropic per generar pistes a partir de paraules
+					del diccionari; no hi enviem el perfil del jugador per generar-les.
+					PostHog desa les estadístiques d'ús, que rep sense dades que
+					t'identifiquin. Reddit allotja la comunitat r/garbuix i executa
 					l'aplicació que hi publica el joc de cada dia.
 				</p>
 				<p>
-					Els informes d'errors s'envien a la nostra instància de GlitchTip.
-					Pots demanar-nos informació sobre l'allotjament i el tractament
-					d'aquestes dades per correu.
+					Els informes d'errors s'envien a la nostra instància de GlitchTip, i
+					les estadístiques d'ús, al servei de PostHog a la Unió Europea. Pots
+					demanar-nos informació sobre l'allotjament i el tractament d'aquestes
+					dades per correu.
 				</p>
 			</section>
 
@@ -176,7 +231,9 @@ function PrivacyPage() {
 					l'última actualització. Les pistes compartides i els registres de
 					peticions tenen un termini de caducitat de 24 hores. Els informes
 					d'errors tenen un termini de retenció de 90 dies, segons la
-					configuració predeterminada de GlitchTip que utilitzem.
+					configuració predeterminada de GlitchTip que utilitzem. Els comptadors
+					contra abusos s'esborren al cap d'una hora com a màxim, i les
+					estadístiques d'ús es conserven un màxim de 25 mesos.
 				</p>
 			</section>
 

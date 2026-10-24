@@ -13,6 +13,7 @@ import type {
 	DailyPuzzlePublic,
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
+import { useGuestProgressReport } from "@/lib/use-guest-progress-report";
 
 export function useMiniProgress({
 	puzzle,
@@ -122,6 +123,14 @@ export function useMiniProgress({
 			writeMiniSave(userId, dateKey, saved);
 		}
 		writeMiniSave(userId, puzzle.dateKey, current.current);
+	});
+
+	useGuestProgressReport({
+		game: "mini",
+		dateKey: puzzle.dateKey,
+		progress,
+		userId,
+		ready,
 	});
 
 	return { progress, ready, dispatch, syncFailed };

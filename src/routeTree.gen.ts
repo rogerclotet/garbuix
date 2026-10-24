@@ -16,6 +16,7 @@ import { Route as DiesAnteriorsRouteImport } from './routes/dies-anteriors'
 import { Route as PreferenciesRouteImport } from './routes/preferencies'
 import { Route as PrivacitatRouteImport } from './routes/privacitat'
 import { Route as SobreElJocRouteImport } from './routes/sobre-el-joc'
+import { Route as ApiGuestProgressRouteImport } from './routes/api/guest-progress'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
@@ -61,6 +62,11 @@ const PrivacitatRoute = PrivacitatRouteImport.update({
 const SobreElJocRoute = SobreElJocRouteImport.update({
   id: '/sobre-el-joc',
   path: '/sobre-el-joc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGuestProgressRoute = ApiGuestProgressRouteImport.update({
+  id: '/api/guest-progress',
+  path: '/api/guest-progress',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/guest-progress': typeof ApiGuestProgressRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/guest-progress': typeof ApiGuestProgressRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/preferencies': typeof PreferenciesRoute
   '/privacitat': typeof PrivacitatRoute
   '/sobre-el-joc': typeof SobreElJocRoute
+  '/api/guest-progress': typeof ApiGuestProgressRoute
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/guest-progress'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/guest-progress'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/preferencies'
     | '/privacitat'
     | '/sobre-el-joc'
+    | '/api/guest-progress'
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
@@ -251,6 +263,7 @@ export interface RootRouteChildren {
   PreferenciesRoute: typeof PreferenciesRoute
   PrivacitatRoute: typeof PrivacitatRoute
   SobreElJocRoute: typeof SobreElJocRoute
+  ApiGuestProgressRoute: typeof ApiGuestProgressRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre-el-joc'
       fullPath: '/sobre-el-joc'
       preLoaderRoute: typeof SobreElJocRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/guest-progress': {
+      id: '/api/guest-progress'
+      path: '/api/guest-progress'
+      fullPath: '/api/guest-progress'
+      preLoaderRoute: typeof ApiGuestProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -403,6 +423,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreferenciesRoute: PreferenciesRoute,
   PrivacitatRoute: PrivacitatRoute,
   SobreElJocRoute: SobreElJocRoute,
+  ApiGuestProgressRoute: ApiGuestProgressRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,

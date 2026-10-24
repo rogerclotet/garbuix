@@ -29,6 +29,7 @@ import type {
 	PuzzleProgressState,
 } from "@/lib/puzzle-types";
 import { trackBackgroundTask } from "@/lib/shutdown.server";
+import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 
 // Guess hashes of the valid words that aren't answers: the only guesses that
 // count toward a bonus clue.
@@ -412,6 +413,13 @@ export async function syncPuzzleEventsForUser(options: {
 			}),
 		);
 	}
+
+	recordSyncedProgressUsage({
+		game: "regular",
+		dateKey: puzzleRow.dateKey,
+		userId,
+		progress: nextProgress,
+	});
 
 	return {
 		ackedEventIds,

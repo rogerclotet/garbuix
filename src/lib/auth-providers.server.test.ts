@@ -9,6 +9,7 @@ function env(overrides: Partial<Env> = {}): Env {
 		BETTER_AUTH_SECRET: "secret",
 		DATABASE_URL: "postgres://localhost/test",
 		EMAIL_FROM: "Garbuix <codi@garbuix.app>",
+		POSTHOG_HOST: "https://eu.i.posthog.com",
 		...overrides,
 	};
 }

@@ -32,6 +32,8 @@ x-app: &app
     RESEND_API_KEY: "${RESEND_API_KEY:-}"
     EMAIL_FROM: "${EMAIL_FROM:-}"
     ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    POSTHOG_PROJECT_KEY: "${POSTHOG_PROJECT_KEY:-}"
+    POSTHOG_HOST: "${POSTHOG_HOST:-}"
   init: true
   healthcheck:
     test:
