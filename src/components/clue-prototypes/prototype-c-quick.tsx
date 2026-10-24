@@ -116,9 +116,9 @@ function candidateMetaText(
 	if (candidate.kind === "given") {
 		return `La teva · a ${formatNames(candidate.recipients)}, ${minutesAgoLabel(candidate.minutesAgo)}`;
 	}
-	if (skipped.length === 0) return "Pista IA";
+	if (skipped.length === 0) return "Pista Garbuix";
 	const names = formatNames(skipped.map((request) => request.requesterName));
-	return `Pista IA · ${names} ja la ${skipped.length === 1 ? "té" : "tenen"}`;
+	return `Pista Garbuix · ${names} ja la ${skipped.length === 1 ? "té" : "tenen"}`;
 }
 
 function CandidateMeta({
@@ -395,7 +395,7 @@ export const prototypeC: CluePrototype = {
 	id: "c",
 	name: "Resposta ràpida",
 	summary:
-		"Una resposta per paraula. Hi ha un suggeriment llest (la teva última pista, les anteriors o la IA) i un toc l'envia a tothom qui la demana. Pots canviar de suggeriment, editar-lo o escriure'n una de nova.",
+		"Una resposta per paraula. Hi ha un suggeriment llest (la teva última pista, les anteriors o la pista Garbuix) i un toc l'envia a tothom qui la demana. Pots canviar de suggeriment, editar-lo o escriure'n una de nova.",
 	HelpRows,
 	hidesAiClue: (openRequests) =>
 		openRequests.some((request) => !request.requesterHasAiClue),

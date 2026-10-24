@@ -136,7 +136,7 @@ export const SCENARIOS: Scenario[] = [
 		id: "primera",
 		label: "Primera ajuda",
 		description:
-			"Una petició i cap pista donada encara. Només hi ha la pista IA.",
+			"Una petició i cap pista donada encara. Només hi ha la pista Garbuix.",
 		build: () => stateWithHints([request(1, "Anna")], []),
 	},
 	{
@@ -157,7 +157,7 @@ export const SCENARIOS: Scenario[] = [
 		id: "diversos",
 		label: "Diversos jugadors",
 		description:
-			"Tres jugadors demanen PLATJA (un ja té la pista IA) i un altre demana LLIBRE.",
+			"Tres jugadors demanen PLATJA (un ja té la pista Garbuix) i un altre demana LLIBRE.",
 		build: () =>
 			stateWithHints(
 				[
@@ -171,9 +171,9 @@ export const SCENARIOS: Scenario[] = [
 	},
 	{
 		id: "te-ia",
-		label: "Ja té la pista IA",
+		label: "Ja té la pista Garbuix",
 		description:
-			"El Jordi ja ha desbloquejat la pista IA de FINESTRA. Tens una pista teva d'abans.",
+			"El Jordi ja ha desbloquejat la pista Garbuix de FINESTRA. Tens una pista teva d'abans.",
 		build: () =>
 			stateWithHints(
 				[request(4, "Jordi", { hasAiClue: true })],
@@ -182,16 +182,16 @@ export const SCENARIOS: Scenario[] = [
 	},
 	{
 		id: "te-ia-sense",
-		label: "Ja té la IA, sense pistes",
+		label: "Ja té la pista Garbuix, cap de teva",
 		description:
-			"El Pau ja té la pista IA de RELLOTGE i tu no n'has donat cap. No hi ha res a reutilitzar.",
+			"El Pau ja té la pista Garbuix de RELLOTGE i tu no n'has donat cap. No hi ha res a reutilitzar.",
 		build: () => stateWithHints([request(5, "Pau", { hasAiClue: true })], []),
 	},
 	{
 		id: "llargs",
 		label: "Textos llargs",
 		description:
-			"Pista IA i pistes teves a prop del límit de 140 caràcters, amb quatre pistes per reutilitzar.",
+			"Pista Garbuix i pistes teves a prop del límit de 140 caràcters, amb quatre pistes per reutilitzar.",
 		longTexts: true,
 		build: () =>
 			stateWithHints(

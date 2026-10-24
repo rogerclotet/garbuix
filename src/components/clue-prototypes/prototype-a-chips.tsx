@@ -75,7 +75,7 @@ function SuggestionChip({
 		>
 			<Icon className="size-3.5 shrink-0" aria-hidden="true" />
 			<span className="truncate">
-				{suggestion.kind === "ai" ? "Pista IA" : suggestion.text}
+				{suggestion.kind === "ai" ? "Pista Garbuix" : suggestion.text}
 			</span>
 		</button>
 	);
@@ -128,8 +128,8 @@ function ChipComposer({
 			</p>
 			{request.requesterHasAiClue ? (
 				<p className="text-xs text-muted-foreground">
-					{request.requesterName} ja té la pista IA, prova de donar-ne una de
-					diferent.
+					{request.requesterName} ja té la pista Garbuix, prova de donar-ne una
+					de diferent.
 				</p>
 			) : null}
 			{suggestions.length > 0 ? (
@@ -255,7 +255,7 @@ export const prototypeA: CluePrototype = {
 	id: "a",
 	name: "Suggeriments",
 	summary:
-		"El quadre d'ara, amb xips a sobre: la pista IA i les teves pistes d'avui. Una xip només omple el quadre; l'envies tu.",
+		"El quadre d'ara, amb xips a sobre: la pista Garbuix i les teves pistes d'avui. Una xip només omple el quadre; l'envies tu.",
 	HelpRows,
 	hidesAiClue: () => false,
 };

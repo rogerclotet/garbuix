@@ -215,7 +215,7 @@ function HintPicker({
 
 					{word.aiClue ? (
 						<>
-							<SectionLabel>Pista IA</SectionLabel>
+							<SectionLabel>Pista Garbuix</SectionLabel>
 							<OptionCard
 								selected={choice.kind === "ai"}
 								disabled={request.requesterHasAiClue}
@@ -373,7 +373,7 @@ export const prototypeB: CluePrototype = {
 	id: "b",
 	name: "Full de tria",
 	summary:
-		"«Ajuda X» obre un full des de baix amb totes les opcions en targetes: les teves pistes d'avui, la IA i un quadre per escriure'n una. En tries una i l'envies.",
+		"«Ajuda X» obre un full des de baix amb totes les opcions en targetes: les teves pistes d'avui, la pista Garbuix i un quadre per escriure'n una. En tries una i l'envies.",
 	HelpRows,
 	hidesAiClue: () => false,
 };
