@@ -1,7 +1,6 @@
 import {
 	Check,
 	Circle,
-	ClipboardCopy,
 	Clock3,
 	HelpingHand,
 	Info,
@@ -9,9 +8,13 @@ import {
 	Star,
 	Users,
 } from "lucide-react";
-import { useRef, useState } from "react";
-import { ClueResponder } from "@/components/clue/clue-responder";
+import { useState } from "react";
+import {
+	ClueResponder,
+	collectGivenHints,
+} from "@/components/clue/clue-responder";
 import { Button } from "@/components/ui/button";
+import { Reveal } from "@/components/ui/reveal";
 import type {
 	ClueHelpGiven,
 	ClueRequest,
@@ -94,12 +97,9 @@ export function DailyWordList({
 		}
 	}
 
-	// Which request's composer is currently expanded (one at a time keeps the
-	// list compact), plus the text it should open with. The nonce forces the
-	// composer to remount when text is dropped in via the copy button.
+	// Which request's composer is currently expanded: one at a time keeps the
+	// list compact.
 	const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
-	const [prefillText, setPrefillText] = useState("");
-	const composerNonceRef = useRef(0);
 
 	const helpedKeys = new Set(
 		helpGivenRecords.map((record) =>
@@ -133,35 +133,6 @@ export function DailyWordList({
 		return onRespondToClue(requestId, text);
 	};
 
-	const openComposer = (requestId: string, initial: string) => {
-		composerNonceRef.current += 1;
-		setPrefillText(initial);
-		setActiveRequestId(requestId);
-	};
-
-	const closeComposer = () => {
-		setActiveRequestId(null);
-		setPrefillText("");
-	};
-
-	// True while a response composer for one of this word's requests is open —
-	// the only time it makes sense to copy the word's AI clue into a reply.
-	const isComposingForWord = (wordId: number): boolean => {
-		if (activeRequestId === null) return false;
-		const requests = requestsByWordId.get(wordId);
-		return Boolean(requests?.some((request) => request.id === activeRequestId));
-	};
-
-	// Drop the word's AI clue into the composer that's currently open for it.
-	const handleUseClue = (wordId: number, clueText: string) => {
-		const requests = requestsByWordId.get(wordId);
-		const target =
-			requests?.find((request) => request.id === activeRequestId) ??
-			requests?.[0];
-		if (!target) return;
-		openComposer(target.id, clueText);
-	};
-
 	// "Ajuda" buttons and "Has ajudat" confirmations share one list and one row
 	// height, so a word mixing both keeps its rows evenly spaced.
 	const helpRowClassName =
@@ -182,33 +153,40 @@ export function DailyWordList({
 			(record) => record.wordId === wordId,
 		);
 		if (openRequests.length === 0 && helpedForWord.length === 0) return null;
+		const givenHints = collectGivenHints(helpGivenRecords, wordId);
 
 		return (
 			<div className="mt-1 flex min-w-0 flex-col pl-7">
-				{openRequests.map((request) =>
-					activeRequestId === request.id ? (
+				{openRequests.map((request) => (
+					// The composer slides down from under its "Ajuda X" row, which
+					// stays put and closes it again when tapped.
+					<Reveal
+						key={request.id}
+						open={activeRequestId === request.id}
+						onOpenChange={(open) =>
+							setActiveRequestId(open ? request.id : null)
+						}
+						trigger={
+							<Button
+								type="button"
+								variant="text"
+								size="sm"
+								className={`${helpRowClassName} h-auto justify-start border-0 px-0 font-normal whitespace-normal text-primary`}
+							>
+								<HelpingHand className="size-3.5" />
+								Ajuda {request.requesterName}
+							</Button>
+						}
+					>
 						<ClueResponder
-							key={`${request.id}:${composerNonceRef.current}`}
 							request={request}
-							onRespond={(requestId, text) => respondAndRecord(requestId, text)}
-							onDone={closeComposer}
-							intro={`Dona una pista a ${request.requesterName}`}
-							initialText={prefillText}
+							clueText={foundClueTextsByWordId[wordId] ?? null}
+							givenHints={givenHints}
+							onRespond={respondAndRecord}
+							onDone={() => setActiveRequestId(null)}
 						/>
-					) : (
-						<Button
-							key={request.id}
-							type="button"
-							variant="text"
-							size="sm"
-							className={`${helpRowClassName} h-auto justify-start border-0 px-0 font-normal whitespace-normal text-primary`}
-							onClick={() => openComposer(request.id, "")}
-						>
-							<HelpingHand className="size-3.5" />
-							Ajuda {request.requesterName}
-						</Button>
-					),
-				)}
+					</Reveal>
+				))}
 				{helpedForWord.map((record) => (
 					<span
 						key={clueHelpGivenField(record.requesterId, record.wordId)}
@@ -222,35 +200,14 @@ export function DailyWordList({
 		);
 	};
 
-	// An AI clue shown next to a word can be copied into the response composer,
-	// but only while a composer for that word is actually open.
-	const renderClueLine = (
-		wordId: number,
-		clueText: string,
-		tone: "muted" | "foreground",
-	) => (
-		<div className="flex min-w-0 items-start gap-1 pl-7">
-			<span
-				className={`block min-w-0 flex-1 text-sm leading-relaxed wrap-anywhere font-ui ${
-					tone === "foreground" ? "text-foreground" : "text-muted-foreground"
-				}`}
-			>
-				{clueText}
-			</span>
-			{isComposingForWord(wordId) && onRespondToClue ? (
-				<Button
-					type="button"
-					variant="text"
-					size="icon"
-					className="size-11 shrink-0 text-muted-foreground hover:text-primary lg:size-9"
-					aria-label="Fes servir aquesta pista"
-					title="Fes servir aquesta pista"
-					onClick={() => handleUseClue(wordId, clueText)}
-				>
-					<ClipboardCopy className="size-3.5" />
-				</Button>
-			) : null}
-		</div>
+	const renderClueLine = (clueText: string, tone: "muted" | "foreground") => (
+		<span
+			className={`block min-w-0 pl-7 text-sm leading-relaxed wrap-anywhere font-ui ${
+				tone === "foreground" ? "text-foreground" : "text-muted-foreground"
+			}`}
+		>
+			{clueText}
+		</span>
 	);
 
 	const pangramTooltip = "Pangrama: fa servir totes les lletres";
@@ -294,7 +251,7 @@ export function DailyWordList({
 						{slot.length} lletres
 					</span>
 				</div>
-				{foundClueText ? renderClueLine(slot.id, foundClueText, "muted") : null}
+				{foundClueText ? renderClueLine(foundClueText, "muted") : null}
 				{renderHelpRows(slot.id)}
 			</div>
 		);
@@ -354,7 +311,7 @@ export function DailyWordList({
 									{slot.length} lletres
 								</span>
 							</button>
-							{clueText ? renderClueLine(slot.id, clueText, "muted") : null}
+							{clueText ? renderClueLine(clueText, "muted") : null}
 							{peerClue ? (
 								<span className="block pl-7 text-sm leading-relaxed wrap-anywhere font-ui">
 									<span className="text-foreground">{peerClue.text}</span>

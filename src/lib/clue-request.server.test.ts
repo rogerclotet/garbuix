@@ -180,7 +180,7 @@ describe("clue request store-and-forward", () => {
 		).toBeUndefined();
 	});
 
-	it("records help given and blocks duplicate help for the same asker and word", async () => {
+	it("records help given with its hint and blocks duplicate help for the same asker and word", async () => {
 		const request = await createClueRequest(createInput());
 		expect(request).not.toBeNull();
 		if (!request) return;
@@ -217,6 +217,8 @@ describe("clue request store-and-forward", () => {
 		const helpGiven = await getHelpGivenRecords("responder-1", DATE_KEY);
 		expect(helpGiven).toHaveLength(1);
 		expect(helpGiven[0]?.requesterName).toBe("Anna");
+		// Kept so the responder can offer it again to the next asker.
+		expect(helpGiven[0]?.text).toBe("Una peça de roba");
 
 		expect(
 			redisRef.current?.store.get(clueHelpGivenKey("responder-1", DATE_KEY)),

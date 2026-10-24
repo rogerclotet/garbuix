@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import type { ClueResponse } from "@/lib/clue-request-types";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+	ClueHelpGiven,
+	ClueRequest,
+	ClueResponse,
+} from "@/lib/clue-request-types";
 import type { DailyPuzzlePublic } from "@/lib/puzzle-types";
 import { DailyWordList } from "./daily-word-list";
 
@@ -97,5 +101,53 @@ describe("DailyWordList peer clues", () => {
 
 		expect(screen.getByText(response.text)).toBeTruthy();
 		expect(screen.getByText("Pista de Anna")).toBeTruthy();
+	});
+});
+
+describe("DailyWordList helping other players", () => {
+	afterEach(() => {
+		cleanup();
+	});
+
+	const request: ClueRequest = {
+		id: "req-marta",
+		dateKey: "2026-04-11",
+		puzzleId: "puzzle-1",
+		wordId: 0,
+		wordLength: 4,
+		requesterId: "marta",
+		requesterName: "Marta",
+		createdAt: "2026-04-11T10:00:00.000Z",
+		requesterHasAiClue: false,
+	};
+	const helpedAnna: ClueHelpGiven = {
+		requesterId: "anna",
+		requesterName: "Anna",
+		wordId: 0,
+		at: "2026-04-11T09:00:00.000Z",
+		text: "Una qualsevol",
+	};
+
+	it("offers the word's clue and the hints already sent for it", () => {
+		const onRespondToClue = vi.fn(async () => ({ ok: true as const }));
+		render(
+			<DailyWordList
+				puzzle={puzzle}
+				guessedWordIds={[0]}
+				revealedAnswers={{ 0: "cosa" }}
+				cellLetters={new Map()}
+				foundClueTextsByWordId={{ 0: "Element indeterminat." }}
+				incomingRequests={[request]}
+				helpGivenRecords={[helpedAnna]}
+				onRespondToClue={onRespondToClue}
+			/>,
+		);
+
+		expect(screen.getByText("Has ajudat Anna")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Ajuda Marta" }));
+		expect(screen.getByRole("button", { name: "Copia la pista" })).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Una qualsevol" }));
+		fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+		expect(onRespondToClue).toHaveBeenCalledWith("req-marta", "Una qualsevol");
 	});
 });

@@ -485,6 +485,7 @@ export function ClueRequestsProvider({
 								wordId: request.wordId,
 								requesterName: request.requesterName,
 								at: new Date().toISOString(),
+								text: text.trim(),
 							},
 						]);
 					}

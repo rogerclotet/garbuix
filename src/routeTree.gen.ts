@@ -21,7 +21,6 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiReadyRouteImport } from './routes/api/ready'
 import { Route as MiniIndexRouteImport } from './routes/mini.index'
 import { Route as MiniDiesAnteriorsRouteImport } from './routes/mini.dies-anteriors'
-import { Route as PrototipsPistesRouteImport } from './routes/prototips.pistes'
 import { Route as QuadratIndexRouteImport } from './routes/quadrat.index'
 import { Route as QuadratDiesAnteriorsRouteImport } from './routes/quadrat.dies-anteriors'
 import { Route as SillabesIndexRouteImport } from './routes/sillabes.index'
@@ -90,11 +89,6 @@ const MiniDiesAnteriorsRoute = MiniDiesAnteriorsRouteImport.update({
   path: '/mini/dies-anteriors',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrototipsPistesRoute = PrototipsPistesRouteImport.update({
-  id: '/prototips/pistes',
-  path: '/prototips/pistes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const QuadratIndexRoute = QuadratIndexRouteImport.update({
   id: '/quadrat/',
   path: '/quadrat/',
@@ -143,7 +137,6 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/prototips/pistes': typeof PrototipsPistesRoute
   '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
@@ -165,7 +158,6 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/prototips/pistes': typeof PrototipsPistesRoute
   '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini': typeof MiniIndexRoute
@@ -188,7 +180,6 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/ready': typeof ApiReadyRoute
   '/mini/dies-anteriors': typeof MiniDiesAnteriorsRoute
-  '/prototips/pistes': typeof PrototipsPistesRoute
   '/quadrat/dies-anteriors': typeof QuadratDiesAnteriorsRoute
   '/sillabes/dies-anteriors': typeof SillabesDiesAnteriorsRoute
   '/mini/': typeof MiniIndexRoute
@@ -212,7 +203,6 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
-    | '/prototips/pistes'
     | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini/'
@@ -234,7 +224,6 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
-    | '/prototips/pistes'
     | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini'
@@ -256,7 +245,6 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/ready'
     | '/mini/dies-anteriors'
-    | '/prototips/pistes'
     | '/quadrat/dies-anteriors'
     | '/sillabes/dies-anteriors'
     | '/mini/'
@@ -279,7 +267,6 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiReadyRoute: typeof ApiReadyRoute
   MiniDiesAnteriorsRoute: typeof MiniDiesAnteriorsRoute
-  PrototipsPistesRoute: typeof PrototipsPistesRoute
   QuadratDiesAnteriorsRoute: typeof QuadratDiesAnteriorsRoute
   SillabesDiesAnteriorsRoute: typeof SillabesDiesAnteriorsRoute
   MiniIndexRoute: typeof MiniIndexRoute
@@ -376,13 +363,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MiniDiesAnteriorsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prototips/pistes': {
-      id: '/prototips/pistes'
-      path: '/prototips/pistes'
-      fullPath: '/prototips/pistes'
-      preLoaderRoute: typeof PrototipsPistesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/quadrat/': {
       id: '/quadrat/'
       path: '/quadrat'
@@ -447,7 +427,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiReadyRoute: ApiReadyRoute,
   MiniDiesAnteriorsRoute: MiniDiesAnteriorsRoute,
-  PrototipsPistesRoute: PrototipsPistesRoute,
   QuadratDiesAnteriorsRoute: QuadratDiesAnteriorsRoute,
   SillabesDiesAnteriorsRoute: SillabesDiesAnteriorsRoute,
   MiniIndexRoute: MiniIndexRoute,
