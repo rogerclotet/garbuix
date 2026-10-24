@@ -1,83 +1,117 @@
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
 	Check,
+	Copy,
 	HelpingHand,
 	History,
 	Loader2,
+	type LucideIcon,
+	Pencil,
 	Send,
-	Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import {
+	type ReactElement,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_CLUE_LENGTH } from "@/lib/clue-fairness";
+import { formatNames } from "./fake-clue-session";
 import type { FakeRequest, FakeWord, GivenHint } from "./fake-data";
 import type { CluePrototype, HelpRowsProps } from "./prototype-shared";
 import {
 	COMPOSER_TEXTAREA_CLASS_NAME,
 	HELP_ROW_CLASS_NAME,
+	minutesAgoLabel,
 	reasonMessage,
 } from "./prototype-shared";
 
-// Prototype A: today's inline composer, plus one row of chips above the text
-// box. A chip only fills the box, so every hint is still read and sent by hand.
+// Prototype A: "Ajuda X" slides a panel down beneath it with one chip per way
+// to help: copy the word's clue, resend one of today's hints, or write a new
+// one. A chip only selects; Enviar sends. The text box exists only for "write
+// a new one", so the panel stays a single row of chips until it's needed.
 
 const VISIBLE_HINT_CHIPS = 2;
 
-type Suggestion = {
-	id: string;
-	kind: "ai" | "given";
-	text: string;
-	title: string;
-};
+// Matches the Reveal transition, so the panel is scrolled once it has its
+// final height.
+const REVEAL_MS = 250;
 
-function buildSuggestions(
-	word: FakeWord,
-	request: FakeRequest,
-	givenHints: GivenHint[],
-): Suggestion[] {
-	const fromHints = givenHints.map((given) => ({
-		id: given.id,
-		kind: "given" as const,
-		text: given.text,
-		title: `Enviada a ${given.recipients.join(", ")}`,
-	}));
-	// Handing the asker the AI clue they already unlocked tells them nothing.
-	if (!word.aiClue || request.requesterHasAiClue) {
-		return fromHints;
-	}
-	return [
-		{ id: "ai", kind: "ai", text: word.aiClue, title: word.aiClue },
-		...fromHints,
-	];
+type Choice =
+	| { kind: "copy" }
+	| { kind: "given"; id: string }
+	| { kind: "own" }
+	| null;
+
+function Reveal({
+	open,
+	onOpenChange,
+	trigger,
+	children,
+}: {
+	open: boolean;
+	onOpenChange?: (open: boolean) => void;
+	trigger?: ReactElement;
+	children: ReactNode;
+}) {
+	return (
+		<Collapsible.Root open={open} onOpenChange={onOpenChange}>
+			{trigger ? <Collapsible.Trigger render={trigger} /> : null}
+			<Collapsible.Panel className="group h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] data-starting-style:h-0 data-ending-style:h-0 motion-reduce:transition-none [&[hidden]:not([hidden='until-found'])]:hidden">
+				<div className="transition-[opacity,translate] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-ending-style:-translate-y-2 group-data-ending-style:opacity-0 group-data-starting-style:-translate-y-2 group-data-starting-style:opacity-0 motion-reduce:transition-none">
+					{children}
+				</div>
+			</Collapsible.Panel>
+		</Collapsible.Root>
+	);
 }
 
-function SuggestionChip({
-	suggestion,
+function ChoiceChip({
+	icon: Icon,
+	label,
+	title,
 	selected,
-	onPick,
+	disabled = false,
+	onSelect,
 }: {
-	suggestion: Suggestion;
+	icon: LucideIcon;
+	label: string;
+	title?: string;
 	selected: boolean;
-	onPick: () => void;
+	disabled?: boolean;
+	onSelect: () => void;
 }) {
-	const Icon = suggestion.kind === "ai" ? Sparkles : History;
 	return (
 		<button
 			type="button"
-			onClick={onPick}
-			title={suggestion.title}
+			onClick={onSelect}
+			title={title}
 			aria-pressed={selected}
-			className={`flex min-h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-xs font-ui transition-colors lg:min-h-8 ${
+			disabled={disabled}
+			className={`flex min-h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-xs font-ui transition-colors disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-8 ${
 				selected
 					? "border-primary bg-primary/10 text-primary"
-					: "border-border bg-background text-foreground hover:border-primary/60"
+					: "border-border bg-background text-foreground enabled:hover:border-primary/60"
 			}`}
 		>
 			<Icon className="size-3.5 shrink-0" aria-hidden="true" />
-			<span className="truncate">
-				{suggestion.kind === "ai" ? "Pista Garbuix" : suggestion.text}
-			</span>
+			<span className="truncate">{label}</span>
 		</button>
+	);
+}
+
+function HintPreview({ hint }: { hint: GivenHint }) {
+	return (
+		<div className="rounded-sm border border-border bg-muted/40 px-2.5 py-2">
+			<p className="text-sm leading-snug wrap-anywhere">{hint.text}</p>
+			<p className="mt-1 text-xs text-muted-foreground font-ui">
+				Enviada a {formatNames(hint.recipients)} ·{" "}
+				{minutesAgoLabel(hint.minutesAgo)}
+			</p>
+		</div>
 	);
 }
 
@@ -94,25 +128,55 @@ function ChipComposer({
 	onSend: HelpRowsProps["onSend"];
 	onDone: () => void;
 }) {
-	const [text, setText] = useState("");
+	const [choice, setChoice] = useState<Choice>(null);
+	// Kept while other chips are picked, so a draft survives a detour.
+	const [ownText, setOwnText] = useState("");
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showAllHints, setShowAllHints] = useState(false);
+	const composerRef = useRef<HTMLDivElement>(null);
 
-	const suggestions = buildSuggestions(word, request, givenHints);
-	const aiSuggestions = suggestions.filter((s) => s.kind === "ai");
-	const hintSuggestions = suggestions.filter((s) => s.kind === "given");
+	// Opening the panel, and any choice that grows it, can push Enviar past the
+	// bottom of the screen; bring the whole panel back into view once it settles.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: choice changes the panel's height.
+	useEffect(() => {
+		const timer = window.setTimeout(() => {
+			composerRef.current?.scrollIntoView({
+				block: "nearest",
+				behavior: "smooth",
+			});
+		}, REVEAL_MS);
+		return () => window.clearTimeout(timer);
+	}, [choice]);
+
 	const visibleHints = showAllHints
-		? hintSuggestions
-		: hintSuggestions.slice(0, VISIBLE_HINT_CHIPS);
-	const hiddenHintCount = hintSuggestions.length - visibleHints.length;
+		? givenHints
+		: givenHints.slice(0, VISIBLE_HINT_CHIPS);
+	const hiddenHintCount = givenHints.length - visibleHints.length;
+	const selectedHint =
+		choice?.kind === "given"
+			? (givenHints.find((given) => given.id === choice.id) ?? null)
+			: null;
+	// Copying back the clue the asker already unlocked would tell them nothing.
+	const canCopyClue = word.aiClue != null && !request.requesterHasAiClue;
+
+	const textToSend = (() => {
+		if (choice?.kind === "copy") return word.aiClue ?? "";
+		if (choice?.kind === "given") return selectedHint?.text ?? "";
+		if (choice?.kind === "own") return ownText.trim();
+		return "";
+	})();
+
+	const select = (next: Choice) => {
+		setChoice(next);
+		setError(null);
+	};
 
 	const submit = async () => {
-		const trimmed = text.trim();
-		if (trimmed.length === 0 || pending) return;
+		if (textToSend.length === 0 || pending) return;
 		setPending(true);
 		setError(null);
-		const result = await onSend([request.id], trimmed);
+		const result = await onSend([request.id], textToSend);
 		setPending(false);
 		if (result.ok) {
 			onDone();
@@ -122,63 +186,82 @@ function ChipComposer({
 	};
 
 	return (
-		<div className="flex w-full flex-col gap-2 py-1">
-			<p className="text-sm font-medium">
-				Dona una pista a {request.requesterName}
-			</p>
-			{request.requesterHasAiClue ? (
+		<div
+			ref={composerRef}
+			// The game keypad covers the bottom of the screen on phones.
+			className="flex w-full scroll-mb-[18rem] flex-col gap-2 pt-1 pb-2 lg:scroll-mb-4"
+		>
+			{request.requesterHasAiClue && word.aiClue ? (
 				<p className="text-xs text-muted-foreground">
-					{request.requesterName} ja té la pista Garbuix, prova de donar-ne una
-					de diferent.
+					{request.requesterName} ja té la pista, prova de donar-ne una de
+					diferent.
 				</p>
 			) : null}
-			{suggestions.length > 0 ? (
-				<div className="flex flex-wrap gap-1.5">
-					{[...aiSuggestions, ...visibleHints].map((suggestion) => (
-						<SuggestionChip
-							key={suggestion.id}
-							suggestion={suggestion}
-							selected={text === suggestion.text}
-							onPick={() => {
-								setText(suggestion.text);
-								setError(null);
-							}}
-						/>
-					))}
-					{hiddenHintCount > 0 ? (
-						<button
-							type="button"
-							onClick={() => setShowAllHints(true)}
-							className="flex min-h-9 items-center rounded-full px-2 text-xs font-ui text-primary hover:text-foreground lg:min-h-8"
-						>
-							+{hiddenHintCount} més
-						</button>
-					) : null}
-				</div>
-			) : null}
-			<Textarea
-				autoFocus
-				value={text}
-				maxLength={MAX_CLUE_LENGTH}
-				onChange={(event) => {
-					setText(event.target.value);
-					setError(null);
-				}}
-				onKeyDown={(event) => {
-					if (event.key === "Enter" && !event.shiftKey) {
-						event.preventDefault();
-						void submit();
-					}
-				}}
-				placeholder={
-					suggestions.length > 0
-						? "Tria'n una de dalt o escriu-ne una"
-						: "Escriu una pista (sense dir la paraula!)"
-				}
-				className={COMPOSER_TEXTAREA_CLASS_NAME}
-				aria-label={`Pista per a ${request.requesterName}`}
-				aria-invalid={error != null}
-			/>
+			<div className="flex flex-wrap gap-1.5">
+				{word.aiClue ? (
+					<ChoiceChip
+						icon={Copy}
+						label="Copia la pista"
+						title={
+							canCopyClue
+								? word.aiClue
+								: `${request.requesterName} ja té aquesta pista`
+						}
+						selected={choice?.kind === "copy"}
+						disabled={!canCopyClue}
+						onSelect={() => select({ kind: "copy" })}
+					/>
+				) : null}
+				{visibleHints.map((given) => (
+					<ChoiceChip
+						key={given.id}
+						icon={History}
+						label={given.text}
+						title={given.text}
+						selected={choice?.kind === "given" && choice.id === given.id}
+						onSelect={() => select({ kind: "given", id: given.id })}
+					/>
+				))}
+				{hiddenHintCount > 0 ? (
+					<button
+						type="button"
+						onClick={() => setShowAllHints(true)}
+						className="flex min-h-9 items-center rounded-full px-2 text-xs font-ui text-primary hover:text-foreground lg:min-h-8"
+					>
+						+{hiddenHintCount} més
+					</button>
+				) : null}
+				<ChoiceChip
+					icon={Pencil}
+					label="Escriu-ne una"
+					selected={choice?.kind === "own"}
+					onSelect={() => select({ kind: "own" })}
+				/>
+			</div>
+			<Reveal open={selectedHint != null || choice?.kind === "own"}>
+				{selectedHint ? <HintPreview hint={selectedHint} /> : null}
+				{choice?.kind === "own" ? (
+					<Textarea
+						autoFocus
+						value={ownText}
+						maxLength={MAX_CLUE_LENGTH}
+						onChange={(event) => {
+							setOwnText(event.target.value);
+							setError(null);
+						}}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								void submit();
+							}
+						}}
+						placeholder="Escriu una pista (sense dir la paraula!)"
+						className={COMPOSER_TEXTAREA_CLASS_NAME}
+						aria-label={`Pista per a ${request.requesterName}`}
+						aria-invalid={error != null}
+					/>
+				) : null}
+			</Reveal>
 			{error ? <p className="text-xs text-destructive">{error}</p> : null}
 			<div className="flex items-center justify-end gap-2">
 				<Button variant="text" size="sm" onClick={onDone} disabled={pending}>
@@ -188,7 +271,7 @@ function ChipComposer({
 					size="sm"
 					className="gap-1.5 hover:bg-primary/85"
 					onClick={() => void submit()}
-					disabled={pending || text.trim().length === 0}
+					disabled={pending || textToSend.length === 0}
 				>
 					{pending ? (
 						<Loader2 className="size-4 animate-spin" />
@@ -214,30 +297,32 @@ function HelpRows({
 
 	return (
 		<div className="mt-1 flex min-w-0 flex-col pl-7">
-			{openRequests.map((request) =>
-				activeRequestId === request.id ? (
+			{openRequests.map((request) => (
+				<Reveal
+					key={request.id}
+					open={activeRequestId === request.id}
+					onOpenChange={(open) => setActiveRequestId(open ? request.id : null)}
+					trigger={
+						<Button
+							type="button"
+							variant="text"
+							size="sm"
+							className={`${HELP_ROW_CLASS_NAME} h-auto justify-start border-0 px-0 font-normal whitespace-normal text-primary`}
+						>
+							<HelpingHand className="size-3.5" />
+							Ajuda {request.requesterName}
+						</Button>
+					}
+				>
 					<ChipComposer
-						key={request.id}
 						word={word}
 						request={request}
 						givenHints={givenHints}
 						onSend={onSend}
 						onDone={() => setActiveRequestId(null)}
 					/>
-				) : (
-					<Button
-						key={request.id}
-						type="button"
-						variant="text"
-						size="sm"
-						className={`${HELP_ROW_CLASS_NAME} h-auto justify-start border-0 px-0 font-normal whitespace-normal text-primary`}
-						onClick={() => setActiveRequestId(request.id)}
-					>
-						<HelpingHand className="size-3.5" />
-						Ajuda {request.requesterName}
-					</Button>
-				),
-			)}
+				</Reveal>
+			))}
 			{helped.map((record) => (
 				<span
 					key={record.requesterId}
@@ -255,7 +340,7 @@ export const prototypeA: CluePrototype = {
 	id: "a",
 	name: "Suggeriments",
 	summary:
-		"El quadre d'ara, amb xips a sobre: la pista Garbuix i les teves pistes d'avui. Una xip només omple el quadre; l'envies tu.",
+		"«Ajuda X» desplega les opcions a sota: copiar la pista de la paraula, reenviar una de les teves d'avui o escriure'n una. El quadre de text només surt amb «Escriu-ne una».",
 	HelpRows,
 	hidesAiClue: () => false,
 };
