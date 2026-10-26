@@ -36,6 +36,7 @@ import { useDailyProgress } from "./use-daily-progress";
 import { useDailyShare } from "./use-daily-share";
 import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
+import { WordRulesAnnouncementDialog } from "./word-rules-announcement-dialog";
 
 export function Daily({ initialData }: { initialData: DailyData }) {
 	return <DailySession key={initialData.puzzle.id} initialData={initialData} />;
@@ -170,11 +171,15 @@ function DailyGame({
 		welcomeOpen,
 		quadratAnnouncementOpen,
 		setQuadratAnnouncementOpen,
+		wordRulesAnnouncementOpen,
+		setWordRulesAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,
 	} = useDailyOnboarding({
 		activeUser,
+		puzzleDateKey: puzzle.dateKey,
+		accountHistoryEntries: initialData.historyEntries,
 		isPresentable,
 		derivedProgress,
 		sharePreviewOpen,
@@ -224,7 +229,11 @@ function DailyGame({
 	});
 	usePuzzleKeyboard({
 		enabled:
-			isPresentable && !isComplete && !tutorialOpen && !quadratAnnouncementOpen,
+			isPresentable &&
+			!isComplete &&
+			!tutorialOpen &&
+			!quadratAnnouncementOpen &&
+			!wordRulesAnnouncementOpen,
 		letters: derivedProgress.shuffledLetters,
 		guess: currentGuess,
 		minimumGuessLength: 4,
@@ -373,6 +382,10 @@ function DailyGame({
 			<QuadratAnnouncementDialog
 				open={quadratAnnouncementOpen}
 				onOpenChange={setQuadratAnnouncementOpen}
+			/>
+			<WordRulesAnnouncementDialog
+				open={wordRulesAnnouncementOpen}
+				onOpenChange={setWordRulesAnnouncementOpen}
 			/>
 			<SharePreviewDialog
 				open={sharePreviewOpen}

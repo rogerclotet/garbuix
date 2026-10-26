@@ -20,6 +20,8 @@ const PROFILE_PREFERENCES_TIP_SEEN_KEY =
 const WELCOME_SEEN_KEY = "paraules-welcome-seen-v1";
 const WELCOME_POSTPONED_DATE_KEY = "garbuix-welcome-postponed-date-v1";
 const QUADRAT_ANNOUNCEMENT_SEEN_KEY = "garbuix-quadrat-announcement-seen-v1";
+const WORD_RULES_ANNOUNCEMENT_SEEN_KEY =
+	"garbuix-word-rules-announcement-seen-v1";
 // Re-show the welcome dialog to anonymous users periodically so they keep
 // getting nudged to sign in. We store the last-shown timestamp and only
 // suppress the dialog within this cooldown window.
@@ -228,10 +230,10 @@ export function isWelcomePostponedToday(): boolean {
 	);
 }
 
-export function hasSeenQuadratAnnouncement(): boolean {
+function hasSeenAnnouncement(key: string): boolean {
 	if (typeof window === "undefined") return true;
 	try {
-		return window.localStorage.getItem(QUADRAT_ANNOUNCEMENT_SEEN_KEY) === "1";
+		return window.localStorage.getItem(key) === "1";
 	} catch (error) {
 		// Skip announcements when we cannot remember that they have been shown.
 		if (error instanceof DOMException) return true;
@@ -239,14 +241,30 @@ export function hasSeenQuadratAnnouncement(): boolean {
 	}
 }
 
-export function markQuadratAnnouncementSeen(): void {
+function markAnnouncementSeen(key: string): void {
 	if (typeof window === "undefined") return;
 	try {
-		window.localStorage.setItem(QUADRAT_ANNOUNCEMENT_SEEN_KEY, "1");
+		window.localStorage.setItem(key, "1");
 	} catch (error) {
 		// A blocked storage write must not interrupt the game.
 		if (!(error instanceof DOMException)) throw error;
 	}
+}
+
+export function hasSeenQuadratAnnouncement(): boolean {
+	return hasSeenAnnouncement(QUADRAT_ANNOUNCEMENT_SEEN_KEY);
+}
+
+export function markQuadratAnnouncementSeen(): void {
+	markAnnouncementSeen(QUADRAT_ANNOUNCEMENT_SEEN_KEY);
+}
+
+export function hasSeenWordRulesAnnouncement(): boolean {
+	return hasSeenAnnouncement(WORD_RULES_ANNOUNCEMENT_SEEN_KEY);
+}
+
+export function markWordRulesAnnouncementSeen(): void {
+	markAnnouncementSeen(WORD_RULES_ANNOUNCEMENT_SEEN_KEY);
 }
 
 export function getDeviceId() {
