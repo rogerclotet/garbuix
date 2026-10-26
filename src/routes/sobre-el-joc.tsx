@@ -31,9 +31,18 @@ function AboutPage() {
 					>
 						Softcatalà
 					</a>
-					. Per crear els mots encreuats, el joc prioritza les paraules més
-					habituals segons la seva freqüència d'ús. També n'accepta d'altres de
-					menys freqüents com a paraules extra.
+					. Valen tal com hi surten: noms i adjectius en singular, en masculí o
+					en femení (petit, petita), verbs en infinitiu (menjar), adverbis, i
+					també determinants, pronoms, preposicions i conjuncions (cada, ningú,
+					sense). No valen els plurals (cases), els verbs conjugats (menjo), els
+					noms propis ni les interjeccions.
+				</p>
+				<p>
+					Per crear els mots encreuats, el joc tria noms, adjectius, verbs i
+					adverbis que tinguin definició al Viccionari, i prioritza els més
+					habituals segons la seva freqüència d'ús. La resta de paraules del
+					diccionari, incloses les menys freqüents, compten com a paraules
+					extra.
 				</p>
 				<p>
 					Garbuix mini i Garbuix síl·labes fan servir una selecció pròpia de

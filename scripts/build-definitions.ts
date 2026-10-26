@@ -35,8 +35,9 @@ const BARE_SYNONYM_TEMPLATE =
 	/^\{\{\s*sinònim\s*\|\s*ca\s*\|\s*([^|}=]+)(?:\|[^}=]*)*\}\}[\s.]*$/;
 const POS_HEADING = /^={3,4}\s*([^=]+?)\s*={3,4}\s*$/;
 const LABELLED_SENSE = /^\s*\{\{\s*marca(?:-nocat)?\s*\|/;
-const FEMININE_FORM_TEMPLATE =
-	/^\{\{\s*forma-f\s*\|\s*ca\s*\|\s*([^|}]+)\}\}[\s.]*$/;
+// {{forma-f|ca|vidu}}, or the same written out as "Femení singular de [[ronc]]".
+const FEMININE_FORM =
+	/^(?:\{\{\s*forma-f\s*\|\s*ca\s*\|\s*([^|}]+)\}\}|Femení (?:singular )?de \[\[([^\]|]+)\]\])[\s.]*$/;
 
 type RawSense = { partOfSpeech: string; text: string };
 type RankedSense = { rank: "own" | "feminine" | "labelled"; text: string };
@@ -147,7 +148,8 @@ function buildSenses(
 	const senses: RankedSense[] = [];
 	for (const sense of sensesByTitle.get(word) ?? []) {
 		const raw = stripReferences(sense.text).replace(SENSE_NUMBER, "");
-		const masculine = raw.trim().match(FEMININE_FORM_TEMPLATE)?.[1]?.trim();
+		const feminineOf = raw.trim().match(FEMININE_FORM);
+		const masculine = (feminineOf?.[1] ?? feminineOf?.[2])?.trim();
 		const text = masculine
 			? describeFeminineForm(masculine, sense.partOfSpeech, sensesByTitle)
 			: describeSense(word, raw, sensesByTitle);
@@ -160,11 +162,6 @@ function buildSenses(
 					: "own",
 			text: sense.partOfSpeech ? `(${sense.partOfSpeech}) ${text}` : text,
 		});
-	}
-	// A word that is only the feminine of another is an inflection, not a
-	// puzzle word of its own.
-	if (senses.every((sense) => sense.rank === "feminine")) {
-		return [];
 	}
 	return orderFeminineSenses(senses)
 		.slice(0, MAX_SENSES)

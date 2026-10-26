@@ -41,12 +41,12 @@ describe("generated Catalan dictionary", () => {
 		}
 	});
 
-	it("generates puzzles from open-class headwords", () => {
+	it("generates puzzles from open-class headwords and their feminines", () => {
 		const names = new Set(generationWords.map((word) => word.name));
-		for (const word of ["ordre", "vall", "salut"]) {
+		for (const word of ["ordre", "vall", "salut", "noia", "petita"]) {
 			expect(names.has(word), word).toBe(true);
 		}
-		for (const word of ["cada", "sense", "finalment", "petita"]) {
+		for (const word of ["cada", "sense", "finalment", "aquesta"]) {
 			expect(names.has(word), word).toBe(false);
 		}
 	});

@@ -13,7 +13,7 @@ export const GUESS_MIN_FREQUENCY = 1;
 const SOURCE_COMMIT = "1c95123b972b264957d299ef206689bfaa6b98ce";
 // Bump when the rules below change what counts as a word, so builds that keep
 // generated files (--if-missing) rebuild them.
-const POLICY_VERSION = 3;
+const POLICY_VERSION = 4;
 export const LEXICON_VERSION = `${SOURCE_COMMIT}:${POLICY_VERSION}`;
 
 const SOURCE_BASE_URL = `https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/${SOURCE_COMMIT}`;
@@ -219,10 +219,10 @@ function isPersonalPronounHeadword(tag: string): boolean {
 	return number !== "P" || (strong && (person === "1" || person === "2"));
 }
 
-// Open-class headwords, plus feminine nouns such as germana. A feminine
-// adjective's Viccionari page holds a bare "femení de" (ronca) or an unrelated
-// sense, so it would get a misleading clue. -ment adverbs are long and would
-// crowd out other words.
+// Open-class headwords and their feminine singulars (noia, petita). A
+// feminine's clue rests on the masculine's definition; see
+// scripts/build-definitions.ts. -ment adverbs are long and would crowd out
+// other words.
 function isGenerationForm({ form, lemma, tag }: DictionaryLine): boolean {
 	if (!GENERATION_CATEGORIES.has(tag.charAt(0))) {
 		return false;
@@ -230,7 +230,7 @@ function isGenerationForm({ form, lemma, tag }: DictionaryLine): boolean {
 	if (tag.startsWith("R") && form.endsWith("ment")) {
 		return false;
 	}
-	return form === lemma || tag.startsWith("NC");
+	return form === lemma || isFeminineSingularTag(tag);
 }
 
 // Gender and number follow the subtype in nouns (NCFS000) and one position

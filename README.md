@@ -522,14 +522,24 @@ Useful flags:
 ### Dictionary Download
 
 The build process automatically:
-1. Fetches general lexical data from Softcatalà's `catalan-dict-tools` repository
-2. Combines nouns, adjectives, verbs, adverbs, and lemma frequency data
-3. Filters to crossword-friendly entries (4-12 letters, alphabetic, corpus frequency >= 20)
-   that have a definition in `src/data/catalan-definitions.json`
-4. Saves the result to `src/data/catalan-words.json` (currently ~16k words)
+1. Fetches Softcatalà's compiled dictionary (`resultats/lt/diccionari.txt`: form,
+   lemma and FreeLing tag per line) and its corpus frequencies from
+   `catalan-dict-tools`, pinned to the commit in `scripts/lib/catalan-lexicon.ts`
+2. Keeps headwords, feminine singulars (catalana, noia), and singular personal
+   pronouns plus nosaltres and vosaltres. Numbered homographs (pau_1, pau_2)
+   merge into one word. Plurals, conjugated verbs, proper nouns, interjections
+   and abbreviations are left out
+3. Filters puzzle words to nouns, adjectives, verbs and non -ment adverbs
+   (headwords and their feminine singulars) of 4-12 letters with corpus
+   frequency >= 20 and a definition in `src/data/catalan-definitions.json`
+4. Saves the result to `src/data/catalan-words.json` (currently ~18k words)
 
-Guesses are still checked against every Softcatalà word of 4-12 letters, with
-or without a definition.
+Guesses are checked against every kept word of 4-12 letters with corpus
+frequency >= 1, including determiners, pronouns, prepositions, conjunctions and
+-ment adverbs, with or without a definition. A version stamp in
+`src/data/catalan-lexicon-version.txt` makes `--if-missing` rebuild lists made
+from an older source commit or older rules; bump `POLICY_VERSION` when the rules
+change.
 
 ### Word Definitions
 
@@ -539,10 +549,17 @@ word, extracted from the [Viccionari](https://ca.wiktionary.org/) dump
 the real meaning instead of guessing. The extraction:
 
 - Keeps the Catalan section only and tags each sense with its part of speech
+- Replaces "femení de X" (`{{forma-f}}`) with X's first definition in the same
+  part of speech, so vídua reads "femení de vidu: Persona amb el cònjuge mort"
+  instead of losing its main meaning. A page that opens with it but has an
+  unlabelled sense of its own (hamburguesa) leads with that sense instead
 - Drops senses that only point at another form (`{{ca-forma-conj}}`,
-  `{{forma-f}}`, ...) or mark a missing definition (`{{sense accepcions}}`)
+  `{{forma-p}}`, ...) or mark a missing definition (`{{sense accepcions}}`)
 - Replaces a sense that only names a synonym with that synonym's first
   definition, or drops it when the synonym has none
+
+The clue prompt asks for the best-known sense rather than the first one, and
+for a clue that only fits the feminine when the sense is "femení de".
 
 Words left without any sense never appear in puzzles. The file is committed
 because Wikimedia deletes old dumps after a few months. Regenerate it (needs
@@ -582,7 +599,7 @@ the only seven-letter puzzle published is 2026-10-12.
 - The dictionary source is a general lexicon instead of a terminology database
 - Low-frequency words are filtered out during the build step (currently `frequency >= 20`)
 - Words without a Viccionari definition are filtered out, which also drops most
-  proper nouns and foreign words from the Softcatalà lists
+  foreign words from the Softcatalà lists
 - Puzzle generation prefers more common words, while keeping some randomness
 
 ### Reddit Daily Post
@@ -676,14 +693,17 @@ Edit `src/lib/crossword-generator.ts` to adjust:
 
 ### Updating the Dictionary
 
-The build only downloads the dictionary if `src/data/catalan-words.json` is missing.
-To force a refresh from the upstream source:
+The build only downloads the dictionary when the generated lists are missing or
+were built from another source commit or rule version. To update Softcatalà's
+data, change `SOURCE_COMMIT` in `scripts/lib/catalan-lexicon.ts`, then refresh
+the definitions for the new candidates and rebuild the lists:
 
 ```bash
+pnpm run build-definitions
 pnpm run download-dict
 ```
 
-This will fetch the latest source files from Softcatalà and rebuild the local JSON.
+Commit the regenerated `src/data/catalan-definitions.json`.
 
 ## Contributing
 

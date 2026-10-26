@@ -152,24 +152,25 @@ describe("buildCatalanLexicon", () => {
 		}
 	});
 
-	it("keeps generation to open-class headwords and feminine nouns", () => {
+	it("keeps generation to open-class headwords and their feminine singulars", () => {
 		const candidates = lexicon
 			.filter(isGenerationCandidate)
 			.map((word) => word.name)
 			.sort();
 		expect(candidates).toEqual([
 			"casa",
+			"catalana",
 			"català",
 			"menjar",
 			"noia",
 			"ordre",
 			"petit",
+			"petita",
 			"ràpid",
 			"sempre",
 		]);
-		expect(find("noia")?.generationEligible).toBe(true);
-		expect(find("petita")?.generationEligible).toBe(false);
 		expect(find("ràpidament")?.generationEligible).toBe(false);
+		expect(find("aquesta")?.generationEligible).toBe(false);
 		expect(find("cada")?.generationEligible).toBe(false);
 	});
 });
