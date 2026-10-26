@@ -10,24 +10,34 @@ import {
 	hasSeenProfilePreferencesTip,
 	hasSeenQuadratAnnouncement,
 	hasSeenWelcome,
+	hasSeenWordRulesAnnouncement,
 	isWelcomePostponedToday,
 	markProfilePreferencesTipSeen,
 	markQuadratAnnouncementSeen,
 	markWelcomeSeen,
+	markWordRulesAnnouncementSeen,
 } from "@/lib/puzzle-local";
-import type { PuzzleProgressState } from "@/lib/puzzle-types";
+import type {
+	HistorySummaryEntry,
+	PuzzleProgressState,
+} from "@/lib/puzzle-types";
 import { hasPlayedQuadrat } from "@/lib/quadrat-local";
+import { shouldAnnounceWordRules } from "@/lib/word-rules-announcement";
 import type { DailySessionUser } from "./daily-types";
 import { openHowToPlay, useHowToPlayOpen } from "./how-to-play-store";
 
 export function useDailyOnboarding({
 	activeUser,
+	puzzleDateKey,
+	accountHistoryEntries,
 	isPresentable,
 	derivedProgress,
 	sharePreviewOpen,
 	winDialogOpen,
 }: {
 	activeUser: DailySessionUser;
+	puzzleDateKey: string;
+	accountHistoryEntries: HistorySummaryEntry[] | null;
 	isPresentable: boolean;
 	derivedProgress: PuzzleProgressState;
 	sharePreviewOpen: boolean;
@@ -35,6 +45,8 @@ export function useDailyOnboarding({
 }) {
 	const [welcomeOpen, setWelcomeOpen] = useState(false);
 	const [quadratAnnouncementOpen, setQuadratAnnouncementOpen] = useState(false);
+	const [wordRulesAnnouncementOpen, setWordRulesAnnouncementOpen] =
+		useState(false);
 	const tutorialOpen = useHowToPlayOpen();
 	const profilePreferencesTipOpen = useProfilePreferencesTipOpen();
 	const firstVisitChecked = useRef(false);
@@ -58,6 +70,22 @@ export function useDailyOnboarding({
 
 		if (!hasSeenHowToPlay()) {
 			openHowToPlayIfFirstVisit();
+			return;
+		}
+
+		// Ahead of the welcome and the tips, which come back on later visits,
+		// because this one only matters while the change is recent.
+		if (
+			!sharePreviewOpen &&
+			!winDialogOpen &&
+			!hasSeenWordRulesAnnouncement() &&
+			shouldAnnounceWordRules(puzzleDateKey, [
+				...(accountHistoryEntries ?? []),
+				...getSortedAnonymousHistoryEntries(),
+			])
+		) {
+			markWordRulesAnnouncementSeen();
+			setWordRulesAnnouncementOpen(true);
 			return;
 		}
 
@@ -93,6 +121,8 @@ export function useDailyOnboarding({
 		setQuadratAnnouncementOpen(true);
 	}, [
 		activeUser,
+		puzzleDateKey,
+		accountHistoryEntries,
 		openHowToPlayIfFirstVisit,
 		openProfilePreferencesTipIfNeeded,
 		isPresentable,
@@ -135,6 +165,8 @@ export function useDailyOnboarding({
 		welcomeOpen,
 		quadratAnnouncementOpen,
 		setQuadratAnnouncementOpen,
+		wordRulesAnnouncementOpen,
+		setWordRulesAnnouncementOpen,
 		tutorialOpen,
 		handleWelcomeOpenChange,
 		handleWelcomeSignIn,

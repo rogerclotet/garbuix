@@ -22,8 +22,9 @@ import { decodeRevealedAnswers } from "@/lib/puzzle-client";
 import {
 	getSortedAnonymousHistoryEntries,
 	hasSeenQuadratAnnouncement,
+	hasSeenWordRulesAnnouncement,
 } from "@/lib/puzzle-local";
-import type { SessionUser } from "@/lib/puzzle-types";
+import type { HistorySummaryEntry, SessionUser } from "@/lib/puzzle-types";
 import { Daily } from "./daily";
 import { useHowToPlayOpen } from "./how-to-play-store";
 
@@ -226,6 +227,13 @@ function installVibrateMock() {
 	return window.navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
 }
 
+const dailyDataState = vi.hoisted(
+	(): {
+		dateKey: string;
+		historyEntries: HistorySummaryEntry[] | null;
+	} => ({ dateKey: "2026-04-11", historyEntries: null }),
+);
+
 const queryClient = new QueryClient({
 	defaultOptions: { queries: { retry: false } },
 });
@@ -235,10 +243,10 @@ function dailyView() {
 		<QueryClientProvider client={queryClient}>
 			<Daily
 				initialData={{
-					historyEntries: null,
+					historyEntries: dailyDataState.historyEntries,
 					puzzle: {
 						id: "puzzle-1",
-						dateKey: "2026-04-11",
+						dateKey: dailyDataState.dateKey,
 						seed: 260411,
 						algorithmVersion: "1",
 						rows: 1,
@@ -281,6 +289,19 @@ function dailyView() {
 			/>
 		</QueryClientProvider>
 	);
+}
+
+function playedEntry(dateKey: string): HistorySummaryEntry {
+	return {
+		dateKey,
+		seed: null,
+		totalWords: 8,
+		guessedWords: 3,
+		guessCount: 4,
+		hintsUsed: 0,
+		completed: false,
+		lastUpdated: `${dateKey}T12:00:00Z`,
+	};
 }
 
 const quadratSave = {
@@ -350,6 +371,8 @@ async function submitCurrentGuess() {
 describe("Daily submit feedback", () => {
 	beforeEach(() => {
 		installLocalStorageMock({ "garbuix-quadrat-announcement-seen-v1": "1" });
+		dailyDataState.dateKey = "2026-04-11";
+		dailyDataState.historyEntries = null;
 		sessionState.activeUser = null;
 		progressState.guessCount = 0;
 		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([]);
@@ -815,6 +838,70 @@ describe("Daily submit feedback", () => {
 			view.rerender(dailyView());
 			expect(screen.queryByRole("alertdialog")).toBeNull();
 			expect(hasSeenQuadratAnnouncement()).toBe(false);
+		},
+	);
+
+	it.each(["local", "google"])(
+		"explains the new word rules once to a returning %s player",
+		async (kind) => {
+			installLocalStorageMock();
+			dailyDataState.dateKey = "2026-10-27";
+			if (kind === "local")
+				vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([
+					playedEntry("2026-10-26"),
+				]);
+			else {
+				sessionState.activeUser = {
+					id: "parent",
+					name: "Parent",
+					email: "parent@example.com",
+				};
+				dailyDataState.historyEntries = [playedEntry("2026-10-20")];
+			}
+			const first = renderAnnouncementVisit();
+			await screen.findByRole("alertdialog", { name: "Més paraules vàlides" });
+			expect(hasSeenWordRulesAnnouncement()).toBe(true);
+			expect(hasSeenQuadratAnnouncement()).toBe(false);
+			for (const key of "cosa") fireEvent.keyDown(window, { key });
+			fireEvent.keyDown(window, { key: "Enter" });
+			expect(resolveGuessMock).not.toHaveBeenCalled();
+			fireEvent.click(screen.getByRole("button", { name: "Entesos" }));
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+			first.unmount();
+			renderAnnouncementVisit();
+			await screen.findByRole("alertdialog", { name: "Garbuix quadrat" });
+			expect(screen.queryByText("Més paraules vàlides")).toBeNull();
+		},
+	);
+
+	it("explains the new word rules before the welcome dialog", async () => {
+		installLocalStorageMock({ "garbuix-quadrat-announcement-seen-v1": "1" });
+		dailyDataState.dateKey = "2026-11-09";
+		vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([
+			playedEntry("2026-10-26"),
+		]);
+		hasSeenWelcomeMock.mockReturnValue(false);
+		renderAnnouncementVisit();
+		await screen.findByRole("alertdialog", { name: "Més paraules vàlides" });
+		expect(screen.queryByText("Desa el teu progrés")).toBeNull();
+	});
+
+	it.each([
+		["on a puzzle before the change", "2026-10-26", "2026-10-25"],
+		["once the announcement has expired", "2026-11-10", "2026-10-26"],
+		["to a player who started after the change", "2026-10-28", "2026-10-27"],
+	])(
+		"does not explain the new word rules %s",
+		async (_, dateKey, playedDateKey) => {
+			installLocalStorageMock({ "garbuix-quadrat-announcement-seen-v1": "1" });
+			dailyDataState.dateKey = dateKey;
+			vi.mocked(getSortedAnonymousHistoryEntries).mockReturnValue([
+				playedEntry(playedDateKey),
+			]);
+			renderDaily();
+			await screen.findByTestId("daily-grid");
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(hasSeenWordRulesAnnouncement()).toBe(false);
 		},
 	);
 
