@@ -35,8 +35,8 @@ describe("generated Catalan dictionary", () => {
 		}
 	});
 
-	it("leaves out plurals, verb forms and interjections", () => {
-		for (const word of ["cases", "catalans", "menjo", "hola"]) {
+	it("leaves out plurals, verb forms, plural pronouns and interjections", () => {
+		for (const word of ["cases", "catalans", "menjo", "hola", "ells", "els"]) {
 			expect(allLengths.has(word), word).toBe(false);
 		}
 	});

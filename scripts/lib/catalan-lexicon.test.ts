@@ -33,6 +33,12 @@ aquest aquest DD0MS0
 aquesta aquest DD0FS0
 aquests aquest DD0MP0
 nosaltres jo PP1CPN00
+ella ell PP3FSN00
+ells ell PP3MPN00
+els ell PP3CP000
+ens jo PP1CP000
+vostè ell PP3CS00P
+vostès ell PP3CP00P
 ràpid ràpid AQ0MS0
 ràpidament ràpidament RG
 sempre sempre RG
@@ -75,6 +81,12 @@ molta, 5000
 aquesta, 203301
 aquests, 100000
 nosaltres, 60000
+ella, 150000
+ells, 200000
+els, 1400000
+ens, 300000
+vostè, 37000
+vostès, 5000
 `;
 
 const lexicon = buildCatalanLexicon({
@@ -103,6 +115,13 @@ describe("buildCatalanLexicon", () => {
 		expect(find("ningú")?.areatematica).toBe("Pronom");
 		expect(find("mentre")?.areatematica).toBe("Conjunció");
 		expect(find("nosaltres")?.areatematica).toBe("Pronom");
+	});
+
+	it("accepts singular personal pronouns, nosaltres and vosaltres only", () => {
+		const pronouns = ["ella", "ells", "els", "ens", "vostè", "vostès"].filter(
+			(name) => find(name) !== undefined,
+		);
+		expect(pronouns).toEqual(["ella", "vostè"]);
 	});
 
 	it("accepts feminine singulars by their own frequency", () => {

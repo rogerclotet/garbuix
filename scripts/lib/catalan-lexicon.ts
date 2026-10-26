@@ -13,7 +13,7 @@ export const GUESS_MIN_FREQUENCY = 1;
 const SOURCE_COMMIT = "1c95123b972b264957d299ef206689bfaa6b98ce";
 // Bump when the rules below change what counts as a word, so builds that keep
 // generated files (--if-missing) rebuild them.
-const POLICY_VERSION = 2;
+const POLICY_VERSION = 3;
 export const LEXICON_VERSION = `${SOURCE_COMMIT}:${POLICY_VERSION}`;
 
 const SOURCE_BASE_URL = `https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/${SOURCE_COMMIT}`;
@@ -193,13 +193,30 @@ function parseDictionaryLine(rawLine: string): DictionaryLine | null {
 }
 
 // Headwords, plus the feminine singular a dictionary lists beside them
-// (catalana, noia, aquesta) and the personal pronouns, which are headwords
-// even though Softcatalà files nosaltres under jo.
+// (catalana, noia, aquesta) and the personal pronouns below.
 function isWordForm({ form, lemma, tag }: DictionaryLine): boolean {
 	if (tag.startsWith("NP")) {
 		return false;
 	}
-	return form === lemma || tag.startsWith("PP") || isFeminineSingularTag(tag);
+	return (
+		form === lemma ||
+		isFeminineSingularTag(tag) ||
+		isPersonalPronounHeadword(tag)
+	);
+}
+
+// Softcatalà files every personal pronoun under jo, tu or ell, but mi, li and
+// vostè are dictionary headwords, and so are nosaltres and vosaltres. Other
+// plurals (ells, els, ens, vostès) are not. Tags read PP, person, gender,
+// number, case: PP1CPN00 is nosaltres, the strong first person plural.
+function isPersonalPronounHeadword(tag: string): boolean {
+	if (!tag.startsWith("PP")) {
+		return false;
+	}
+	const person = tag.charAt(2);
+	const number = tag.charAt(4);
+	const strong = tag.charAt(5) === "N";
+	return number !== "P" || (strong && (person === "1" || person === "2"));
 }
 
 // Open-class headwords, plus feminine nouns such as germana. A feminine
