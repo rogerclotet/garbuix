@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import { MINI_WORDS } from "../src/data/mini-words";
 import { SYLLABLE_WORDS } from "../src/data/syllable-words";
@@ -10,9 +10,10 @@ import { createSyllableSplitter } from "./syllable-patterns";
 const SOURCE =
 	"https://raw.githubusercontent.com/jaumeortola/hyphen-ca/dac10c01eab7132c1ddf4a22e2ea8a3f6ee439ae/ca.js";
 const OUTPUT = "src/data/catalan-syllables.json";
+const INPUT = "src/data/catalan-syllable-words.json";
 
 async function main() {
-	if (process.argv.includes("--if-missing") && existsSync(OUTPUT)) return;
+	if (process.argv.includes("--if-missing") && isOutputCurrent()) return;
 	const response = await fetch(SOURCE);
 	if (!response.ok)
 		throw new Error(`Syllable patterns: HTTP ${response.status}`);
@@ -23,9 +24,7 @@ async function main() {
 	const split = createSyllableSplitter(patterns);
 	const dictionary = z
 		.array(z.string())
-		.parse(
-			JSON.parse(readFileSync("src/data/catalan-syllable-words.json", "utf8")),
-		);
+		.parse(JSON.parse(readFileSync(INPUT, "utf8")));
 	const words = [
 		...new Set([
 			...dictionary,
@@ -48,6 +47,14 @@ async function main() {
 	});
 	writeFileSync(OUTPUT, `${JSON.stringify(entries)}\n`);
 	console.log(`Saved ${entries.length} syllabified words to ${OUTPUT}`);
+}
+
+// The word list is rebuilt whenever its Softcatalà source changes, and the
+// syllables must follow it.
+function isOutputCurrent(): boolean {
+	return (
+		existsSync(OUTPUT) && statSync(OUTPUT).mtimeMs >= statSync(INPUT).mtimeMs
+	);
 }
 
 main().catch((error) => {

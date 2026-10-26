@@ -18,3 +18,4 @@ public/version.json
 
 src/data/catalan-syllables.json
 src/data/catalan-syllable-words.json
+src/data/catalan-lexicon-version.txt

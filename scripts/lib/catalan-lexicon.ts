@@ -8,91 +8,125 @@ export const MAX_LENGTH = 12;
 export const GENERATION_MIN_FREQUENCY = 20;
 export const GUESS_MIN_FREQUENCY = 1;
 
-const SOURCE_BASE_URL =
-	"https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/master";
+// Pinned so a new Softcatalà dictionary only reaches players through a commit
+// here, never through an unrelated rebuild.
+const SOURCE_COMMIT = "1c95123b972b264957d299ef206689bfaa6b98ce";
+// Bump when the rules below change what counts as a word, so builds that keep
+// generated files (--if-missing) rebuild them.
+const POLICY_VERSION = 2;
+export const LEXICON_VERSION = `${SOURCE_COMMIT}:${POLICY_VERSION}`;
+
+const SOURCE_BASE_URL = `https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/${SOURCE_COMMIT}`;
+const DICTIONARY_PATH = "resultats/lt/diccionari.txt";
+const LEMMA_FREQUENCIES_PATH = "frequencies/frequencies-dict-lemmas.txt";
+const FORM_FREQUENCIES_PATH = "frequencies/frequencies-dict-forms.txt";
+
 const VALID_WORD_REGEX = /^(?=.*[a-zà-ÿç])[a-zà-ÿç·]+$/u;
+// Softcatalà numbers homograph lemmas, such as pau_1 and pau_2.
+const HOMOGRAPH_SUFFIX = /_\d+$/;
 
-const SOURCES = [
-	{
-		label: "Nom",
-		path: "diccionari-arrel/noms-fdic.txt",
-		type: "fdic",
-	},
-	{
-		label: "Adjectiu",
-		path: "diccionari-arrel/adjectius-fdic.txt",
-		type: "fdic",
-	},
-	{
-		label: "Verb",
-		path: "diccionari-arrel/verbs-fdic.txt",
-		type: "fdic",
-	},
-	{
-		label: "Adverbi",
-		path: "diccionari-arrel/adverbis-lt.txt",
-		type: "lt",
-	},
-] as const;
+// The first letter of a FreeLing tag is the part of speech. Interjections (I),
+// abbreviations (Y) and punctuation (F) are left out on purpose. Order here is
+// the order of the labels in areatematica.
+const CATEGORY_LABELS = new Map<string, string>([
+	["N", "Nom"],
+	["A", "Adjectiu"],
+	["V", "Verb"],
+	["R", "Adverbi"],
+	["D", "Determinant"],
+	["P", "Pronom"],
+	["S", "Preposició"],
+	["C", "Conjunció"],
+]);
+const GENDERED_CATEGORIES = new Set(["N", "A", "D", "P"]);
+// Closed-class words make poor crossword answers, so they are guess-only.
+const GENERATION_CATEGORIES = new Set(["N", "A", "V", "R"]);
 
-type Source = (typeof SOURCES)[number];
+export type LexiconSources = {
+	dictionary: string;
+	lemmaFrequencies: string;
+	formFrequencies: string;
+};
+
+type DictionaryLine = {
+	form: string;
+	lemma: string;
+	tag: string;
+};
+
+// generationEligible marks the words a puzzle may use, subject to frequency,
+// length and a definition. It is not written to the generated files.
+export type LexiconWord = Word & { generationEligible: boolean };
 
 type WordAccumulator = {
 	name: string;
 	frequency: number;
 	labels: Set<string>;
+	generationEligible: boolean;
 };
 
-// Every Softcatalà headword with a corpus frequency of at least
-// GUESS_MIN_FREQUENCY, sorted by descending frequency.
-export async function fetchCatalanLexicon(): Promise<Word[]> {
-	const [frequencyText, ...sourceTexts] = await Promise.all([
-		fetchText("frequencies/frequencies-dict-lemmas.txt"),
-		...SOURCES.map((source) => fetchText(source.path)),
+// Every Softcatalà headword, feminine singular and personal pronoun with a
+// corpus frequency of at least GUESS_MIN_FREQUENCY, sorted by descending
+// frequency. Plurals and conjugated verb forms are left out.
+export async function fetchCatalanLexicon(): Promise<LexiconWord[]> {
+	const [dictionary, lemmaFrequencies, formFrequencies] = await Promise.all([
+		fetchText(DICTIONARY_PATH),
+		fetchText(LEMMA_FREQUENCIES_PATH),
+		fetchText(FORM_FREQUENCIES_PATH),
 	]);
+	return buildCatalanLexicon({
+		dictionary,
+		lemmaFrequencies,
+		formFrequencies,
+	});
+}
 
-	const frequencies = parseFrequencyIndex(frequencyText);
+export function buildCatalanLexicon(sources: LexiconSources): LexiconWord[] {
+	const lemmaFrequencies = parseFrequencyIndex(sources.lemmaFrequencies);
+	const formFrequencies = parseFrequencyIndex(sources.formFrequencies);
 	const words = new Map<string, WordAccumulator>();
 
-	for (const [index, source] of SOURCES.entries()) {
-		const text = sourceTexts[index];
-
-		for (const rawLine of text.split(/\r?\n/)) {
-			for (const form of extractForms(rawLine, source)) {
-				if (!isSourceWordLowercase(form)) {
-					continue;
-				}
-
-				const name = normalizeWord(form);
-
-				if (!isValidWord(name)) {
-					continue;
-				}
-
-				const frequency = frequencies.get(name) ?? 0;
-				if (frequency < GUESS_MIN_FREQUENCY) {
-					continue;
-				}
-
-				const entry = words.get(name) ?? {
-					name,
-					frequency,
-					labels: new Set<string>(),
-				};
-
-				entry.frequency = Math.max(entry.frequency, frequency);
-				entry.labels.add(source.label);
-				words.set(name, entry);
-			}
+	for (const rawLine of sources.dictionary.split(/\r?\n/)) {
+		const line = parseDictionaryLine(rawLine);
+		if (!line) {
+			continue;
 		}
+
+		const label = CATEGORY_LABELS.get(line.tag.charAt(0));
+		if (!label || !isValidWord(line.form) || !isWordForm(line)) {
+			continue;
+		}
+
+		// The lemma index counts every inflection of a headword, which keeps
+		// headwords whose bare form is rare. Other forms only have their own count.
+		const formFrequency = formFrequencies.get(line.form) ?? 0;
+		const frequency =
+			line.form === line.lemma
+				? Math.max(formFrequency, lemmaFrequencies.get(line.form) ?? 0)
+				: formFrequency;
+		if (frequency < GUESS_MIN_FREQUENCY) {
+			continue;
+		}
+
+		const entry = words.get(line.form) ?? {
+			name: line.form,
+			frequency,
+			labels: new Set<string>(),
+			generationEligible: false,
+		};
+		entry.frequency = Math.max(entry.frequency, frequency);
+		entry.labels.add(label);
+		entry.generationEligible ||= isGenerationForm(line);
+		words.set(line.form, entry);
 	}
 
 	return Array.from(words.values())
 		.map(
-			(entry): Word => ({
+			(entry): LexiconWord => ({
 				name: entry.name,
 				areatematica: formatLabels(entry.labels),
 				frequency: entry.frequency,
+				generationEligible: entry.generationEligible,
 			}),
 		)
 		.sort(
@@ -101,10 +135,16 @@ export async function fetchCatalanLexicon(): Promise<Word[]> {
 }
 
 // Puzzle candidates before the definition filter.
-export function isGenerationCandidate(word: Word): boolean {
+export function isGenerationCandidate(word: LexiconWord): boolean {
 	return (
-		word.name.length >= MIN_LENGTH && word.frequency >= GENERATION_MIN_FREQUENCY
+		word.generationEligible &&
+		word.name.length >= MIN_LENGTH &&
+		word.frequency >= GENERATION_MIN_FREQUENCY
 	);
+}
+
+export function toWord({ name, areatematica, frequency }: LexiconWord): Word {
+	return { name, areatematica, frequency };
 }
 
 async function fetchText(path: string): Promise<string> {
@@ -137,51 +177,67 @@ function parseFrequencyIndex(text: string): Map<string, number> {
 			continue;
 		}
 
-		frequencies.set(normalizeWord(word), frequency);
+		frequencies.set(word.toLocaleLowerCase("ca"), frequency);
 	}
 
 	return frequencies;
 }
 
-function extractForms(line: string, source: Source): string[] {
-	const trimmed = line.trim();
-	if (!trimmed || trimmed.startsWith("#")) {
-		return [];
+// Lines are "form lemma tag", for example "pau pau_1 NCFS000".
+function parseDictionaryLine(rawLine: string): DictionaryLine | null {
+	const [form, lemma, tag] = rawLine.trim().split(/\s+/);
+	if (!form || !lemma || !tag) {
+		return null;
 	}
-
-	if (source.type === "lt") {
-		const form = trimmed.split(/\s+/)[0];
-		return form ? [form] : [];
-	}
-
-	const head = trimmed
-		.split("=", 1)[0]
-		.replace(/\[[^\]]*]/g, " ")
-		.trim();
-
-	return head ? head.split(/\s+/).filter(Boolean) : [];
+	return { form, lemma: lemma.replace(HOMOGRAPH_SUFFIX, ""), tag };
 }
 
-function normalizeWord(word: string): string {
-	return word.toLocaleLowerCase("ca");
+// Headwords, plus the feminine singular a dictionary lists beside them
+// (catalana, noia, aquesta) and the personal pronouns, which are headwords
+// even though Softcatalà files nosaltres under jo.
+function isWordForm({ form, lemma, tag }: DictionaryLine): boolean {
+	if (tag.startsWith("NP")) {
+		return false;
+	}
+	return form === lemma || tag.startsWith("PP") || isFeminineSingularTag(tag);
 }
 
-function isSourceWordLowercase(word: string): boolean {
-	return word === word.toLocaleLowerCase("ca");
+// Open-class headwords, plus feminine nouns such as germana. A feminine
+// adjective's Viccionari page holds a bare "femení de" (ronca) or an unrelated
+// sense, so it would get a misleading clue. -ment adverbs are long and would
+// crowd out other words.
+function isGenerationForm({ form, lemma, tag }: DictionaryLine): boolean {
+	if (!GENERATION_CATEGORIES.has(tag.charAt(0))) {
+		return false;
+	}
+	if (tag.startsWith("R") && form.endsWith("ment")) {
+		return false;
+	}
+	return form === lemma || tag.startsWith("NC");
+}
+
+// Gender and number follow the subtype in nouns (NCFS000) and one position
+// later in adjectives, determiners and pronouns (AQ0FS0, DI0FS0, PI0FS000).
+function isFeminineSingularTag(tag: string): boolean {
+	const category = tag.charAt(0);
+	if (!GENDERED_CATEGORIES.has(category)) {
+		return false;
+	}
+	const genderIndex = category === "N" ? 2 : 3;
+	return tag.charAt(genderIndex) === "F" && tag.charAt(genderIndex + 1) === "S";
 }
 
 function isValidWord(word: string): boolean {
 	return (
-		word.length >= 1 && word.length <= MAX_LENGTH && VALID_WORD_REGEX.test(word)
+		word.length <= MAX_LENGTH &&
+		word === word.toLocaleLowerCase("ca") &&
+		VALID_WORD_REGEX.test(word)
 	);
 }
 
 function formatLabels(labels: Set<string>): string {
-	const order = new Map<string, number>(
-		SOURCES.map((source, index) => [source.label, index]),
-	);
-
+	const order = [...CATEGORY_LABELS.values()];
 	return Array.from(labels)
-		.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
+		.sort((a, b) => order.indexOf(a) - order.indexOf(b))
 		.join(" / ");
 }

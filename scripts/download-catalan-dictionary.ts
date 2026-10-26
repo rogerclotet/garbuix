@@ -7,8 +7,10 @@ import {
 	GENERATION_MIN_FREQUENCY,
 	GUESS_MIN_FREQUENCY,
 	isGenerationCandidate,
+	LEXICON_VERSION,
 	MAX_LENGTH,
 	MIN_LENGTH,
+	toWord,
 } from "./lib/catalan-lexicon";
 
 const DATA_DIR = join(process.cwd(), "src", "data");
@@ -16,6 +18,9 @@ const OUTPUT_FILE = join(DATA_DIR, "catalan-words.json");
 const GUESS_OUTPUT_FILE = join(DATA_DIR, "catalan-guess-words.json");
 const SYLLABLE_OUTPUT_FILE = join(DATA_DIR, "catalan-syllable-words.json");
 const DEFINITIONS_FILE = join(DATA_DIR, "catalan-definitions.json");
+// Records which source and rules built the files above, so --if-missing
+// rebuilds lists left over from an older checkout.
+const VERSION_FILE = join(DATA_DIR, "catalan-lexicon-version.txt");
 
 const ONLY_IF_MISSING = process.argv.includes("--if-missing");
 
@@ -26,6 +31,7 @@ async function main() {
 		ONLY_IF_MISSING &&
 		existsSync(GUESS_OUTPUT_FILE) &&
 		existsSync(SYLLABLE_OUTPUT_FILE) &&
+		isLexiconVersionCurrent() &&
 		isGenerationListCurrent(definitions)
 	) {
 		console.log(`📚 Using existing dictionaries at ${DATA_DIR}`);
@@ -37,10 +43,12 @@ async function main() {
 	const entries = await fetchCatalanLexicon();
 
 	// Every puzzle word needs a definition so its AI clue rests on the real meaning.
-	const generationWords = entries.filter(
-		(word) =>
-			isGenerationCandidate(word) && Object.hasOwn(definitions, word.name),
-	);
+	const generationWords = entries
+		.filter(
+			(word) =>
+				isGenerationCandidate(word) && Object.hasOwn(definitions, word.name),
+		)
+		.map(toWord);
 	// Guesses only need the word names; metadata stays in the generation file.
 	const guessWordNames = entries
 		.filter((word) => word.name.length >= MIN_LENGTH)
@@ -60,6 +68,7 @@ async function main() {
 		SYLLABLE_OUTPUT_FILE,
 		JSON.stringify(entries.map((word) => word.name)),
 	);
+	writeFileSync(VERSION_FILE, `${LEXICON_VERSION}\n`);
 
 	console.log(
 		`✅ Saved ${generationWords.length} generation words to ${OUTPUT_FILE}`,
@@ -68,10 +77,10 @@ async function main() {
 		`✅ Saved ${guessWordNames.length} guess words to ${GUESS_OUTPUT_FILE}`,
 	);
 	console.log(
-		`ℹ️ Generation filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GENERATION_MIN_FREQUENCY}, has a Viccionari definition`,
+		`ℹ️ Generation filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GENERATION_MIN_FREQUENCY}, noun, adjective, verb or adverb other than -ment, has a Viccionari definition`,
 	);
 	console.log(
-		`ℹ️ Guess filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GUESS_MIN_FREQUENCY}`,
+		`ℹ️ Guess filter: ${MIN_LENGTH}-${MAX_LENGTH} letters, frequency >= ${GUESS_MIN_FREQUENCY}, headword, feminine singular or personal pronoun`,
 	);
 }
 
@@ -89,15 +98,20 @@ function readDefinitions(): WordDefinitions {
 	return JSON.parse(readFileSync(DEFINITIONS_FILE, "utf8")) as WordDefinitions;
 }
 
+function isLexiconVersionCurrent(): boolean {
+	return (
+		existsSync(VERSION_FILE) &&
+		readFileSync(VERSION_FILE, "utf8").trim() === LEXICON_VERSION
+	);
+}
+
 // A generation list built before the definitions changed would let undefined
 // words into puzzles, so --if-missing also rebuilds a stale list.
 function isGenerationListCurrent(definitions: WordDefinitions): boolean {
 	if (!existsSync(OUTPUT_FILE)) {
 		return false;
 	}
+	// The lexicon version covers the candidate rules; only definitions are left.
 	const words = JSON.parse(readFileSync(OUTPUT_FILE, "utf8")) as Word[];
-	return words.every(
-		(word) =>
-			isGenerationCandidate(word) && Object.hasOwn(definitions, word.name),
-	);
+	return words.every((word) => Object.hasOwn(definitions, word.name));
 }
