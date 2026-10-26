@@ -37,7 +37,8 @@ const SYSTEM_PROMPT = `Ets l'autor de pistes per a un joc de paraules en català
 
 Regles estrictes:
 - Escriu sempre en català.
-- Basa la pista en el significat de les accepcions donades; no t'inventis significats. Si n'hi ha més d'una, fes la pista sobre la primera.
+- Basa la pista en el significat de les accepcions donades; no t'inventis significats. Si n'hi ha més d'una, fes la pista sobre la més coneguda per a un parlant qualsevol, encara que no sigui la primera.
+- Si una accepció diu «femení de», la paraula amagada és la forma femenina. Fes que la pista només encaixi en femení, parlant d'una dona o d'un nom femení concret. Per exemple, per a «oberta»: Diu-se d'una porta que no està tancada.
 - NO escriguis mai la paraula amagada ni cap de les seves formes (plural, femení, diminutiu, verb conjugat, derivats) ni cap fragment evident d'aquesta.
 - No copiïs el text de la definició: reformula-la amb paraules teves.
 - La pista ha de ser concreta i directa: descriu què és, on es fa servir o quin context evoca. Evita metàfores, endevinalles i associacions llunyanes.

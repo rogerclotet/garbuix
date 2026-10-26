@@ -12,6 +12,7 @@ import {
 	getQuadratProgress,
 	getQuadratSolution,
 	saveQuadratProgress,
+	toQuadratPublicPuzzle,
 } from "@/lib/quadrat.server";
 import { consumeRateLimit, getClientAddress } from "@/lib/rate-limit.server";
 import type { WordCluesResult } from "@/lib/word-clues";
@@ -23,7 +24,7 @@ export const getQuadratPageData = createServerFn({ method: "GET" }).handler(
 			getAuthSession(),
 		]);
 		return {
-			puzzle: row.publicSnapshotJson,
+			puzzle: toQuadratPublicPuzzle(row),
 			progress: session
 				? await getQuadratProgress(session.user.id, row.id)
 				: null,

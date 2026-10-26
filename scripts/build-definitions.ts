@@ -34,8 +34,13 @@ const LINK_ONLY_SENSE = /^(?:\s*\[\[[^\]]+\]\][\s,;.]*)+$/;
 const BARE_SYNONYM_TEMPLATE =
 	/^\{\{\s*sinònim\s*\|\s*ca\s*\|\s*([^|}=]+)(?:\|[^}=]*)*\}\}[\s.]*$/;
 const POS_HEADING = /^={3,4}\s*([^=]+?)\s*={3,4}\s*$/;
+const LABELLED_SENSE = /^\s*\{\{\s*marca(?:-nocat)?\s*\|/;
+// {{forma-f|ca|vidu}}, or the same written out as "Femení singular de [[ronc]]".
+const FEMININE_FORM =
+	/^(?:\{\{\s*forma-f\s*\|\s*ca\s*\|\s*([^|}]+)\}\}|Femení (?:singular )?de \[\[([^\]|]+)\]\])[\s.]*$/;
 
 type RawSense = { partOfSpeech: string; text: string };
+type RankedSense = { rank: "own" | "feminine" | "labelled"; text: string };
 
 async function main() {
 	console.log("📚 Loading Softcatalà candidates...");
@@ -135,18 +140,48 @@ async function readCatalanSenses(): Promise<Map<string, RawSense[]>> {
 	return sensesByTitle;
 }
 
+// Clues are written about the first sense, so its order matters.
 function buildSenses(
 	word: string,
 	sensesByTitle: Map<string, RawSense[]>,
 ): string[] {
-	const senses: string[] = [];
+	const senses: RankedSense[] = [];
 	for (const sense of sensesByTitle.get(word) ?? []) {
-		const text = describeSense(word, sense.text, sensesByTitle);
+		const raw = stripReferences(sense.text).replace(SENSE_NUMBER, "");
+		const feminineOf = raw.trim().match(FEMININE_FORM);
+		const masculine = (feminineOf?.[1] ?? feminineOf?.[2])?.trim();
+		const text = masculine
+			? describeFeminineForm(masculine, sense.partOfSpeech, sensesByTitle)
+			: describeSense(word, raw, sensesByTitle);
 		if (!text) continue;
-		senses.push(sense.partOfSpeech ? `(${sense.partOfSpeech}) ${text}` : text);
-		if (senses.length === MAX_SENSES) break;
+		senses.push({
+			rank: masculine
+				? "feminine"
+				: LABELLED_SENSE.test(raw)
+					? "labelled"
+					: "own",
+			text: sense.partOfSpeech ? `(${sense.partOfSpeech}) ${text}` : text,
+		});
 	}
-	return senses;
+	return orderFeminineSenses(senses)
+		.slice(0, MAX_SENSES)
+		.map((sense) => sense.text);
+}
+
+// Viccionari's order is kept, with one exception: a page that opens with
+// "femení de" (hamburguesa: femení de hamburguès) leads with its first
+// unlabelled sense of its own (the burger) instead. Pages with only labelled
+// senses beside the feminine (catalana: a Valencian porró, vídua: a fish)
+// keep the masculine's meaning first.
+function orderFeminineSenses(senses: RankedSense[]): RankedSense[] {
+	const leadIndex = senses.findIndex((sense) => sense.rank === "own");
+	if (senses[0]?.rank !== "feminine" || leadIndex === -1) {
+		return senses;
+	}
+	return [
+		senses[leadIndex],
+		...senses.filter((_, index) => index !== leadIndex),
+	];
 }
 
 // A sense that only names a synonym (balcar → [[embogar]]) can mislead the
@@ -154,10 +189,9 @@ function buildSenses(
 // when the synonym has none.
 function describeSense(
 	word: string,
-	rawSense: string,
+	raw: string,
 	sensesByTitle: Map<string, RawSense[]>,
 ): string | null {
-	const raw = stripReferences(rawSense).replace(SENSE_NUMBER, "");
 	if (NON_DEFINITION_TEMPLATE.test(raw)) {
 		return null;
 	}
@@ -179,6 +213,31 @@ function describeSense(
 		return null;
 	}
 	return `${cleanWikitext(raw)}: ${cleanWikitext(targetDefinition)}`;
+}
+
+// "femení de vidu" becomes the meaning of vidu, in the same part of speech
+// when it has one.
+function describeFeminineForm(
+	masculine: string,
+	partOfSpeech: string,
+	sensesByTitle: Map<string, RawSense[]>,
+): string | null {
+	const candidates = (sensesByTitle.get(masculine) ?? [])
+		.map((sense) => ({
+			partOfSpeech: sense.partOfSpeech,
+			text: stripReferences(sense.text).replace(SENSE_NUMBER, ""),
+		}))
+		.filter(
+			({ text }) =>
+				!NON_DEFINITION_TEMPLATE.test(text) && findSynonymTarget(text) === null,
+		);
+	const definition =
+		candidates.find((sense) => sense.partOfSpeech === partOfSpeech) ??
+		candidates[0];
+	if (!definition) {
+		return null;
+	}
+	return `femení de ${masculine}: ${cleanWikitext(definition.text)}`;
 }
 
 function findSynonymTarget(raw: string): string | null {

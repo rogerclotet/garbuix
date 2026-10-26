@@ -854,6 +854,35 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			}
 		});
 
+		it("counts Quadrat extras from the current dictionary on boards saved with an older one", async () => {
+			const fixture = await createFixture();
+			const quadrat = await ensureQuadratPuzzle("2026-03-12");
+			try {
+				const puzzle = quadrat.publicSnapshotJson;
+				const [extra] = puzzle.validNormalizedGuesses;
+				if (!extra) throw new Error("Missing test extra");
+				await db
+					.update(quadratPuzzles)
+					.set({
+						publicSnapshotJson: { ...puzzle, validNormalizedGuesses: [] },
+					})
+					.where(eq(quadratPuzzles.id, quadrat.id));
+
+				const saved = await saveQuadratProgress(fixture.id, {
+					...createEmptyProgressState({
+						id: puzzle.id,
+						initialShuffledLetters: [],
+					}),
+					guessHashes: [await createGuessHash(puzzle.id, extra)],
+				});
+				expect(saved.bonusWordsFound).toBe(1);
+			} finally {
+				await db
+					.delete(quadratPuzzles)
+					.where(eq(quadratPuzzles.id, quadrat.id));
+			}
+		});
+
 		it("merges Quadrat across devices, holds clues to three and freezes completed games", async () => {
 			const fixture = await createFixture();
 			const [quadrat, sameQuadrat] = await Promise.all([

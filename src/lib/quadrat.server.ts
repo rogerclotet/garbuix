@@ -42,11 +42,39 @@ import { recordSyncedProgressUsage } from "@/lib/usage-stats.server";
 export type QuadratPuzzleRow = typeof quadratPuzzles.$inferSelect;
 
 let normalizedGuessWords: string[] | null = null;
+const validGuessesByPuzzle = new Map<string, string[]>();
 const clueGenerationsInProgress = new Set<string>();
 
 function getNormalizedGuessWords(): string[] {
 	normalizedGuessWords ??= buildNormalizedDictionary(guessWords);
 	return normalizedGuessWords;
+}
+
+// A board keeps the valid guesses of the dictionary it was generated with.
+// Serving the current dictionary's instead lets every board accept words added
+// since, as the classic game does.
+function getCurrentValidGuesses(row: QuadratPuzzleRow): string[] {
+	const cached = validGuessesByPuzzle.get(row.id);
+	if (cached) return cached;
+	const guesses = findQuadratValidGuesses({
+		letters: row.publicSnapshotJson.letters,
+		connections: row.publicSnapshotJson.connections,
+		normalizedWords: getNormalizedGuessWords(),
+		targetWords: row.privateSnapshotJson.words.map(
+			(word) => word.normalizedWord,
+		),
+	});
+	validGuessesByPuzzle.set(row.id, guesses);
+	return guesses;
+}
+
+export function toQuadratPublicPuzzle(
+	row: QuadratPuzzleRow,
+): QuadratPuzzlePublic {
+	return {
+		...row.publicSnapshotJson,
+		validNormalizedGuesses: getCurrentValidGuesses(row),
+	};
 }
 
 async function findQuadratPuzzle(
@@ -282,7 +310,7 @@ export async function saveQuadratProgress(
 	if (!row || row.dateKey > getTodayDateKey()) {
 		throw new Error(`Quadrat puzzle ${incoming.puzzleId} not found`);
 	}
-	const puzzle = row.publicSnapshotJson;
+	const puzzle = toQuadratPublicPuzzle(row);
 	// Validate claims at the storage boundary, using the persisted answers.
 	const tokens: Record<string, string> = {};
 	const guessedWordIds: number[] = [];
