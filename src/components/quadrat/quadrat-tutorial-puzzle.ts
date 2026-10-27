@@ -135,15 +135,11 @@ export function releaseTutorialPath(
 				: "Sense aixecar el dit, arrossega'l d'una lletra a la següent.",
 		);
 
-	// A drag shorter than a word is not a guess either, as on the daily board.
-	const isPartOfTarget = startsWith(target.path, path);
+	// A drag shorter than a word is dropped silently, as on the daily board.
 	if (path.length < QUADRAT_MIN_WORD_LENGTH)
-		return withMessage(
-			isPartOfTarget
-				? keepGoing
-				: `Les paraules tenen com a mínim ${QUADRAT_MIN_WORD_LENGTH} lletres. ${hint}`,
-		);
+		return { state, feedback: null, foundPath: null };
 
+	const isPartOfTarget = startsWith(target.path, path);
 	const word = getWordFromPath(TUTORIAL_LETTERS, path);
 	const shown = formatGuess(word);
 
