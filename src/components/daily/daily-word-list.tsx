@@ -153,7 +153,8 @@ export function DailyWordList({
 			(record) => record.wordId === wordId,
 		);
 		if (openRequests.length === 0 && helpedForWord.length === 0) return null;
-		const givenHints = collectGivenHints(helpGivenRecords, wordId);
+		const clueText = foundClueTextsByWordId[wordId] ?? null;
+		const givenHints = collectGivenHints(helpGivenRecords, wordId, clueText);
 
 		return (
 			<div className="mt-1 flex min-w-0 flex-col pl-7">
@@ -180,7 +181,7 @@ export function DailyWordList({
 					>
 						<ClueResponder
 							request={request}
-							clueText={foundClueTextsByWordId[wordId] ?? null}
+							clueText={clueText}
 							givenHints={givenHints}
 							onRespond={respondAndRecord}
 							onDone={() => setActiveRequestId(null)}

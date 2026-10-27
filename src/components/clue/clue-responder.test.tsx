@@ -108,6 +108,18 @@ describe("collectGivenHints", () => {
 		);
 		expect(hints).toEqual([]);
 	});
+
+	it("leaves out the word's own clue sent by copying it", () => {
+		const hints = collectGivenHints(
+			[
+				helped("Anna", "2026-10-24T09:00:00.000Z", { text: CLUE }),
+				helped("Pau", "2026-10-24T09:30:00.000Z"),
+			],
+			3,
+			CLUE,
+		);
+		expect(hints.map((hint) => hint.text)).toEqual(["Hi puja un genet"]);
+	});
 });
 
 describe("ClueResponder", () => {

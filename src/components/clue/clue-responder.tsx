@@ -32,15 +32,19 @@ const nameList = new Intl.ListFormat("ca", {
 
 // The player's help records for one word as reusable hints, newest first. The
 // same text sent to several askers is one hint. Records written before hints
-// were kept have no text and are left out.
+// were kept have no text and are left out, and so is the word's own clue sent
+// back through "Copia la pista", which already has its own chip.
 export function collectGivenHints(
 	records: ClueHelpGiven[],
 	wordId: number,
+	clueText: string | null = null,
 ): GivenHint[] {
+	const clueKey = clueText?.trim().toLocaleLowerCase("ca");
 	const byText = new Map<string, GivenHint>();
 	for (const record of records) {
 		if (record.wordId !== wordId || !record.text) continue;
-		const key = record.text.toLocaleLowerCase("ca");
+		const key = record.text.trim().toLocaleLowerCase("ca");
+		if (key === clueKey) continue;
 		const existing = byText.get(key);
 		if (!existing) {
 			byText.set(key, {
