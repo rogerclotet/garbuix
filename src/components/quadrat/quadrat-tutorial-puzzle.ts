@@ -135,20 +135,17 @@ export function releaseTutorialPath(
 				: "Sense aixecar el dit, arrossega'l d'una lletra a la següent.",
 		);
 
-	const word = getWordFromPath(TUTORIAL_LETTERS, path);
-	const shown = formatGuess(word);
+	// A drag shorter than a word is not a guess either, as on the daily board.
 	const isPartOfTarget = startsWith(target.path, path);
 	if (path.length < QUADRAT_MIN_WORD_LENGTH)
-		return {
-			state: {
-				...state,
-				message: isPartOfTarget
-					? keepGoing
-					: `Les paraules tenen com a mínim ${QUADRAT_MIN_WORD_LENGTH} lletres. ${hint}`,
-			},
-			feedback: { word: shown, kind: "invalid_input" },
-			foundPath: null,
-		};
+		return withMessage(
+			isPartOfTarget
+				? keepGoing
+				: `Les paraules tenen com a mínim ${QUADRAT_MIN_WORD_LENGTH} lletres. ${hint}`,
+		);
+
+	const word = getWordFromPath(TUTORIAL_LETTERS, path);
+	const shown = formatGuess(word);
 
 	// Past the minimum length every drag counts as an attempt, as on the
 	// daily board.

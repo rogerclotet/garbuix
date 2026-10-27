@@ -143,14 +143,10 @@ function QuadratGame({
 	const handleRelease = useCallback(
 		async (released: number[]) => {
 			setPath([]);
-			// A tap on a single letter is not a guess.
-			if (released.length < 2) return;
-			const word = getWordFromPath(puzzle.letters, released);
-			if (released.length < QUADRAT_MIN_WORD_LENGTH) {
-				showSubmitFeedback(formatGuess(word), "invalid_input");
-				return;
-			}
+			// A drag shorter than a word, a tap included, is not a guess.
+			if (released.length < QUADRAT_MIN_WORD_LENGTH) return;
 			if (!interactive || submitting.current) return;
+			const word = getWordFromPath(puzzle.letters, released);
 			submitting.current = true;
 			setBusy(true);
 			try {
