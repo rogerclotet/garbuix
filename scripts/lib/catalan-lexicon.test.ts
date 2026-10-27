@@ -47,6 +47,8 @@ km quilòmetre Y
 Pau Pau NPMSSP0
 Barcelona Barcelona NPFSG00
 abans-d'ahir abans-d'ahir RG
+col·laboració col·laboració NCFS000
+internacional internacional AQ0CS0
 `;
 
 const LEMMA_FREQUENCIES = `
@@ -67,6 +69,8 @@ ràpid, 9000
 ràpidament, 11183
 sempre, 120000
 hola, 5140
+col·laboració, 5389
+internacional, 15273
 `;
 
 const FORM_FREQUENCIES = `
@@ -152,6 +156,11 @@ describe("buildCatalanLexicon", () => {
 		}
 	});
 
+	it("counts the letters in the grid toward the length limit", () => {
+		expect(find("col·laboració")).toBeDefined();
+		expect(find("internacional")).toBeUndefined();
+	});
+
 	it("keeps generation to open-class headwords and their feminine singulars", () => {
 		const candidates = lexicon
 			.filter(isGenerationCandidate)
@@ -161,6 +170,7 @@ describe("buildCatalanLexicon", () => {
 			"casa",
 			"catalana",
 			"català",
+			"col·laboració",
 			"menjar",
 			"noia",
 			"ordre",
