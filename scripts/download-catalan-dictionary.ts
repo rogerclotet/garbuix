@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Word } from "@/data/types";
 import type { WordDefinitions } from "@/lib/word-definitions";
 import {
+	countLetters,
 	fetchCatalanLexicon,
 	GENERATION_MIN_FREQUENCY,
 	GUESS_MIN_FREQUENCY,
@@ -51,7 +52,7 @@ async function main() {
 		.map(toWord);
 	// Guesses only need the word names; metadata stays in the generation file.
 	const guessWordNames = entries
-		.filter((word) => word.name.length >= MIN_LENGTH)
+		.filter((word) => countLetters(word.name) >= MIN_LENGTH)
 		.map((word) => word.name);
 
 	mkdirSync(DATA_DIR, { recursive: true });

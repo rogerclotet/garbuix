@@ -1,4 +1,5 @@
 import type { Word } from "@/data/types";
+import { getPlayableWordLetters } from "@/lib/puzzle-text";
 
 export const MIN_LENGTH = 4;
 export const MAX_LENGTH = 12;
@@ -13,7 +14,7 @@ export const GUESS_MIN_FREQUENCY = 1;
 const SOURCE_COMMIT = "1c95123b972b264957d299ef206689bfaa6b98ce";
 // Bump when the rules below change what counts as a word, so builds that keep
 // generated files (--if-missing) rebuild them.
-const POLICY_VERSION = 4;
+const POLICY_VERSION = 5;
 export const LEXICON_VERSION = `${SOURCE_COMMIT}:${POLICY_VERSION}`;
 
 const SOURCE_BASE_URL = `https://raw.githubusercontent.com/Softcatala/catalan-dict-tools/${SOURCE_COMMIT}`;
@@ -138,9 +139,14 @@ export function buildCatalanLexicon(sources: LexiconSources): LexiconWord[] {
 export function isGenerationCandidate(word: LexiconWord): boolean {
 	return (
 		word.generationEligible &&
-		word.name.length >= MIN_LENGTH &&
+		countLetters(word.name) >= MIN_LENGTH &&
 		word.frequency >= GENERATION_MIN_FREQUENCY
 	);
+}
+
+// Grid cells, so the middle dot in l·l does not count toward the length limits.
+export function countLetters(word: string): number {
+	return getPlayableWordLetters(word).length;
 }
 
 export function toWord({ name, areatematica, frequency }: LexiconWord): Word {
@@ -246,7 +252,7 @@ function isFeminineSingularTag(tag: string): boolean {
 
 function isValidWord(word: string): boolean {
 	return (
-		word.length <= MAX_LENGTH &&
+		countLetters(word) <= MAX_LENGTH &&
 		word === word.toLocaleLowerCase("ca") &&
 		VALID_WORD_REGEX.test(word)
 	);

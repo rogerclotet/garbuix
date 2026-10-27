@@ -1,5 +1,5 @@
 import type { Configuration } from "lint-staged";
 
 export default {
-	"*.{js,jsx,mjs,ts,tsx,json,html,css}": "biome check --write",
+	"*.{js,jsx,mjs,ts,tsx,json,html,css}": "biome check --write --no-errors-on-unmatched",
 } satisfies Configuration;
