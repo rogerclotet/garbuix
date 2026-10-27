@@ -181,6 +181,15 @@ describe("Garbuix quadrat tutorial", () => {
 		expect(stepTitle()).toBe("Arrossega per formar PORTA");
 	});
 
+	it("drops a drag shorter than a word silently", () => {
+		const release = releaseTutorialPath(
+			INITIAL_QUADRAT_TUTORIAL_STATE,
+			TUTORIAL_GUIDED_WORD.path.slice(0, 3),
+		);
+		expect(release.feedback).toBeNull();
+		expect(release.state).toBe(INITIAL_QUADRAT_TUTORIAL_STATE);
+	});
+
 	it("asks for PORTA before TAULA", () => {
 		const release = releaseTutorialPath(
 			INITIAL_QUADRAT_TUTORIAL_STATE,

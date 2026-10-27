@@ -191,6 +191,21 @@ it("finds a word by dragging, lowers its letters' counts and saves it", async ()
 	]);
 });
 
+it("cancels a drag shorter than a word without counting it", async () => {
+	const { container } = renderQuadrat();
+	const board = await screen.findByRole("group", { name: /Tauler de lletres/ });
+	const [word] = privateSnapshot.words;
+	if (!word) throw new Error("Fixture has no words");
+
+	drag(board, word.path.slice(0, 3));
+
+	expect(container.querySelector('[data-slot="submit-feedback"]')).toBeNull();
+	expect(
+		container.querySelector('[data-slot="current-guess"]')?.textContent,
+	).toBe("");
+	expect(readQuadratSaves(null)[puzzle.dateKey]).toBeUndefined();
+});
+
 it("keeps a drag on drawn connections and away from visited letters", async () => {
 	const { container } = renderQuadrat();
 	const board = await screen.findByRole("group", { name: /Tauler de lletres/ });
