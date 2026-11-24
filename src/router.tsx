@@ -24,6 +24,8 @@ export const getRouter = () => {
 
 		defaultErrorComponent: RouterErrorComponent,
 		defaultPreload: "intent",
+		scrollRestoration: true,
+		scrollToTopSelectors: ['[data-scroll-restoration-id="main"]'],
 	});
 
 	if (typeof window !== "undefined") rememberRenderedLoaderData(router);

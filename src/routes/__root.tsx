@@ -135,7 +135,10 @@ function RootDocument() {
 										    visually hidden input far down a long page stretches
 										    the page past the viewport and lets the browser scroll
 										    the whole shell, header included, out of view. */}
-									<main className="relative flex-1 min-h-0 overflow-y-auto">
+									<main
+										className="relative flex-1 min-h-0 overflow-y-auto"
+										data-scroll-restoration-id="main"
+									>
 										<Outlet />
 									</main>
 								</div>
