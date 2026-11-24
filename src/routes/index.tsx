@@ -1,4 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	useElementScrollRestoration,
+} from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Daily } from "@/components/daily/daily";
 import type { DailyData } from "@/components/daily/daily-types";
@@ -31,6 +34,18 @@ function IndexPage() {
 }
 
 function ReadyDailyPage({ initialData }: { initialData: DailyData }) {
+	const scrollEntry = useElementScrollRestoration({ id: "main" });
+	const initialScrollY = useRef(scrollEntry?.scrollY);
+	const restoreScrollOnReady = useCallback((content: HTMLDivElement | null) => {
+		const main = content?.closest("main");
+		if (!main) return;
+
+		// Saved progress can keep the board behind a loading state until
+		// after the router has tried to restore the scroll position.
+		const scrollY = initialScrollY.current;
+		initialScrollY.current = undefined;
+		if (scrollY && main.scrollTop === 0) main.scrollTop = scrollY;
+	}, []);
 	const sourceRef = useRef<DailyData | null>(initialData);
 	useIsomorphicLayoutEffect(() => {
 		sourceRef.current = initialData;
@@ -52,7 +67,11 @@ function ReadyDailyPage({ initialData }: { initialData: DailyData }) {
 			setReplacement({ source: initialData, data: next });
 	}, [initialData]);
 	const expired = useDailyRollover(data.rolloverAt, refresh);
-	return expired ? <PuzzleLoadingPage /> : <Daily initialData={data} />;
+	return expired ? (
+		<PuzzleLoadingPage />
+	) : (
+		<Daily initialData={data} contentRef={restoreScrollOnReady} />
+	);
 }
 
 function PuzzleGeneratingPage() {

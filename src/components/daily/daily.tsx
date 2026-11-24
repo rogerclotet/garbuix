@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 import { useMemo, useState } from "react";
 import { PuzzleConfetti } from "@/components/puzzle/puzzle-confetti";
 import {
@@ -38,11 +38,16 @@ import { WelcomeDialog } from "./welcome-dialog";
 import { WinDialog } from "./win-dialog";
 import { WordRulesAnnouncementDialog } from "./word-rules-announcement-dialog";
 
-export function Daily({ initialData }: { initialData: DailyData }) {
-	return <DailySession key={initialData.puzzle.id} initialData={initialData} />;
+type DailyProps = {
+	initialData: DailyData;
+	contentRef?: Ref<HTMLDivElement>;
+};
+
+export function Daily(props: DailyProps) {
+	return <DailySession key={props.initialData.puzzle.id} {...props} />;
 }
 
-function DailySession({ initialData }: { initialData: DailyData }) {
+function DailySession({ initialData, contentRef }: DailyProps) {
 	const { activeUser, sessionConfirmed, session } = useActiveSessionUser(
 		initialData.sessionUser,
 	);
@@ -57,6 +62,7 @@ function DailySession({ initialData }: { initialData: DailyData }) {
 		<DailyGame
 			key={activeUser?.id ?? "anonymous"}
 			initialData={initialData}
+			contentRef={contentRef}
 			activeUser={activeUser}
 			progressState={progressState}
 			sessionPending={session.isPending}
@@ -66,11 +72,11 @@ function DailySession({ initialData }: { initialData: DailyData }) {
 
 function DailyGame({
 	initialData,
+	contentRef,
 	activeUser,
 	progressState,
 	sessionPending,
-}: {
-	initialData: DailyData;
+}: DailyProps & {
 	activeUser: DailySessionUser;
 	progressState: ReturnType<typeof useDailyProgress>;
 	sessionPending: boolean;
@@ -264,6 +270,7 @@ function DailyGame({
 			<PuzzleConfetti fire={shouldFireConfetti} />
 			<PuzzleFlyingLetters {...flyingLettersProps} />
 			<div
+				ref={contentRef}
 				// h-full, not min-h-full: the word list below the fold overflows this
 				// box on purpose, so the board above it can be sized against the room
 				// the viewport really has.
