@@ -66,20 +66,17 @@ export function TriesHistogram({
 }: TriesHistogramProps) {
 	const { buckets, totalFinishers, totalInProgress, maxCount, highlightIndex } =
 		buildTriesHistogram(entries, { highlightTries, selfParticipantId });
+	const totalPlayers = totalFinishers + totalInProgress;
 
 	// Nothing to show before anybody has played. A local player who has just
 	// finished is always counted, so this only holds on an empty leaderboard.
-	if (totalFinishers + totalInProgress === 0) {
+	if (totalPlayers === 0) {
 		return null;
 	}
 
 	const summary = buckets.filter(hasPlayers).map(describeBucket).join("; ");
-	const counts = [
-		finishersLabel(totalFinishers),
-		totalInProgress > 0 ? playingLabel(totalInProgress) : null,
-	]
-		.filter((part) => part != null)
-		.join(" · ");
+	const players = totalPlayers === 1 ? "1 jugador" : `${totalPlayers} jugadors`;
+	const counts = `${players} · ${finishersLabel(totalFinishers)}`;
 	const showYou = highlightIndex != null && highlightTries != null;
 
 	return (
