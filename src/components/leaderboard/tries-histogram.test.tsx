@@ -35,7 +35,7 @@ describe("TriesHistogram", () => {
 	it("shows players still playing before anybody finishes", () => {
 		render(<TriesHistogram entries={[buildEntry("a", 30, false)]} />);
 
-		expect(screen.getByText("0 han acabat · 1 encara juga")).toBeDefined();
+		expect(screen.getByText("1 jugador · 0 han acabat")).toBeDefined();
 		expect(screen.getByTitle("25-34 intents: 1 encara juga")).toBeDefined();
 		expect(screen.getByText("Encara jugant")).toBeDefined();
 		expect(screen.queryByText("Han acabat")).toBeNull();
@@ -48,6 +48,7 @@ describe("TriesHistogram", () => {
 			/>,
 		);
 
+		expect(screen.getByText("2 jugadors · 1 ha acabat")).toBeDefined();
 		expect(screen.getByText("Han acabat")).toBeDefined();
 		expect(screen.getByText("Encara jugant")).toBeDefined();
 	});
@@ -65,7 +66,7 @@ describe("TriesHistogram", () => {
 			/>,
 		);
 
-		expect(screen.getByText("3 han acabat · 2 encara juguen")).toBeDefined();
+		expect(screen.getByText("5 jugadors · 3 han acabat")).toBeDefined();
 		expect(
 			screen.getByTitle("15-24 intents: 2 han acabat, 1 encara juga"),
 		).toBeDefined();
@@ -83,7 +84,7 @@ describe("TriesHistogram", () => {
 			/>,
 		);
 
-		expect(screen.getByText("2 han acabat")).toBeDefined();
+		expect(screen.getByText("2 jugadors · 2 han acabat")).toBeDefined();
 		expect(screen.getByTitle("25-34 intents: 1 ha acabat")).toBeDefined();
 	});
 
