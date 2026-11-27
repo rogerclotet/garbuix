@@ -11,11 +11,25 @@ const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const iconsDir = path.join(publicDir, "icons");
 const { background, primary } = appScheme.dark;
 
-type IconShape = "squircle" | "square" | "maskable";
+// Apple and Android apply their own launcher masks to full-bleed artwork.
+const squareBackdrop = `<rect width="100" height="100" fill="${background}" />`;
+const iconStyles = {
+	"rounded-square": {
+		backdrop: `<rect width="100" height="100" rx="20" fill="${background}" />`,
+		padding: 11,
+	},
+	squircle: {
+		backdrop: `<path d="M 50 0 C 90 0 100 10 100 50 C 100 90 90 100 50 100 C 10 100 0 90 0 50 C 0 10 10 0 50 0 Z" fill="${background}" />`,
+		padding: 15,
+	},
+	square: { backdrop: squareBackdrop, padding: 15 },
+	// 14.5% brings the outer cells up to the 40%-radius maskable safe zone.
+	maskable: { backdrop: squareBackdrop, padding: 14.5 },
+};
+type IconShape = keyof typeof iconStyles;
 
 function renderIcon(size: number, shape: IconShape) {
-	// 14.5% brings the outer cells up to the 40%-radius maskable safe zone.
-	const padding = shape === "maskable" ? 14.5 : 15;
+	const { backdrop, padding } = iconStyles[shape];
 	const logoSize = 100 - 2 * padding;
 	const logo = renderToStaticMarkup(
 		createElement(Logo, {
@@ -26,12 +40,6 @@ function renderIcon(size: number, shape: IconShape) {
 			fill: primary,
 		}),
 	);
-	// Apple and Android apply their own launcher masks to full-bleed artwork.
-	const backdrop =
-		shape === "squircle"
-			? `<path d="M 50 0 C 90 0 100 10 100 50 C 100 90 90 100 50 100 C 10 100 0 90 0 50 C 0 10 10 0 50 0 Z" fill="${background}" />`
-			: `<rect width="100" height="100" fill="${background}" />`;
-
 	const svg = `<svg width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 		${backdrop}
 		${logo}
@@ -47,7 +55,7 @@ async function generateIcon(filename: string, size: number, shape: IconShape) {
 
 async function generateFaviconIco() {
 	const size = 32;
-	const png = await renderIcon(size, "squircle").toBuffer();
+	const png = await renderIcon(size, "rounded-square").toBuffer();
 
 	// ICO header and directory entry for one PNG-compressed RGBA image.
 	const header = Buffer.alloc(22);
@@ -68,7 +76,7 @@ async function generateFaviconIco() {
 }
 
 async function main() {
-	await generateIcon("favicon-196.png", 196, "squircle");
+	await generateIcon("favicon-196.png", 196, "rounded-square");
 	for (const size of [120, 152, 167, 180]) {
 		await generateIcon(`apple-icon-${size}.png`, size, "square");
 	}
