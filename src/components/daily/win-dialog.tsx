@@ -1,7 +1,10 @@
-import { LogIn } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, LogIn } from "lucide-react";
 import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
+import { Logo, QuadratLogo } from "@/components/logo";
 import {
 	AlertDialog,
+	AlertDialogAction,
 	AlertDialogCancel,
 	AlertDialogContent,
 	AlertDialogDescription,
@@ -26,7 +29,7 @@ type WinDialogProps = {
 
 function Stat({ value, label }: { value: string; label: string }) {
 	return (
-		<div className="bg-muted/50 flex flex-col items-center justify-center rounded-lg border border-border/50 px-2 py-3">
+		<div className="bg-muted/50 flex flex-col items-center justify-center rounded-lg border border-border/50 px-2 py-2">
 			<div className="text-foreground text-xl font-semibold tabular-nums">
 				{value}
 			</div>
@@ -55,7 +58,7 @@ export function WinDialog({
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
+			<AlertDialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-3 overflow-y-auto data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-lg">
 						Felicitats! 🎉
@@ -90,6 +93,39 @@ export function WinDialog({
 					selfParticipantId={localParticipantId}
 				/>
 
+				<nav aria-label="Altres jocs" className="grid grid-cols-2 gap-2">
+					<h3 className="col-span-2 text-sm font-semibold">
+						Et ve de gust un altre repte?
+					</h3>
+					<AlertDialogAction
+						asChild
+						className="col-span-2 min-h-14 justify-start gap-3 px-3 text-left [--primary-foreground:#ffffff] [--primary:var(--game-quadrat)] dark:[--primary-foreground:#0d2a52]"
+					>
+						<Link to="/quadrat">
+							<QuadratLogo className="size-6" aria-hidden />
+							<span className="min-w-0 flex-1 whitespace-normal">
+								<span className="block font-semibold">Garbuix quadrat</span>
+								<span className="block text-xs font-ui">
+									Troba 15 paraules en una graella de 4×4.
+								</span>
+							</span>
+							<ArrowRight className="size-4" aria-hidden />
+						</Link>
+					</AlertDialogAction>
+					<AlertDialogAction asChild variant="outline" className="min-h-10">
+						<Link to="/mini">
+							<Logo className="size-4 text-(--game-mini)" aria-hidden />
+							Mini
+						</Link>
+					</AlertDialogAction>
+					<AlertDialogAction asChild variant="outline" className="min-h-10">
+						<Link to="/sillabes">
+							<Logo className="size-4 text-(--game-syllables)" aria-hidden />
+							Síl·labes
+						</Link>
+					</AlertDialogAction>
+				</nav>
+
 				{isAnonymous ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
 						<p className="text-sm font-medium leading-tight">
@@ -112,7 +148,7 @@ export function WinDialog({
 					</div>
 				) : null}
 
-				<AlertDialogFooter>
+				<AlertDialogFooter className="py-2">
 					<AlertDialogCancel>Tancar</AlertDialogCancel>
 				</AlertDialogFooter>
 			</AlertDialogContent>
