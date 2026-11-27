@@ -23,6 +23,18 @@ export function createEmptyProgressState(
 	};
 }
 
+export function hasPlayedPuzzle(
+	progress: PuzzleProgressState | null | undefined,
+) {
+	return (
+		progress != null &&
+		(progress.guessCount > 0 ||
+			progress.guessedWordIds.length > 0 ||
+			progress.hintsUsed > 0 ||
+			progress.completedAt !== null)
+	);
+}
+
 export function getCompatibleProgress(
 	progress: PuzzleProgressState | null | undefined,
 	puzzle: Pick<DailyPuzzlePublic, "id">,

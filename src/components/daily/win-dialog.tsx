@@ -10,8 +10,9 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { formatMadridTime } from "@/lib/puzzle-dates";
+import { formatMadridTime, getDateKeyForDate } from "@/lib/puzzle-dates";
 import { useLeaderboard } from "@/lib/use-leaderboard";
+import { WinGameRecommendations } from "./win-game-recommendations";
 
 type WinDialogProps = {
 	open: boolean;
@@ -20,13 +21,13 @@ type WinDialogProps = {
 	hintsUsed: number;
 	completedAt: string | null;
 	currentStreak: number;
-	isAnonymous: boolean;
+	userId: string | null;
 	onSignIn: () => void;
 };
 
 function Stat({ value, label }: { value: string; label: string }) {
 	return (
-		<div className="bg-muted/50 flex flex-col items-center justify-center rounded-lg border border-border/50 px-2 py-3">
+		<div className="bg-muted/50 flex flex-col items-center justify-center rounded-lg border border-border/50 px-2 py-2">
 			<div className="text-foreground text-xl font-semibold tabular-nums">
 				{value}
 			</div>
@@ -44,18 +45,20 @@ export function WinDialog({
 	hintsUsed,
 	completedAt,
 	currentStreak,
-	isAnonymous,
+	userId,
 	onSignIn,
 }: WinDialogProps) {
 	// Read here rather than in Daily: the leaderboard stream ticks on every
 	// player's progress, and the board above shouldn't re-render for it.
 	const { entries, localParticipantId } = useLeaderboard();
-	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
+	const completion = completedAt ? new Date(completedAt) : null;
+	const formattedTime = completion ? formatMadridTime(completion) : null;
+	const completionDay = completion ? getDateKeyForDate(completion) : null;
 	const showStreak = currentStreak >= 3;
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent className="data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
+			<AlertDialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] gap-3 overflow-y-auto data-[size=default]:max-w-sm data-[size=default]:sm:max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-lg">
 						Felicitats! 🎉
@@ -90,7 +93,15 @@ export function WinDialog({
 					selfParticipantId={localParticipantId}
 				/>
 
-				{isAnonymous ? (
+				{completionDay ? (
+					<WinGameRecommendations
+						key={`${completionDay}:${userId ?? ""}`}
+						dateKey={completionDay}
+						userId={userId}
+					/>
+				) : null}
+
+				{userId === null ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
 						<p className="text-sm font-medium leading-tight">
 							Guarda la teva ratxa
@@ -112,7 +123,7 @@ export function WinDialog({
 					</div>
 				) : null}
 
-				<AlertDialogFooter>
+				<AlertDialogFooter className="py-2">
 					<AlertDialogCancel>Tancar</AlertDialogCancel>
 				</AlertDialogFooter>
 			</AlertDialogContent>
