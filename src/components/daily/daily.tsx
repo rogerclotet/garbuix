@@ -414,7 +414,7 @@ function DailyGame({
 				hintsUsed={cluesUsed}
 				completedAt={derivedProgress.completedAt}
 				currentStreak={streakStats.currentStreak}
-				isAnonymous={!activeUser}
+				userId={activeUser?.id ?? null}
 				onSignIn={() => {
 					setWinDialogOpen(false);
 					openSignIn();

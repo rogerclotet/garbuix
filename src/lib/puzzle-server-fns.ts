@@ -2,11 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { readAnonDeviceId } from "@/lib/anon-session.server";
+import { getMiniProgress } from "@/lib/mini.server";
 import { getTodayDateKey, isPlayableDateKey } from "@/lib/puzzle-dates";
 import {
 	anonymousImportPayloadSchema,
 	puzzleClientEventsSchema,
 } from "@/lib/puzzle-event-schemas";
+import { hasPlayedPuzzle } from "@/lib/puzzle-progress";
 import {
 	checkDailyPuzzleExists,
 	getAuthSession,
@@ -22,7 +24,10 @@ import {
 	updateUserProfileData,
 } from "@/lib/puzzle-service.server";
 import { HISTORY_PAGE_SIZE, type HistoryEntriesPage } from "@/lib/puzzle-types";
+import { getQuadratProgress } from "@/lib/quadrat.server";
+import { quadratPuzzleId } from "@/lib/quadrat-local";
 import { consumeRateLimit, getClientAddress } from "@/lib/rate-limit.server";
+import { getSyllableProgress } from "@/lib/syllable.server";
 import type { WordCluesResult } from "@/lib/word-clues";
 
 // Every date key that reaches a server function comes from the client, so it is
@@ -112,6 +117,28 @@ export const getUserPuzzleProgress = createServerFn({ method: "POST" })
 		}
 
 		return getUserPuzzleProgressData(data.puzzleId, session.user.id);
+	});
+
+export const getPlayedOtherGames = createServerFn({ method: "POST" })
+	.validator(z.object({ dateKey: z.string().refine(isPlayableDateKey) }))
+	.handler(async ({ data: { dateKey } }) => {
+		const session = await getAuthSession();
+		if (!session) return null;
+
+		const userId = session.user.id;
+		const [quadrat, mini, syllables] = await Promise.all([
+			getQuadratProgress(userId, quadratPuzzleId(dateKey)),
+			getMiniProgress(userId, `mini:${dateKey}`),
+			getSyllableProgress(userId, `syllable:${dateKey}`),
+		]);
+		return {
+			userId,
+			played: {
+				quadrat: hasPlayedPuzzle(quadrat),
+				mini: hasPlayedPuzzle(mini),
+				syllables: hasPlayedPuzzle(syllables),
+			},
+		};
 	});
 
 export const syncUserPuzzleEvents = createServerFn({ method: "POST" })

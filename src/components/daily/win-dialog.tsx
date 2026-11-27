@@ -1,10 +1,7 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowRight, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { TriesHistogram } from "@/components/leaderboard/tries-histogram";
-import { Logo, QuadratLogo } from "@/components/logo";
 import {
 	AlertDialog,
-	AlertDialogAction,
 	AlertDialogCancel,
 	AlertDialogContent,
 	AlertDialogDescription,
@@ -13,8 +10,9 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { formatMadridTime } from "@/lib/puzzle-dates";
+import { formatMadridTime, getDateKeyForDate } from "@/lib/puzzle-dates";
 import { useLeaderboard } from "@/lib/use-leaderboard";
+import { WinGameRecommendations } from "./win-game-recommendations";
 
 type WinDialogProps = {
 	open: boolean;
@@ -23,7 +21,7 @@ type WinDialogProps = {
 	hintsUsed: number;
 	completedAt: string | null;
 	currentStreak: number;
-	isAnonymous: boolean;
+	userId: string | null;
 	onSignIn: () => void;
 };
 
@@ -47,13 +45,15 @@ export function WinDialog({
 	hintsUsed,
 	completedAt,
 	currentStreak,
-	isAnonymous,
+	userId,
 	onSignIn,
 }: WinDialogProps) {
 	// Read here rather than in Daily: the leaderboard stream ticks on every
 	// player's progress, and the board above shouldn't re-render for it.
 	const { entries, localParticipantId } = useLeaderboard();
-	const formattedTime = completedAt ? formatMadridTime(completedAt) : null;
+	const completion = completedAt ? new Date(completedAt) : null;
+	const formattedTime = completion ? formatMadridTime(completion) : null;
+	const completionDay = completion ? getDateKeyForDate(completion) : null;
 	const showStreak = currentStreak >= 3;
 
 	return (
@@ -93,40 +93,15 @@ export function WinDialog({
 					selfParticipantId={localParticipantId}
 				/>
 
-				<nav aria-label="Altres jocs" className="grid grid-cols-2 gap-2">
-					<h3 className="col-span-2 text-sm font-semibold">
-						Et ve de gust un altre repte?
-					</h3>
-					<AlertDialogAction
-						asChild
-						className="col-span-2 min-h-14 justify-start gap-3 px-3 text-left [--primary-foreground:#ffffff] [--primary:var(--game-quadrat)] dark:[--primary-foreground:#0d2a52]"
-					>
-						<Link to="/quadrat">
-							<QuadratLogo className="size-6" aria-hidden />
-							<span className="min-w-0 flex-1 whitespace-normal">
-								<span className="block font-semibold">Garbuix quadrat</span>
-								<span className="block text-xs font-ui">
-									Troba 15 paraules en una graella de 4×4.
-								</span>
-							</span>
-							<ArrowRight className="size-4" aria-hidden />
-						</Link>
-					</AlertDialogAction>
-					<AlertDialogAction asChild variant="outline" className="min-h-10">
-						<Link to="/mini">
-							<Logo className="size-4 text-(--game-mini)" aria-hidden />
-							Mini
-						</Link>
-					</AlertDialogAction>
-					<AlertDialogAction asChild variant="outline" className="min-h-10">
-						<Link to="/sillabes">
-							<Logo className="size-4 text-(--game-syllables)" aria-hidden />
-							Síl·labes
-						</Link>
-					</AlertDialogAction>
-				</nav>
+				{completionDay ? (
+					<WinGameRecommendations
+						key={`${completionDay}:${userId ?? ""}`}
+						dateKey={completionDay}
+						userId={userId}
+					/>
+				) : null}
 
-				{isAnonymous ? (
+				{userId === null ? (
 					<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
 						<p className="text-sm font-medium leading-tight">
 							Guarda la teva ratxa
