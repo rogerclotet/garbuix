@@ -164,6 +164,58 @@ code {
 	}
 }
 
+@keyframes puzzle-loading-wave {
+	0%,
+	45%,
+	100% {
+		opacity: 0.5;
+		scale: 0.92;
+	}
+
+	16%,
+	24% {
+		opacity: 1;
+		scale: 1;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.puzzle-loading-logo path {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: puzzle-loading-wave 2.2s ease-in-out infinite;
+		animation-delay: calc(-2.2s + var(--tile-delay, 0ms));
+	}
+
+	.puzzle-loading-logo path:nth-child(2) {
+		--tile-delay: 75ms;
+	}
+	.puzzle-loading-logo path:nth-child(3) {
+		--tile-delay: 150ms;
+	}
+	.puzzle-loading-logo path:nth-child(4) {
+		--tile-delay: 225ms;
+	}
+	.puzzle-loading-logo path:nth-child(5) {
+		--tile-delay: 300ms;
+	}
+	.puzzle-loading-logo path:nth-child(6) {
+		--tile-delay: 375ms;
+	}
+	.puzzle-loading-logo path:nth-child(7) {
+		--tile-delay: 450ms;
+	}
+	.puzzle-loading-logo path:nth-child(8) {
+		--tile-delay: 525ms;
+	}
+	.puzzle-loading-logo path:nth-child(9) {
+		--tile-delay: 600ms;
+	}
+	.puzzle-loading-logo path:nth-child(10) {
+		--tile-delay: 675ms;
+	}
+}
+
 @keyframes grid-word-just-guessed-cell-flash {
 	0% {
 		transform: scale(0.96);
