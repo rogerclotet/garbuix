@@ -16,7 +16,9 @@ const PRECACHE_URLS = [
 	"/manifest.json",
 	"/icons/favicon-196.png",
 	"/icons/apple-icon-180.png",
+	"/icons/manifest-icon-192.png",
 	"/icons/manifest-icon-192.maskable.png",
+	"/icons/manifest-icon-512.png",
 	"/icons/manifest-icon-512.maskable.png",
 ];
 
