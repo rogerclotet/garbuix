@@ -69,7 +69,9 @@ async function generateFaviconIco() {
 
 async function main() {
 	await generateIcon("favicon-196.png", 196, "squircle");
-	await generateIcon("apple-icon-180.png", 180, "square");
+	for (const size of [120, 152, 167, 180]) {
+		await generateIcon(`apple-icon-${size}.png`, size, "square");
+	}
 	for (const size of [192, 512]) {
 		await generateIcon(`manifest-icon-${size}.png`, size, "squircle");
 		await generateIcon(`manifest-icon-${size}.maskable.png`, size, "maskable");
